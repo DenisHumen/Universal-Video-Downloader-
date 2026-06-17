@@ -1,0 +1,4 @@
+provider: github
+owner: DenisHumen
+repo: Universal-Video-Downloader-
+updaterCacheDirName: universal-video-downloader-updater

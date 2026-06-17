@@ -1,0 +1,87 @@
+appId: com.denishumen.universalvideodownloader
+productName: Universal Video Downloader
+copyright: Copyright © 2026 Denis Humen
+directories:
+  buildResources: build
+  output: release/${version}
+
+files:
+  - '!**/.vscode/*'
+  - '!src/*'
+  - '!scripts/*'
+  - '!assets/*'
+  - '!electron.vite.config.{js,ts,mjs,cjs}'
+  - '!{.eslintignore,.eslintrc.cjs,.prettierignore,.prettierrc.yaml,dev-app-update.yml,CHANGELOG.md,README.md}'
+  - '!{.env,.env.*,.npmrc,pnpm-lock.yaml,package-lock.json}'
+  - '!{tsconfig.json,tsconfig.node.json,tsconfig.web.json,tailwind.config.js,postcss.config.js}'
+
+# ffmpeg-static ships a per-platform binary that must stay executable on disk.
+asarUnpack:
+  - resources/**
+  - '**/node_modules/ffmpeg-static/**'
+
+win:
+  executableName: Universal Video Downloader
+  artifactName: ${productName}-${version}-windows-${arch}-setup.${ext}
+  target:
+    - target: nsis
+      arch:
+        - x64
+
+nsis:
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+  deleteAppDataOnUninstall: false
+  createDesktopShortcut: always
+  shortcutName: Universal Video Downloader
+
+mac:
+  category: public.app-category.utilities
+  artifactName: ${productName}-${version}-mac-${arch}.${ext}
+  entitlementsInherit: build/entitlements.mac.plist
+  hardenedRuntime: true
+  gatekeeperAssess: false
+  notarize: false
+  target:
+    - target: dmg
+      arch:
+        - arm64
+        - x64
+    - target: zip
+      arch:
+        - arm64
+        - x64
+  extendInfo:
+    NSCameraUsageDescription: This app does not use the camera.
+    NSMicrophoneUsageDescription: This app does not use the microphone.
+
+dmg:
+  artifactName: ${productName}-${version}-mac-${arch}.${ext}
+
+linux:
+  artifactName: ${productName}-${version}-linux-${arch}.${ext}
+  category: AudioVideo
+  maintainer: Denis Humen <dberkut18@gmail.com>
+  synopsis: Universal video downloader with automatic stream detection
+  description: A beautiful cross-platform desktop app that detects and downloads video streams from almost any website.
+  desktop:
+    entry:
+      Name: Universal Video Downloader
+      Categories: AudioVideo;Network;Utility;
+  target:
+    - target: AppImage
+      arch:
+        - x64
+    - target: deb
+      arch:
+        - x64
+    - target: rpm
+      arch:
+        - x64
+
+publish:
+  provider: github
+  owner: DenisHumen
+  repo: Universal-Video-Downloader-
+  releaseType: release
