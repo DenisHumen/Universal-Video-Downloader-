@@ -9,6 +9,9 @@ import HomeView from './views/HomeView'
 import DownloadsView from './views/DownloadsView'
 import SettingsView from './views/SettingsView'
 import Logo from './components/Logo'
+import MacNotice from './components/MacNotice'
+import Toasts from './components/Toasts'
+import { useShortcuts } from './hooks/useShortcuts'
 
 export default function App(): JSX.Element {
   const ready = useStore((s) => s.ready)
@@ -19,16 +22,20 @@ export default function App(): JSX.Element {
     void init()
   }, [init])
 
+  useShortcuts()
+
   return (
     <>
       <AuroraBackground />
       <TitleBar />
+      <Toasts />
 
       <div className="relative flex min-h-0 flex-1 gap-0 px-3 pb-3">
         <Sidebar />
-        <main className="relative min-w-0 flex-1">
+        <main className="relative flex min-w-0 flex-1 flex-col gap-2.5">
           <UpdateBanner />
-          <div className="panel h-full overflow-hidden shadow-panel">
+          <MacNotice />
+          <div className="panel min-h-0 flex-1 overflow-hidden shadow-panel">
             <AnimatePresence mode="wait">
               {!ready ? (
                 <motion.div

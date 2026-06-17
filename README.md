@@ -20,6 +20,9 @@ Powered by [yt-dlp](https://github.com/yt-dlp/yt-dlp) and ffmpeg, wrapped in a m
 
 - **Universal detection** — automatically discovers the video/audio stream behind a link. 1800+ sites supported via yt-dlp, plus a generic extractor for everything else.
 - **Restricted sites** — age-verification, login-only and members-only videos (including adult sites) work by reading cookies from your browser: **Settings → Access & cookies → Use cookies from browser**.
+- **Custom site resolvers** — sites the engine doesn't know natively are supported through small pluggable resolvers (`src/main/services/resolvers.ts`) that scrape the page for the real stream and required headers. Listing/model pages are detected and offered as a one-click "download all" playlist.
+- **Playlists** — model/listing pages expand into a pickable list with per-item or bulk download.
+- **Convenience** — desktop notifications on completion, taskbar/dock progress, keyboard shortcuts (⌘/Ctrl+1/2/3, ⌘/Ctrl+,), paste-anywhere and drag-and-drop a link to detect, plus a one-click macOS Gatekeeper fix banner.
 - **Quality your way** — one-click presets (Best, 4K, 1080p, 720p…) or pick an exact stream. Audio-only extraction to MP3, M4A, OPUS, FLAC, WAV, AAC.
 - **Smart download queue** — parallel downloads, live progress, speed & ETA, pause / resume / retry / cancel.
 - **Post-processing** — embed thumbnails, metadata and subtitles; automatic merging of separate video+audio streams with bundled ffmpeg.

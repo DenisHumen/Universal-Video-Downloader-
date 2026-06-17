@@ -8,6 +8,7 @@ import { ytdlpBinaryPath, ensureYtdlp, ytdlpSpawnOptions } from './ytdlp'
 import { ffmpegLocation } from './ffmpeg'
 import { getSettings } from './settings'
 import { accessArgs, hasCookies, humanizeYtdlpError } from './options'
+import { resolveUrl } from './resolvers'
 import type { DownloadItem, DownloadProgress, DownloadRequest, QualityPreset } from '@shared/types'
 
 export const downloadEvents = new EventEmitter()
@@ -100,11 +101,22 @@ function buildArgs(item: DownloadItem): string[] {
   const ffmpeg = ffmpegLocation()
   if (ffmpeg) args.push('--ffmpeg-location', ffmpeg)
   args.push(...accessArgs(settings))
+  if (item.referer) args.push('--referer', item.referer)
   if (settings.restrictFilenames) args.push('--restrict-filenames')
 
-  // Output template
-  const template = settings.filenameTemplate || '%(title)s [%(id)s].%(ext)s'
-  args.push('-o', join(item.outputDir, template))
+  // Output template. For custom-resolved streams (e.g. a scraped .m3u8) the
+  // engine's own title is meaningless, so we bake in the title we scraped.
+  if (item.referer && item.title) {
+    const safe = item.title
+      .replace(/[%/\\:*?"<>|]+/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim()
+      .slice(0, 150)
+    args.push('-o', join(item.outputDir, `${safe || 'video'}.%(ext)s`))
+  } else {
+    const template = settings.filenameTemplate || '%(title)s [%(id)s].%(ext)s'
+    args.push('-o', join(item.outputDir, template))
+  }
 
   // Progress as machine-readable lines
   args.push(
@@ -279,17 +291,21 @@ export async function startDownload(req: DownloadRequest): Promise<DownloadItem>
   await ensureYtdlp()
   const settings = getSettings()
   const id = randomUUID()
+  // Resolve custom sites (e.g. scrape a page to its real stream URL + referer).
+  const resolved = await resolveUrl(req.url)
   const item: DownloadItem = {
     id,
-    url: req.url,
-    title: req.title || req.url,
-    thumbnail: req.thumbnail,
+    url: resolved.url,
+    title: req.title || resolved.title || req.url,
+    thumbnail: req.thumbnail || resolved.thumbnail,
+    extractor: resolved.extractor,
     mode: req.mode,
     quality: req.quality,
     formatId: req.formatId,
     state: 'queued',
     percent: 0,
     outputDir: req.outputDir || settings.downloadDir,
+    referer: resolved.referer,
     createdAt: Date.now()
   }
   items.set(id, item)

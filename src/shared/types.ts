@@ -51,6 +51,13 @@ export interface MediaInfo {
   // For playlists: number of entries detected
   playlistCount?: number
   isPlaylist?: boolean
+  entries?: PlaylistEntry[]
+}
+
+export interface PlaylistEntry {
+  url: string
+  title: string
+  thumbnail?: string
 }
 
 export type DownloadState =
@@ -97,6 +104,7 @@ export interface DownloadItem {
   filepath?: string
   outputDir: string
   error?: string
+  referer?: string
   createdAt: number
   finishedAt?: number
 }

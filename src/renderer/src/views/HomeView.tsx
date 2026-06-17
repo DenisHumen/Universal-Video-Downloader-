@@ -14,7 +14,9 @@ import {
 import type { DownloadMode, MediaInfo, QualityPreset } from '@shared/types'
 import { useStore } from '../store'
 import { formatCount, formatDuration, isProbablyUrl } from '../lib/format'
+import { toast } from '../lib/toast'
 import FormatSelector from '../components/FormatSelector'
+import PlaylistCard from '../components/PlaylistCard'
 
 type Status = 'idle' | 'detecting' | 'error'
 
@@ -39,6 +41,47 @@ export default function HomeView(): JSX.Element {
 
   useEffect(() => {
     inputRef.current?.focus()
+  }, [])
+
+  // Paste a link anywhere to auto-detect; Esc clears; drop a link onto the window.
+  useEffect(() => {
+    const onPaste = (e: ClipboardEvent): void => {
+      const target = e.target as HTMLElement | null
+      if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA')) return
+      const text = e.clipboardData?.getData('text')?.trim()
+      if (text && isProbablyUrl(text)) {
+        setUrl(text)
+        void detect(text)
+      }
+    }
+    const onKey = (e: KeyboardEvent): void => {
+      if (e.key === 'Escape') {
+        setInfo(null)
+        setError('')
+        setStatus('idle')
+        setUrl('')
+      }
+    }
+    const onDrop = (e: DragEvent): void => {
+      e.preventDefault()
+      const text = e.dataTransfer?.getData('text')?.trim()
+      if (text && isProbablyUrl(text)) {
+        setUrl(text)
+        void detect(text)
+      }
+    }
+    const prevent = (e: DragEvent): void => e.preventDefault()
+    window.addEventListener('paste', onPaste)
+    window.addEventListener('keydown', onKey)
+    window.addEventListener('drop', onDrop)
+    window.addEventListener('dragover', prevent)
+    return () => {
+      window.removeEventListener('paste', onPaste)
+      window.removeEventListener('keydown', onKey)
+      window.removeEventListener('drop', onDrop)
+      window.removeEventListener('dragover', prevent)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   const detect = async (value?: string): Promise<void> => {
@@ -85,6 +128,7 @@ export default function HomeView(): JSX.Element {
     setInfo(null)
     setUrl('')
     setStatus('idle')
+    toast('Added to the queue', 'success')
     setView('downloads')
   }
 
@@ -160,7 +204,19 @@ export default function HomeView(): JSX.Element {
             </motion.div>
           )}
 
-          {info && status === 'idle' && settings && (
+          {info && info.isPlaylist && status === 'idle' && (
+            <motion.div
+              key="playlist"
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -8 }}
+              transition={{ type: 'spring', stiffness: 280, damping: 28 }}
+            >
+              <PlaylistCard info={info} onDone={() => setInfo(null)} />
+            </motion.div>
+          )}
+
+          {info && !info.isPlaylist && status === 'idle' && settings && (
             <motion.div
               key="info"
               initial={{ opacity: 0, y: 12 }}

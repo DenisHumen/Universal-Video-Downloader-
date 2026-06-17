@@ -1,6 +1,6 @@
-import { app, BrowserWindow, dialog, ipcMain, shell } from 'electron'
+import { app, BrowserWindow, dialog, ipcMain, Notification, shell } from 'electron'
 import { IPC } from '@shared/ipc'
-import type { AppSettings, DownloadRequest } from '@shared/types'
+import type { AppSettings, DownloadItem, DownloadRequest } from '@shared/types'
 import { detect } from './services/detector'
 import {
   cancelDownload,
@@ -101,9 +101,51 @@ export function registerIpc(getWindow: () => BrowserWindow | null): void {
   ipcMain.handle(IPC.windowIsMaximized, () => getWindow()?.isMaximized() ?? false)
 
   // ---- Forward service events to the renderer ----
-  downloadEvents.on('progress', (p) => send(IPC.evtDownloadProgress, p))
-  downloadEvents.on('updated', (item) => send(IPC.evtDownloadUpdated, item))
-  downloadEvents.on('removed', (id) => send(IPC.evtDownloadUpdated, { id, removed: true }))
+  downloadEvents.on('progress', (p) => {
+    send(IPC.evtDownloadProgress, p)
+    updateTaskbarProgress(getWindow)
+  })
+  downloadEvents.on('updated', (item: DownloadItem) => {
+    send(IPC.evtDownloadUpdated, item)
+    maybeNotify(item)
+    updateTaskbarProgress(getWindow)
+  })
+  downloadEvents.on('removed', (id) => {
+    send(IPC.evtDownloadUpdated, { id, removed: true })
+    updateTaskbarProgress(getWindow)
+  })
   ytdlpEvents.on('status', (s) => send(IPC.evtYtdlpStatus, s))
   updateEvents.on('status', (s) => send(IPC.evtUpdateStatus, s))
+}
+
+const notified = new Set<string>()
+
+function maybeNotify(item: DownloadItem): void {
+  if (item.state === 'completed' && !notified.has(item.id)) {
+    notified.add(item.id)
+    if (Notification.isSupported()) {
+      const n = new Notification({
+        title: 'Download complete',
+        body: item.title,
+        silent: false
+      })
+      n.on('click', () => {
+        if (item.filepath) shell.showItemInFolder(item.filepath)
+      })
+      n.show()
+    }
+  }
+  if (item.state === 'downloading') notified.delete(item.id)
+}
+
+function updateTaskbarProgress(getWindow: () => BrowserWindow | null): void {
+  const win = getWindow()
+  if (!win || win.isDestroyed()) return
+  const active = listDownloads().filter((d) => d.state === 'downloading' || d.state === 'processing')
+  if (!active.length) {
+    win.setProgressBar(-1)
+    return
+  }
+  const avg = active.reduce((sum, d) => sum + (d.percent || 0), 0) / active.length / 100
+  win.setProgressBar(Math.max(0.02, Math.min(1, avg)))
 }

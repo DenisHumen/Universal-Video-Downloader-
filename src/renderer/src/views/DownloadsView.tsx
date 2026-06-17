@@ -1,10 +1,11 @@
 import { AnimatePresence, motion } from 'framer-motion'
-import { Inbox, Trash2 } from 'lucide-react'
+import { FolderOpen, Inbox, Trash2 } from 'lucide-react'
 import { useStore } from '../store'
 import DownloadCard from '../components/DownloadCard'
 
 export default function DownloadsView(): JSX.Element {
   const downloads = useStore((s) => s.downloads)
+  const settings = useStore((s) => s.settings)
   const setView = useStore((s) => s.setView)
 
   const hasFinished = downloads.some((d) => ['completed', 'error', 'canceled'].includes(d.state))
@@ -18,11 +19,18 @@ export default function DownloadsView(): JSX.Element {
             {downloads.length} item{downloads.length === 1 ? '' : 's'}
           </p>
         </div>
-        {hasFinished && (
-          <button className="btn-ghost" onClick={() => window.api.clearFinished()}>
-            <Trash2 size={16} /> clear finished
-          </button>
-        )}
+        <div className="flex items-center gap-2">
+          {settings?.downloadDir && (
+            <button className="btn-ghost" onClick={() => window.api.openPath(settings.downloadDir)}>
+              <FolderOpen size={16} /> open folder
+            </button>
+          )}
+          {hasFinished && (
+            <button className="btn-ghost" onClick={() => window.api.clearFinished()}>
+              <Trash2 size={16} /> clear finished
+            </button>
+          )}
+        </div>
       </div>
 
       <div className="flex-1 overflow-y-auto pr-1">

@@ -2,6 +2,7 @@ import { spawn } from 'child_process'
 import { ytdlpBinaryPath, ytdlpSpawnOptions } from './ytdlp'
 import { getSettings } from './settings'
 import { accessArgs, hasCookies, humanizeYtdlpError } from './options'
+import { resolveUrl } from './resolvers'
 import type { DetectResult, FormatKind, MediaInfo, VideoFormat } from '@shared/types'
 
 interface RawFormat {
@@ -104,7 +105,48 @@ function pickThumbnail(info: RawInfo): string | undefined {
   return undefined
 }
 
-export function detect(url: string, signal?: AbortSignal): Promise<DetectResult> {
+export async function detect(url: string, signal?: AbortSignal): Promise<DetectResult> {
+  const resolved = await resolveUrl(url)
+
+  // A custom resolver found a playlist/listing — present its entries directly.
+  if (resolved.isPlaylist) {
+    const entries = resolved.entries || []
+    if (!entries.length) {
+      return { ok: false, error: 'No videos found on this page.' }
+    }
+    const info: MediaInfo = {
+      id: 'playlist',
+      title: resolved.playlistTitle || 'Playlist',
+      webpageUrl: url,
+      originalUrl: url,
+      extractor: resolved.extractor || 'generic',
+      isLive: false,
+      formats: [],
+      isPlaylist: true,
+      playlistCount: entries.length,
+      entries
+    }
+    return { ok: true, info }
+  }
+
+  const probe = await probeWithEngine(resolved.url, resolved.referer, signal)
+  if (!probe.ok || !probe.info) return probe
+
+  // Prefer metadata from the resolver (page scrape) over the bare stream's.
+  const info = probe.info
+  info.webpageUrl = url
+  info.originalUrl = url
+  if (resolved.title) info.title = resolved.title
+  if (resolved.thumbnail) info.thumbnail = resolved.thumbnail
+  if (resolved.extractor) info.extractor = resolved.extractor
+  return { ok: true, info }
+}
+
+function probeWithEngine(
+  url: string,
+  referer: string | undefined,
+  signal?: AbortSignal
+): Promise<DetectResult> {
   return new Promise((resolve) => {
     const settings = getSettings()
     const args = [
@@ -115,6 +157,7 @@ export function detect(url: string, signal?: AbortSignal): Promise<DetectResult>
       '--ignore-config',
       ...accessArgs(settings)
     ]
+    if (referer) args.push('--referer', referer)
     args.push(url)
 
     const child = spawn(ytdlpBinaryPath(), args, ytdlpSpawnOptions())
