@@ -7,6 +7,7 @@ import { randomUUID } from 'crypto'
 import { ytdlpBinaryPath, ensureYtdlp } from './ytdlp'
 import { ffmpegLocation } from './ffmpeg'
 import { getSettings } from './settings'
+import { accessArgs, hasCookies, humanizeYtdlpError } from './options'
 import type { DownloadItem, DownloadProgress, DownloadRequest, QualityPreset } from '@shared/types'
 
 export const downloadEvents = new EventEmitter()
@@ -98,7 +99,7 @@ function buildArgs(item: DownloadItem): string[] {
 
   const ffmpeg = ffmpegLocation()
   if (ffmpeg) args.push('--ffmpeg-location', ffmpeg)
-  if (settings.proxy) args.push('--proxy', settings.proxy)
+  args.push(...accessArgs(settings))
   if (settings.restrictFilenames) args.push('--restrict-filenames')
 
   // Output template
@@ -264,11 +265,10 @@ function runDownload(item: DownloadItem): void {
       finalPaths.delete(item.id)
     } else {
       item.state = 'error'
-      const lastErr = stderrTail
-        .split(/\r?\n/)
-        .filter((l) => l.trim())
-        .pop()
-      item.error = (lastErr || `yt-dlp exited with code ${code}`).replace(/^ERROR:\s*/i, '')
+      item.error = humanizeYtdlpError(
+        stderrTail || `yt-dlp exited with code ${code}`,
+        hasCookies(getSettings())
+      )
     }
     emitUpdated(item)
     processQueue()

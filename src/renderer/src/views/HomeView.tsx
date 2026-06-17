@@ -158,9 +158,17 @@ export default function HomeView(): JSX.Element {
               className="card flex items-start gap-3 border-red-500/20 bg-red-500/5 p-4"
             >
               <AlertCircle className="mt-0.5 shrink-0 text-red-400" size={18} />
-              <div>
+              <div className="min-w-0">
                 <p className="text-sm font-medium text-red-200">Detection failed</p>
                 <p className="mt-0.5 text-xs text-white/50">{error}</p>
+                {/Settings/.test(error) && (
+                  <button
+                    className="btn-ghost mt-2 py-1.5 text-xs"
+                    onClick={() => setView('settings')}
+                  >
+                    Open Settings → Access
+                  </button>
+                )}
               </div>
             </motion.div>
           )}

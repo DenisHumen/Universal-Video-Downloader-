@@ -7,9 +7,10 @@ import {
   RefreshCw,
   Sparkles,
   Cpu,
+  Cookie,
   Info
 } from 'lucide-react'
-import type { AppSettings, DownloadMode, QualityPreset } from '@shared/types'
+import { SUPPORTED_COOKIE_BROWSERS, type AppSettings, type DownloadMode, type QualityPreset } from '@shared/types'
 import { useStore } from '../store'
 
 function Section({ title, icon, children }: { title: string; icon: ReactNode; children: ReactNode }): JSX.Element {
@@ -193,6 +194,34 @@ export default function SettingsView(): JSX.Element {
             yt-dlp output template, e.g. %(title)s [%(id)s].%(ext)s
           </p>
         </div>
+      </Section>
+
+      <Section title="Access &amp; cookies" icon={<Cookie size={16} />}>
+        <Row
+          label="Use cookies from browser"
+          hint="Unlocks age-restricted, private and members-only videos"
+        >
+          <select
+            value={settings.cookiesFromBrowser}
+            onChange={(e) => set('cookiesFromBrowser', e.target.value)}
+            className="input w-36 cursor-pointer py-2 capitalize"
+          >
+            <option value="" className="bg-base-800">
+              Off
+            </option>
+            {SUPPORTED_COOKIE_BROWSERS.map((b) => (
+              <option key={b} value={b} className="bg-base-800 capitalize">
+                {b}
+              </option>
+            ))}
+          </select>
+        </Row>
+        <p className="text-[11px] leading-relaxed text-white/35">
+          Many sites (including adult sites) put videos behind an age-verification or login gate.
+          Pointing the app at the browser where you&apos;re already signed in lets it pass that gate.
+          Make sure the chosen browser is fully closed while downloading so its cookie database can
+          be read.
+        </p>
       </Section>
 
       <Section title="Updates" icon={<RefreshCw size={16} />}>

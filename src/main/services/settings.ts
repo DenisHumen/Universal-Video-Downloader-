@@ -19,7 +19,9 @@ function defaults(): AppSettings {
     filenameTemplate: '%(title)s [%(id)s].%(ext)s',
     autoUpdate: true,
     theme: 'midnight',
-    proxy: ''
+    proxy: '',
+    cookiesFromBrowser: '',
+    cookiesFile: ''
   }
 }
 

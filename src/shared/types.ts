@@ -127,7 +127,22 @@ export interface AppSettings {
   autoUpdate: boolean
   theme: 'dark' | 'midnight' | 'aurora'
   proxy: string
+  /** Read cookies from this installed browser (e.g. 'chrome', 'firefox', 'safari'). Empty = off. */
+  cookiesFromBrowser: string
+  /** Optional path to a Netscape-format cookies.txt file (takes precedence over the browser). */
+  cookiesFile: string
 }
+
+export const SUPPORTED_COOKIE_BROWSERS = [
+  'chrome',
+  'firefox',
+  'edge',
+  'safari',
+  'brave',
+  'chromium',
+  'opera',
+  'vivaldi'
+] as const
 
 export type YtDlpState = 'idle' | 'checking' | 'downloading' | 'ready' | 'error'
 

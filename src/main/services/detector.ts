@@ -1,6 +1,7 @@
 import { spawn } from 'child_process'
 import { ytdlpBinaryPath } from './ytdlp'
 import { getSettings } from './settings'
+import { accessArgs, hasCookies, humanizeYtdlpError } from './options'
 import type { DetectResult, FormatKind, MediaInfo, VideoFormat } from '@shared/types'
 
 interface RawFormat {
@@ -111,9 +112,9 @@ export function detect(url: string, signal?: AbortSignal): Promise<DetectResult>
       '--no-warnings',
       '--no-playlist',
       '--no-progress',
-      '--ignore-config'
+      '--ignore-config',
+      ...accessArgs(settings)
     ]
-    if (settings.proxy) args.push('--proxy', settings.proxy)
     args.push(url)
 
     const child = spawn(ytdlpBinaryPath(), args, { windowsHide: true })
@@ -141,8 +142,8 @@ export function detect(url: string, signal?: AbortSignal): Promise<DetectResult>
     child.on('close', (code) => {
       clearTimeout(timeout)
       if (code !== 0 || !stdout.trim()) {
-        const reason = stderr.split('\n').filter(Boolean).pop() || 'Could not detect any media at this URL.'
-        resolve({ ok: false, error: reason.replace(/^ERROR:\s*/i, '') })
+        const reason = stderr.trim() || 'Could not detect any media at this URL.'
+        resolve({ ok: false, error: humanizeYtdlpError(reason, hasCookies(settings)) })
         return
       }
       try {

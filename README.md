@@ -19,6 +19,7 @@ Powered by [yt-dlp](https://github.com/yt-dlp/yt-dlp) and ffmpeg, wrapped in a m
 ## ✨ Features
 
 - **Universal detection** — automatically discovers the video/audio stream behind a link. 1800+ sites supported via yt-dlp, plus a generic extractor for everything else.
+- **Restricted sites** — age-verification, login-only and members-only videos (including adult sites) work by reading cookies from your browser: **Settings → Access & cookies → Use cookies from browser**.
 - **Quality your way** — one-click presets (Best, 4K, 1080p, 720p…) or pick an exact stream. Audio-only extraction to MP3, M4A, OPUS, FLAC, WAV, AAC.
 - **Smart download queue** — parallel downloads, live progress, speed & ETA, pause / resume / retry / cancel.
 - **Post-processing** — embed thumbnails, metadata and subtitles; automatic merging of separate video+audio streams with bundled ffmpeg.
