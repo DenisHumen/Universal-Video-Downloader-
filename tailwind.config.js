@@ -4,34 +4,20 @@ module.exports = {
   theme: {
     extend: {
       colors: {
-        // Dark "Midnight Aurora" palette
-        base: {
-          950: '#06060c',
-          900: '#0a0a14',
-          850: '#0e0e1c',
-          800: '#121225',
-          700: '#1a1a30',
-          600: '#24243f',
-          500: '#32324f'
+        // Monochrome "cobalt-like" dark palette
+        ink: {
+          950: '#08080a',
+          900: '#0c0c0f',
+          850: '#121216',
+          800: '#17171c',
+          750: '#1c1c22',
+          700: '#222229',
+          600: '#2b2b33',
+          500: '#3a3a44'
         },
-        accent: {
-          DEFAULT: '#7c5cff',
-          50: '#f1edff',
-          100: '#e3d9ff',
-          200: '#c8b4ff',
-          300: '#ab8cff',
-          400: '#8f6cff',
-          500: '#7c5cff',
-          600: '#6a3df0',
-          700: '#5a2fd0',
-          800: '#4a26a8',
-          900: '#3a1f80'
-        },
-        teal: {
-          DEFAULT: '#22d3ee',
-          400: '#34e0f5',
-          500: '#22d3ee',
-          600: '#0fb6d0'
+        cream: {
+          DEFAULT: '#ededf2',
+          dim: '#c9c9d2'
         }
       },
       fontFamily: {
@@ -44,29 +30,36 @@ module.exports = {
           'Helvetica Neue',
           'Arial',
           'sans-serif'
+        ],
+        mono: [
+          'ui-monospace',
+          'SFMono-Regular',
+          'SF Mono',
+          'Menlo',
+          'Consolas',
+          'Liberation Mono',
+          'monospace'
         ]
       },
-      boxShadow: {
-        glow: '0 0 40px -10px rgba(124, 92, 255, 0.55)',
-        'glow-teal': '0 0 40px -12px rgba(34, 211, 238, 0.5)',
-        card: '0 12px 40px -12px rgba(0, 0, 0, 0.6)'
+      borderRadius: {
+        '4xl': '1.75rem'
       },
-      backgroundImage: {
-        'aurora':
-          'radial-gradient(60% 80% at 20% 10%, rgba(124,92,255,0.18) 0%, transparent 60%), radial-gradient(50% 70% at 90% 20%, rgba(34,211,238,0.14) 0%, transparent 55%), radial-gradient(60% 90% at 60% 100%, rgba(124,92,255,0.12) 0%, transparent 60%)'
+      boxShadow: {
+        panel: '0 24px 70px -28px rgba(0, 0, 0, 0.85)',
+        soft: '0 8px 30px -14px rgba(0, 0, 0, 0.7)'
       },
       keyframes: {
-        'aurora-shift': {
-          '0%, 100%': { transform: 'translate3d(0,0,0) scale(1)' },
-          '50%': { transform: 'translate3d(0,-2%,0) scale(1.05)' }
-        },
         shimmer: {
           '100%': { transform: 'translateX(100%)' }
+        },
+        'fade-up': {
+          '0%': { opacity: '0', transform: 'translateY(8px)' },
+          '100%': { opacity: '1', transform: 'translateY(0)' }
         }
       },
       animation: {
-        'aurora-shift': 'aurora-shift 18s ease-in-out infinite',
-        shimmer: 'shimmer 1.8s infinite'
+        shimmer: 'shimmer 1.6s infinite',
+        'fade-up': 'fade-up 0.35s ease-out'
       }
     }
   },

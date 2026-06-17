@@ -9,41 +9,35 @@ export default function UpdateBanner(): JSX.Element | null {
 
   const visible =
     !dismissed &&
-    (update.state === 'available' ||
-      update.state === 'downloading' ||
-      update.state === 'downloaded')
+    (update.state === 'available' || update.state === 'downloading' || update.state === 'downloaded')
 
   return (
     <AnimatePresence>
       {visible && (
         <motion.div
-          initial={{ opacity: 0, y: -20, scale: 0.98 }}
+          initial={{ opacity: 0, y: -16, scale: 0.98 }}
           animate={{ opacity: 1, y: 0, scale: 1 }}
-          exit={{ opacity: 0, y: -20, scale: 0.98 }}
+          exit={{ opacity: 0, y: -16, scale: 0.98 }}
           transition={{ type: 'spring', stiffness: 380, damping: 30 }}
-          className="absolute left-1/2 top-4 z-40 w-[min(640px,calc(100%-2rem))] -translate-x-1/2"
+          className="absolute left-1/2 top-4 z-40 w-[min(620px,calc(100%-2rem))] -translate-x-1/2"
         >
-          <div className="glass-strong flex items-center gap-4 rounded-2xl px-5 py-3.5 shadow-glow">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-accent-500/20 text-accent-300">
-              <Rocket size={20} />
+          <div className="flex items-center gap-4 rounded-3xl border border-white/[0.09] bg-ink-750 px-5 py-3.5 shadow-soft backdrop-blur-xl">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-white/[0.06] text-cream">
+              <Rocket size={19} />
             </div>
             <div className="min-w-0 flex-1">
               {update.state === 'available' && (
                 <>
-                  <p className="text-sm font-semibold text-white">
-                    Version {update.version} is available
-                  </p>
-                  <p className="truncate text-xs text-white/50">
-                    A new update is ready to download and install automatically.
-                  </p>
+                  <p className="text-sm font-semibold text-cream">version {update.version} is available</p>
+                  <p className="mono truncate text-xs text-white/45">ready to download and install</p>
                 </>
               )}
               {update.state === 'downloading' && (
                 <>
-                  <p className="text-sm font-semibold text-white">Downloading update…</p>
+                  <p className="text-sm font-semibold text-cream">downloading update…</p>
                   <div className="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-white/10">
                     <motion.div
-                      className="h-full rounded-full bg-gradient-to-r from-accent-500 to-teal-500"
+                      className="h-full rounded-full bg-cream"
                       animate={{ width: `${update.percent ?? 0}%` }}
                       transition={{ ease: 'easeOut' }}
                     />
@@ -52,12 +46,8 @@ export default function UpdateBanner(): JSX.Element | null {
               )}
               {update.state === 'downloaded' && (
                 <>
-                  <p className="text-sm font-semibold text-white">
-                    Update {update.version} ready to install
-                  </p>
-                  <p className="truncate text-xs text-white/50">
-                    The app will restart to apply the update.
-                  </p>
+                  <p className="text-sm font-semibold text-cream">update {update.version} ready</p>
+                  <p className="mono truncate text-xs text-white/45">the app will restart to apply it</p>
                 </>
               )}
             </div>
@@ -65,12 +55,12 @@ export default function UpdateBanner(): JSX.Element | null {
             <div className="flex shrink-0 items-center gap-2">
               {update.state === 'available' && (
                 <button className="btn-primary" onClick={() => window.api.downloadUpdate()}>
-                  <Download size={16} /> Update
+                  <Download size={16} /> update
                 </button>
               )}
               {update.state === 'downloaded' && (
                 <button className="btn-primary" onClick={() => window.api.installUpdate()}>
-                  <RefreshCw size={16} /> Restart &amp; install
+                  <RefreshCw size={16} /> restart
                 </button>
               )}
               <button className="btn-icon" onClick={dismiss} aria-label="Dismiss">

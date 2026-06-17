@@ -6,7 +6,6 @@ import {
   Clock,
   Download,
   Eye,
-  Link2,
   Loader2,
   Radio,
   Search,
@@ -90,83 +89,71 @@ export default function HomeView(): JSX.Element {
   }
 
   return (
-    <div className="mx-auto flex w-full max-w-3xl flex-col px-8 py-10">
+    <div className="mx-auto flex w-full max-w-2xl flex-col px-8 py-12">
       <motion.div
-        initial={{ opacity: 0, y: 12 }}
+        initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.4 }}
-        className="mb-7 text-center"
+        transition={{ duration: 0.35 }}
+        className="mb-8 text-center"
       >
-        <h1 className="bg-gradient-to-r from-white via-white to-accent-200 bg-clip-text text-3xl font-bold tracking-tight text-transparent">
-          Download video from anywhere
+        <h1 className="text-[28px] font-semibold tracking-tight text-cream">
+          paste a link, get the video
         </h1>
-        <p className="mt-2 text-sm text-white/45">
-          Paste a link and we&apos;ll automatically detect the stream. Thousands of sites supported.
+        <p className="mt-2 text-sm text-white/40">
+          automatic stream detection for thousands of sites — no clutter, no ads.
         </p>
       </motion.div>
 
       {/* URL input */}
       <motion.div
-        initial={{ opacity: 0, y: 12 }}
+        initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.4, delay: 0.05 }}
-        className="relative"
+        transition={{ duration: 0.35, delay: 0.05 }}
+        className="flex items-center gap-2 rounded-3xl border border-white/[0.08] bg-ink-900 p-2 transition-colors focus-within:border-white/25"
       >
-        <div className="group relative">
-          <div className="pointer-events-none absolute -inset-0.5 rounded-2xl bg-gradient-to-r from-accent-500/40 via-teal-500/30 to-accent-500/40 opacity-0 blur transition-opacity duration-300 group-focus-within:opacity-100" />
-          <div className="relative flex items-center gap-2 rounded-2xl border border-white/10 bg-base-900/80 p-2 backdrop-blur-xl">
-            <Link2 className="ml-2 shrink-0 text-white/30" size={20} />
-            <input
-              ref={inputRef}
-              value={url}
-              onChange={(e) => setUrl(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && detect()}
-              placeholder="https://… paste a video link"
-              className="no-drag min-w-0 flex-1 bg-transparent px-1 py-2 text-sm text-white placeholder-white/30 outline-none"
-              spellCheck={false}
-            />
-            <button className="btn-ghost px-3 py-2" onClick={paste} title="Paste from clipboard">
-              <ClipboardPaste size={16} />
-            </button>
-            <button
-              className="btn-primary px-5"
-              onClick={() => detect()}
-              disabled={!url.trim() || status === 'detecting'}
-            >
-              {status === 'detecting' ? (
-                <Loader2 size={16} className="animate-spin" />
-              ) : (
-                <Search size={16} />
-              )}
-              Detect
-            </button>
-          </div>
-        </div>
+        <Search className="ml-2.5 shrink-0 text-white/30" size={19} />
+        <input
+          ref={inputRef}
+          value={url}
+          onChange={(e) => setUrl(e.target.value)}
+          onKeyDown={(e) => e.key === 'Enter' && detect()}
+          placeholder="paste a video link"
+          className="no-drag min-w-0 flex-1 bg-transparent px-1 py-2 text-sm text-cream placeholder-white/25 outline-none"
+          spellCheck={false}
+        />
+        <button className="btn-ghost px-3 py-2.5" onClick={paste} title="Paste from clipboard">
+          <ClipboardPaste size={16} />
+        </button>
+        <button
+          className="btn-primary px-5 py-2.5"
+          onClick={() => detect()}
+          disabled={!url.trim() || status === 'detecting'}
+        >
+          {status === 'detecting' ? <Loader2 size={16} className="animate-spin" /> : <Download size={16} />}
+          get
+        </button>
       </motion.div>
 
       {/* Results */}
-      <div className="mt-6">
+      <div className="mt-5">
         <AnimatePresence mode="wait">
           {status === 'detecting' && <DetectingSkeleton key="skeleton" />}
 
           {status === 'error' && (
             <motion.div
               key="error"
-              initial={{ opacity: 0, y: 10 }}
+              initial={{ opacity: 0, y: 8 }}
               animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -10 }}
-              className="card flex items-start gap-3 border-red-500/20 bg-red-500/5 p-4"
+              exit={{ opacity: 0, y: -8 }}
+              className="card flex items-start gap-3 p-4"
             >
-              <AlertCircle className="mt-0.5 shrink-0 text-red-400" size={18} />
+              <AlertCircle className="mt-0.5 shrink-0 text-red-400/80" size={18} />
               <div className="min-w-0">
-                <p className="text-sm font-medium text-red-200">Detection failed</p>
-                <p className="mt-0.5 text-xs text-white/50">{error}</p>
+                <p className="text-sm font-medium text-cream">couldn&apos;t detect a video</p>
+                <p className="mt-0.5 text-xs text-white/45">{error}</p>
                 {/Settings/.test(error) && (
-                  <button
-                    className="btn-ghost mt-2 py-1.5 text-xs"
-                    onClick={() => setView('settings')}
-                  >
-                    Open Settings → Access
+                  <button className="btn-ghost mt-2.5 py-1.5 text-xs" onClick={() => setView('settings')}>
+                    open settings → access
                   </button>
                 )}
               </div>
@@ -176,43 +163,38 @@ export default function HomeView(): JSX.Element {
           {info && status === 'idle' && settings && (
             <motion.div
               key="info"
-              initial={{ opacity: 0, y: 14 }}
+              initial={{ opacity: 0, y: 12 }}
               animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -10 }}
-              transition={{ type: 'spring', stiffness: 260, damping: 28 }}
+              exit={{ opacity: 0, y: -8 }}
+              transition={{ type: 'spring', stiffness: 280, damping: 28 }}
               className="card overflow-hidden"
             >
-              <div className="grid gap-0 md:grid-cols-[1.1fr_1fr]">
-                {/* Media preview */}
-                <div className="relative border-b border-white/5 p-5 md:border-b-0 md:border-r">
-                  <div className="relative aspect-video w-full overflow-hidden rounded-xl bg-base-950">
-                    {info.thumbnail ? (
-                      <img
-                        src={info.thumbnail}
-                        alt=""
-                        className="h-full w-full object-cover"
-                        referrerPolicy="no-referrer"
-                      />
-                    ) : (
-                      <div className="flex h-full items-center justify-center text-white/20">
-                        <Download size={40} />
-                      </div>
-                    )}
-                    {info.isLive && (
-                      <span className="absolute left-2 top-2 chip bg-red-500/90 text-white">
-                        <Radio size={11} /> LIVE
-                      </span>
-                    )}
-                    {info.durationString && (
-                      <span className="absolute bottom-2 right-2 chip bg-black/70 text-white/90">
-                        {info.durationString || formatDuration(info.duration)}
-                      </span>
-                    )}
-                  </div>
-                  <h2 className="mt-3 line-clamp-2 text-sm font-semibold text-white" title={info.title}>
+              {/* Preview header */}
+              <div className="flex gap-4 border-b border-white/[0.06] p-4">
+                <div className="relative aspect-video w-40 shrink-0 overflow-hidden rounded-2xl bg-ink-950">
+                  {info.thumbnail ? (
+                    <img
+                      src={info.thumbnail}
+                      alt=""
+                      className="h-full w-full object-cover"
+                      referrerPolicy="no-referrer"
+                    />
+                  ) : (
+                    <div className="flex h-full items-center justify-center text-white/20">
+                      <Download size={28} />
+                    </div>
+                  )}
+                  {info.isLive && (
+                    <span className="chip absolute left-1.5 top-1.5 bg-red-500/90 text-white">
+                      <Radio size={10} /> LIVE
+                    </span>
+                  )}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <h2 className="line-clamp-2 text-sm font-semibold text-cream" title={info.title}>
                     {info.title}
                   </h2>
-                  <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-white/45">
+                  <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-white/40">
                     {info.uploader && (
                       <span className="flex items-center gap-1">
                         <User size={12} /> {info.uploader}
@@ -228,33 +210,29 @@ export default function HomeView(): JSX.Element {
                         <Clock size={12} /> {formatDuration(info.duration)}
                       </span>
                     )}
-                    <span className="rounded bg-accent-500/15 px-1.5 py-0.5 text-[10px] font-medium text-accent-200">
-                      {info.extractor}
-                    </span>
                   </div>
+                  <span className="mono mt-2 inline-block rounded-lg bg-white/[0.06] px-2 py-0.5 text-[10px] text-white/50">
+                    {info.extractor}
+                  </span>
                 </div>
+              </div>
 
-                {/* Format selection + CTA */}
-                <div className="flex flex-col p-5">
-                  <FormatSelector
-                    info={info}
-                    settings={settings}
-                    onChangeAudioFormat={(fmt) => saveSettings({ audioFormat: fmt })}
-                    onSelectionChange={setSelection}
-                  />
-                  <button
-                    className="btn-primary mt-5 w-full py-3 text-base"
-                    onClick={start}
-                    disabled={starting}
-                  >
-                    {starting ? (
-                      <Loader2 size={18} className="animate-spin" />
-                    ) : (
-                      <Download size={18} />
-                    )}
-                    Download
-                  </button>
-                </div>
+              {/* Format selection + CTA */}
+              <div className="p-4">
+                <FormatSelector
+                  info={info}
+                  settings={settings}
+                  onChangeAudioFormat={(fmt) => saveSettings({ audioFormat: fmt })}
+                  onSelectionChange={setSelection}
+                />
+                <button
+                  className="btn-primary mt-5 w-full py-3 text-[15px]"
+                  onClick={start}
+                  disabled={starting}
+                >
+                  {starting ? <Loader2 size={18} className="animate-spin" /> : <Download size={18} />}
+                  download
+                </button>
               </div>
             </motion.div>
           )}
@@ -265,13 +243,13 @@ export default function HomeView(): JSX.Element {
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              className="mt-2 flex flex-wrap justify-center gap-2"
+              className="mt-1 flex flex-wrap justify-center gap-2"
             >
-              {['YouTube', 'Vimeo', 'TikTok', 'Twitter / X', 'Instagram', 'Twitch', 'and 1800+ more'].map(
+              {['youtube', 'vimeo', 'tiktok', 'twitter / x', 'instagram', 'twitch', '+1800 more'].map(
                 (site) => (
                   <span
                     key={site}
-                    className="rounded-full border border-white/5 bg-white/[0.03] px-3 py-1 text-xs text-white/40"
+                    className="mono rounded-full border border-white/[0.06] bg-white/[0.02] px-3 py-1 text-xs text-white/35"
                   >
                     {site}
                   </span>
@@ -291,23 +269,26 @@ function DetectingSkeleton(): JSX.Element {
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      className="card grid gap-0 overflow-hidden md:grid-cols-[1.1fr_1fr]"
+      className="card overflow-hidden"
     >
-      <div className="border-b border-white/5 p-5 md:border-b-0 md:border-r">
-        <div className="relative aspect-video w-full overflow-hidden rounded-xl bg-white/5">
-          <div className="absolute inset-0 -translate-x-full animate-shimmer bg-gradient-to-r from-transparent via-white/10 to-transparent" />
+      <div className="flex gap-4 border-b border-white/[0.06] p-4">
+        <div className="relative aspect-video w-40 shrink-0 overflow-hidden rounded-2xl bg-white/[0.04]">
+          <div className="absolute inset-0 -translate-x-full animate-shimmer bg-gradient-to-r from-transparent via-white/[0.08] to-transparent" />
         </div>
-        <div className="mt-3 h-4 w-3/4 rounded bg-white/5" />
-        <div className="mt-2 h-3 w-1/2 rounded bg-white/5" />
+        <div className="flex-1 space-y-2 py-1">
+          <div className="h-4 w-3/4 rounded bg-white/[0.05]" />
+          <div className="h-3 w-1/2 rounded bg-white/[0.05]" />
+          <div className="h-5 w-20 rounded-lg bg-white/[0.05]" />
+        </div>
       </div>
-      <div className="space-y-3 p-5">
-        <div className="h-10 w-full rounded-xl bg-white/5" />
+      <div className="space-y-3 p-4">
+        <div className="h-10 w-full rounded-2xl bg-white/[0.04]" />
         <div className="grid grid-cols-3 gap-2">
           {Array.from({ length: 6 }).map((_, i) => (
-            <div key={i} className="h-14 rounded-xl bg-white/5" />
+            <div key={i} className="h-12 rounded-xl bg-white/[0.04]" />
           ))}
         </div>
-        <div className="h-12 w-full rounded-xl bg-white/5" />
+        <div className="h-12 w-full rounded-2xl bg-white/[0.04]" />
       </div>
     </motion.div>
   )

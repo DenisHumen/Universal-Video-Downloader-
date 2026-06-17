@@ -24,7 +24,7 @@ Powered by [yt-dlp](https://github.com/yt-dlp/yt-dlp) and ffmpeg, wrapped in a m
 - **Smart download queue** — parallel downloads, live progress, speed & ETA, pause / resume / retry / cancel.
 - **Post-processing** — embed thumbnails, metadata and subtitles; automatic merging of separate video+audio streams with bundled ffmpeg.
 - **Self-updating** — the app checks for new releases on launch and can download, install and relaunch itself. The yt-dlp engine also keeps itself up to date.
-- **Gorgeous dark UI** — an animated "Midnight Aurora" theme with smooth Framer Motion transitions, frameless window and custom title bar.
+- **Minimal dark UI** — a clean, monochrome cobalt-inspired interface: a left nav, floating rounded panels, segmented controls and smooth Framer Motion transitions in a frameless window.
 - **Private & local** — everything runs on your machine. No accounts, no telemetry.
 
 ## 📦 Install

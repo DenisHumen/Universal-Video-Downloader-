@@ -24,42 +24,44 @@ export default function App(): JSX.Element {
       <AuroraBackground />
       <TitleBar />
 
-      <div className="relative flex min-h-0 flex-1">
+      <div className="relative flex min-h-0 flex-1 gap-0 px-3 pb-3">
         <Sidebar />
-        <main className="relative min-w-0 flex-1 overflow-hidden">
+        <main className="relative min-w-0 flex-1">
           <UpdateBanner />
-          <AnimatePresence mode="wait">
-            {!ready ? (
-              <motion.div
-                key="splash"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                className="flex h-full flex-col items-center justify-center"
-              >
+          <div className="panel h-full overflow-hidden shadow-panel">
+            <AnimatePresence mode="wait">
+              {!ready ? (
                 <motion.div
-                  animate={{ scale: [1, 1.08, 1], rotate: [0, 4, 0] }}
-                  transition={{ duration: 2.4, repeat: Infinity, ease: 'easeInOut' }}
+                  key="splash"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  className="flex h-full flex-col items-center justify-center"
                 >
-                  <Logo className="h-16 w-16" />
+                  <motion.div
+                    animate={{ opacity: [0.5, 1, 0.5], scale: [1, 1.05, 1] }}
+                    transition={{ duration: 2.2, repeat: Infinity, ease: 'easeInOut' }}
+                  >
+                    <Logo className="h-14 w-14" />
+                  </motion.div>
+                  <p className="mono mt-4 text-sm text-white/40">starting up…</p>
                 </motion.div>
-                <p className="mt-4 text-sm text-white/40">Starting up…</p>
-              </motion.div>
-            ) : (
-              <motion.div
-                key={view}
-                initial={{ opacity: 0, x: 16 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: -16 }}
-                transition={{ duration: 0.22, ease: 'easeOut' }}
-                className="h-full overflow-y-auto"
-              >
-                {view === 'home' && <HomeView />}
-                {view === 'downloads' && <DownloadsView />}
-                {view === 'settings' && <SettingsView />}
-              </motion.div>
-            )}
-          </AnimatePresence>
+              ) : (
+                <motion.div
+                  key={view}
+                  initial={{ opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -8 }}
+                  transition={{ duration: 0.2, ease: 'easeOut' }}
+                  className="h-full overflow-y-auto"
+                >
+                  {view === 'home' && <HomeView />}
+                  {view === 'downloads' && <DownloadsView />}
+                  {view === 'settings' && <SettingsView />}
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
         </main>
       </div>
     </>
