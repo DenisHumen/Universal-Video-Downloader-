@@ -17,6 +17,7 @@ import { formatCount, formatDuration, isProbablyUrl } from '../lib/format'
 import { toast } from '../lib/toast'
 import FormatSelector from '../components/FormatSelector'
 import PlaylistCard from '../components/PlaylistCard'
+import StreamingCard from '../components/StreamingCard'
 
 type Status = 'idle' | 'detecting' | 'error'
 
@@ -204,7 +205,19 @@ export default function HomeView(): JSX.Element {
             </motion.div>
           )}
 
-          {info && info.isPlaylist && status === 'idle' && (
+          {info && info.streaming && status === 'idle' && (
+            <motion.div
+              key="streaming"
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -8 }}
+              transition={{ type: 'spring', stiffness: 280, damping: 28 }}
+            >
+              <StreamingCard info={info} onDone={() => setInfo(null)} />
+            </motion.div>
+          )}
+
+          {info && info.isPlaylist && !info.streaming && status === 'idle' && (
             <motion.div
               key="playlist"
               initial={{ opacity: 0, y: 12 }}
@@ -216,7 +229,7 @@ export default function HomeView(): JSX.Element {
             </motion.div>
           )}
 
-          {info && !info.isPlaylist && status === 'idle' && settings && (
+          {info && !info.isPlaylist && !info.streaming && status === 'idle' && settings && (
             <motion.div
               key="info"
               initial={{ opacity: 0, y: 12 }}

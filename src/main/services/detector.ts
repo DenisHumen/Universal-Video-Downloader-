@@ -108,6 +108,23 @@ function pickThumbnail(info: RawInfo): string | undefined {
 export async function detect(url: string, signal?: AbortSignal): Promise<DetectResult> {
   const resolved = await resolveUrl(url)
 
+  // A streaming site (translator/episode/quality selection) — present its picker.
+  if (resolved.streaming) {
+    const s = resolved.streaming
+    const info: MediaInfo = {
+      id: s.id,
+      title: s.title,
+      thumbnail: s.thumbnail,
+      webpageUrl: url,
+      originalUrl: url,
+      extractor: resolved.extractor || s.provider,
+      isLive: false,
+      formats: [],
+      streaming: s
+    }
+    return { ok: true, info }
+  }
+
   // A custom resolver found a playlist/listing — present its entries directly.
   if (resolved.isPlaylist) {
     const entries = resolved.entries || []

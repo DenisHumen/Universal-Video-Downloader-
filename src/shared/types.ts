@@ -52,12 +52,38 @@ export interface MediaInfo {
   playlistCount?: number
   isPlaylist?: boolean
   entries?: PlaylistEntry[]
+  // For streaming sites needing translator/episode/quality selection
+  streaming?: StreamingInfo
 }
 
 export interface PlaylistEntry {
   url: string
   title: string
   thumbnail?: string
+}
+
+export interface StreamTranslator {
+  id: string
+  name: string
+}
+
+export interface StreamSeason {
+  season: number
+  episodes: number[]
+}
+
+/** Rich info for streaming sites that need translator/episode/quality selection. */
+export interface StreamingInfo {
+  provider: 'rezka'
+  host: string
+  id: string
+  title: string
+  thumbnail?: string
+  isSeries: boolean
+  translators: StreamTranslator[]
+  defaultTranslator: string
+  seasons: StreamSeason[]
+  qualities: string[]
 }
 
 export type DownloadState =
