@@ -94,8 +94,8 @@ interface Resolver {
 }
 
 const resolvers: Resolver[] = [
-  { match: /(?:^|\.)cumgloryhole\.se\/videos\//i, resolve: resolveCghVideo },
-  { match: /(?:^|\.)cumgloryhole\.se\/models\//i, resolve: resolveCghModel }
+  { match: /^https?:\/\/(?:[a-z0-9-]+\.)*cumgloryhole\.se\/videos\//i, resolve: resolveCghVideo },
+  { match: /^https?:\/\/(?:[a-z0-9-]+\.)*cumgloryhole\.se\/models\//i, resolve: resolveCghModel }
 ]
 
 /**
