@@ -1,8 +1,7 @@
-import { app } from 'electron'
+import { app, net } from 'electron'
 import { EventEmitter } from 'events'
-import { spawn } from 'child_process'
-import { createWriteStream, existsSync, mkdirSync, chmodSync, statSync } from 'fs'
-import { Readable } from 'stream'
+import { spawn, execFileSync } from 'child_process'
+import { createWriteStream, existsSync, mkdirSync, chmodSync, statSync, renameSync, rmSync } from 'fs'
 import { join } from 'path'
 import type { YtDlpStatus } from '@shared/types'
 
@@ -20,10 +19,51 @@ export function getYtdlpStatus(): YtDlpStatus {
   return currentStatus
 }
 
+function isAscii(s: string): boolean {
+  return !/[^\x20-\x7E]/.test(s)
+}
+
+/**
+ * Base directory for the engine binary and its scratch space. On Windows the
+ * yt-dlp.exe is a PyInstaller one-file bundle whose bootloader fails to extract
+ * (`[PYI...] Failed to extract entry`) when the binary OR the temp path contains
+ * non-ASCII characters — which happens whenever the Windows account name is
+ * non-Latin (e.g. Cyrillic). So on Windows we keep everything under the
+ * guaranteed-ASCII %PUBLIC% directory instead of the per-user %APPDATA%.
+ */
+function engineBaseDir(): string {
+  if (process.platform === 'win32') {
+    const pub = process.env.PUBLIC && isAscii(process.env.PUBLIC) ? process.env.PUBLIC : 'C:\\Users\\Public'
+    return join(pub, 'UniversalVideoDownloader')
+  }
+  return app.getPath('userData')
+}
+
 function binDir(): string {
-  const dir = join(app.getPath('userData'), 'bin')
+  const dir = join(engineBaseDir(), 'bin')
   if (!existsSync(dir)) mkdirSync(dir, { recursive: true })
   return dir
+}
+
+/** ASCII-safe scratch dir used as TEMP/TMP for the engine on Windows. */
+function engineTmpDir(): string {
+  const dir = join(engineBaseDir(), 'tmp')
+  if (!existsSync(dir)) mkdirSync(dir, { recursive: true })
+  return dir
+}
+
+/**
+ * Spawn options shared by every yt-dlp invocation. On Windows we redirect the
+ * child's TEMP/TMP to an ASCII path so the PyInstaller bootloader can extract.
+ */
+export function ytdlpSpawnOptions(): { windowsHide: boolean; env: NodeJS.ProcessEnv } {
+  const env: NodeJS.ProcessEnv = { ...process.env }
+  if (process.platform === 'win32') {
+    const tmp = engineTmpDir()
+    env.TMP = tmp
+    env.TEMP = tmp
+  }
+  return { windowsHide: true, env }
 }
 
 function assetName(): string {
@@ -44,6 +84,49 @@ export function ytdlpBinaryPath(): string {
 
 const RELEASE_BASE = 'https://github.com/yt-dlp/yt-dlp/releases/latest/download'
 
+function headerValue(value: string | string[] | undefined): string {
+  if (Array.isArray(value)) return value[0] ?? ''
+  return value ?? ''
+}
+
+/**
+ * Download the engine binary using Electron's net module (Chromium's network
+ * stack). This is far more reliable in the main process than Node's global
+ * fetch (which can hang there) and transparently honours system proxies and
+ * GitHub's redirect to the release asset.
+ */
+function fetchToFile(url: string, tmp: string): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const request = net.request({ url, redirect: 'follow' })
+    request.on('response', (response) => {
+      const status = response.statusCode
+      if (status >= 400) {
+        reject(new Error(`Failed to download yt-dlp (HTTP ${status})`))
+        return
+      }
+      const total = Number(headerValue(response.headers['content-length']) || 0)
+      let received = 0
+      const out = createWriteStream(tmp)
+      out.on('error', reject)
+      response.on('data', (chunk: Buffer) => {
+        received += chunk.length
+        out.write(chunk)
+        if (total) {
+          emit({
+            state: 'downloading',
+            percent: Math.min(99, Math.round((received / total) * 100)),
+            message: 'Downloading download engine…'
+          })
+        }
+      })
+      response.on('end', () => out.end(() => resolve()))
+      response.on('error', reject)
+    })
+    request.on('error', reject)
+    request.end()
+  })
+}
+
 async function downloadBinary(): Promise<void> {
   const url = `${RELEASE_BASE}/${assetName()}`
   const dest = ytdlpBinaryPath()
@@ -51,34 +134,9 @@ async function downloadBinary(): Promise<void> {
 
   emit({ state: 'downloading', percent: 0, message: 'Downloading download engine…' })
 
-  const res = await fetch(url, { redirect: 'follow' })
-  if (!res.ok || !res.body) {
-    throw new Error(`Failed to download yt-dlp (HTTP ${res.status})`)
-  }
-  const total = Number(res.headers.get('content-length') || 0)
-  let received = 0
-
-  await new Promise<void>((resolve, reject) => {
-    const out = createWriteStream(tmp)
-    const nodeStream = Readable.fromWeb(res.body as unknown as Parameters<typeof Readable.fromWeb>[0])
-    nodeStream.on('data', (chunk: Buffer) => {
-      received += chunk.length
-      if (total) {
-        emit({
-          state: 'downloading',
-          percent: Math.min(99, Math.round((received / total) * 100)),
-          message: 'Downloading download engine…'
-        })
-      }
-    })
-    nodeStream.on('error', reject)
-    out.on('error', reject)
-    out.on('finish', resolve)
-    nodeStream.pipe(out)
-  })
+  await fetchToFile(url, tmp)
 
   // Atomic-ish replace
-  const { renameSync, rmSync } = await import('fs')
   try {
     if (existsSync(dest)) rmSync(dest)
   } catch {
@@ -89,11 +147,39 @@ async function downloadBinary(): Promise<void> {
   if (process.platform !== 'win32') {
     chmodSync(dest, 0o755)
   }
+
+  if (process.platform === 'darwin') {
+    // The official yt-dlp_macos build is already ad-hoc signed and runs as-is.
+    // We only strip a quarantine flag if one is present (harmless otherwise).
+    // We deliberately do NOT re-sign here: codesign --force first removes the
+    // existing signature and, if it then fails, leaves the binary unsigned —
+    // which the kernel SIGKILLs on Apple Silicon. Signature repair only happens
+    // on demand (see repairMacSignature) when the binary actually fails to run.
+    try {
+      execFileSync('/usr/bin/xattr', ['-dr', 'com.apple.quarantine', dest], { stdio: 'ignore' })
+    } catch {
+      /* nothing to strip */
+    }
+  }
+}
+
+/**
+ * Last-resort repair for macOS: if a freshly downloaded engine won't run (e.g. a
+ * future release ships unsigned), apply an ad-hoc signature so the kernel will
+ * allow it. Best-effort; callers re-verify with --version afterwards.
+ */
+function repairMacSignature(path: string): void {
+  if (process.platform !== 'darwin') return
+  try {
+    execFileSync('/usr/bin/codesign', ['--force', '--sign', '-', path], { stdio: 'ignore' })
+  } catch {
+    /* leave as-is; caller will surface an error */
+  }
 }
 
 function spawnYtdlp(args: string[]): Promise<{ code: number; stdout: string; stderr: string }> {
   return new Promise((resolve) => {
-    const child = spawn(ytdlpBinaryPath(), args, { windowsHide: true })
+    const child = spawn(ytdlpBinaryPath(), args, ytdlpSpawnOptions())
     let stdout = ''
     let stderr = ''
     child.stdout.on('data', (d) => (stdout += d.toString()))
@@ -122,14 +208,25 @@ export function ensureYtdlp(): Promise<string> {
       if (existsSync(path) && statSync(path).size > 1_000_000) {
         emit({ state: 'checking', message: 'Checking download engine…' })
         const version = await getVersion()
-        emit({ state: 'ready', version, message: 'Ready' })
-        // Refresh in background occasionally (non-blocking).
-        void backgroundUpdate()
-        return path
+        if (version) {
+          emit({ state: 'ready', version, message: 'Ready' })
+          // Refresh in background occasionally (non-blocking).
+          void backgroundUpdate()
+          return path
+        }
+        // Present but won't run (e.g. a previously broken download) — replace it.
       }
       emit({ state: 'checking', message: 'Preparing download engine…' })
       await downloadBinary()
-      const version = await getVersion()
+      let version = await getVersion()
+      if (!version) {
+        // The stock binary normally runs as-is; if not, try an ad-hoc re-sign.
+        repairMacSignature(path)
+        version = await getVersion()
+      }
+      if (!version) {
+        throw new Error('The download engine was installed but failed to start on this system.')
+      }
       emit({ state: 'ready', version, message: 'Ready' })
       return path
     } catch (err) {

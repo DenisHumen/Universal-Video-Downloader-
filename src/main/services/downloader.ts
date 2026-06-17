@@ -4,7 +4,7 @@ import { spawn, ChildProcess } from 'child_process'
 import { existsSync, mkdirSync, readFileSync, writeFileSync, readdirSync, rmSync } from 'fs'
 import { join } from 'path'
 import { randomUUID } from 'crypto'
-import { ytdlpBinaryPath, ensureYtdlp } from './ytdlp'
+import { ytdlpBinaryPath, ensureYtdlp, ytdlpSpawnOptions } from './ytdlp'
 import { ffmpegLocation } from './ffmpeg'
 import { getSettings } from './settings'
 import { accessArgs, hasCookies, humanizeYtdlpError } from './options'
@@ -211,7 +211,7 @@ function runDownload(item: DownloadItem): void {
   emitUpdated(item)
 
   const args = buildArgs(item)
-  const child = spawn(ytdlpBinaryPath(), args, { windowsHide: true })
+  const child = spawn(ytdlpBinaryPath(), args, ytdlpSpawnOptions())
   procs.set(item.id, child)
 
   let stderrTail = ''

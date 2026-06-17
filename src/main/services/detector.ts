@@ -1,5 +1,5 @@
 import { spawn } from 'child_process'
-import { ytdlpBinaryPath } from './ytdlp'
+import { ytdlpBinaryPath, ytdlpSpawnOptions } from './ytdlp'
 import { getSettings } from './settings'
 import { accessArgs, hasCookies, humanizeYtdlpError } from './options'
 import type { DetectResult, FormatKind, MediaInfo, VideoFormat } from '@shared/types'
@@ -117,7 +117,7 @@ export function detect(url: string, signal?: AbortSignal): Promise<DetectResult>
     ]
     args.push(url)
 
-    const child = spawn(ytdlpBinaryPath(), args, { windowsHide: true })
+    const child = spawn(ytdlpBinaryPath(), args, ytdlpSpawnOptions())
     let stdout = ''
     let stderr = ''
     const timeout = setTimeout(() => {
