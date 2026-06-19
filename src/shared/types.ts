@@ -65,6 +65,8 @@ export interface PlaylistEntry {
 export interface StreamTranslator {
   id: string
   name: string
+  /** Translation is locked behind the site's Premium subscription — not downloadable. */
+  premium?: boolean
 }
 
 export interface StreamSeason {
@@ -74,7 +76,7 @@ export interface StreamSeason {
 
 /** Rich info for streaming sites that need translator/episode/quality selection. */
 export interface StreamingInfo {
-  provider: 'rezka'
+  provider: 'rezka' | 'yummyani'
   host: string
   id: string
   title: string
@@ -83,6 +85,8 @@ export interface StreamingInfo {
   translators: StreamTranslator[]
   defaultTranslator: string
   seasons: StreamSeason[]
+  /** Per-translator season/episode lists, when they differ between translators (e.g. anime dubbings). */
+  episodesByTranslator?: Record<string, StreamSeason[]>
   qualities: string[]
 }
 

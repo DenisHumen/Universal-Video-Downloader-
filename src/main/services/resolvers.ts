@@ -183,8 +183,10 @@ async function rezkaGetStreams(
     params.toString(),
     { Referer: `https://${host}/` }
   )
-  const json = JSON.parse(raw) as { url?: string; success?: boolean }
-  if (!json.url) throw new Error('The stream is unavailable (it may be Premium-only).')
+  const json = JSON.parse(raw) as { url?: string; success?: boolean; premium_content?: number }
+  if (json.premium_content || !json.url) {
+    throw new Error('This translation requires HDrezka Premium — it can’t be downloaded.')
+  }
   return parseRezkaStreams(json.url)
 }
 
@@ -197,19 +199,25 @@ async function resolveRezkaPage(url: string): Promise<ResolvedUrl> {
   const isSeries = !!sm
   const id = isSeries ? sm![1] : mm ? mm[1] : pick(/data-post_id="(\d+)"/, html)
   if (!id) return { url }
-  const defaultTranslator = isSeries ? sm![2] : mm ? mm[2] : '0'
+  let defaultTranslator = isSeries ? sm![2] : mm ? mm[2] : '0'
 
   const translators: StreamTranslator[] = []
   const seen = new Set<string>()
-  for (const tm of html.matchAll(/data-translator_id="(\d+)"[^>]*>\s*([^<]+?)\s*(?=<)/g)) {
-    const tid = tm[1]
-    const name = tm[2].trim()
+  for (const tm of html.matchAll(/<a\b([^>]*\bdata-translator_id="(\d+)"[^>]*)>\s*([^<]*)/g)) {
+    const attrs = tm[1]
+    const tid = tm[2]
+    const title = pick(/title="([^"]*)"/, attrs)
+    const name = (title || tm[3] || '').trim()
     if (name && !seen.has(tid)) {
       seen.add(tid)
-      translators.push({ id: tid, name })
+      translators.push({ id: tid, name, premium: /prem/i.test(attrs) })
     }
   }
   if (!translators.length) translators.push({ id: defaultTranslator, name: 'Default' })
+  // Start on a free translation so the picker doesn't open on a locked one.
+  if (!translators.some((t) => t.id === defaultTranslator && !t.premium)) {
+    defaultTranslator = (translators.find((t) => !t.premium) ?? translators[0]).id
+  }
 
   const epMap = new Map<number, Set<number>>()
   for (const em of html.matchAll(/data-season_id="(\d+)"\s+data-episode_id="(\d+)"/g)) {
@@ -253,6 +261,173 @@ async function resolveRezkaStream(uvdUrl: string): Promise<ResolvedUrl> {
   return { url: chosen.url, referer: `https://${host}/`, extractor: 'HDrezka' }
 }
 
+// ---- yummyani.me (anime, played through Kodik) ----
+
+const YUMMY_DOMAIN = /^https?:\/\/(?:[a-z0-9-]+\.)*yummyani\.me\/catalog\/item\//i
+
+function b64urlEncode(s: string): string {
+  return Buffer.from(s, 'utf-8').toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
+}
+function b64urlDecode(s: string): string {
+  return Buffer.from(s.replace(/-/g, '+').replace(/_/g, '/'), 'base64').toString('utf-8')
+}
+
+function caesar(s: string, n: number): string {
+  return s.replace(/[a-zA-Z]/g, (c) => {
+    const base = c <= 'Z' ? 65 : 97
+    return String.fromCharCode(((c.charCodeAt(0) - base + n) % 26) + base)
+  })
+}
+
+/**
+ * Kodik encodes its stream URLs as a Caesar cipher + base64. The shift changes
+ * periodically (it has been 13, 16, 18, …), so we brute-force it and accept the
+ * shift that decodes to a valid URL.
+ */
+function kodikDecode(src: string): string {
+  for (let n = 1; n < 26; n++) {
+    try {
+      let out = Buffer.from(caesar(src, n), 'base64').toString('utf-8')
+      if (out.startsWith('//') || /^https?:\/\//.test(out)) {
+        if (out.startsWith('//')) out = 'https:' + out
+        return out
+      }
+    } catch {
+      /* try next shift */
+    }
+  }
+  let out = Buffer.from(src, 'base64').toString('utf-8')
+  if (out.startsWith('//')) out = 'https:' + out
+  return out
+}
+
+interface KodikLinks {
+  [quality: string]: { src: string; type?: string }[]
+}
+
+async function kodikGetM3u8(playerUrl: string, episode: number, requested: string): Promise<string> {
+  const url = playerUrl.startsWith('//') ? 'https:' + playerUrl : playerUrl
+  const html = await fetchText(url, { Referer: 'https://old.yummyani.me/' })
+  const upRaw = pick(/urlParams = '([^']+)'/, html)
+  if (!upRaw) throw new Error('Kodik player params not found')
+  const up = JSON.parse(upRaw) as Record<string, string>
+
+  // Episode <option> elements carry data-id (episodeID) and data-hash (episodeHash).
+  let id = ''
+  let hash = ''
+  for (const opt of html.match(/<option[^>]*>/g) || []) {
+    const oid = pick(/data-id="(\d+)"/, opt)
+    const oh = pick(/data-hash="([a-f0-9]+)"/, opt)
+    const v = pick(/value="(\d+)"/, opt)
+    if (oid && oh && Number(v) === episode) {
+      id = oid
+      hash = oh
+      break
+    }
+  }
+  if (!id) {
+    const seq = [...html.matchAll(/data-id="(\d+)"\s+data-hash="([a-f0-9]+)"/g)]
+    const fallback = seq[episode - 1]
+    if (fallback) {
+      id = fallback[1]
+      hash = fallback[2]
+    }
+  }
+  if (!id || !hash) throw new Error('Episode not found in the Kodik player')
+
+  const body = new URLSearchParams({
+    d: up.d,
+    d_sign: up.d_sign,
+    pd: up.pd,
+    pd_sign: up.pd_sign,
+    ref: decodeURIComponent(up.ref || ''),
+    ref_sign: up.ref_sign,
+    bad_user: 'false',
+    cdn_is_working: 'true',
+    type: 'seria',
+    hash,
+    id
+  })
+  const raw = await netPost('https://kodikplayer.com/ftor', body.toString(), {
+    Referer: 'https://kodikplayer.com/'
+  })
+  const json = JSON.parse(raw) as { links?: KodikLinks }
+  const links = json.links || {}
+  const tiers = Object.keys(links)
+    .map((q) => ({ q, h: parseInt(q, 10) || 0 }))
+    .sort((a, b) => a.h - b.h)
+  if (!tiers.length) throw new Error('No streams returned by Kodik')
+  const want = requested === 'best' || requested === 'audio' ? Infinity : parseInt(requested, 10) || Infinity
+  const chosen = tiers.filter((t) => t.h <= want).pop()?.q || tiers[tiers.length - 1].q
+  return kodikDecode(links[chosen][0].src)
+}
+
+interface YaniVideo {
+  number: string
+  data: { player: string; dubbing: string }
+  iframe_url: string
+}
+
+async function resolveYummyaniPage(url: string): Promise<ResolvedUrl> {
+  const page = await fetchText(url, { Referer: 'https://old.yummyani.me/' })
+  const animeId = pick(/yani\.tv\/a(\d+)/, page) || pick(/data-id="(\d+)"/, page)
+  if (!animeId) return { url }
+
+  const meta = (
+    JSON.parse(await fetchText(`https://api.yani.tv/anime/${animeId}`, { Referer: 'https://old.yummyani.me/' })) as {
+      response: { title?: string; poster?: string }
+    }
+  ).response
+  const videos = (
+    JSON.parse(
+      await fetchText(`https://api.yani.tv/anime/${animeId}/videos`, { Referer: 'https://old.yummyani.me/' })
+    ) as { response: YaniVideo[] }
+  ).response
+
+  // Group Kodik entries by dubbing — each dubbing maps to one season player URL.
+  const byDub = new Map<string, { base: string; episodes: Set<number> }>()
+  for (const v of videos) {
+    if (v.data.player !== 'Плеер Kodik') continue
+    const base = v.iframe_url.split('?')[0]
+    const dub = v.data.dubbing || 'Kodik'
+    if (!byDub.has(dub)) byDub.set(dub, { base, episodes: new Set() })
+    byDub.get(dub)!.episodes.add(Number(v.number))
+  }
+  if (!byDub.size) return { url }
+
+  const translators: StreamTranslator[] = []
+  const episodesByTranslator: Record<string, StreamSeason[]> = {}
+  for (const [dub, info] of byDub) {
+    const tid = b64urlEncode(info.base)
+    translators.push({ id: tid, name: dub })
+    episodesByTranslator[tid] = [{ season: 1, episodes: [...info.episodes].sort((a, b) => a - b) }]
+  }
+  const defaultTranslator = translators[0].id
+
+  const streaming: StreamingInfo = {
+    provider: 'yummyani',
+    host: 'old.yummyani.me',
+    id: animeId,
+    title: meta.title || 'Anime',
+    thumbnail: meta.poster,
+    isSeries: episodesByTranslator[defaultTranslator][0].episodes.length > 1,
+    translators,
+    defaultTranslator,
+    seasons: episodesByTranslator[defaultTranslator],
+    episodesByTranslator,
+    qualities: ['360p', '480p', '720p']
+  }
+  return { url, streaming, extractor: 'YummyAnime', title: streaming.title, thumbnail: streaming.thumbnail }
+}
+
+// uvd-yummy://<translatorId(=base64url kodik season url)>/<episode>/<quality>
+async function resolveYummyaniStream(uvdUrl: string): Promise<ResolvedUrl> {
+  const [tid, episode, quality] = uvdUrl.replace(/^uvd-yummy:\/\//, '').split('/')
+  const base = b64urlDecode(tid)
+  const m3u8 = await kodikGetM3u8(base, Number(episode), decodeURIComponent(quality || 'best'))
+  return { url: m3u8, referer: 'https://kodikplayer.com/', extractor: 'YummyAnime' }
+}
+
 interface Resolver {
   match: RegExp
   resolve: (url: string) => Promise<ResolvedUrl>
@@ -261,7 +436,8 @@ interface Resolver {
 const resolvers: Resolver[] = [
   { match: /^https?:\/\/(?:[a-z0-9-]+\.)*cumgloryhole\.se\/videos\//i, resolve: resolveCghVideo },
   { match: /^https?:\/\/(?:[a-z0-9-]+\.)*cumgloryhole\.se\/models\//i, resolve: resolveCghModel },
-  { match: REZKA_DOMAIN, resolve: resolveRezkaPage }
+  { match: REZKA_DOMAIN, resolve: resolveRezkaPage },
+  { match: YUMMY_DOMAIN, resolve: resolveYummyaniPage }
 ]
 
 /**
@@ -273,6 +449,9 @@ export async function resolveUrl(input: string): Promise<ResolvedUrl> {
   const trimmed = input.trim()
   if (trimmed.startsWith('uvd-rezka://')) {
     return resolveRezkaStream(trimmed)
+  }
+  if (trimmed.startsWith('uvd-yummy://')) {
+    return resolveYummyaniStream(trimmed)
   }
   for (const r of resolvers) {
     if (r.match.test(trimmed)) {

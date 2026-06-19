@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { CheckCheck, Download, Film, Loader2, Tv, X } from 'lucide-react'
+import { CheckCheck, Crown, Download, Film, Loader2, Tv, X } from 'lucide-react'
 import type { MediaInfo, QualityPreset } from '@shared/types'
 import Segmented from './Segmented'
 import { toast } from '../lib/toast'
@@ -30,11 +30,24 @@ export default function StreamingCard({ info, onDone }: Props): JSX.Element {
   const [busy, setBusy] = useState(false)
 
   const translatorName = s.translators.find((t) => t.id === translatorId)?.name || ''
-  const currentSeason = s.seasons.find((x) => x.season === season)
+  const seasonsForT = s.episodesByTranslator?.[translatorId] ?? s.seasons
+  const currentSeason = seasonsForT.find((x) => x.season === season) ?? seasonsForT[0]
   const totalSelected = useMemo(
     () => Object.values(selected).reduce((n, arr) => n + arr.length, 0),
     [selected]
   )
+
+  const changeTranslator = (id: string): void => {
+    setTranslatorId(id)
+    const next = s.episodesByTranslator?.[id] ?? s.seasons
+    setSeason(next[0]?.season ?? 1)
+    setSelected({})
+  }
+
+  const buildEpisodeUrl = (seasonNum: number, ep: number): string =>
+    s.provider === 'yummyani'
+      ? `uvd-yummy://${translatorId}/${ep}/${quality}`
+      : `uvd-rezka://${s.host}/${s.id}/${translatorId}/${seasonNum}/${ep}/${quality}`
 
   const toggleEpisode = (ep: number): void => {
     setSelected((prev) => {
@@ -54,9 +67,8 @@ export default function StreamingCard({ info, onDone }: Props): JSX.Element {
     let count = 0
     for (const [seasonStr, eps] of Object.entries(selected)) {
       for (const ep of eps) {
-        const q = quality === 'best' ? 'best' : quality
         await window.api.startDownload({
-          url: `uvd-rezka://${s.host}/${s.id}/${translatorId}/${seasonStr}/${ep}/${q}`,
+          url: buildEpisodeUrl(Number(seasonStr), ep),
           title: `${s.title} - S${pad2(Number(seasonStr))}E${pad2(ep)} (${translatorName})`,
           thumbnail: s.thumbnail,
           mode: 'video',
@@ -78,7 +90,10 @@ export default function StreamingCard({ info, onDone }: Props): JSX.Element {
   const queueMovie = async (): Promise<void> => {
     setBusy(true)
     await window.api.startDownload({
-      url: `uvd-rezka://${s.host}/${s.id}/${translatorId}/movie/0/${quality}`,
+      url:
+        s.provider === 'yummyani'
+          ? `uvd-yummy://${translatorId}/1/${quality}`
+          : `uvd-rezka://${s.host}/${s.id}/${translatorId}/movie/0/${quality}`,
       title: `${s.title}${translatorName ? ` (${translatorName})` : ''}`,
       thumbnail: s.thumbnail,
       mode: 'video',
@@ -108,7 +123,12 @@ export default function StreamingCard({ info, onDone }: Props): JSX.Element {
         <div className="min-w-0 flex-1">
           <h2 className="text-base font-semibold text-cream">{s.title}</h2>
           <p className="mono mt-0.5 text-xs text-white/40">
-            {s.isSeries ? `series · ${s.seasons.length} seasons` : 'movie'} · HDrezka
+            {s.isSeries
+              ? seasonsForT.length > 1
+                ? `series · ${seasonsForT.length} seasons`
+                : 'series'
+              : 'movie'}{' '}
+            · {s.provider === 'yummyani' ? 'YummyAnime' : 'HDrezka'}
           </p>
           <span className="mono mt-2 inline-block rounded-lg bg-white/[0.06] px-2 py-0.5 text-[10px] text-white/50">
             {s.host}
@@ -127,12 +147,23 @@ export default function StreamingCard({ info, onDone }: Props): JSX.Element {
                 return (
                   <button
                     key={t.id}
-                    onClick={() => setTranslatorId(t.id)}
-                    className={`no-drag rounded-xl px-3 py-2 text-xs font-medium transition-colors ${
-                      active ? 'bg-cream text-ink-950' : 'bg-white/[0.05] text-white/60 hover:text-cream'
+                    onClick={() => !t.premium && changeTranslator(t.id)}
+                    disabled={t.premium}
+                    title={t.premium ? 'Requires Premium — cannot be downloaded' : undefined}
+                    className={`no-drag flex items-center gap-1.5 rounded-xl px-3 py-2 text-xs font-medium transition-colors ${
+                      t.premium
+                        ? 'cursor-not-allowed bg-white/[0.02] text-white/30'
+                        : active
+                          ? 'bg-cream text-ink-950'
+                          : 'bg-white/[0.05] text-white/60 hover:text-cream'
                     }`}
                   >
                     {t.name}
+                    {t.premium && (
+                      <span className="flex items-center gap-0.5 rounded bg-amber-400/15 px-1 py-0.5 text-[9px] font-bold uppercase text-amber-300/90">
+                        <Crown size={9} /> premium
+                      </span>
+                    )}
                   </button>
                 )
               })}
@@ -150,7 +181,7 @@ export default function StreamingCard({ info, onDone }: Props): JSX.Element {
                 fill={false}
                 value={String(season)}
                 onChange={(v) => setSeason(Number(v))}
-                options={s.seasons.map((x) => ({ value: String(x.season), label: String(x.season) }))}
+                options={seasonsForT.map((x) => ({ value: String(x.season), label: String(x.season) }))}
               />
             </div>
 
