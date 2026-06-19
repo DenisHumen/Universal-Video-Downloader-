@@ -368,6 +368,21 @@ interface YaniVideo {
   iframe_url: string
 }
 
+type YaniPoster = string | Record<string, string> | undefined
+
+/** yani.tv posters come as an object of sizes with protocol-relative URLs. */
+function normalizeYaniPoster(poster: YaniPoster): string | undefined {
+  let u: string | undefined
+  if (typeof poster === 'string') u = poster
+  else if (poster && typeof poster === 'object') {
+    u = poster.fullsize || poster.big || poster.medium || poster.small || poster.huge || poster.mega
+  }
+  if (!u) return undefined
+  if (u.startsWith('//')) u = 'https:' + u
+  else if (u.startsWith('/')) u = 'https://static.yani.tv' + u
+  return u
+}
+
 async function resolveYummyaniPage(url: string): Promise<ResolvedUrl> {
   const page = await fetchText(url, { Referer: 'https://old.yummyani.me/' })
   const animeId = pick(/yani\.tv\/a(\d+)/, page) || pick(/data-id="(\d+)"/, page)
@@ -375,9 +390,10 @@ async function resolveYummyaniPage(url: string): Promise<ResolvedUrl> {
 
   const meta = (
     JSON.parse(await fetchText(`https://api.yani.tv/anime/${animeId}`, { Referer: 'https://old.yummyani.me/' })) as {
-      response: { title?: string; poster?: string }
+      response: { title?: string; poster?: YaniPoster }
     }
   ).response
+  const thumbnail = normalizeYaniPoster(meta.poster)
   const videos = (
     JSON.parse(
       await fetchText(`https://api.yani.tv/anime/${animeId}/videos`, { Referer: 'https://old.yummyani.me/' })
@@ -409,7 +425,7 @@ async function resolveYummyaniPage(url: string): Promise<ResolvedUrl> {
     host: 'old.yummyani.me',
     id: animeId,
     title: meta.title || 'Anime',
-    thumbnail: meta.poster,
+    thumbnail,
     isSeries: episodesByTranslator[defaultTranslator][0].episodes.length > 1,
     translators,
     defaultTranslator,
