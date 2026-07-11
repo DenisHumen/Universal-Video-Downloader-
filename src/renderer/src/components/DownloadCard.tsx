@@ -31,8 +31,17 @@ const STATE_LABEL: Record<DownloadItem['state'], { label: string; tone: string }
 
 export default function DownloadCard({ item }: Props): JSX.Element {
   const meta = STATE_LABEL[item.state]
-  const active = item.state === 'downloading' || item.state === 'processing'
+  const active =
+    item.state === 'downloading' || item.state === 'processing' || item.state === 'detecting'
   const percent = Math.round(item.percent || 0)
+  const qualityLabel =
+    item.mode === 'audio'
+      ? null
+      : item.formatId
+        ? null
+        : item.quality && item.quality !== 'best' && item.quality !== 'audio'
+          ? `${item.quality}p`
+          : null
 
   return (
     <motion.div
@@ -67,10 +76,16 @@ export default function DownloadCard({ item }: Props): JSX.Element {
             <p className="truncate text-sm font-medium text-cream" title={item.title}>
               {item.title}
             </p>
-            <div className="mono mt-0.5 flex items-center gap-2 text-xs">
+            <div className="mono mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs">
               <span className={`font-medium ${meta.tone}`}>{meta.label}</span>
+              {qualityLabel && <span className="text-white/35">· {qualityLabel}</span>}
               {active && item.speed ? <span className="text-white/35">· {formatSpeed(item.speed)}</span> : null}
               {active && item.eta ? <span className="text-white/35">· {formatEta(item.eta)}</span> : null}
+              {item.state === 'downloading' && item.downloadedBytes && item.totalBytes ? (
+                <span className="text-white/35">
+                  · {formatBytes(item.downloadedBytes)} / {formatBytes(item.totalBytes)}
+                </span>
+              ) : null}
               {item.state === 'completed' && item.totalBytes ? (
                 <span className="text-white/35">· {formatBytes(item.totalBytes)}</span>
               ) : null}
@@ -79,11 +94,19 @@ export default function DownloadCard({ item }: Props): JSX.Element {
 
           <div className="flex shrink-0 items-center gap-1">
             {item.state === 'completed' && item.filepath && (
-              <button className="btn-icon" title="Show in folder" onClick={() => window.api.showInFolder(item.filepath!)}>
-                <FolderOpen size={16} />
-              </button>
+              <>
+                <button className="btn-icon" title="Play" onClick={() => window.api.openPath(item.filepath!)}>
+                  <Play size={16} />
+                </button>
+                <button className="btn-icon" title="Show in folder" onClick={() => window.api.showInFolder(item.filepath!)}>
+                  <FolderOpen size={16} />
+                </button>
+              </>
             )}
-            {(item.state === 'downloading' || item.state === 'queued' || item.state === 'processing') && (
+            {(item.state === 'downloading' ||
+              item.state === 'queued' ||
+              item.state === 'processing' ||
+              item.state === 'detecting') && (
               <button className="btn-icon" title="Pause" onClick={() => window.api.pauseDownload(item.id)}>
                 <Pause size={16} />
               </button>
@@ -98,7 +121,10 @@ export default function DownloadCard({ item }: Props): JSX.Element {
                 <RotateCw size={16} />
               </button>
             )}
-            {(item.state === 'downloading' || item.state === 'paused' || item.state === 'queued') && (
+            {(item.state === 'downloading' ||
+              item.state === 'paused' ||
+              item.state === 'queued' ||
+              item.state === 'detecting') && (
               <button
                 className="btn-icon hover:bg-red-500/20 hover:text-red-300"
                 title="Cancel"

@@ -24,8 +24,8 @@ Powered by [yt-dlp](https://github.com/yt-dlp/yt-dlp) and ffmpeg, wrapped in a m
 - **Streaming sites (films & series)** — for sites like **HDrezka** (and its mirror domains) and **YummyAnime** (via the Kodik player) the app reads the available **voiceovers (озвучки)**, **seasons**, **episodes** and **qualities**, lets you multi-select episodes, and queues each as `Title - S01E02`. Premium-only translations are flagged with a ⭐ badge and can't be downloaded.
 - **Playlists** — model/listing pages expand into a pickable list with per-item or bulk download.
 - **Convenience** — desktop notifications on completion, taskbar/dock progress, keyboard shortcuts (⌘/Ctrl+1/2/3, ⌘/Ctrl+,), paste-anywhere and drag-and-drop a link to detect, plus a one-click macOS Gatekeeper fix banner.
-- **Quality your way** — one-click presets (Best, 4K, 1080p, 720p…) or pick an exact stream. Audio-only extraction to MP3, M4A, OPUS, FLAC, WAV, AAC.
-- **Smart download queue** — parallel downloads, live progress, speed & ETA, pause / resume / retry / cancel.
+- **Quality your way** — automatic **best** quality by default, one-click presets (4K, 1080p, 720p…) or pick an exact stream. A preset above what the video offers gracefully falls back to the best available — it never fails. Audio-only extraction to MP3, M4A, OPUS, FLAC, WAV, AAC.
+- **Smart download queue** — parallel downloads, live progress, speed & ETA, pause / resume / retry / cancel. Streaming-site links are re-resolved on every retry, so expired CDN URLs never break a download.
 - **Post-processing** — embed thumbnails, metadata and subtitles; automatic merging of separate video+audio streams with bundled ffmpeg.
 - **Self-updating** — the app checks for new releases on launch and can download, install and relaunch itself. The yt-dlp engine also keeps itself up to date.
 - **Minimal dark UI** — a clean, monochrome cobalt-inspired interface: a left nav, floating rounded panels, segmented controls and smooth Framer Motion transitions in a frameless window.

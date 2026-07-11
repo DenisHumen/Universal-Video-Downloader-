@@ -35,7 +35,12 @@ export function loadHistory(): void {
     const arr = JSON.parse(readFileSync(file, 'utf-8')) as DownloadItem[]
     for (const item of arr) {
       // Anything that was mid-flight when the app closed becomes paused.
-      if (item.state === 'downloading' || item.state === 'processing' || item.state === 'queued') {
+      if (
+        item.state === 'downloading' ||
+        item.state === 'processing' ||
+        item.state === 'queued' ||
+        item.state === 'detecting'
+      ) {
         item.state = 'paused'
       }
       items.set(item.id, item)
@@ -73,30 +78,29 @@ function emitProgress(progress: DownloadProgress): void {
 }
 
 function qualityFormat(quality: QualityPreset | undefined): string {
-  switch (quality) {
-    case 'audio':
-      return 'bestaudio/best'
-    case '2160':
-      return 'bv*[height<=2160]+ba/b[height<=2160]/b'
-    case '1440':
-      return 'bv*[height<=1440]+ba/b[height<=1440]/b'
-    case '1080':
-      return 'bv*[height<=1080]+ba/b[height<=1080]/b'
-    case '720':
-      return 'bv*[height<=720]+ba/b[height<=720]/b'
-    case '480':
-      return 'bv*[height<=480]+ba/b[height<=480]/b'
-    case '360':
-      return 'bv*[height<=360]+ba/b[height<=360]/b'
-    case 'best':
-    default:
-      return 'bv*+ba/b'
-  }
+  if (quality === 'audio') return 'bestaudio/best'
+  const height = Number(quality)
+  // 'best' (and anything non-numeric) → let the engine pick the best available.
+  if (!Number.isFinite(height) || height <= 0) return 'bv*+ba/b'
+  // `<=?` keeps formats with unknown height in play (common for HLS streams),
+  // and the trailing `bv*+ba/b` means a request above what the site offers
+  // falls back to the best available instead of erroring out.
+  return `bv*[height<=?${height}]+ba/b[height<=?${height}]/bv*+ba/b`
 }
 
 function buildArgs(item: DownloadItem): string[] {
   const settings = getSettings()
-  const args: string[] = ['--ignore-config', '--no-playlist', '--newline', '--no-color', '--continue']
+  const args: string[] = [
+    '--ignore-config',
+    '--no-playlist',
+    '--newline',
+    '--no-color',
+    '--continue',
+    // Be resilient to flaky hosts and speed up fragmented (HLS/DASH) downloads.
+    '--retries', '5',
+    '--fragment-retries', '10',
+    '--concurrent-fragments', '4'
+  ]
 
   const ffmpeg = ffmpegLocation()
   if (ffmpeg) args.push('--ffmpeg-location', ffmpeg)
@@ -200,7 +204,7 @@ function handleProgressLine(line: string, item: DownloadItem): void {
 function activeCount(): number {
   let n = 0
   for (const item of items.values()) {
-    if (item.state === 'downloading' || item.state === 'processing') n++
+    if (item.state === 'downloading' || item.state === 'processing' || item.state === 'detecting') n++
   }
   return n
 }
@@ -212,14 +216,39 @@ function processQueue(): void {
   for (const item of listDownloads().reverse()) {
     if (activeCount() >= limit) break
     if (item.state === 'queued' && !procs.has(item.id)) {
-      runDownload(item)
+      void runDownload(item)
     }
   }
 }
 
-function runDownload(item: DownloadItem): void {
-  item.state = 'downloading'
+async function runDownload(item: DownloadItem): Promise<void> {
+  // Re-resolve the original URL on every (re)start: streaming-site CDN links
+  // are short-lived, and resolve errors (e.g. premium-only translations) land
+  // on the card as a normal failure the user can see and retry.
+  item.state = 'detecting'
   item.error = undefined
+  emitUpdated(item)
+  try {
+    const resolved = await resolveUrl(item.sourceUrl || item.url)
+    item.url = resolved.url
+    item.referer = resolved.referer
+    if (resolved.extractor) item.extractor = resolved.extractor
+    if (resolved.title && (!item.title || item.title === item.sourceUrl)) item.title = resolved.title
+    if (!item.thumbnail && resolved.thumbnail) item.thumbnail = resolved.thumbnail
+  } catch (err) {
+    item.state = 'error'
+    item.error = err instanceof Error ? err.message : String(err)
+    emitUpdated(item)
+    processQueue()
+    return
+  }
+  // Paused/canceled/removed while we were resolving — don't start the engine.
+  if (!items.has(item.id) || item.state !== 'detecting') {
+    processQueue()
+    return
+  }
+
+  item.state = 'downloading'
   emitUpdated(item)
 
   const args = buildArgs(item)
@@ -291,21 +320,20 @@ export async function startDownload(req: DownloadRequest): Promise<DownloadItem>
   await ensureYtdlp()
   const settings = getSettings()
   const id = randomUUID()
-  // Resolve custom sites (e.g. scrape a page to its real stream URL + referer).
-  const resolved = await resolveUrl(req.url)
+  // Queue immediately; URL resolution (scraping custom sites for the real
+  // stream link) happens in runDownload when the item's turn comes.
   const item: DownloadItem = {
     id,
-    url: resolved.url,
-    title: req.title || resolved.title || req.url,
-    thumbnail: req.thumbnail || resolved.thumbnail,
-    extractor: resolved.extractor,
+    url: req.url,
+    sourceUrl: req.url,
+    title: req.title || req.url,
+    thumbnail: req.thumbnail,
     mode: req.mode,
     quality: req.quality,
     formatId: req.formatId,
     state: 'queued',
     percent: 0,
     outputDir: req.outputDir || settings.downloadDir,
-    referer: resolved.referer,
     createdAt: Date.now()
   }
   items.set(id, item)

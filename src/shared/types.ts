@@ -119,6 +119,9 @@ export interface DownloadRequest {
 export interface DownloadItem {
   id: string
   url: string
+  /** The URL the user originally submitted — re-resolved on every (re)start so
+   *  short-lived CDN stream links are always fresh. */
+  sourceUrl?: string
   title: string
   thumbnail?: string
   extractor?: string

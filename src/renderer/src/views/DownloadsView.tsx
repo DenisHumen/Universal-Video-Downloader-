@@ -1,6 +1,7 @@
 import { AnimatePresence, motion } from 'framer-motion'
 import { FolderOpen, Inbox, Trash2 } from 'lucide-react'
 import { useStore } from '../store'
+import { formatSpeed } from '../lib/format'
 import DownloadCard from '../components/DownloadCard'
 
 export default function DownloadsView(): JSX.Element {
@@ -9,6 +10,9 @@ export default function DownloadsView(): JSX.Element {
   const setView = useStore((s) => s.setView)
 
   const hasFinished = downloads.some((d) => ['completed', 'error', 'canceled'].includes(d.state))
+  const totalSpeed = downloads
+    .filter((d) => d.state === 'downloading')
+    .reduce((n, d) => n + (d.speed || 0), 0)
 
   return (
     <div className="mx-auto flex h-full w-full max-w-2xl flex-col px-8 py-9">
@@ -17,6 +21,7 @@ export default function DownloadsView(): JSX.Element {
           <h1 className="text-2xl font-semibold tracking-tight text-cream">queue</h1>
           <p className="mono text-sm text-white/40">
             {downloads.length} item{downloads.length === 1 ? '' : 's'}
+            {totalSpeed > 0 && <span className="text-white/55"> · {formatSpeed(totalSpeed)}</span>}
           </p>
         </div>
         <div className="flex items-center gap-2">

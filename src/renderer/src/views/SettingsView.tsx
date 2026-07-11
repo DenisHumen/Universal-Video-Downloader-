@@ -108,17 +108,22 @@ export default function SettingsView(): JSX.Element {
             ]}
           />
         </Field>
-        <Field label="default quality">
+        <Field
+          label="default quality"
+          hint="best = automatically picks the highest quality the video offers. a fixed choice falls back to best when it isn't available."
+        >
           <Segmented
             layoutId="set-quality"
-            value={settings.defaultQuality}
+            value={settings.defaultQuality === 'audio' ? 'best' : settings.defaultQuality}
             onChange={(v) => set('defaultQuality', v as QualityPreset)}
             options={[
               { value: 'best', label: 'best' },
               { value: '2160', label: '4K' },
+              { value: '1440', label: '1440p' },
               { value: '1080', label: '1080p' },
               { value: '720', label: '720p' },
-              { value: 'audio', label: 'audio' }
+              { value: '480', label: '480p' },
+              { value: '360', label: '360p' }
             ]}
           />
         </Field>

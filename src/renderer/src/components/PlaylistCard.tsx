@@ -1,7 +1,8 @@
 import { useState } from 'react'
-import { Download, ListVideo, Loader2, Music, Video } from 'lucide-react'
+import { Download, ListVideo, Loader2, Music, Sparkles, Video } from 'lucide-react'
 import type { DownloadMode, MediaInfo, QualityPreset } from '@shared/types'
 import Segmented from './Segmented'
+import { initialMode, initialQuality } from '../lib/quality'
 import { toast } from '../lib/toast'
 import { useStore } from '../store'
 
@@ -12,8 +13,9 @@ interface Props {
 
 export default function PlaylistCard({ info, onDone }: Props): JSX.Element {
   const setView = useStore((s) => s.setView)
-  const [mode, setMode] = useState<DownloadMode>('video')
-  const [quality, setQuality] = useState<QualityPreset>('best')
+  const settings = useStore((s) => s.settings)
+  const [mode, setMode] = useState<DownloadMode>(initialMode(settings))
+  const [quality, setQuality] = useState<QualityPreset>(initialQuality(settings))
   const [busy, setBusy] = useState(false)
   const [added, setAdded] = useState<Set<string>>(new Set())
 
@@ -32,8 +34,14 @@ export default function PlaylistCard({ info, onDone }: Props): JSX.Element {
 
   const downloadAll = async (): Promise<void> => {
     setBusy(true)
-    await queue(entries)
-    setBusy(false)
+    try {
+      await queue(entries)
+    } catch (err) {
+      toast(err instanceof Error ? err.message : 'Could not start the download', 'error')
+      return
+    } finally {
+      setBusy(false)
+    }
     toast(`Added ${entries.length} videos to the queue`, 'success')
     onDone()
     setView('downloads')
@@ -78,10 +86,13 @@ export default function PlaylistCard({ info, onDone }: Props): JSX.Element {
               value={quality}
               onChange={(v) => setQuality(v as QualityPreset)}
               options={[
-                { value: 'best', label: 'best' },
+                { value: 'best', label: 'best', icon: <Sparkles size={12} /> },
+                { value: '2160', label: '4K' },
+                { value: '1440', label: '1440p' },
                 { value: '1080', label: '1080p' },
                 { value: '720', label: '720p' },
-                { value: '480', label: '480p' }
+                { value: '480', label: '480p' },
+                { value: '360', label: '360p' }
               ]}
             />
           </div>

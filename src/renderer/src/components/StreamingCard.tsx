@@ -1,7 +1,8 @@
 import { useMemo, useState } from 'react'
-import { CheckCheck, Crown, Download, Film, Loader2, Tv, X } from 'lucide-react'
+import { CheckCheck, Crown, Download, Film, Loader2, Sparkles, Tv, X } from 'lucide-react'
 import type { MediaInfo, QualityPreset } from '@shared/types'
-import Segmented from './Segmented'
+import Segmented, { type SegOption } from './Segmented'
+import { initialQuality, QUALITY_HEIGHTS } from '../lib/quality'
 import { toast } from '../lib/toast'
 import { useStore } from '../store'
 
@@ -10,23 +11,29 @@ interface Props {
   onDone: () => void
 }
 
-const QUALITIES: { q: QualityPreset; label: string }[] = [
-  { q: 'best', label: 'best' },
-  { q: '1080', label: '1080p' },
-  { q: '720', label: '720p' },
-  { q: '480', label: '480p' },
-  { q: '360', label: '360p' }
-]
-
 const pad2 = (n: number): string => String(n).padStart(2, '0')
 
 export default function StreamingCard({ info, onDone }: Props): JSX.Element {
   const setView = useStore((s) => s.setView)
+  const settings = useStore((s) => s.settings)
   const s = info.streaming!
+
+  // Offer only the qualities this provider actually serves, plus automatic
+  // "best" — preselected so a too-high default can never break the download.
+  const heights = useMemo(() => {
+    const known = new Set<number>(QUALITY_HEIGHTS)
+    const hs = [...new Set(s.qualities.map((q) => parseInt(q, 10)).filter((h) => known.has(h)))]
+    return hs.sort((a, b) => b - a)
+  }, [s.qualities])
+  const qualityOptions: SegOption[] = [
+    { value: 'best', label: 'best', icon: <Sparkles size={12} /> },
+    ...heights.map((h) => ({ value: String(h), label: `${h}p` }))
+  ]
+
   const [translatorId, setTranslatorId] = useState(s.defaultTranslator)
   const [season, setSeason] = useState(s.seasons[0]?.season ?? 1)
   const [selected, setSelected] = useState<Record<number, number[]>>({})
-  const [quality, setQuality] = useState<QualityPreset>('1080')
+  const [quality, setQuality] = useState<QualityPreset>(initialQuality(settings, heights[0] || 0))
   const [busy, setBusy] = useState(false)
 
   const translatorName = s.translators.find((t) => t.id === translatorId)?.name || ''
@@ -65,19 +72,25 @@ export default function StreamingCard({ info, onDone }: Props): JSX.Element {
   const queueSeries = async (): Promise<void> => {
     setBusy(true)
     let count = 0
-    for (const [seasonStr, eps] of Object.entries(selected)) {
-      for (const ep of eps) {
-        await window.api.startDownload({
-          url: buildEpisodeUrl(Number(seasonStr), ep),
-          title: `${s.title} - S${pad2(Number(seasonStr))}E${pad2(ep)} (${translatorName})`,
-          thumbnail: s.thumbnail,
-          mode: 'video',
-          quality
-        })
-        count++
+    try {
+      for (const [seasonStr, eps] of Object.entries(selected)) {
+        for (const ep of eps) {
+          await window.api.startDownload({
+            url: buildEpisodeUrl(Number(seasonStr), ep),
+            title: `${s.title} - S${pad2(Number(seasonStr))}E${pad2(ep)} (${translatorName})`,
+            thumbnail: s.thumbnail,
+            mode: 'video',
+            quality
+          })
+          count++
+        }
       }
+    } catch (err) {
+      toast(err instanceof Error ? err.message : 'Could not start the download', 'error')
+      return
+    } finally {
+      setBusy(false)
     }
-    setBusy(false)
     if (count) {
       toast(`Added ${count} episode${count > 1 ? 's' : ''} to the queue`, 'success')
       onDone()
@@ -89,17 +102,23 @@ export default function StreamingCard({ info, onDone }: Props): JSX.Element {
 
   const queueMovie = async (): Promise<void> => {
     setBusy(true)
-    await window.api.startDownload({
-      url:
-        s.provider === 'yummyani'
-          ? `uvd-yummy://${translatorId}/1/${quality}`
-          : `uvd-rezka://${s.host}/${s.id}/${translatorId}/movie/0/${quality}`,
-      title: `${s.title}${translatorName ? ` (${translatorName})` : ''}`,
-      thumbnail: s.thumbnail,
-      mode: 'video',
-      quality
-    })
-    setBusy(false)
+    try {
+      await window.api.startDownload({
+        url:
+          s.provider === 'yummyani'
+            ? `uvd-yummy://${translatorId}/1/${quality}`
+            : `uvd-rezka://${s.host}/${s.id}/${translatorId}/movie/0/${quality}`,
+        title: `${s.title}${translatorName ? ` (${translatorName})` : ''}`,
+        thumbnail: s.thumbnail,
+        mode: 'video',
+        quality
+      })
+    } catch (err) {
+      toast(err instanceof Error ? err.message : 'Could not start the download', 'error')
+      return
+    } finally {
+      setBusy(false)
+    }
     toast('Added to the queue', 'success')
     onDone()
     setView('downloads')
@@ -225,7 +244,7 @@ export default function StreamingCard({ info, onDone }: Props): JSX.Element {
                 layoutId="rz-quality"
                 value={quality}
                 onChange={(v) => setQuality(v as QualityPreset)}
-                options={QUALITIES.map((q) => ({ value: q.q, label: q.label }))}
+                options={qualityOptions}
               />
             </div>
 
@@ -242,7 +261,7 @@ export default function StreamingCard({ info, onDone }: Props): JSX.Element {
                 layoutId="rz-quality"
                 value={quality}
                 onChange={(v) => setQuality(v as QualityPreset)}
-                options={QUALITIES.map((q) => ({ value: q.q, label: q.label }))}
+                options={qualityOptions}
               />
             </div>
             <button className="btn-primary w-full py-3 text-[15px]" onClick={queueMovie} disabled={busy}>

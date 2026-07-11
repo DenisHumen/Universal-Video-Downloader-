@@ -14,6 +14,7 @@ import {
 import type { DownloadMode, MediaInfo, QualityPreset } from '@shared/types'
 import { useStore } from '../store'
 import { formatCount, formatDuration, isProbablyUrl } from '../lib/format'
+import { initialMode, initialQuality, maxHeightOf } from '../lib/quality'
 import { toast } from '../lib/toast'
 import FormatSelector from '../components/FormatSelector'
 import PlaylistCard from '../components/PlaylistCard'
@@ -94,7 +95,12 @@ export default function HomeView(): JSX.Element {
     const res = await window.api.detect(target)
     if (res.ok && res.info) {
       setInfo(res.info)
-      setSelection({ mode: 'video', quality: 'best' })
+      // Preselect the user's defaults, falling back to automatic "best" when
+      // their default quality isn't available for this particular video.
+      setSelection({
+        mode: initialMode(settings),
+        quality: initialQuality(settings, maxHeightOf(res.info.formats))
+      })
       setStatus('idle')
     } else {
       setError(res.error || 'Could not detect a video at this link.')
@@ -117,15 +123,21 @@ export default function HomeView(): JSX.Element {
   const start = async (): Promise<void> => {
     if (!info) return
     setStarting(true)
-    await window.api.startDownload({
-      url: info.webpageUrl || url,
-      title: info.title,
-      thumbnail: info.thumbnail,
-      mode: selection.mode,
-      quality: selection.quality,
-      formatId: selection.formatId
-    })
-    setStarting(false)
+    try {
+      await window.api.startDownload({
+        url: info.webpageUrl || url,
+        title: info.title,
+        thumbnail: info.thumbnail,
+        mode: selection.mode,
+        quality: selection.quality,
+        formatId: selection.formatId
+      })
+    } catch (err) {
+      toast(err instanceof Error ? err.message : 'Could not start the download', 'error')
+      return
+    } finally {
+      setStarting(false)
+    }
     setInfo(null)
     setUrl('')
     setStatus('idle')
@@ -280,9 +292,16 @@ export default function HomeView(): JSX.Element {
                       </span>
                     )}
                   </div>
-                  <span className="mono mt-2 inline-block rounded-lg bg-white/[0.06] px-2 py-0.5 text-[10px] text-white/50">
-                    {info.extractor}
-                  </span>
+                  <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                    <span className="mono rounded-lg bg-white/[0.06] px-2 py-0.5 text-[10px] text-white/50">
+                      {info.extractor}
+                    </span>
+                    {maxHeightOf(info.formats) > 0 && (
+                      <span className="mono rounded-lg bg-white/[0.06] px-2 py-0.5 text-[10px] text-white/50">
+                        up to {maxHeightOf(info.formats)}p
+                      </span>
+                    )}
+                  </div>
                 </div>
               </div>
 
@@ -291,6 +310,8 @@ export default function HomeView(): JSX.Element {
                 <FormatSelector
                   info={info}
                   settings={settings}
+                  initialMode={selection.mode}
+                  initialQuality={selection.quality ?? 'best'}
                   onChangeAudioFormat={(fmt) => saveSettings({ audioFormat: fmt })}
                   onSelectionChange={setSelection}
                 />

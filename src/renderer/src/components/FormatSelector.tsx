@@ -8,6 +8,9 @@ import Segmented from './Segmented'
 interface Props {
   info: MediaInfo
   settings: AppSettings
+  /** Preselected mode/quality — the user's defaults, already clamped to what this video offers. */
+  initialMode?: DownloadMode
+  initialQuality?: QualityPreset
   onChangeAudioFormat: (fmt: string) => void
   onSelectionChange: (sel: { mode: DownloadMode; quality?: QualityPreset; formatId?: string }) => void
 }
@@ -18,7 +21,8 @@ const PRESETS: { q: QualityPreset; label: string }[] = [
   { q: '1440', label: '1440p' },
   { q: '1080', label: '1080p' },
   { q: '720', label: '720p' },
-  { q: '480', label: '480p' }
+  { q: '480', label: '480p' },
+  { q: '360', label: '360p' }
 ]
 
 const AUDIO_FORMATS = ['mp3', 'm4a', 'opus', 'flac', 'wav', 'aac']
@@ -26,11 +30,13 @@ const AUDIO_FORMATS = ['mp3', 'm4a', 'opus', 'flac', 'wav', 'aac']
 export default function FormatSelector({
   info,
   settings,
+  initialMode = 'video',
+  initialQuality = 'best',
   onChangeAudioFormat,
   onSelectionChange
 }: Props): JSX.Element {
-  const [mode, setMode] = useState<DownloadMode>('video')
-  const [quality, setQuality] = useState<QualityPreset>('best')
+  const [mode, setMode] = useState<DownloadMode>(initialMode)
+  const [quality, setQuality] = useState<QualityPreset>(initialQuality)
   const [formatId, setFormatId] = useState<string | undefined>(undefined)
   const [showAdvanced, setShowAdvanced] = useState(false)
 
