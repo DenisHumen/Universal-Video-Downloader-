@@ -2,6 +2,7 @@ import { spawn } from 'child_process'
 import { ytdlpBinaryPath, ytdlpSpawnOptions, ensureYtdlp } from './ytdlp'
 import { getSettings } from './settings'
 import { humanizeYtdlpError } from './options'
+import { searchYummyani } from './resolvers'
 import { SEARCH_SERVICES } from '@shared/types'
 import type { SearchResponse, SearchResult, SearchScope, SearchService } from '@shared/types'
 
@@ -22,11 +23,15 @@ interface FlatPlaylist {
   entries?: FlatEntry[]
 }
 
-const PREFIX: Record<SearchService, string> = {
+/** Services searched through the engine's `<prefix>N:query` search extractors. */
+const PREFIX: Partial<Record<SearchService, string>> = {
   youtube: 'ytsearch',
-  soundcloud: 'scsearch',
-  bilibili: 'bilisearch',
-  niconico: 'nicosearch'
+  soundcloud: 'scsearch'
+}
+
+/** Services searched by handing the engine a site search-results URL. */
+const URL_SEARCH: Partial<Record<SearchService, (q: string) => string>> = {
+  pornhub: (q) => `https://www.pornhub.com/video/search?search=${encodeURIComponent(q)}`
 }
 
 function thumbnailOf(entry: FlatEntry, service: SearchService): string | undefined {
@@ -39,14 +44,14 @@ function thumbnailOf(entry: FlatEntry, service: SearchService): string | undefin
   return u
 }
 
-/** Search one service with the engine's flat search extractor. */
-function searchOne(query: string, service: SearchService, limit: number): Promise<SearchResponse> {
+/** Run one engine search (prefix- or URL-based) and map the flat entries. */
+function ytdlpSearch(target: string, service: SearchService, limit: number): Promise<SearchResponse> {
   const settings = getSettings()
   const args = ['-J', '--flat-playlist', '--no-warnings', '--no-progress', '--ignore-config']
-  // Proxy matters for reachability; skip cookies here — extracting them per
+  // Proxy matters for reachability; cookies are skipped — extracting them per
   // search would slow every roundtrip for no benefit.
   if (settings.proxy) args.push('--proxy', settings.proxy)
-  args.push(`${PREFIX[service]}${Math.max(1, Math.min(30, limit))}:${query}`)
+  args.push('--playlist-end', String(Math.max(1, Math.min(30, limit))), target)
 
   return new Promise((resolve) => {
     const child = spawn(ytdlpBinaryPath(), args, ytdlpSpawnOptions())
@@ -72,7 +77,7 @@ function searchOne(query: string, service: SearchService, limit: number): Promis
       try {
         const raw = JSON.parse(stdout) as FlatPlaylist
         const results: SearchResult[] = (raw.entries || [])
-          .filter((e) => e.url || e.webpage_url)
+          .filter((e) => (e.url || e.webpage_url) && e.title)
           .map((e) => ({
             id: e.id || e.url || e.webpage_url || '',
             title: e.title || 'Untitled',
@@ -89,6 +94,23 @@ function searchOne(query: string, service: SearchService, limit: number): Promis
       }
     })
   })
+}
+
+/** Search one service by title. */
+async function searchOne(query: string, service: SearchService, limit: number): Promise<SearchResponse> {
+  const cap = Math.max(1, Math.min(30, limit))
+  if (service === 'yummyani') {
+    try {
+      return { ok: true, results: await searchYummyani(query, cap) }
+    } catch (err) {
+      return { ok: false, error: err instanceof Error ? err.message : 'Anime search failed.' }
+    }
+  }
+  const prefix = PREFIX[service]
+  if (prefix) return ytdlpSearch(`${prefix}${cap}:${query}`, service, cap)
+  const urlFor = URL_SEARCH[service]
+  if (urlFor) return ytdlpSearch(urlFor(query), service, cap)
+  return { ok: false, error: `Unsupported search service: ${service}` }
 }
 
 /** Round-robin merge so no single service dominates the top of the grid. */

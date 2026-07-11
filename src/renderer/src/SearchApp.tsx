@@ -5,6 +5,7 @@ import AuroraBackground from './components/AuroraBackground'
 import Logo from './components/Logo'
 import Toasts from './components/Toasts'
 import SearchView from './views/SearchView'
+import { useStore } from './store'
 
 /** Shell for the dedicated title-search window. */
 export default function SearchApp(): JSX.Element {
@@ -12,7 +13,12 @@ export default function SearchApp(): JSX.Element {
   const [isMac, setIsMac] = useState(false)
 
   useEffect(() => {
-    void window.api.getSettings().then(setSettings)
+    void window.api.getSettings().then((s) => {
+      setSettings(s)
+      // Share settings with the store so the embedded StreamingCard (anime
+      // picker) honours the user's default quality.
+      useStore.setState({ settings: s })
+    })
     void window.api.getAppInfo().then((info) => setIsMac(info.platform === 'darwin'))
   }, [])
 

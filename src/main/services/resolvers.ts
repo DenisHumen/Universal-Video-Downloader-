@@ -1,5 +1,5 @@
 import { net } from 'electron'
-import type { StreamingInfo, StreamSeason, StreamTranslator } from '@shared/types'
+import type { SearchResult, StreamingInfo, StreamSeason, StreamTranslator } from '@shared/types'
 
 export interface ResolvedEntry {
   url: string
@@ -383,11 +383,12 @@ function normalizeYaniPoster(poster: YaniPoster): string | undefined {
   return u
 }
 
-async function resolveYummyaniPage(url: string): Promise<ResolvedUrl> {
-  const page = await fetchText(url, { Referer: 'https://old.yummyani.me/' })
-  const animeId = pick(/yani\.tv\/a(\d+)/, page) || pick(/data-id="(\d+)"/, page)
-  if (!animeId) return { url }
-
+/**
+ * Build the full streaming picker (dubbings → episodes → qualities) for an
+ * anime from its numeric yani.tv id. Shared by the page resolver and the
+ * search-result resolver (uvd-yummy-item://<id>).
+ */
+async function yummyStreamingFromId(animeId: string, webUrl: string): Promise<ResolvedUrl> {
   const meta = (
     JSON.parse(await fetchText(`https://api.yani.tv/anime/${animeId}`, { Referer: 'https://old.yummyani.me/' })) as {
       response: { title?: string; poster?: YaniPoster }
@@ -409,7 +410,7 @@ async function resolveYummyaniPage(url: string): Promise<ResolvedUrl> {
     if (!byDub.has(dub)) byDub.set(dub, { base, episodes: new Set() })
     byDub.get(dub)!.episodes.add(Number(v.number))
   }
-  if (!byDub.size) return { url }
+  if (!byDub.size) throw new Error('No playable Kodik streams found for this title.')
 
   const translators: StreamTranslator[] = []
   const episodesByTranslator: Record<string, StreamSeason[]> = {}
@@ -433,7 +434,47 @@ async function resolveYummyaniPage(url: string): Promise<ResolvedUrl> {
     episodesByTranslator,
     qualities: ['360p', '480p', '720p']
   }
-  return { url, streaming, extractor: 'YummyAnime', title: streaming.title, thumbnail: streaming.thumbnail }
+  return { url: webUrl, streaming, extractor: 'YummyAnime', title: streaming.title, thumbnail: streaming.thumbnail }
+}
+
+async function resolveYummyaniPage(url: string): Promise<ResolvedUrl> {
+  const page = await fetchText(url, { Referer: 'https://old.yummyani.me/' })
+  const animeId = pick(/yani\.tv\/a(\d+)/, page) || pick(/data-id="(\d+)"/, page)
+  if (!animeId) return { url }
+  return yummyStreamingFromId(animeId, url)
+}
+
+// Internal scheme built from a search result: uvd-yummy-item://<animeId>
+async function resolveYummyaniItem(uvdUrl: string): Promise<ResolvedUrl> {
+  const animeId = uvdUrl.replace(/^uvd-yummy-item:\/\//, '').split('/')[0]
+  return yummyStreamingFromId(animeId, uvdUrl)
+}
+
+interface YaniSearchItem {
+  anime_id: number
+  anime_url: string
+  title: string
+  poster?: YaniPoster
+  year?: number
+  views?: number
+}
+
+/** Search anime by title via the yani.tv API (powers the 'yummyani' service). */
+export async function searchYummyani(query: string, limit: number): Promise<SearchResult[]> {
+  const raw = await fetchText(`https://api.yani.tv/search?q=${encodeURIComponent(query)}`, {
+    Referer: 'https://old.yummyani.me/'
+  })
+  const list = (JSON.parse(raw) as { response?: YaniSearchItem[] }).response || []
+  return list.slice(0, limit).map((it) => ({
+    id: `yani-${it.anime_id}`,
+    title: it.title,
+    url: `https://yummyani.me/catalog/item/${it.anime_url}`,
+    pickerUrl: `uvd-yummy-item://${it.anime_id}`,
+    thumbnail: normalizeYaniPoster(it.poster),
+    uploader: it.year ? String(it.year) : undefined,
+    viewCount: it.views,
+    service: 'yummyani' as const
+  }))
 }
 
 // uvd-yummy://<translatorId(=base64url kodik season url)>/<episode>/<quality>
@@ -465,6 +506,9 @@ export async function resolveUrl(input: string): Promise<ResolvedUrl> {
   const trimmed = input.trim()
   if (trimmed.startsWith('uvd-rezka://')) {
     return resolveRezkaStream(trimmed)
+  }
+  if (trimmed.startsWith('uvd-yummy-item://')) {
+    return resolveYummyaniItem(trimmed)
   }
   if (trimmed.startsWith('uvd-yummy://')) {
     return resolveYummyaniStream(trimmed)

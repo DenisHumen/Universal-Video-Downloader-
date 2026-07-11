@@ -65,18 +65,55 @@ function fakeInfo(url: string): MediaInfo {
 function fakeResults(query: string, scope: string): SearchResult[] {
   const services =
     scope === 'all'
-      ? (['youtube', 'soundcloud', 'bilibili', 'niconico'] as const)
+      ? (['youtube', 'soundcloud', 'yummyani', 'pornhub'] as const)
       : ([scope] as unknown as readonly SearchResult['service'][])
-  return Array.from({ length: scope === 'all' ? 12 : 9 }, (_, i) => ({
-    id: `mock-${i}`,
-    title: `${query} — result ${i + 1}: an adequately long video title to test clamping`,
-    url: `https://example.com/watch?v=mock-${i}`,
-    thumbnail: `https://picsum.photos/seed/uvd${i}/480/270`,
-    duration: 63 + i * 137,
-    uploader: ['Blender Foundation', 'NASA', 'Kurzgesagt'][i % 3],
-    viewCount: 1000 * (i + 1) ** 3,
-    service: services[i % services.length]
-  }))
+  return Array.from({ length: scope === 'all' ? 12 : 9 }, (_, i) => {
+    const service = services[i % services.length]
+    const isAnime = service === 'yummyani'
+    return {
+      id: `mock-${i}`,
+      title: `${query} — result ${i + 1}: an adequately long ${isAnime ? 'anime' : 'video'} title to test clamping`,
+      url: `https://example.com/watch?v=mock-${i}`,
+      pickerUrl: isAnime ? `uvd-yummy-item://${100 + i}` : undefined,
+      thumbnail: `https://picsum.photos/seed/uvd${i}/480/270`,
+      duration: isAnime ? undefined : 63 + i * 137,
+      uploader: isAnime ? '2021' : ['Blender Foundation', 'NASA', 'Kurzgesagt'][i % 3],
+      viewCount: 1000 * (i + 1) ** 3,
+      service
+    }
+  })
+}
+
+function fakeAnimeInfo(url: string): MediaInfo {
+  return {
+    id: 'anime-mock',
+    title: 'Mock Anime — Season 1',
+    thumbnail: 'https://picsum.photos/seed/anime/300/440',
+    webpageUrl: url,
+    originalUrl: url,
+    extractor: 'YummyAnime',
+    isLive: false,
+    formats: [],
+    streaming: {
+      provider: 'yummyani',
+      host: 'old.yummyani.me',
+      id: 'anime-mock',
+      title: 'Mock Anime',
+      thumbnail: 'https://picsum.photos/seed/anime/300/440',
+      isSeries: true,
+      translators: [
+        { id: 'dub-a', name: 'AniLibria' },
+        { id: 'dub-b', name: 'AniDUB' }
+      ],
+      defaultTranslator: 'dub-a',
+      seasons: [{ season: 1, episodes: [1, 2, 3, 4, 5, 6, 7, 8] }],
+      episodesByTranslator: {
+        'dub-a': [{ season: 1, episodes: [1, 2, 3, 4, 5, 6, 7, 8] }],
+        'dub-b': [{ season: 1, episodes: [1, 2, 3, 4, 5] }]
+      },
+      qualities: ['360p', '480p', '720p']
+    }
+  }
 }
 
 let itemSeq = 0
@@ -85,6 +122,7 @@ export function installMockApi(): void {
   const api: UvdApi = {
     detect: async (url) => {
       await delay(700)
+      if (url.startsWith('uvd-yummy-item://')) return { ok: true, info: fakeAnimeInfo(url) }
       return { ok: true, info: fakeInfo(url) }
     },
     searchVideos: async (query, scope) => {

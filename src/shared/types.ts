@@ -221,14 +221,14 @@ export interface DetectResult {
 
 // ---- Title search ----
 
-/** Services the engine ships a reliable search extractor for. */
-export type SearchService = 'youtube' | 'soundcloud' | 'bilibili' | 'niconico'
+/** Services searchable by title (verified to return real results). */
+export type SearchService = 'youtube' | 'soundcloud' | 'pornhub' | 'yummyani'
 
 export const SEARCH_SERVICES: readonly SearchService[] = [
   'youtube',
   'soundcloud',
-  'bilibili',
-  'niconico'
+  'pornhub',
+  'yummyani'
 ] as const
 
 /** What the user searches: one service, or all of them in parallel. */
@@ -237,7 +237,13 @@ export type SearchScope = SearchService | 'all'
 export interface SearchResult {
   id: string
   title: string
+  /** Canonical web page — used for "open in browser". */
   url: string
+  /**
+   * For streaming providers (anime), the internal URL that opens the
+   * episode/translator/quality picker instead of downloading directly.
+   */
+  pickerUrl?: string
   thumbnail?: string
   duration?: number
   uploader?: string
