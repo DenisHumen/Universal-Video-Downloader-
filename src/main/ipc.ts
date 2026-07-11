@@ -1,6 +1,6 @@
 import { app, BrowserWindow, dialog, ipcMain, Notification, shell } from 'electron'
 import { IPC } from '@shared/ipc'
-import type { AppSettings, DownloadItem, DownloadRequest, SearchService } from '@shared/types'
+import type { AppSettings, DownloadItem, DownloadRequest, SearchScope } from '@shared/types'
 import { detect } from './services/detector'
 import { searchVideos } from './services/search'
 import {
@@ -40,8 +40,8 @@ export function registerIpc(
     await ensureYtdlp()
     return detect(url)
   })
-  ipcMain.handle(IPC.search, (_e, query: string, service: SearchService, limit?: number) =>
-    searchVideos(query, service, limit)
+  ipcMain.handle(IPC.search, (_e, query: string, scope: SearchScope, limit?: number) =>
+    searchVideos(query, scope, limit)
   )
   ipcMain.handle(IPC.searchOpenWindow, (_e, query: string) => openSearchWindow(query))
 

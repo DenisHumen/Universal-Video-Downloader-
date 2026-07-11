@@ -7,12 +7,13 @@ import {
   Download,
   ExternalLink,
   Eye,
+  Globe,
   Loader2,
   Music,
   Search,
   SearchX
 } from 'lucide-react'
-import type { AppSettings, SearchResult, SearchService } from '@shared/types'
+import type { AppSettings, SearchResult, SearchScope, SearchService } from '@shared/types'
 import Segmented from '../components/Segmented'
 import { formatCount, formatDuration } from '../lib/format'
 import { initialMode, initialQuality, maxHeightOf } from '../lib/quality'
@@ -36,7 +37,7 @@ function queryFromHash(): string {
 
 export default function SearchView({ settings }: Props): JSX.Element {
   const [query, setQuery] = useState(queryFromHash)
-  const [service, setService] = useState<SearchService>('youtube')
+  const [service, setService] = useState<SearchScope>('all')
   const [status, setStatus] = useState<Status>('idle')
   const [error, setError] = useState('')
   const [results, setResults] = useState<SearchResult[] | null>(null)
@@ -46,7 +47,7 @@ export default function SearchView({ settings }: Props): JSX.Element {
   // Bumped on every new search so stale probe results are discarded.
   const generation = useRef(0)
 
-  const search = async (value?: string, svc?: SearchService): Promise<void> => {
+  const search = async (value?: string, svc?: SearchScope): Promise<void> => {
     const q = (value ?? query).trim()
     const s = svc ?? service
     if (!q) return
@@ -56,7 +57,7 @@ export default function SearchView({ settings }: Props): JSX.Element {
     setResults(null)
     setProbes({})
     setAdded(new Set())
-    const res = await window.api.searchVideos(q, s, 12)
+    const res = await window.api.searchVideos(q, s, s === 'all' ? 6 : 12)
     if (res.ok && res.results) {
       setResults(res.results)
       setStatus('idle')
@@ -69,8 +70,9 @@ export default function SearchView({ settings }: Props): JSX.Element {
 
   // Lazily discover each result's best available quality (2 probes at a time)
   // so the cards fill in with "1080p" / "audio" badges as answers arrive.
+  // SoundCloud is audio-only — no point probing it.
   const probeQualities = async (list: SearchResult[], gen: number): Promise<void> => {
-    const queue = [...list]
+    const queue = list.filter((r) => r.service !== 'soundcloud')
     const worker = async (): Promise<void> => {
       while (queue.length) {
         const item = queue.shift()!
@@ -106,7 +108,7 @@ export default function SearchView({ settings }: Props): JSX.Element {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  const changeService = (s: SearchService): void => {
+  const changeService = (s: SearchScope): void => {
     setService(s)
     if (results || status === 'error') void search(undefined, s)
   }
@@ -131,8 +133,11 @@ export default function SearchView({ settings }: Props): JSX.Element {
 
   const services = useMemo(
     () => [
+      { value: 'all', label: 'all services', icon: <Globe size={13} /> },
       { value: 'youtube', label: 'youtube' },
-      { value: 'soundcloud', label: 'soundcloud' }
+      { value: 'soundcloud', label: 'soundcloud' },
+      { value: 'bilibili', label: 'bilibili' },
+      { value: 'niconico', label: 'niconico' }
     ],
     []
   )
@@ -167,12 +172,12 @@ export default function SearchView({ settings }: Props): JSX.Element {
       </motion.div>
 
       {/* Service picker */}
-      <div className="mt-3 flex items-center justify-between">
+      <div className="mt-3 flex items-center justify-between gap-3">
         <Segmented
           layoutId="search-service"
           fill={false}
           value={service}
-          onChange={(v) => changeService(v as SearchService)}
+          onChange={(v) => changeService(v as SearchScope)}
           options={services}
         />
         {results && (
@@ -336,15 +341,19 @@ function ResultCard({
       initial={{ opacity: 0, y: 12 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.25, delay: Math.min(index * 0.04, 0.4) }}
-      className="card flex flex-col overflow-hidden"
+      className="card group flex flex-col overflow-hidden transition-colors hover:border-white/[0.16]"
     >
-      <div className="relative aspect-video bg-ink-950">
+      <button
+        className="relative block aspect-video w-full cursor-pointer overflow-hidden bg-ink-950 text-left"
+        title="Open in browser"
+        onClick={() => window.api.openExternal(result.url)}
+      >
         {result.thumbnail ? (
           <img
             src={result.thumbnail}
             alt=""
             loading="lazy"
-            className="h-full w-full object-cover"
+            className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.04]"
             referrerPolicy="no-referrer"
           />
         ) : (
@@ -353,12 +362,15 @@ function ResultCard({
           </div>
         )}
         <div className="absolute left-1.5 top-1.5">{qualityBadge(probe, result.service)}</div>
+        <span className="chip absolute right-1.5 top-1.5 bg-black/70 text-[10px] text-white/75">
+          {result.service}
+        </span>
         {result.duration != null && result.duration > 0 && (
           <span className="chip absolute bottom-1.5 right-1.5 bg-black/70 text-[10px] font-medium text-white/90">
             <Clock size={9} /> {formatDuration(result.duration)}
           </span>
         )}
-      </div>
+      </button>
 
       <div className="flex flex-1 flex-col p-3">
         <p className="line-clamp-2 text-[13px] font-medium leading-snug text-cream" title={result.title}>

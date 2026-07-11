@@ -221,7 +221,18 @@ export interface DetectResult {
 
 // ---- Title search ----
 
-export type SearchService = 'youtube' | 'soundcloud'
+/** Services the engine ships a reliable search extractor for. */
+export type SearchService = 'youtube' | 'soundcloud' | 'bilibili' | 'niconico'
+
+export const SEARCH_SERVICES: readonly SearchService[] = [
+  'youtube',
+  'soundcloud',
+  'bilibili',
+  'niconico'
+] as const
+
+/** What the user searches: one service, or all of them in parallel. */
+export type SearchScope = SearchService | 'all'
 
 export interface SearchResult {
   id: string

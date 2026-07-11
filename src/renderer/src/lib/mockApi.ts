@@ -62,8 +62,12 @@ function fakeInfo(url: string): MediaInfo {
   }
 }
 
-function fakeResults(query: string): SearchResult[] {
-  return Array.from({ length: 9 }, (_, i) => ({
+function fakeResults(query: string, scope: string): SearchResult[] {
+  const services =
+    scope === 'all'
+      ? (['youtube', 'soundcloud', 'bilibili', 'niconico'] as const)
+      : ([scope] as unknown as readonly SearchResult['service'][])
+  return Array.from({ length: scope === 'all' ? 12 : 9 }, (_, i) => ({
     id: `mock-${i}`,
     title: `${query} — result ${i + 1}: an adequately long video title to test clamping`,
     url: `https://example.com/watch?v=mock-${i}`,
@@ -71,7 +75,7 @@ function fakeResults(query: string): SearchResult[] {
     duration: 63 + i * 137,
     uploader: ['Blender Foundation', 'NASA', 'Kurzgesagt'][i % 3],
     viewCount: 1000 * (i + 1) ** 3,
-    service: 'youtube' as const
+    service: services[i % services.length]
   }))
 }
 
@@ -83,9 +87,9 @@ export function installMockApi(): void {
       await delay(700)
       return { ok: true, info: fakeInfo(url) }
     },
-    searchVideos: async (query) => {
+    searchVideos: async (query, scope) => {
       await delay(800)
-      return { ok: true, results: fakeResults(query) }
+      return { ok: true, results: fakeResults(query, scope) }
     },
     openSearchWindow: async (query) => {
       window.location.hash = `/search?q=${encodeURIComponent(query)}`
