@@ -8,6 +8,12 @@ export default function DownloadsView(): JSX.Element {
   const downloads = useStore((s) => s.downloads)
   const settings = useStore((s) => s.settings)
   const setView = useStore((s) => s.setView)
+  const refreshDownloads = useStore((s) => s.refreshDownloads)
+
+  const clearFinished = async (): Promise<void> => {
+    await window.api.clearFinished()
+    await refreshDownloads()
+  }
 
   const hasFinished = downloads.some((d) => ['completed', 'error', 'canceled'].includes(d.state))
   const totalSpeed = downloads
@@ -31,7 +37,7 @@ export default function DownloadsView(): JSX.Element {
             </button>
           )}
           {hasFinished && (
-            <button className="btn-ghost" onClick={() => window.api.clearFinished()}>
+            <button className="btn-ghost" onClick={clearFinished}>
               <Trash2 size={16} /> clear finished
             </button>
           )}

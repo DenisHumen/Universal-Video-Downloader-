@@ -415,8 +415,11 @@ export function clearFinished(): void {
     if (item.state === 'completed' || item.state === 'canceled' || item.state === 'error') {
       items.delete(id)
       finalPaths.delete(id)
+      // Per-item 'removed' events — the only channel the renderer listens to.
+      // (The old single 'cleared' event was never forwarded, so the button
+      // appeared to do nothing until an app restart.)
+      downloadEvents.emit('removed', id)
     }
   }
   scheduleSave()
-  downloadEvents.emit('cleared')
 }

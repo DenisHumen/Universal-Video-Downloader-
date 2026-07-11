@@ -218,3 +218,24 @@ export interface DetectResult {
   info?: MediaInfo
   error?: string
 }
+
+// ---- Title search ----
+
+export type SearchService = 'youtube' | 'soundcloud'
+
+export interface SearchResult {
+  id: string
+  title: string
+  url: string
+  thumbnail?: string
+  duration?: number
+  uploader?: string
+  viewCount?: number
+  service: SearchService
+}
+
+export interface SearchResponse {
+  ok: boolean
+  results?: SearchResult[]
+  error?: string
+}

@@ -6,6 +6,8 @@ import type {
   DownloadItem,
   DownloadProgress,
   DownloadRequest,
+  SearchResponse,
+  SearchService,
   UpdateStatus,
   YtDlpStatus
 } from '@shared/types'
@@ -28,6 +30,12 @@ function on<T>(channel: string, cb: (payload: T) => void): () => void {
 const api = {
   // Detection
   detect: (url: string): Promise<DetectResult> => ipcRenderer.invoke(IPC.detect, url),
+
+  // Title search
+  searchVideos: (query: string, service: SearchService, limit?: number): Promise<SearchResponse> =>
+    ipcRenderer.invoke(IPC.search, query, service, limit),
+  openSearchWindow: (query: string): Promise<void> => ipcRenderer.invoke(IPC.searchOpenWindow, query),
+  onSearchQuery: (cb: (query: string) => void) => on(IPC.evtSearchQuery, cb),
 
   // Downloads
   startDownload: (req: DownloadRequest): Promise<DownloadItem> =>

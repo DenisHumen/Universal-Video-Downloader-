@@ -1,7 +1,8 @@
 import { app, BrowserWindow, dialog, ipcMain, Notification, shell } from 'electron'
 import { IPC } from '@shared/ipc'
-import type { AppSettings, DownloadItem, DownloadRequest } from '@shared/types'
+import type { AppSettings, DownloadItem, DownloadRequest, SearchService } from '@shared/types'
 import { detect } from './services/detector'
+import { searchVideos } from './services/search'
 import {
   cancelDownload,
   clearFinished,
@@ -23,7 +24,10 @@ import {
   updateEvents
 } from './services/updater'
 
-export function registerIpc(getWindow: () => BrowserWindow | null): void {
+export function registerIpc(
+  getWindow: () => BrowserWindow | null,
+  openSearchWindow: (query: string) => void
+): void {
   const send = (channel: string, payload: unknown): void => {
     const win = getWindow()
     if (win && !win.isDestroyed()) {
@@ -31,11 +35,15 @@ export function registerIpc(getWindow: () => BrowserWindow | null): void {
     }
   }
 
-  // ---- Media detection ----
+  // ---- Media detection & search ----
   ipcMain.handle(IPC.detect, async (_e, url: string) => {
     await ensureYtdlp()
     return detect(url)
   })
+  ipcMain.handle(IPC.search, (_e, query: string, service: SearchService, limit?: number) =>
+    searchVideos(query, service, limit)
+  )
+  ipcMain.handle(IPC.searchOpenWindow, (_e, query: string) => openSearchWindow(query))
 
   // ---- Downloads ----
   ipcMain.handle(IPC.downloadStart, (_e, req: DownloadRequest) => startDownload(req))
@@ -89,16 +97,20 @@ export function registerIpc(getWindow: () => BrowserWindow | null): void {
     ytdlp: getYtdlpStatus(),
     update: getUpdateStatus()
   }))
-  ipcMain.handle(IPC.windowMinimize, () => getWindow()?.minimize())
-  ipcMain.handle(IPC.windowMaximize, () => {
-    const win = getWindow()
+  // Window controls act on the window the call came from (main or search).
+  ipcMain.handle(IPC.windowMinimize, (e) => BrowserWindow.fromWebContents(e.sender)?.minimize())
+  ipcMain.handle(IPC.windowMaximize, (e) => {
+    const win = BrowserWindow.fromWebContents(e.sender)
     if (!win) return false
     if (win.isMaximized()) win.unmaximize()
     else win.maximize()
     return win.isMaximized()
   })
-  ipcMain.handle(IPC.windowClose, () => getWindow()?.close())
-  ipcMain.handle(IPC.windowIsMaximized, () => getWindow()?.isMaximized() ?? false)
+  ipcMain.handle(IPC.windowClose, (e) => BrowserWindow.fromWebContents(e.sender)?.close())
+  ipcMain.handle(
+    IPC.windowIsMaximized,
+    (e) => BrowserWindow.fromWebContents(e.sender)?.isMaximized() ?? false
+  )
 
   // ---- Forward service events to the renderer ----
   downloadEvents.on('progress', (p) => {

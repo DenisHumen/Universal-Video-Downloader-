@@ -1,5 +1,6 @@
 import { app, BrowserWindow, shell, nativeImage } from 'electron'
 import { join } from 'path'
+import { IPC } from '@shared/ipc'
 import { registerIpc } from './ipc'
 import { getSettings } from './services/settings'
 import { ensureYtdlp } from './services/ytdlp'
@@ -8,18 +9,37 @@ import { loadHistory } from './services/downloader'
 
 const isMac = process.platform === 'darwin'
 let mainWindow: BrowserWindow | null = null
+let searchWindow: BrowserWindow | null = null
 
 function resolveIcon(): string {
   // Used on Linux/Windows where the window icon is set explicitly.
   return join(__dirname, '../../build/icon.png')
 }
 
-function createWindow(): void {
-  mainWindow = new BrowserWindow({
-    width: 1200,
-    height: 800,
-    minWidth: 960,
-    minHeight: 640,
+/** Shared hardening for every app window. */
+function wireWindow(win: BrowserWindow): void {
+  win.on('ready-to-show', () => win.show())
+
+  win.webContents.setWindowOpenHandler(({ url }) => {
+    shell.openExternal(url)
+    return { action: 'deny' }
+  })
+
+  // If the renderer ever crashes (GPU/OOM/…) the window turns into a black
+  // rectangle until it's reloaded — do that reload automatically.
+  win.webContents.on('render-process-gone', (_e, details) => {
+    if (details.reason !== 'clean-exit' && !win.isDestroyed()) {
+      win.webContents.reload()
+    }
+  })
+}
+
+function windowOptions(width: number, height: number): Electron.BrowserWindowConstructorOptions {
+  return {
+    width,
+    height,
+    minWidth: 760,
+    minHeight: 560,
     show: false,
     backgroundColor: '#0a0a14',
     frame: isMac,
@@ -32,16 +52,12 @@ function createWindow(): void {
       nodeIntegration: false,
       sandbox: false
     }
-  })
+  }
+}
 
-  mainWindow.on('ready-to-show', () => {
-    mainWindow?.show()
-  })
-
-  mainWindow.webContents.setWindowOpenHandler(({ url }) => {
-    shell.openExternal(url)
-    return { action: 'deny' }
-  })
+function createWindow(): void {
+  mainWindow = new BrowserWindow({ ...windowOptions(1200, 800), minWidth: 960, minHeight: 640 })
+  wireWindow(mainWindow)
 
   const devUrl = process.env['ELECTRON_RENDERER_URL']
   if (devUrl) {
@@ -52,6 +68,30 @@ function createWindow(): void {
 
   mainWindow.on('closed', () => {
     mainWindow = null
+  })
+}
+
+/** Open (or focus) the title-search window, seeded with a query. */
+export function openSearchWindow(query: string): void {
+  if (searchWindow && !searchWindow.isDestroyed()) {
+    if (searchWindow.isMinimized()) searchWindow.restore()
+    searchWindow.focus()
+    searchWindow.webContents.send(IPC.evtSearchQuery, query)
+    return
+  }
+  searchWindow = new BrowserWindow(windowOptions(1020, 780))
+  wireWindow(searchWindow)
+
+  const hash = `/search?q=${encodeURIComponent(query)}`
+  const devUrl = process.env['ELECTRON_RENDERER_URL']
+  if (devUrl) {
+    searchWindow.loadURL(`${devUrl}#${hash}`)
+  } else {
+    searchWindow.loadFile(join(__dirname, '../renderer/index.html'), { hash })
+  }
+
+  searchWindow.on('closed', () => {
+    searchWindow = null
   })
 }
 
@@ -71,7 +111,7 @@ if (!gotLock) {
       app.setAppUserModelId('com.denishumen.universalvideodownloader')
     }
 
-    registerIpc(() => mainWindow)
+    registerIpc(() => mainWindow, openSearchWindow)
     loadHistory()
     initUpdater()
     createWindow()

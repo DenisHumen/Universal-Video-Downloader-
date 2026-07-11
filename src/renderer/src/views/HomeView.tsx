@@ -89,6 +89,11 @@ export default function HomeView(): JSX.Element {
   const detect = async (value?: string): Promise<void> => {
     const target = (value ?? url).trim()
     if (!target) return
+    // Plain text (not a link) → search video services by title in a new window.
+    if (!isProbablyUrl(target)) {
+      void window.api.openSearchWindow(target)
+      return
+    }
     setStatus('detecting')
     setError('')
     setInfo(null)
@@ -157,7 +162,7 @@ export default function HomeView(): JSX.Element {
           paste a link, get the video
         </h1>
         <p className="mt-2 text-sm text-white/40">
-          automatic stream detection for thousands of sites — no clutter, no ads.
+          automatic stream detection for thousands of sites — or type a title to search.
         </p>
       </motion.div>
 
@@ -174,7 +179,7 @@ export default function HomeView(): JSX.Element {
           value={url}
           onChange={(e) => setUrl(e.target.value)}
           onKeyDown={(e) => e.key === 'Enter' && detect()}
-          placeholder="paste a video link"
+          placeholder="paste a video link — or search by title"
           className="no-drag min-w-0 flex-1 bg-transparent px-1 py-2 text-sm text-cream placeholder-white/25 outline-none"
           spellCheck={false}
         />
@@ -186,8 +191,14 @@ export default function HomeView(): JSX.Element {
           onClick={() => detect()}
           disabled={!url.trim() || status === 'detecting'}
         >
-          {status === 'detecting' ? <Loader2 size={16} className="animate-spin" /> : <Download size={16} />}
-          get
+          {status === 'detecting' ? (
+            <Loader2 size={16} className="animate-spin" />
+          ) : url.trim() && !isProbablyUrl(url) ? (
+            <Search size={16} />
+          ) : (
+            <Download size={16} />
+          )}
+          {url.trim() && !isProbablyUrl(url) ? 'search' : 'get'}
         </button>
       </motion.div>
 

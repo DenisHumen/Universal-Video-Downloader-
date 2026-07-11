@@ -19,6 +19,7 @@ Powered by [yt-dlp](https://github.com/yt-dlp/yt-dlp) and ffmpeg, wrapped in a m
 ## ✨ Features
 
 - **Universal detection** — automatically discovers the video/audio stream behind a link. 1800+ sites supported via yt-dlp, plus a generic extractor for everything else.
+- **Title search** — type a title instead of a link and a dedicated search window opens: browse YouTube/SoundCloud results with thumbnails, durations and best-available-quality badges, then download in one click or open in the browser.
 - **Restricted sites** — age-verification, login-only and members-only videos (including adult sites) work by reading cookies from your browser: **Settings → Access & cookies → Use cookies from browser**.
 - **Custom site resolvers** — sites the engine doesn't know natively are supported through small pluggable resolvers (`src/main/services/resolvers.ts`) that scrape the page for the real stream and required headers. Listing/model pages are detected and offered as a one-click "download all" playlist.
 - **Streaming sites (films & series)** — for sites like **HDrezka** (and its mirror domains) and **YummyAnime** (via the Kodik player) the app reads the available **voiceovers (озвучки)**, **seasons**, **episodes** and **qualities**, lets you multi-select episodes, and queues each as `Title - S01E02`. Premium-only translations are flagged with a ⭐ badge and can't be downloaded.

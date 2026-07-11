@@ -3,6 +3,8 @@
 export const IPC = {
   // invoke/handle
   detect: 'media:detect',
+  search: 'media:search',
+  searchOpenWindow: 'search:open-window',
   downloadStart: 'download:start',
   downloadPause: 'download:pause',
   downloadResume: 'download:resume',
@@ -33,7 +35,8 @@ export const IPC = {
   evtDownloadUpdated: 'event:download-updated',
   evtYtdlpStatus: 'event:ytdlp-status',
   evtUpdateStatus: 'event:update-status',
-  evtWindowState: 'event:window-state'
+  evtWindowState: 'event:window-state',
+  evtSearchQuery: 'event:search-query'
 } as const
 
 export type IpcChannel = (typeof IPC)[keyof typeof IPC]
