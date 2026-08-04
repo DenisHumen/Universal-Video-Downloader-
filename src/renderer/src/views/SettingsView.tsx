@@ -13,6 +13,7 @@ import { useStore } from '../store'
 import { LANGUAGES, useT, type TranslationKey } from '../i18n'
 import { toast } from '../lib/toast'
 import Choice from '../components/Choice'
+import TabStrip from '../components/TabStrip'
 
 type SectionId =
   | 'appearance'
@@ -218,18 +219,19 @@ export default function SettingsView(): JSX.Element {
           radio groups it scrolls to, and nothing said which one changed a
           setting and which one just moved the page.
         */}
-        <nav className="mt-4 flex gap-0.5 overflow-x-auto border-b border-edge" aria-label={t('settings.title')}>
+        <TabStrip label={t('settings.title')} className="mt-4 border-b border-edge">
           {SECTIONS.map((s) => (
             <button
               key={s.id}
               onClick={() => jump(s.id)}
-              aria-current={active === s.id ? 'true' : undefined}
+              role="tab"
+              aria-selected={active === s.id}
               className={`tab -mb-px shrink-0 ${active === s.id ? 'tab-on' : ''}`}
             >
               {t(s.label)}
             </button>
           ))}
-        </nav>
+        </TabStrip>
       </div>
 
       <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto">

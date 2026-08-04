@@ -127,7 +127,7 @@ export default function StreamingCard({ info, onDone }: Props): JSX.Element {
   const chosenHere = selected[season] || []
 
   return (
-    <div className="block overflow-hidden">
+    <div className="panel overflow-hidden">
       <div className="flex gap-4 border-b border-edge p-4">
         <Thumbnail
           src={s.thumbnail}

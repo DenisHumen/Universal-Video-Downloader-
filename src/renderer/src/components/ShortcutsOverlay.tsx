@@ -34,7 +34,7 @@ export default function ShortcutsOverlay(): JSX.Element {
         >
           <motion.div
             {...dialog}
-            className="block w-full max-w-sm overflow-hidden"
+            className="panel w-full max-w-sm overflow-hidden"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between border-b border-edge px-4 py-3">

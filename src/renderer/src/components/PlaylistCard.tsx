@@ -69,7 +69,7 @@ export default function PlaylistCard({ info, onDone }: Props): JSX.Element {
   const chosen = entries.filter((e) => selected.has(e.url))
 
   return (
-    <div className="block overflow-hidden">
+    <div className="panel overflow-hidden">
       <div className="border-b border-edge p-4">
         <h2 className="h2 truncate">{info.title}</h2>
         <p className="mono mt-1 text-[12px] text-ink-2">

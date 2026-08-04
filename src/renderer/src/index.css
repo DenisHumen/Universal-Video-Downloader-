@@ -203,13 +203,21 @@ textarea,
 @layer components {
   /* ---------------- Planes ---------------- */
 
-  /* A raised plane. One hairline, one flat fill, no shadow — elevation reads
-     from the rule, which stays crisp at any scale factor. */
-  .block {
+  /*
+   * A raised plane. One hairline, one flat fill, no shadow — elevation reads
+   * from the rule, which stays crisp at any scale factor.
+   *
+   * Named `.panel`, never `.block`: Tailwind ships `.block` as the
+   * `display: block` utility, so a component class of that name silently
+   * painted a bordered card onto every element that merely wanted to be a
+   * block — labels, hints, the search thumbnail. Component classes must not
+   * collide with utility names.
+   */
+  .panel {
     border-radius: var(--r-3);
     @apply border border-edge bg-raise;
   }
-  /* An inset plane: nests inside .block for secondary content. */
+  /* An inset plane: nests inside .panel for secondary content. */
   .well {
     border-radius: var(--r-2);
     @apply border border-edge bg-sink;
@@ -328,6 +336,20 @@ textarea,
 
   /* ---------------- Small parts ---------------- */
 
+  /*
+   * A strip that scrolls sideways without ever showing a scrollbar.
+   * A 10px scrollbar inside a 48px bar of chrome is a hairline of grey noise
+   * across the top of the window; the arrows on either end say "there is more"
+   * far better, and they can be clicked.
+   */
+  .no-scrollbar {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+
   /* A read-only fact: extractor name, container, count. Never interactive. */
   .tag {
     border-radius: var(--r-1);
@@ -406,6 +428,21 @@ select.field {
 
 /* Placeholder blocks breathe in place. The old build swept a gradient across
    them, which animates a paint every frame for no information gain. */
+@keyframes progress-drift {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(300%);
+  }
+}
+/* Used when the site reports no total size: the bar says "working, size
+   unknown" instead of sitting at a 0% that isn't true. */
+.progress-indeterminate {
+  width: 33%;
+  animation: progress-drift 1.4s var(--ease) infinite;
+}
+
 @keyframes idle-pulse {
   0%,
   100% {

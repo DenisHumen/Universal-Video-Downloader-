@@ -132,7 +132,7 @@ export default function MediaJobModal({ item, mode, onClose }: Props): JSX.Eleme
       >
         <motion.div
           {...dialog}
-          className="block w-full max-w-lg overflow-hidden"
+          className="panel w-full max-w-lg overflow-hidden"
           onClick={(e) => e.stopPropagation()}
         >
           <div className="flex items-center gap-3 border-b border-edge px-4 py-3">

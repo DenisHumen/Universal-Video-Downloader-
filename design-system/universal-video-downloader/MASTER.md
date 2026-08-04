@@ -121,8 +121,8 @@ Tailwind: `rounded-1` · `rounded-2` · `rounded-3` · `rounded-full`.
 
 | Class | What it is |
 |---|---|
-| `.block` | Raised plane: one hairline, one flat fill, no shadow |
-| `.well` | Inset plane, nests inside `.block` |
+| `.panel` | Raised plane: one hairline, one flat fill, no shadow |
+| `.well` | Inset plane, nests inside `.panel` |
 | `.btn-solid` | The one loud action per screen — accent fill, pill |
 | `.btn-quiet` | Neutral filled control |
 | `.btn-danger` | Destructive — `bad` at 12% |
@@ -135,6 +135,7 @@ Tailwind: `rounded-1` · `rounded-2` · `rounded-3` · `rounded-full`.
 | `.kbd` | Keyboard key |
 | `.skeleton` | Placeholder plane; pulses in place |
 | `EmptyState` | The one "nothing here" layout: icon, heading, hint, and always a way out |
+| `TabStrip` | A tab row that scrolls with arrows, never a scrollbar |
 
 React: `components/Choice.tsx` (choice row), `components/EmptyState.tsx`, and
 `Switch` inside `SettingsView` (booleans).
@@ -146,6 +147,13 @@ Electron — but nothing goes below 36.
 **Focus** is an `outline`, not a ring with an offset colour: these controls sit
 on three different planes, so any single offset colour paints a wrong-coloured
 halo on two of them.
+
+> **Rule: component classes must not collide with utility names.** The raised
+> plane was called `.block` at first — and Tailwind ships `.block` as the
+> `display: block` utility, so every element that merely wanted to be a block
+> silently gained a bordered, rounded, filled card. Field labels, capability
+> hints and the search thumbnail all rendered inside a stray panel. Check a
+> proposed class against Tailwind's utility names before adding it.
 
 **Deliberately absent:** segmented controls with a sliding indicator · sweeping
 shimmer gradients · hover lift · card borders inside grids · an icon on every
@@ -164,6 +172,21 @@ One curve, three durations. Defined in `src/renderer/src/lib/motion.ts`.
 - **Stagger:** 30ms per item, 8px rise. A longer cascade reads as slowness.
 - `prefers-reduced-motion: reduce` collapses every animation and transition.
 
+> **Nothing load-bearing may depend on the frame clock.** A throttled window —
+> a backgrounded downloader, which is the normal case here — stops firing
+> `requestAnimationFrame`, and with it framer-motion's `animate`, CSS
+> `scroll-behavior: smooth`, and the `scroll` event. Measured with the clock
+> stalled: progress bars froze at their initial width, smooth `scrollIntoView`
+> and `scrollBy` moved nothing, and tab arrows never updated. Progress,
+> scrolling a result into view, and arrow state are all plain styles, instant
+> scrolls and synchronous measurements now. Motion is for entrances only.
+>
+> Related: `AnimatePresence mode="popLayout"` needs a ref on each child to
+> measure it. Function components cannot take one, so it silently failed to lift
+> exiting children out of flow — the reason three home-screen states once
+> stacked on top of each other. Exit animations were dropped from the state
+> swaps entirely.
+
 ## 7. Layout
 
 - **Chrome:** a single 48px bar carrying identity, tab navigation, engine state
@@ -178,6 +201,10 @@ One curve, three durations. Defined in `src/renderer/src/lib/motion.ts`.
 - **Settings:** one scrolling document with a sticky **underline** index driven
   by an `IntersectionObserver` — not nine mutually exclusive panes, and not
   pills, which would look identical to the `.choice` groups it scrolls to.
+- **Overflowing tab rows** use `TabStrip`: the scrollbar is hidden and arrows
+  appear on whichever side still has content. A 10px scrollbar inside a 48px
+  bar of chrome is a band of grey noise, and it is the one affordance you
+  cannot use before noticing it.
 - **Queue:** one ruled list. Per-row actions are **always visible** and progress
   is a real bar with a track — an action the user cannot see is an action they
   do not have, and nobody reads a hairline as "62% downloaded".

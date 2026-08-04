@@ -269,7 +269,7 @@ export default function SearchView({ settings, embedded = false }: Props): JSX.E
               initial={{ opacity: 0, y: 6 }}
               animate={{ opacity: 1, y: 0 }}
               transition={enter}
-              className="block p-4"
+              className="panel p-4"
             >
               <p className="h2 flex items-center gap-2">
                 <span className="h-1.5 w-1.5 rounded-full bg-bad" /> {t('search.failed')}

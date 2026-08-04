@@ -147,7 +147,7 @@ export default function BrowserApp(): JSX.Element {
           </button>
         </div>
 
-        <div className="field flex min-w-0 flex-1 items-center gap-2 rounded-full px-3 py-1.5">
+        <label className="field flex min-w-0 flex-1 cursor-text items-center gap-2 rounded-full px-3 py-1.5">
           {state.loading && <Loader2 size={12} className="shrink-0 animate-spin text-ink-3" />}
           <input
             value={address}
@@ -159,9 +159,9 @@ export default function BrowserApp(): JSX.Element {
             onKeyDown={(e) => e.key === 'Enter' && go()}
             placeholder={t('browser.urlPlaceholder')}
             spellCheck={false}
-            className="no-drag mono min-w-0 flex-1 bg-transparent py-1 text-[13px] text-ink outline-none placeholder:text-ink-3"
+            className="no-drag mono min-w-0 flex-1 self-stretch bg-transparent text-[13px] text-ink outline-none placeholder:text-ink-3"
           />
-        </div>
+        </label>
 
         <button
           className={`shrink-0 px-3 py-2 ${state.picking ? 'btn-solid' : 'btn-quiet'}`}

@@ -14,6 +14,7 @@ import {
 import { useStore, type ViewId } from '../store'
 import { useT, type TranslationKey } from '../i18n'
 import Logo from './Logo'
+import TabStrip from './TabStrip'
 import EngineBadge from './EngineBadge'
 
 interface NavItem {
@@ -81,15 +82,22 @@ export default function TopBar(): JSX.Element {
           </span>
         </div>
 
-        <nav className="flex min-w-0 items-stretch gap-0.5 overflow-x-auto">
+        <TabStrip label={t('nav.home')}>
           {ITEMS.map((item) => {
             const on = view === item.id
             return (
               <button
                 key={item.id}
                 onClick={() => setView(item.id)}
-                title={`${t(item.label)} · Ctrl/⌘ ${item.hint}`}
+                role="tab"
+                aria-selected={on}
                 aria-current={on ? 'page' : undefined}
+                /*
+                  No `title`. The label is right there, so the tooltip added
+                  nothing but a native black box that covers the tab next to it
+                  the moment the pointer rests. The shortcut it used to mention
+                  lives in the shortcuts overlay, which is what that list is for.
+                */
                 className={`tab -mb-px ${on ? 'tab-on' : ''}`}
               >
                 {item.icon}
@@ -106,7 +114,7 @@ export default function TopBar(): JSX.Element {
               </button>
             )
           })}
-        </nav>
+        </TabStrip>
       </div>
 
       <div className="flex shrink-0 items-center gap-1 pl-3 pr-2">

@@ -134,16 +134,18 @@ export default function DownloadsView(): JSX.Element {
             onChange={(v) => setFilter(v as Filter)}
             options={FILTERS.map((f) => ({ value: f.value, label: t(f.label) }))}
           />
-          <div className="field ml-auto flex min-w-[220px] max-w-[300px] flex-1 items-center gap-2 rounded-full px-4 py-1.5">
+          {/* A label, so the whole pill is the target — the padding around a bare
+              input is dead to the pointer. */}
+          <label className="field ml-auto flex min-w-[220px] max-w-[300px] flex-1 cursor-text items-center gap-2 rounded-full px-4 py-1.5">
             <Search size={15} className="shrink-0 text-ink-3" />
             <input
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder={t('queue.searchPlaceholder')}
-              className="no-drag min-w-0 flex-1 bg-transparent py-1 text-[13px] text-ink outline-none placeholder:text-ink-3"
+              className="no-drag min-w-0 flex-1 self-stretch bg-transparent text-[13px] text-ink outline-none placeholder:text-ink-3"
               spellCheck={false}
             />
-          </div>
+          </label>
         </div>
       )}
 
@@ -178,7 +180,16 @@ export default function DownloadsView(): JSX.Element {
           />
         ) : (
           <ul className="border-t border-edge">
-            <AnimatePresence mode="popLayout">
+            {/*
+              Plain AnimatePresence, not `mode="popLayout"`.
+              popLayout takes a ref on each child so it can measure and pop it
+              out of flow — and `QueueRow` is a function component, so React
+              refused the ref and logged "Function components cannot be given
+              refs" on every render. The measurement never happened, which is
+              why exiting rows kept their space instead of being lifted out of
+              it. Rows fade; the list reflows immediately.
+            */}
+            <AnimatePresence>
               {visible.map((item, i) => (
                 <QueueRow key={item.id} item={item} index={i} />
               ))}

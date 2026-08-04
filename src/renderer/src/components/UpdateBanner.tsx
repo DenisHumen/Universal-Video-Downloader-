@@ -45,11 +45,19 @@ export default function UpdateBanner(): JSX.Element {
               {update.state === 'downloading' && (
                 <div className="flex items-center gap-3">
                   <p className="shrink-0 text-[14px] font-medium text-ink">{t('update.downloading')}</p>
-                  <div className="h-1 min-w-0 flex-1 overflow-hidden rounded-full bg-sink">
-                    <motion.div
-                      className="h-full bg-accent"
-                      animate={{ width: `${update.percent ?? 0}%` }}
-                      transition={{ ease: 'easeOut' }}
+                  <div
+                    className="h-1 min-w-0 flex-1 overflow-hidden rounded-full bg-sink"
+                    role="progressbar"
+                    aria-valuenow={Math.round(update.percent ?? 0)}
+                    aria-valuemin={0}
+                    aria-valuemax={100}
+                  >
+                    {/* A plain style, not a framer-motion `animate`: an update
+                        downloads in the background, which is precisely where
+                        the frame clock stops ticking. */}
+                    <div
+                      className="h-full bg-accent transition-[width] duration-base ease-ease"
+                      style={{ width: `${update.percent ?? 0}%` }}
                     />
                   </div>
                   <span className="mono shrink-0 text-[12px] text-ink-2">

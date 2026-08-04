@@ -389,7 +389,7 @@ export default function HomeView(): JSX.Element {
               initial={{ opacity: 0, y: 6 }}
               animate={{ opacity: 1, y: 0 }}
               transition={enter}
-              className="block overflow-hidden"
+              className="panel overflow-hidden"
             >
               <div className="flex items-center gap-2.5 border-b border-edge px-4 py-3">
                 <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-bad" />
@@ -446,7 +446,7 @@ export default function HomeView(): JSX.Element {
               initial={{ opacity: 0, y: 6 }}
               animate={{ opacity: 1, y: 0 }}
               transition={enter}
-              className="block overflow-hidden"
+              className="panel overflow-hidden"
             >
               {/* What was found */}
               <div className="flex gap-4 border-b border-edge p-4">
@@ -600,7 +600,7 @@ function DetectingCard({
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
       transition={enter}
-      className="block overflow-hidden"
+      className="panel overflow-hidden"
     >
       <div className="flex items-center gap-2.5 border-b border-edge px-4 py-3">
         <span className="h-1.5 w-1.5 shrink-0 animate-idle-pulse rounded-full bg-accent" />

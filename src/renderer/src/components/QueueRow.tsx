@@ -45,8 +45,7 @@ const STATE_META: Record<DownloadItem['state'], { label: TranslationKey; dot: st
  * four separate treatments per item, repeated down the screen, which made a
  * list of twelve downloads read as twelve objects rather than one list.
  * Hairlines between rows carry the same separation at a fraction of the visual
- * cost, and let the progress rail sit flush at the row's bottom edge where it
- * doubles as the divider while an item is running.
+ * cost.
  */
 export default function QueueRow({ item, index }: Props): JSX.Element {
   const t = useT()
@@ -58,6 +57,13 @@ export default function QueueRow({ item, index }: Props): JSX.Element {
   const active =
     item.state === 'downloading' || item.state === 'processing' || item.state === 'detecting'
   const percent = Math.round(item.percent || 0)
+  /*
+    A running download that has never reported a percentage. Plenty of streams
+    (HLS without a byte total, sites that send no Content-Length) give yt-dlp
+    nothing to compute one from, and a bar pinned at 0% for the whole download
+    reads as "stuck", not as "unknown".
+  */
+  const indeterminate = active && percent === 0 && !item.totalBytes
   const qualityLabel =
     item.mode === 'audio' || item.formatId
       ? null
@@ -71,8 +77,10 @@ export default function QueueRow({ item, index }: Props): JSX.Element {
     qualityLabel,
     active && item.speed ? formatSpeed(item.speed) : null,
     active && item.eta ? formatEta(item.eta) : null,
-    item.state === 'downloading' && item.downloadedBytes && item.totalBytes
-      ? `${formatBytes(item.downloadedBytes)} / ${formatBytes(item.totalBytes)}`
+    item.state === 'downloading' && item.downloadedBytes
+      ? item.totalBytes
+        ? `${formatBytes(item.downloadedBytes)} / ${formatBytes(item.totalBytes)}`
+        : formatBytes(item.downloadedBytes)
       : null,
     item.state === 'completed' && item.totalBytes ? formatBytes(item.totalBytes) : null,
     item.state === 'queued' && (item.attempts || 0) > 0 ? t('queue.retryingIn') : null
@@ -123,27 +131,42 @@ export default function QueueRow({ item, index }: Props): JSX.Element {
           </p>
         </div>
 
-        {/* Progress: a real bar with a visible track, plus the number.
-            This used to be a 2px line on the row's bottom border — elegant, and
-            no one reads a hairline as "62% downloaded". */}
+        {/*
+          Progress: a real bar with a visible track, plus the number.
+
+          Two things were wrong here. The fill was a framer-motion `animate`,
+          so the bar rode the frame clock — the same clock that stalls in a
+          throttled window, which is exactly where a download sits while it
+          runs. It is a plain style with a CSS transition now: the browser
+          moves it whether or not anything is scheduling animation frames.
+
+          And when a site reports no total size, `percent` is genuinely
+          unknown. It used to render as a confident `0%` that never moved until
+          the download finished and the bar vanished. An indeterminate band and
+          the bytes downloaded so far say the true thing: working, size not
+          known.
+        */}
         {!['completed', 'error', 'canceled'].includes(item.state) && (
           <div className="flex w-32 shrink-0 items-center gap-2.5">
             <div
               className="h-1.5 min-w-0 flex-1 overflow-hidden rounded-full bg-sink"
               role="progressbar"
-              aria-valuenow={percent}
+              aria-valuenow={indeterminate ? undefined : percent}
               aria-valuemin={0}
               aria-valuemax={100}
               aria-label={t(meta.label)}
             >
-              <motion.div
-                className="h-full rounded-full bg-accent"
-                animate={{ width: `${percent}%` }}
-                transition={{ ease: 'easeOut', duration: 0.3 }}
-              />
+              {indeterminate ? (
+                <div className="progress-indeterminate h-full rounded-full bg-accent" />
+              ) : (
+                <div
+                  className="h-full rounded-full bg-accent transition-[width] duration-base ease-ease"
+                  style={{ width: `${percent}%` }}
+                />
+              )}
             </div>
             <span className="mono w-9 shrink-0 text-right text-[12px] tabular-nums text-ink-2">
-              {percent}%
+              {indeterminate ? '—' : `${percent}%`}
             </span>
           </div>
         )}
