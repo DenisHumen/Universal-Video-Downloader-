@@ -104,9 +104,8 @@ re-resolved later.
 - **Restricted sites** — age-verification, login-only and members-only videos
   work by reading cookies from your browser, or from a `cookies.txt` file:
   **Settings → access & cookies**.
-- **Themes & language** — four themes (midnight, carbon, nebula and a real light
-  theme) × seven accent colours, and a full **English / Русский** interface that
-  follows your system locale by default.
+- **Themes & language** — two designed themes, night and day, and a full
+  **English / Русский** interface that follows your system locale by default.
 - **Convenience** — desktop notifications, taskbar/dock progress, an optional
   tray icon that keeps downloads running when the window is closed, an optional
   clipboard watcher, drag-and-drop, paste-anywhere, a native menu bar and
@@ -119,17 +118,24 @@ re-resolved later.
 
 ### The look
 
-A cinematic dark interface: layered near-black surfaces (never pure `#000` — it
-smears on OLED and leaves elevated panels nothing to sit against), frosted
-panels over two slow-drifting ambient lights tinted by the accent, a hairline
-highlight along the top edge of every card, and one easing curve
-(`cubic-bezier(0.16, 1, 0.3, 1)`) shared by every transition in the app. Inter
-ships with the app rather than being fetched, so it looks identical offline.
+**UVD — Precision**, a Swiss-modernist system: a strict grid, hairline rules
+instead of shadows, near-monochrome planes, and exactly one saturated colour.
+Depth comes from stacking flat surfaces, never from blur or glow. Navigation is
+a text tab strip on a single 48px bar — no sidebar anywhere. Interface type is
+Inter; every measurement, path and identifier is set in JetBrains Mono with
+tabular figures, so data is always distinguishable from labels at a glance. Both
+faces ship with the app rather than being fetched, so it looks identical
+offline. One easing curve — `cubic-bezier(0.2, 0, 0, 1)` — and three durations
+cover every transition, and nothing animates while idle.
 
-Every dim text tier is contrast-checked against every surface of every theme by
-`npm run check:contrast`, which parses the real values out of the stylesheet and
-fails CI below WCAG AA (4.5:1) — including the light theme, where the same alpha
-that reads comfortably on black falls well under the floor on white.
+The full specification lives in
+[`design-system/universal-video-downloader/MASTER.md`](design-system/universal-video-downloader/MASTER.md).
+
+Text colours are named tokens rather than alphas over a foreground, because the
+same alpha reads very differently on every surface it lands on — which is how a
+palette silently drifts under AA. `npm run check:contrast` parses the real
+values out of the stylesheet and checks all 44 text/plane pairings across both
+themes, failing CI below WCAG AA (4.5:1).
 
 ## 📦 Install
 

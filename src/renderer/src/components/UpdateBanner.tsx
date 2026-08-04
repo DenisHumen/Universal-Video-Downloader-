@@ -1,10 +1,19 @@
 import { AnimatePresence, motion } from 'framer-motion'
-import { modalSpring } from '../lib/motion'
-import { Download, ExternalLink, RefreshCw, Rocket, X } from 'lucide-react'
+import { collapse } from '../lib/motion'
+import { Download, ExternalLink, RefreshCw, X } from 'lucide-react'
 import { useStore } from '../store'
 import { useT } from '../i18n'
 
-export default function UpdateBanner(): JSX.Element | null {
+/**
+ * A full-width strip under the chrome rather than a floating card.
+ *
+ * The old banner was absolutely positioned and centred, which meant it sat on
+ * top of the content it was interrupting and needed a static flex parent to
+ * survive framer-motion overwriting its transform. A strip has neither problem:
+ * it takes its own row, pushes the view down while it exists, and animates on
+ * height alone.
+ */
+export default function UpdateBanner(): JSX.Element {
   const t = useT()
   const update = useStore((s) => s.update)
   const dismissed = useStore((s) => s.updateDismissed)
@@ -18,77 +27,63 @@ export default function UpdateBanner(): JSX.Element | null {
   // the releases page instead of pretending the app can restart into a new one.
   const manual = Boolean(update.manual)
 
-  // Centering is done by this static flex parent — not by a transform on the
-  // motion element — because framer-motion's inline transform (y/scale) would
-  // otherwise override a Tailwind -translate-x-1/2 and push the banner off-screen.
   return (
-    <div className="pointer-events-none absolute inset-x-0 top-4 z-40 flex justify-center px-4">
-      <AnimatePresence>
-        {visible && (
-          <motion.div
-            initial={{ opacity: 0, y: -16, scale: 0.98 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: -16, scale: 0.98 }}
-            transition={modalSpring}
-            className="pointer-events-auto w-full max-w-[600px]"
-          >
-            <div className="flex items-center gap-3 rounded-3xl border border-fg/[0.09] bg-ink-750 px-4 py-3.5 shadow-soft backdrop-blur-xl">
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-fg/[0.06] text-cream">
-                <Rocket size={19} />
-              </div>
-              <div className="min-w-0 flex-1">
-                {update.state === 'available' && (
-                  <>
-                    <p className="truncate text-sm font-semibold text-cream">
-                      {t('update.available', { version: update.version ?? '' })}
-                    </p>
-                    <p className="mono truncate text-xs text-fg/60">
-                      {manual ? t('update.availableManualHint') : t('update.availableHint')}
-                    </p>
-                  </>
-                )}
-                {update.state === 'downloading' && (
-                  <>
-                    <p className="text-sm font-semibold text-cream">{t('update.downloading')}</p>
-                    <div className="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-fg/10">
-                      <motion.div
-                        className="h-full rounded-full bg-accent"
-                        animate={{ width: `${update.percent ?? 0}%` }}
-                        transition={{ ease: 'easeOut' }}
-                      />
-                    </div>
-                  </>
-                )}
-                {update.state === 'downloaded' && (
-                  <>
-                    <p className="truncate text-sm font-semibold text-cream">
-                      {t('update.ready', { version: update.version ?? '' })}
-                    </p>
-                    <p className="mono truncate text-xs text-fg/60">{t('update.readyHint')}</p>
-                  </>
-                )}
-              </div>
-
-              <div className="flex shrink-0 items-center gap-1.5">
-                {update.state === 'available' && (
-                  <button className="btn-primary px-3.5" onClick={() => window.api.downloadUpdate()}>
-                    {manual ? <ExternalLink size={16} /> : <Download size={16} />}
-                    {manual ? t('update.getIt') : t('update.action')}
-                  </button>
-                )}
-                {update.state === 'downloaded' && (
-                  <button className="btn-primary px-3.5" onClick={() => window.api.installUpdate()}>
-                    <RefreshCw size={16} /> {t('update.restart')}
-                  </button>
-                )}
-                <button className="btn-icon" onClick={dismiss} aria-label={t('common.close')}>
-                  <X size={16} />
-                </button>
-              </div>
+    <AnimatePresence initial={false}>
+      {visible && (
+        <motion.div {...collapse} className="shrink-0 overflow-hidden">
+          <div className="flex items-center gap-3 border-b border-edge bg-raise px-4 py-2.5">
+            <span className="label shrink-0 text-accent-ink">update</span>
+            <div className="min-w-0 flex-1">
+              {update.state === 'available' && (
+                <p className="truncate text-[13px] text-ink">
+                  {t('update.available', { version: update.version ?? '' })}
+                  <span className="mono ml-2 text-[11px] text-ink-3">
+                    {manual ? t('update.availableManualHint') : t('update.availableHint')}
+                  </span>
+                </p>
+              )}
+              {update.state === 'downloading' && (
+                <div className="flex items-center gap-3">
+                  <p className="shrink-0 text-[13px] text-ink">{t('update.downloading')}</p>
+                  <div className="h-1 min-w-0 flex-1 overflow-hidden rounded-full bg-sink">
+                    <motion.div
+                      className="h-full bg-accent"
+                      animate={{ width: `${update.percent ?? 0}%` }}
+                      transition={{ ease: 'easeOut' }}
+                    />
+                  </div>
+                  <span className="mono shrink-0 text-[11px] text-ink-3">
+                    {Math.round(update.percent ?? 0)}%
+                  </span>
+                </div>
+              )}
+              {update.state === 'downloaded' && (
+                <p className="truncate text-[13px] text-ink">
+                  {t('update.ready', { version: update.version ?? '' })}
+                  <span className="mono ml-2 text-[11px] text-ink-3">{t('update.readyHint')}</span>
+                </p>
+              )}
             </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-    </div>
+
+            <div className="flex shrink-0 items-center gap-1.5">
+              {update.state === 'available' && (
+                <button className="btn-solid px-3 py-2" onClick={() => window.api.downloadUpdate()}>
+                  {manual ? <ExternalLink size={14} /> : <Download size={14} />}
+                  {manual ? t('update.getIt') : t('update.action')}
+                </button>
+              )}
+              {update.state === 'downloaded' && (
+                <button className="btn-solid px-3 py-2" onClick={() => window.api.installUpdate()}>
+                  <RefreshCw size={14} /> {t('update.restart')}
+                </button>
+              )}
+              <button className="btn-icon" onClick={dismiss} aria-label={t('common.close')}>
+                <X size={15} />
+              </button>
+            </div>
+          </div>
+        </motion.div>
+      )}
+    </AnimatePresence>
   )
 }

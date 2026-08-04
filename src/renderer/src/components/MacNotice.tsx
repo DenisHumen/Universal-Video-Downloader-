@@ -1,12 +1,12 @@
 import { useState } from 'react'
-import { AnimatePresence, motion } from 'framer-motion'
-import { Check, Copy, ShieldAlert, X } from 'lucide-react'
+import { Check, Copy, X } from 'lucide-react'
 import { useStore } from '../store'
 import { useT } from '../i18n'
 
 const COMMAND = 'sudo xattr -rd com.apple.quarantine /Applications/Universal\\ Video\\ Downloader.app'
 const STORAGE_KEY = 'uvd:mac-notice-dismissed'
 
+/** Gatekeeper's "damaged app" message, and the one command that clears it. */
 export default function MacNotice(): JSX.Element | null {
   const t = useT()
   const appInfo = useStore((s) => s.appInfo)
@@ -21,7 +21,7 @@ export default function MacNotice(): JSX.Element | null {
       setCopied(true)
       setTimeout(() => setCopied(false), 1600)
     } catch {
-      /* ignore */
+      /* clipboard unavailable */
     }
   }
 
@@ -31,30 +31,21 @@ export default function MacNotice(): JSX.Element | null {
   }
 
   return (
-    <AnimatePresence>
-      <motion.div
-        initial={{ opacity: 0, y: -8, height: 0 }}
-        animate={{ opacity: 1, y: 0, height: 'auto' }}
-        exit={{ opacity: 0, height: 0 }}
-        className="shrink-0"
-      >
-        <div className="flex items-center gap-3 rounded-2xl border border-warn/20 bg-warn/[0.07] px-4 py-2.5">
-          <ShieldAlert size={17} className="shrink-0 text-warn" />
-          <div className="min-w-0 flex-1">
-            <p className="text-xs font-medium text-cream">{t('mac.title')}</p>
-            <code className="mono mt-1 block truncate text-[11px] text-fg/60" title={COMMAND}>
-              {COMMAND}
-            </code>
-          </div>
-          <button className="btn-ghost shrink-0 px-3 py-2" onClick={copy}>
-            {copied ? <Check size={15} className="text-good" /> : <Copy size={15} />}
-            {copied ? t('common.copied') : t('common.copy')}
-          </button>
-          <button className="btn-icon shrink-0" onClick={dismiss} aria-label={t('common.close')}>
-            <X size={15} />
-          </button>
-        </div>
-      </motion.div>
-    </AnimatePresence>
+    <div className="flex shrink-0 items-center gap-3 border-b border-edge bg-raise px-4 py-2.5">
+      <span className="label shrink-0 text-warn">macos</span>
+      <div className="min-w-0 flex-1">
+        <p className="text-[13px] text-ink">{t('mac.title')}</p>
+        <code className="mono selectable block truncate text-[11px] text-ink-3" title={COMMAND}>
+          {COMMAND}
+        </code>
+      </div>
+      <button className="btn-quiet shrink-0 px-3 py-2" onClick={copy}>
+        {copied ? <Check size={14} className="text-good" /> : <Copy size={14} />}
+        {copied ? t('common.copied') : t('common.copy')}
+      </button>
+      <button className="btn-icon" onClick={dismiss} aria-label={t('common.close')}>
+        <X size={15} />
+      </button>
+    </div>
   )
 }

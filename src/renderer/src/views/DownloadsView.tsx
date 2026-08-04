@@ -1,12 +1,12 @@
 import { useMemo, useState } from 'react'
-import { AnimatePresence, motion } from 'framer-motion'
-import { FolderOpen, Inbox, Pause, Play, RotateCw, Search, Trash2 } from 'lucide-react'
+import { AnimatePresence } from 'framer-motion'
+import { FolderOpen, Pause, Play, RotateCw, Search, Trash2 } from 'lucide-react'
 import type { DownloadItem } from '@shared/types'
 import { useStore } from '../store'
 import { formatBytes, formatSpeed } from '../lib/format'
 import { useT, type TranslationKey } from '../i18n'
-import DownloadCard from '../components/DownloadCard'
-import Segmented from '../components/Segmented'
+import QueueRow from '../components/QueueRow'
+import Choice from '../components/Choice'
 
 type Filter = 'all' | 'active' | 'done' | 'failed'
 
@@ -32,6 +32,11 @@ function matches(item: DownloadItem, filter: Filter): boolean {
   return item.state === 'error' || item.state === 'canceled'
 }
 
+/**
+ * The queue as a document: a header stating the totals, a control strip, then
+ * one ruled list. Bulk actions live as icons in the header rather than inside
+ * each row, so the per-row controls stay about that row.
+ */
 export default function DownloadsView(): JSX.Element {
   const t = useT()
   const downloads = useStore((s) => s.downloads)
@@ -61,32 +66,32 @@ export default function DownloadsView(): JSX.Element {
   const hasPaused = downloads.some((d) => d.state === 'paused')
   const hasFailed = downloads.some((d) => d.state === 'error' || d.state === 'canceled')
 
-  const totalSpeed = downloads
-    .filter((d) => d.state === 'downloading')
-    .reduce((n, d) => n + (d.speed || 0), 0)
-  const remainingBytes = downloads
-    .filter((d) => d.state === 'downloading')
-    .reduce((n, d) => n + Math.max(0, (d.totalBytes || 0) - (d.downloadedBytes || 0)), 0)
+  const running = downloads.filter((d) => d.state === 'downloading')
+  const totalSpeed = running.reduce((n, d) => n + (d.speed || 0), 0)
+  const remainingBytes = running.reduce(
+    (n, d) => n + Math.max(0, (d.totalBytes || 0) - (d.downloadedBytes || 0)),
+    0
+  )
+
+  const summary = [
+    downloads.length === 1
+      ? t('queue.item', { count: 1 })
+      : t('queue.items', { count: downloads.length }),
+    totalSpeed > 0 ? formatSpeed(totalSpeed) : null,
+    remainingBytes > 0 ? t('queue.remaining', { size: formatBytes(remainingBytes) }) : null
+  ].filter(Boolean)
 
   return (
-    <div className="mx-auto flex h-full w-full max-w-2xl flex-col px-8 py-9">
-      <div className="mb-4 flex items-start justify-between gap-4">
+    <div className="mx-auto flex h-full w-full max-w-[860px] flex-col px-6 pb-8 pt-10">
+      <header className="flex items-end justify-between gap-4">
         <div className="min-w-0">
-          <h1 className="text-2xl font-semibold tracking-tight text-cream">{t('queue.title')}</h1>
-          <p className="mono text-sm text-fg/55">
-            {downloads.length === 1
-              ? t('queue.item', { count: 1 })
-              : t('queue.items', { count: downloads.length })}
-            {totalSpeed > 0 && <span className="text-fg/60"> · {formatSpeed(totalSpeed)}</span>}
-            {remainingBytes > 0 && (
-              <span className="text-fg/55"> · {formatBytes(remainingBytes)} left</span>
-            )}
-          </p>
+          <h1 className="text-[22px] font-semibold tracking-[-0.01em] text-ink">{t('queue.title')}</h1>
+          <p className="mono mt-1 truncate text-[11px] text-ink-3">{summary.join('  ·  ')}</p>
         </div>
-        <div className="flex shrink-0 items-center gap-2">
+        <div className="flex shrink-0 items-center gap-0.5">
           {settings?.downloadDir && (
             <button
-              className="btn-ghost px-3 py-2"
+              className="btn-icon"
               title={t('queue.openFolder')}
               onClick={() => window.api.openPath(settings.downloadDir)}
             >
@@ -94,26 +99,18 @@ export default function DownloadsView(): JSX.Element {
             </button>
           )}
           {hasRunning && (
-            <button
-              className="btn-ghost px-3 py-2"
-              title={t('queue.pauseAll')}
-              onClick={() => window.api.pauseAll()}
-            >
+            <button className="btn-icon" title={t('queue.pauseAll')} onClick={() => window.api.pauseAll()}>
               <Pause size={16} />
             </button>
           )}
           {hasPaused && (
-            <button
-              className="btn-ghost px-3 py-2"
-              title={t('queue.resumeAll')}
-              onClick={() => window.api.resumeAll()}
-            >
+            <button className="btn-icon" title={t('queue.resumeAll')} onClick={() => window.api.resumeAll()}>
               <Play size={16} />
             </button>
           )}
           {hasFailed && (
             <button
-              className="btn-ghost px-3 py-2"
+              className="btn-icon"
               title={t('queue.retryFailed')}
               onClick={() => window.api.retryFailed()}
             >
@@ -121,66 +118,55 @@ export default function DownloadsView(): JSX.Element {
             </button>
           )}
           {hasFinished && (
-            <button className="btn-ghost px-3 py-2" title={t('queue.clearFinished')} onClick={clearFinished}>
+            <button className="btn-icon" title={t('queue.clearFinished')} onClick={clearFinished}>
               <Trash2 size={16} />
             </button>
           )}
         </div>
-      </div>
+      </header>
 
       {downloads.length > 0 && (
-        <div className="mb-4 flex flex-wrap items-center gap-2">
-          <Segmented
-            layoutId="queue-filter"
-            fill={false}
+        <div className="mt-6 flex flex-wrap items-center gap-3">
+          <Choice
+            label={t('queue.title')}
             value={filter}
             onChange={(v) => setFilter(v as Filter)}
             options={FILTERS.map((f) => ({ value: f.value, label: t(f.label) }))}
           />
-          <div className="flex min-w-[160px] flex-1 items-center gap-2 rounded-2xl border border-fg/[0.08] bg-ink-900 px-3 py-1.5 transition-colors focus-within:border-accent/40">
-            <Search size={14} className="shrink-0 text-fg/50" />
+          <div className="field ml-auto flex min-w-[200px] max-w-[280px] flex-1 items-center gap-2 rounded-full px-3 py-1.5">
+            <Search size={13} className="shrink-0 text-ink-3" />
             <input
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder={t('queue.searchPlaceholder')}
-              className="no-drag min-w-0 flex-1 bg-transparent py-1 text-xs text-cream placeholder:text-fg/50 outline-none"
+              className="no-drag min-w-0 flex-1 bg-transparent py-1 text-[12px] text-ink outline-none placeholder:text-ink-3"
               spellCheck={false}
             />
           </div>
         </div>
       )}
 
-      <div className="flex-1 overflow-y-auto pr-1">
+      <div className="mt-5 min-h-0 flex-1 overflow-y-auto">
         {downloads.length === 0 ? (
-          <motion.div
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="flex h-full flex-col items-center justify-center text-center"
-          >
-            <div className="flex h-20 w-20 items-center justify-center rounded-3xl bg-fg/[0.03] text-fg/35">
-              <Inbox size={34} />
-            </div>
-            <p className="mt-4 text-sm font-medium text-fg/70">{t('queue.empty')}</p>
-            <p className="mono mt-1 text-xs text-fg/50">{t('queue.emptyHint')}</p>
-            <button className="btn-primary mt-5" onClick={() => setView('home')}>
+          <div className="flex h-full flex-col items-center justify-center text-center">
+            <p className="text-[14px] font-medium text-ink">{t('queue.empty')}</p>
+            <p className="mono mt-1.5 text-[11px] text-ink-3">{t('queue.emptyHint')}</p>
+            <button className="btn-solid mt-6" onClick={() => setView('home')}>
               {t('queue.add')}
             </button>
-          </motion.div>
+          </div>
         ) : visible.length === 0 ? (
           <div className="flex h-full flex-col items-center justify-center text-center">
-            <div className="flex h-16 w-16 items-center justify-center rounded-3xl bg-fg/[0.03] text-fg/35">
-              <Search size={26} />
-            </div>
-            <p className="mt-4 text-sm font-medium text-fg/70">{t('queue.emptyFiltered')}</p>
+            <p className="text-[14px] font-medium text-ink">{t('queue.emptyFiltered')}</p>
           </div>
         ) : (
-          <div className="space-y-3 pb-4">
+          <ul className="border-t border-edge">
             <AnimatePresence mode="popLayout">
-              {visible.map((item) => (
-                <DownloadCard key={item.id} item={item} />
+              {visible.map((item, i) => (
+                <QueueRow key={item.id} item={item} index={i} />
               ))}
             </AnimatePresence>
-          </div>
+          </ul>
         )}
       </div>
     </div>

@@ -233,11 +233,24 @@ export interface DownloadProgress {
   fragmentCount?: number
 }
 
-export const THEMES = ['midnight', 'carbon', 'nebula', 'daylight'] as const
+/**
+ * Two themes, one accent.
+ *
+ * The previous build shipped four palettes and seven accents — 28 combinations,
+ * of which only the default was ever really designed. The system now carries a
+ * single saturated colour, so the only choice left is the one that depends on
+ * the room you're sitting in.
+ */
+export const THEMES = ['night', 'day'] as const
 export type ThemeId = (typeof THEMES)[number]
 
-export const ACCENTS = ['indigo', 'violet', 'cyan', 'emerald', 'amber', 'rose', 'cream'] as const
-export type AccentId = (typeof ACCENTS)[number]
+/** Palettes that existed before the redesign, mapped onto the two that remain. */
+export const LEGACY_THEMES: Record<string, ThemeId> = {
+  midnight: 'night',
+  carbon: 'night',
+  nebula: 'night',
+  daylight: 'day'
+}
 
 export type LanguageId = 'auto' | 'en' | 'ru'
 
@@ -271,7 +284,6 @@ export interface AppSettings {
   playlistLimit: number
   autoUpdate: boolean
   theme: ThemeId
-  accent: AccentId
   language: LanguageId
   /** Show a desktop notification when a download finishes. */
   notifications: boolean

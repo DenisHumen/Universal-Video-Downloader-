@@ -1,11 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Scissors } from 'lucide-react'
 import type { TrimRange } from '@shared/types'
 import { clampTime, parseClock, toClock } from '../lib/time'
 import { useT } from '../i18n'
 
 interface Props {
-  /** Total length of the source, when known. Without it the slider is hidden. */
+  /** Total length of the source, when known. Without it the timeline is hidden. */
   duration?: number
   value: TrimRange
   onChange: (range: TrimRange) => void
@@ -19,6 +18,10 @@ type Handle = 'start' | 'end' | null
  * A two-handle range picker over the video's timeline, backed by editable
  * timestamps. Dragging is for "roughly here", typing is for "exactly here" —
  * both write the same range.
+ *
+ * The track is a flat band with the selection cut out of it in accent, and the
+ * handles are square rather than round: they mark an exact frame, and a circle
+ * reads as approximate.
  */
 export default function TrimEditor({ duration, value, onChange, hint }: Props): JSX.Element {
   const t = useT()
@@ -109,7 +112,7 @@ export default function TrimEditor({ duration, value, onChange, hint }: Props): 
       {total != null && (
         <div
           ref={trackRef}
-          className="relative h-9 cursor-pointer select-none rounded-xl bg-ink-900"
+          className="relative h-10 cursor-pointer select-none rounded-2 border border-edge bg-sink"
           onPointerDown={(e) => {
             const seconds = seek(e.clientX)
             if (seconds == null) return
@@ -126,7 +129,7 @@ export default function TrimEditor({ duration, value, onChange, hint }: Props): 
           }}
         >
           <div
-            className="absolute inset-y-0 rounded-xl bg-accent/25"
+            className="absolute inset-y-0 bg-accent/20"
             style={{
               left: `${percentOf(start)}%`,
               width: `${Math.max(0, percentOf(end ?? total) - percentOf(start))}%`
@@ -157,7 +160,7 @@ export default function TrimEditor({ duration, value, onChange, hint }: Props): 
                     else onChange({ ...value, end: next })
                   }
                 }}
-                className="absolute top-1/2 z-10 h-7 w-3 -translate-x-1/2 -translate-y-1/2 cursor-ew-resize rounded-full border-2 border-ink-900 bg-accent outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
+                className="absolute top-1/2 z-10 h-[26px] w-1.5 -translate-x-1/2 -translate-y-1/2 cursor-ew-resize rounded-full bg-accent outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-canvas"
                 style={{ left: `${percentOf(seconds)}%` }}
               />
             )
@@ -165,11 +168,9 @@ export default function TrimEditor({ duration, value, onChange, hint }: Props): 
         </div>
       )}
 
-      <div className="flex flex-wrap items-end gap-3">
-        <label className="min-w-[92px] flex-1">
-          <span className="mono mb-1 block text-[11px] uppercase tracking-wider text-fg/55">
-            {t('trim.start')}
-          </span>
+      <div className="flex flex-wrap items-end gap-2">
+        <label className="min-w-[96px] flex-1">
+          <span className="label mb-1.5 block">{t('trim.start')}</span>
           <input
             value={startText}
             onChange={(e) => setStartText(e.target.value)}
@@ -178,13 +179,11 @@ export default function TrimEditor({ duration, value, onChange, hint }: Props): 
             onFocus={() => setDragging(null)}
             placeholder="0:00"
             spellCheck={false}
-            className="input mono px-3 py-2 text-sm"
+            className="field mono py-2 text-[13px]"
           />
         </label>
-        <label className="min-w-[92px] flex-1">
-          <span className="mono mb-1 block text-[11px] uppercase tracking-wider text-fg/55">
-            {t('trim.end')}
-          </span>
+        <label className="min-w-[96px] flex-1">
+          <span className="label mb-1.5 block">{t('trim.end')}</span>
           <input
             value={endText}
             onChange={(e) => setEndText(e.target.value)}
@@ -193,31 +192,21 @@ export default function TrimEditor({ duration, value, onChange, hint }: Props): 
             onFocus={() => setDragging(null)}
             placeholder={total != null ? toClock(total) : t('trim.end.full')}
             spellCheck={false}
-            className="input mono px-3 py-2 text-sm"
+            className="field mono py-2 text-[13px]"
           />
         </label>
-        <button
-          className="btn-ghost px-3 py-2 text-xs"
-          onClick={() => onChange({ start: 0, end: undefined })}
-        >
+        <button className="btn-quiet px-3 py-2" onClick={() => onChange({ start: 0, end: undefined })}>
           {t('trim.reset')}
         </button>
       </div>
 
-      <div className="flex items-center gap-2 text-[11px]">
+      <p className="mono text-[11px] text-ink-3">
         {invalid ? (
           <span className="text-bad">{t('trim.invalid')}</span>
         ) : (
-          <>
-            {lengthLabel && (
-              <span className="mono flex items-center gap-1.5 text-fg/50">
-                <Scissors size={11} /> {t('trim.length')} {lengthLabel}
-              </span>
-            )}
-            {hint && <span className="text-fg/50">{hint}</span>}
-          </>
+          [lengthLabel ? `${t('trim.length')} ${lengthLabel}` : null, hint].filter(Boolean).join('  ·  ')
         )}
-      </div>
+      </p>
     </div>
   )
 }

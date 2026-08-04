@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
-import { CheckCheck, Crown, Download, Film, Loader2, Sparkles, Tv, X } from 'lucide-react'
+import { Loader2 } from 'lucide-react'
 import type { MediaInfo, QualityPreset } from '@shared/types'
-import Segmented, { type SegOption } from './Segmented'
+import Choice, { type ChoiceOption } from './Choice'
 import Thumbnail from './Thumbnail'
 import { initialQuality, QUALITY_HEIGHTS } from '../lib/quality'
 import { toast } from '../lib/toast'
@@ -15,6 +15,7 @@ interface Props {
 
 const pad2 = (n: number): string => String(n).padStart(2, '0')
 
+/** Translator → season → episodes → quality, in the order the site imposes. */
 export default function StreamingCard({ info, onDone }: Props): JSX.Element {
   const t = useT()
   const setView = useStore((s) => s.setView)
@@ -28,8 +29,8 @@ export default function StreamingCard({ info, onDone }: Props): JSX.Element {
     const hs = [...new Set(s.qualities.map((q) => parseInt(q, 10)).filter((h) => known.has(h)))]
     return hs.sort((a, b) => b - a)
   }, [s.qualities])
-  const qualityOptions: SegOption[] = [
-    { value: 'best', label: t('common.best'), icon: <Sparkles size={12} /> },
+  const qualityOptions: ChoiceOption[] = [
+    { value: 'best', label: t('common.best') },
     ...heights.map((h) => ({ value: String(h), label: `${h}p` }))
   ]
 
@@ -66,11 +67,6 @@ export default function StreamingCard({ info, onDone }: Props): JSX.Element {
       return { ...prev, [season]: next }
     })
   }
-  const selectAll = (): void => {
-    if (!currentSeason) return
-    setSelected((prev) => ({ ...prev, [season]: [...currentSeason.episodes] }))
-  }
-  const clearSeason = (): void => setSelected((prev) => ({ ...prev, [season]: [] }))
 
   const queueSeries = async (): Promise<void> => {
     if (!totalSelected) {
@@ -127,80 +123,61 @@ export default function StreamingCard({ info, onDone }: Props): JSX.Element {
     setView('downloads')
   }
 
+  const episodesOfSeason = currentSeason?.episodes ?? []
+  const chosenHere = selected[season] || []
+
   return (
-    <div className="card card-lit overflow-hidden">
-      <div className="flex gap-4 border-b border-fg/[0.06] p-4">
+    <div className="block overflow-hidden">
+      <div className="flex gap-4 border-b border-edge p-4">
         <Thumbnail
           src={s.thumbnail}
           pageUrl={info.webpageUrl}
-          className="h-24 w-16 shrink-0 rounded-xl object-cover"
+          className="h-24 w-16 shrink-0 rounded-2 object-cover"
           loading="eager"
-          fallback={
-            <div className="flex h-24 w-16 shrink-0 items-center justify-center rounded-xl bg-fg/[0.05] text-fg/50">
-              {s.isSeries ? <Tv size={20} /> : <Film size={20} />}
-            </div>
-          }
+          fallback={<div className="h-24 w-16 shrink-0 rounded-2 bg-sink" />}
         />
         <div className="min-w-0 flex-1">
-          <h2 className="text-base font-semibold text-cream">{s.title}</h2>
-          <p className="mono mt-0.5 text-xs text-fg/55">
+          <h2 className="text-[15px] font-medium text-ink">{s.title}</h2>
+          <p className="mono mt-1 text-[11px] text-ink-3">
             {s.isSeries
               ? seasonsForT.length > 1
                 ? t('streaming.seriesSeasons', { count: seasonsForT.length })
                 : t('streaming.series')
-              : t('streaming.movie')}{' '}
-            · {s.provider === 'yummyani' ? 'YummyAnime' : 'HDrezka'}
+              : t('streaming.movie')}
+            {'  ·  '}
+            {s.provider === 'yummyani' ? 'YummyAnime' : 'HDrezka'}
           </p>
-          <span className="mono mt-2 inline-block rounded-lg bg-fg/[0.06] px-2 py-0.5 text-[10px] text-fg/50">
-            {s.host}
-          </span>
+          <span className="tag mt-2.5 inline-flex">{s.host}</span>
         </div>
       </div>
 
       <div className="space-y-5 p-4">
-        {/* Translator / voiceover */}
         {s.translators.length > 1 && (
           <div>
-            <p className="group-title">{t('streaming.voiceover')}</p>
-            <div className="flex max-h-32 flex-wrap gap-1.5 overflow-y-auto pr-1">
-              {s.translators.map((tr) => {
-                const active = tr.id === translatorId
-                return (
-                  <button
-                    key={tr.id}
-                    onClick={() => !tr.premium && changeTranslator(tr.id)}
-                    disabled={tr.premium}
-                    title={tr.premium ? t('streaming.premiumHint') : undefined}
-                    className={`no-drag flex items-center gap-1.5 rounded-xl px-3 py-2 text-xs font-medium transition-colors ${
-                      tr.premium
-                        ? 'cursor-not-allowed bg-fg/[0.02] text-fg/50'
-                        : active
-                          ? 'bg-accent text-accent-fg'
-                          : 'bg-fg/[0.05] text-fg/60 hover:text-cream'
-                    }`}
-                  >
-                    {tr.name}
-                    {tr.premium && (
-                      <span className="flex items-center gap-0.5 rounded bg-warn/15 px-1 py-0.5 text-[9px] font-bold uppercase text-warn">
-                        <Crown size={9} /> {t('streaming.premium')}
-                      </span>
-                    )}
-                  </button>
-                )
-              })}
+            <p className="label mb-2">{t('streaming.voiceover')}</p>
+            <div className="max-h-32 overflow-y-auto">
+              <Choice
+                label={t('streaming.voiceover')}
+                value={translatorId}
+                onChange={changeTranslator}
+                options={s.translators.map((tr) => ({
+                  value: tr.id,
+                  label: tr.premium ? `${tr.name} · ${t('streaming.premium')}` : tr.name,
+                  disabled: tr.premium,
+                  title: tr.premium ? t('streaming.premiumHint') : undefined
+                }))}
+              />
             </div>
           </div>
         )}
 
         {s.isSeries ? (
           <>
-            {/* Season */}
             {seasonsForT.length > 1 && (
               <div>
-                <p className="group-title">{t('streaming.season')}</p>
-                <Segmented
-                  layoutId="rz-season"
-                  fill={false}
+                <p className="label mb-2">{t('streaming.season')}</p>
+                <Choice
+                  label={t('streaming.season')}
                   value={String(season)}
                   onChange={(v) => setSeason(Number(v))}
                   options={seasonsForT.map((x) => ({ value: String(x.season), label: String(x.season) }))}
@@ -208,30 +185,41 @@ export default function StreamingCard({ info, onDone }: Props): JSX.Element {
               </div>
             )}
 
-            {/* Episodes */}
             <div>
-              <div className="mb-2 flex items-center justify-between">
-                <p className="group-title mb-0">{t('streaming.episodes')}</p>
-                <div className="flex items-center gap-2">
-                  <button className="btn-ghost px-2.5 py-1.5 text-xs" onClick={selectAll}>
-                    <CheckCheck size={13} /> {t('common.all')}
+              <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+                <p className="label">{t('streaming.episodes')}</p>
+                <div className="flex items-center gap-3">
+                  <button
+                    className="mono text-[11px] text-ink-3 transition-colors duration-fast ease-ease hover:text-ink"
+                    onClick={() =>
+                      setSelected((prev) => ({ ...prev, [season]: [...episodesOfSeason] }))
+                    }
+                  >
+                    {t('common.all')}
                   </button>
-                  <button className="btn-ghost px-2.5 py-1.5 text-xs" onClick={clearSeason}>
-                    <X size={13} /> {t('common.clear')}
+                  <button
+                    className="mono text-[11px] text-ink-3 transition-colors duration-fast ease-ease hover:text-ink"
+                    onClick={() => setSelected((prev) => ({ ...prev, [season]: [] }))}
+                  >
+                    {t('common.clear')}
                   </button>
                 </div>
               </div>
-              <div className="flex max-h-52 flex-wrap gap-1.5 overflow-y-auto pr-1">
-                {currentSeason?.episodes.map((ep) => {
-                  const active = (selected[season] || []).includes(ep)
+              {/* Episodes are multi-select, so they're square toggles on a grid
+                  rather than pills — a grid of numbers reads as a calendar of
+                  what you already have. */}
+              <div className="flex max-h-52 flex-wrap gap-1.5 overflow-y-auto">
+                {episodesOfSeason.map((ep) => {
+                  const on = chosenHere.includes(ep)
                   return (
                     <button
                       key={ep}
                       onClick={() => toggleEpisode(ep)}
-                      className={`no-drag h-9 w-9 rounded-xl text-xs font-semibold transition-colors ${
-                        active
-                          ? 'bg-accent text-accent-fg'
-                          : 'bg-fg/[0.05] text-fg/70 hover:bg-fg/[0.1] hover:text-cream'
+                      aria-pressed={on}
+                      className={`no-drag mono h-8 w-8 shrink-0 rounded-1 border text-[11px] tabular-nums transition-colors duration-fast ease-ease ${
+                        on
+                          ? 'border-accent bg-accent text-accent-fg'
+                          : 'border-edge text-ink-2 hover:border-ink-3 hover:text-ink'
                       }`}
                     >
                       {ep}
@@ -241,35 +229,34 @@ export default function StreamingCard({ info, onDone }: Props): JSX.Element {
               </div>
             </div>
 
-            {/* Quality */}
             <div>
-              <p className="group-title">{t('streaming.quality')}</p>
-              <Segmented
-                layoutId="rz-quality"
+              <p className="label mb-2">{t('streaming.quality')}</p>
+              <Choice
+                label={t('streaming.quality')}
                 value={quality}
                 onChange={(v) => setQuality(v as QualityPreset)}
                 options={qualityOptions}
               />
             </div>
 
-            <button className="btn-primary w-full py-3 text-[15px]" onClick={queueSeries} disabled={busy}>
-              {busy ? <Loader2 size={18} className="animate-spin" /> : <Download size={18} />}
+            <button className="btn-solid w-full py-3.5 text-[14px]" onClick={queueSeries} disabled={busy}>
+              {busy ? <Loader2 size={16} className="animate-spin" /> : null}
               {t('playlist.selected', { count: totalSelected })}
             </button>
           </>
         ) : (
           <>
             <div>
-              <p className="group-title">{t('streaming.quality')}</p>
-              <Segmented
-                layoutId="rz-quality"
+              <p className="label mb-2">{t('streaming.quality')}</p>
+              <Choice
+                label={t('streaming.quality')}
                 value={quality}
                 onChange={(v) => setQuality(v as QualityPreset)}
                 options={qualityOptions}
               />
             </div>
-            <button className="btn-primary w-full py-3 text-[15px]" onClick={queueMovie} disabled={busy}>
-              {busy ? <Loader2 size={18} className="animate-spin" /> : <Download size={18} />}
+            <button className="btn-solid w-full py-3.5 text-[14px]" onClick={queueMovie} disabled={busy}>
+              {busy ? <Loader2 size={16} className="animate-spin" /> : null}
               {t('common.download')}
             </button>
           </>

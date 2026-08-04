@@ -92,6 +92,7 @@ export const ru: Dictionary = {
   'queue.filterDone': 'готовые',
   'queue.filterFailed': 'с ошибкой',
   'queue.searchPlaceholder': 'фильтр по названию…',
+  'queue.remaining': 'осталось {size}',
   'queue.log': 'вывод движка',
   'queue.copyError': 'скопировать ошибку',
   'queue.retryingIn': 'повторяю автоматически…',
@@ -169,11 +170,8 @@ export const ru: Dictionary = {
   'settings.language': 'язык',
   'settings.language.auto': 'как в системе',
   'settings.theme': 'тема',
-  'settings.theme.midnight': 'полночь',
-  'settings.theme.carbon': 'карбон',
-  'settings.theme.nebula': 'туманность',
-  'settings.theme.daylight': 'светлая',
-  'settings.accent': 'акцент',
+  'settings.theme.night': 'ночь',
+  'settings.theme.day': 'день',
 
   'settings.saveLocation': 'папка загрузок',
   'settings.subfolders': 'раскладывать по папкам',
@@ -273,6 +271,7 @@ export const ru: Dictionary = {
   'shortcuts.escape': 'очистить / закрыть',
 
   // ---- capabilities panel ----
+  'cap.title': 'что умеет приложение',
   'cap.link.title': 'вставьте любую ссылку',
   'cap.link.body':
     '1800+ сайтов напрямую, а для остальных приложение само читает страницу — или смотрит её в скрытом браузере — и находит поток.',

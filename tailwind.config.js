@@ -4,27 +4,32 @@ module.exports = {
   theme: {
     extend: {
       colors: {
-        // Every colour is a CSS variable so themes can be swapped at runtime
-        // without rebuilding the stylesheet. See src/renderer/src/index.css.
+        // Every colour resolves through a CSS variable so a theme swap is one
+        // attribute on <html> — no rebuild, no flash. See index.css.
+        //
+        // Planes, darkest-to-lightest in Night and the reverse in Day:
+        // canvas (the window) < raise (a block) < sink (a field inside it).
+        canvas: 'rgb(var(--bg) / <alpha-value>)',
+        raise: 'rgb(var(--surface) / <alpha-value>)',
+        sink: 'rgb(var(--surface-2) / <alpha-value>)',
+        edge: {
+          DEFAULT: 'rgb(var(--line) / <alpha-value>)',
+          strong: 'rgb(var(--line-strong) / <alpha-value>)'
+        },
+        // Three text tiers, all verified ≥4.5:1 on every plane by
+        // scripts/check-contrast.mjs. Never write text in a plane colour.
         ink: {
-          950: 'rgb(var(--ink-950) / <alpha-value>)',
-          900: 'rgb(var(--ink-900) / <alpha-value>)',
-          850: 'rgb(var(--ink-850) / <alpha-value>)',
-          800: 'rgb(var(--ink-800) / <alpha-value>)',
-          750: 'rgb(var(--ink-750) / <alpha-value>)',
-          700: 'rgb(var(--ink-700) / <alpha-value>)',
-          600: 'rgb(var(--ink-600) / <alpha-value>)',
-          500: 'rgb(var(--ink-500) / <alpha-value>)'
+          DEFAULT: 'rgb(var(--text) / <alpha-value>)',
+          2: 'rgb(var(--text-2) / <alpha-value>)',
+          3: 'rgb(var(--text-3) / <alpha-value>)'
         },
-        cream: {
-          DEFAULT: 'rgb(var(--cream) / <alpha-value>)',
-          dim: 'rgb(var(--cream-dim) / <alpha-value>)'
-        },
-        /** Foreground tint for every translucent overlay: text-fg/40, bg-fg/[0.05]. */
-        fg: 'rgb(var(--fg) / <alpha-value>)',
         accent: {
           DEFAULT: 'rgb(var(--accent) / <alpha-value>)',
-          fg: 'rgb(var(--accent-fg) / <alpha-value>)'
+          // Label on an accent fill.
+          fg: 'rgb(var(--accent-fg) / <alpha-value>)',
+          // Accent-coloured *text* on a plane — a lighter/darker cut of the
+          // same hue, because the fill colour alone never clears 4.5:1.
+          ink: 'rgb(var(--accent-ink) / <alpha-value>)'
         },
         good: 'rgb(var(--good) / <alpha-value>)',
         warn: 'rgb(var(--warn) / <alpha-value>)',
@@ -32,6 +37,7 @@ module.exports = {
       },
       fontFamily: {
         sans: [
+          'Inter Variable',
           'Inter',
           '-apple-system',
           'BlinkMacSystemFont',
@@ -42,48 +48,48 @@ module.exports = {
           'sans-serif'
         ],
         mono: [
+          'JetBrains Mono Variable',
+          'JetBrains Mono',
           'ui-monospace',
           'SFMono-Regular',
-          'SF Mono',
           'Menlo',
           'Consolas',
-          'Liberation Mono',
           'monospace'
         ]
       },
       borderRadius: {
-        '4xl': '1.75rem',
-        card: 'var(--radius-card)',
-        panel: 'var(--radius-panel)',
-        control: 'var(--radius-control)'
+        1: 'var(--r-1)',
+        2: 'var(--r-2)',
+        3: 'var(--r-3)'
+      },
+      // Status fills sit at 12% — enough to read as a tinted plane, light
+      // enough that the status text on top keeps its verified contrast.
+      opacity: {
+        12: '0.12'
       },
       transitionTimingFunction: {
-        // Expo-out: leaves quickly, settles softly. The app's one easing curve.
-        expo: 'cubic-bezier(0.16, 1, 0.3, 1)'
+        // Decelerate-emphasised: off the mark instantly, lands soft. The app's
+        // one curve — nothing eases on anything else.
+        ease: 'cubic-bezier(0.2, 0, 0, 1)'
       },
-      boxShadow: {
-        panel: '0 30px 80px -32px rgb(var(--shadow) / 0.9)',
-        soft: '0 10px 34px -16px rgb(var(--shadow) / 0.75)',
-        glow: '0 0 0 1px rgb(var(--accent) / 0.35), 0 12px 38px -14px rgb(var(--accent) / 0.55)',
-        'accent-sm': '0 6px 22px -8px rgb(var(--accent) / 0.7)'
+      transitionDuration: {
+        fast: '160ms',
+        base: '240ms',
+        slow: '320ms'
       },
       keyframes: {
-        shimmer: {
-          '100%': { transform: 'translateX(100%)' }
+        'idle-pulse': {
+          '0%, 100%': { opacity: '0.55' },
+          '50%': { opacity: '1' }
         },
-        'fade-up': {
-          '0%': { opacity: '0', transform: 'translateY(8px)' },
+        rise: {
+          '0%': { opacity: '0', transform: 'translateY(6px)' },
           '100%': { opacity: '1', transform: 'translateY(0)' }
-        },
-        'pulse-ring': {
-          '0%': { transform: 'scale(0.9)', opacity: '0.7' },
-          '100%': { transform: 'scale(1.9)', opacity: '0' }
         }
       },
       animation: {
-        shimmer: 'shimmer 1.6s infinite',
-        'fade-up': 'fade-up 0.35s cubic-bezier(0.16, 1, 0.3, 1)',
-        'pulse-ring': 'pulse-ring 1.8s ease-out infinite'
+        'idle-pulse': 'idle-pulse 1.6s cubic-bezier(0.2, 0, 0, 1) infinite',
+        rise: 'rise 240ms cubic-bezier(0.2, 0, 0, 1)'
       }
     }
   },

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
-import { modalSpring } from '../lib/motion'
-import { FileVideo, Loader2, Scissors, X, Zap } from 'lucide-react'
+import { dialog, overlay } from '../lib/motion'
+import { Loader2, X } from 'lucide-react'
 import {
   AUDIO_CONTAINERS,
   VIDEO_CONTAINERS,
@@ -14,7 +14,7 @@ import { useT } from '../i18n'
 import { toast } from '../lib/toast'
 import { useStore } from '../store'
 import TrimEditor from './TrimEditor'
-import Segmented from './Segmented'
+import Choice from './Choice'
 
 export type JobMode = 'trim' | 'convert'
 
@@ -67,6 +67,16 @@ export default function MediaJobModal({ item, mode, onClose }: Props): JSX.Eleme
     }
   }, [item.filepath, item.duration])
 
+  // Esc closes — a dialog that can only be dismissed by aiming at a small
+  // target is a dialog people learn to dread.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent): void => {
+      if (e.key === 'Escape') onClose()
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [onClose])
+
   const invalid = mode === 'trim' && range.end != null && range.end <= (range.start ?? 0)
   const nothingToDo = mode === 'trim' && !hasTrim(range)
 
@@ -113,59 +123,54 @@ export default function MediaJobModal({ item, mode, onClose }: Props): JSX.Eleme
   return (
     <AnimatePresence>
       <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        exit={{ opacity: 0 }}
-        className="fixed inset-0 z-[70] flex items-center justify-center bg-black/60 p-6 backdrop-blur-sm"
+        {...overlay}
+        role="dialog"
+        aria-modal="true"
+        className="fixed inset-0 flex items-center justify-center bg-canvas/80 p-6"
+        style={{ zIndex: 'var(--z-modal)' }}
         onClick={onClose}
       >
         <motion.div
-          initial={{ opacity: 0, scale: 0.97, y: 12 }}
-          animate={{ opacity: 1, scale: 1, y: 0 }}
-          exit={{ opacity: 0, scale: 0.97, y: 12 }}
-          transition={modalSpring}
-          className="card w-full max-w-lg overflow-hidden"
+          {...dialog}
+          className="block w-full max-w-lg overflow-hidden"
           onClick={(e) => e.stopPropagation()}
         >
-          <div className="flex items-center gap-3 border-b border-fg/[0.06] px-5 py-4">
-            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-fg/[0.06] text-cream">
-              {mode === 'trim' ? <Scissors size={17} /> : <FileVideo size={17} />}
-            </div>
+          <div className="flex items-center gap-3 border-b border-edge px-4 py-3">
             <div className="min-w-0 flex-1">
-              <h2 className="text-sm font-semibold text-cream">
+              <h2 className="text-[13px] font-medium text-ink">
                 {mode === 'trim' ? t('trim.title') : t('convert.title')}
               </h2>
-              <p className="mono truncate text-[11px] text-fg/55" title={item.title}>
+              <p className="mono truncate text-[11px] text-ink-3" title={item.title}>
                 {item.title}
               </p>
             </div>
             <button className="btn-icon" onClick={onClose} aria-label={t('common.close')}>
-              <X size={16} />
+              <X size={15} />
             </button>
           </div>
 
-          <div className="space-y-5 p-5">
+          <div className="space-y-5 p-4">
             {mode === 'trim' ? (
               <>
                 {probing ? (
-                  <div className="flex items-center gap-2 text-xs text-fg/60">
+                  <div className="flex items-center gap-2 text-[12px] text-ink-3">
                     <Loader2 size={14} className="animate-spin" /> …
                   </div>
                 ) : (
                   <TrimEditor duration={duration} value={range} onChange={setRange} />
                 )}
                 <div>
-                  <p className="group-title">{t('trim.precise')}</p>
-                  <Segmented
-                    layoutId="trim-precise"
+                  <p className="label mb-2">{t('trim.precise')}</p>
+                  <Choice
+                    label={t('trim.precise')}
                     value={precise ? 'precise' : 'fast'}
                     onChange={(v) => setPrecise(v === 'precise')}
                     options={[
-                      { value: 'precise', label: t('trim.precise'), icon: <Scissors size={13} /> },
-                      { value: 'fast', label: 'fast', icon: <Zap size={13} /> }
+                      { value: 'precise', label: t('trim.precise') },
+                      { value: 'fast', label: 'fast' }
                     ]}
                   />
-                  <p className="mono mt-1.5 text-[11px] leading-relaxed text-fg/50">
+                  <p className="mt-2 text-[11px] leading-relaxed text-ink-3">
                     {precise ? t('trim.preciseHint') : t('trim.fastHint')}
                   </p>
                 </div>
@@ -174,9 +179,9 @@ export default function MediaJobModal({ item, mode, onClose }: Props): JSX.Eleme
               <>
                 {hasVideo && hasAudio && (
                   <div>
-                    <p className="group-title">{t('common.format')}</p>
-                    <Segmented
-                      layoutId="convert-mode"
+                    <p className="label mb-2">{t('common.format')}</p>
+                    <Choice
+                      label={t('common.format')}
                       value={audioOnly ? 'audio' : 'video'}
                       onChange={(v) => {
                         const next = v === 'audio'
@@ -191,12 +196,12 @@ export default function MediaJobModal({ item, mode, onClose }: Props): JSX.Eleme
                   </div>
                 )}
                 {hasVideo && !hasAudio && (
-                  <p className="mono text-[11px] text-fg/50">{t('convert.noAudio')}</p>
+                  <p className="text-[11px] text-ink-3">{t('convert.noAudio')}</p>
                 )}
                 <div>
-                  <p className="group-title">{t('convert.format')}</p>
-                  <Segmented
-                    layoutId="convert-container"
+                  <p className="label mb-2">{t('convert.format')}</p>
+                  <Choice
+                    label={t('convert.format')}
                     value={container}
                     onChange={setContainer}
                     options={containers.map((c) => ({
@@ -205,14 +210,14 @@ export default function MediaJobModal({ item, mode, onClose }: Props): JSX.Eleme
                     }))}
                   />
                   {container === 'gif' && (
-                    <p className="mono mt-1.5 text-[11px] text-warn">{t('convert.gifHint')}</p>
+                    <p className="mt-2 text-[11px] text-warn">{t('convert.gifHint')}</p>
                   )}
                 </div>
                 {!audioOnly && container !== 'gif' && (
                   <div>
-                    <p className="group-title">{t('convert.resolution')}</p>
-                    <Segmented
-                      layoutId="convert-resolution"
+                    <p className="label mb-2">{t('convert.resolution')}</p>
+                    <Choice
+                      label={t('convert.resolution')}
                       value={resolution}
                       onChange={(v) => setResolution(v as (typeof RESOLUTIONS)[number])}
                       options={RESOLUTIONS.map((r) => ({
@@ -226,17 +231,11 @@ export default function MediaJobModal({ item, mode, onClose }: Props): JSX.Eleme
             )}
 
             <button
-              className="btn-primary w-full py-3 text-[15px]"
+              className="btn-solid w-full py-3.5 text-[14px]"
               onClick={submit}
               disabled={busy || invalid || nothingToDo}
             >
-              {busy ? (
-                <Loader2 size={17} className="animate-spin" />
-              ) : mode === 'trim' ? (
-                <Scissors size={17} />
-              ) : (
-                <FileVideo size={17} />
-              )}
+              {busy ? <Loader2 size={16} className="animate-spin" /> : null}
               {mode === 'trim' ? t('trim.apply') : t('convert.apply')}
             </button>
           </div>

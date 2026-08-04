@@ -3,14 +3,13 @@ import { AnimatePresence, motion } from 'framer-motion'
 import {
   ArrowLeft,
   ArrowRight,
+  Check,
   Crosshair,
   Download,
   ExternalLink,
-  Film,
   Loader2,
   Minus,
   RotateCw,
-  Radio,
   Square,
   Trash2,
   X
@@ -18,11 +17,12 @@ import {
 import type { BrowserMedia, BrowserState } from '@shared/types'
 import Toasts from './components/Toasts'
 import Logo from './components/Logo'
+import { enter } from './lib/motion'
 import { toast } from './lib/toast'
 import { applyAppearance } from './lib/theme'
 import { useT } from './i18n'
 
-const PANEL_WIDTH = 320
+const PANEL_WIDTH = 300
 
 /**
  * Shell for the built-in browser window.
@@ -109,63 +109,46 @@ export default function BrowserApp(): JSX.Element {
     <>
       <Toasts />
 
+      {/* Chrome and navigation share one 48px rule, same as the main window. */}
       <header
-        className="drag-region relative z-30 flex h-11 shrink-0 items-center justify-between border-b border-fg/[0.06] bg-ink-900"
-        style={{ paddingLeft: isMac ? 80 : 14, paddingRight: 10 }}
+        className="drag-region relative flex h-12 shrink-0 items-center gap-2 border-b border-edge bg-canvas pr-2"
+        style={{ zIndex: 'var(--z-chrome)', paddingLeft: isMac ? 76 : 12 }}
       >
-        <div className="flex items-center gap-2.5">
-          <Logo className="h-5 w-5" />
-          <span className="mono text-[13px] font-semibold tracking-tight text-cream">
+        <div className="flex shrink-0 items-center gap-2.5 pr-1">
+          <Logo className="h-[18px] w-[18px] text-ink" />
+          <span className="mono hidden text-[12px] font-semibold uppercase tracking-[0.16em] text-ink sm:inline">
             {t('browser.title')}
           </span>
         </div>
-        {!isMac && (
-          <div className="flex items-center gap-1">
-            <button className="btn-icon" onClick={() => window.api.minimizeWindow()} aria-label="Minimize">
-              <Minus size={16} />
-            </button>
-            <button className="btn-icon" onClick={() => window.api.maximizeWindow()} aria-label="Maximize">
-              <Square size={12} />
-            </button>
-            <button
-              className="no-drag inline-flex h-9 w-9 items-center justify-center rounded-xl text-fg/70 transition-all hover:bg-red-500/80 hover:text-white active:scale-95"
-              onClick={() => window.api.closeWindow()}
-              aria-label="Close"
-            >
-              <X size={16} />
-            </button>
-          </div>
-        )}
-      </header>
 
-      {/* Navigation bar */}
-      <div className="flex shrink-0 items-center gap-2 border-b border-fg/[0.06] bg-ink-900 px-3 py-2">
-        <button
-          className="btn-icon"
-          title={t('browser.back')}
-          disabled={!state.canGoBack}
-          onClick={() => window.api.browserBack()}
-        >
-          <ArrowLeft size={16} />
-        </button>
-        <button
-          className="btn-icon"
-          title={t('browser.forward')}
-          disabled={!state.canGoForward}
-          onClick={() => window.api.browserForward()}
-        >
-          <ArrowRight size={16} />
-        </button>
-        <button
-          className="btn-icon"
-          title={state.loading ? t('browser.stop') : t('browser.reload')}
-          onClick={() => (state.loading ? window.api.browserStop() : window.api.browserReload())}
-        >
-          {state.loading ? <X size={16} /> : <RotateCw size={16} />}
-        </button>
+        <div className="ml-1 flex shrink-0 items-center gap-0.5">
+          <button
+            className="btn-icon"
+            title={t('browser.back')}
+            disabled={!state.canGoBack}
+            onClick={() => window.api.browserBack()}
+          >
+            <ArrowLeft size={15} />
+          </button>
+          <button
+            className="btn-icon"
+            title={t('browser.forward')}
+            disabled={!state.canGoForward}
+            onClick={() => window.api.browserForward()}
+          >
+            <ArrowRight size={15} />
+          </button>
+          <button
+            className="btn-icon"
+            title={state.loading ? t('browser.stop') : t('browser.reload')}
+            onClick={() => (state.loading ? window.api.browserStop() : window.api.browserReload())}
+          >
+            {state.loading ? <X size={15} /> : <RotateCw size={15} />}
+          </button>
+        </div>
 
-        <div className="flex min-w-0 flex-1 items-center gap-2 rounded-2xl border border-fg/[0.08] bg-ink-850 px-3 py-1.5 transition-colors focus-within:border-accent/40">
-          {state.loading && <Loader2 size={13} className="shrink-0 animate-spin text-fg/55" />}
+        <div className="field flex min-w-0 flex-1 items-center gap-2 rounded-full px-3 py-1.5">
+          {state.loading && <Loader2 size={12} className="shrink-0 animate-spin text-ink-3" />}
           <input
             value={address}
             onChange={(e) => {
@@ -176,12 +159,12 @@ export default function BrowserApp(): JSX.Element {
             onKeyDown={(e) => e.key === 'Enter' && go()}
             placeholder={t('browser.urlPlaceholder')}
             spellCheck={false}
-            className="no-drag min-w-0 flex-1 bg-transparent py-1 text-xs text-cream placeholder:text-fg/50 outline-none"
+            className="no-drag mono min-w-0 flex-1 bg-transparent py-1 text-[12px] text-ink outline-none placeholder:text-ink-3"
           />
         </div>
 
         <button
-          className={state.picking ? 'btn-primary px-3 py-2 text-xs' : 'btn-ghost px-3 py-2 text-xs'}
+          className={`shrink-0 px-3 py-2 ${state.picking ? 'btn-solid' : 'btn-quiet'}`}
           title={t('browser.pickHint')}
           onClick={() => window.api.browserSetPick(!state.picking)}
         >
@@ -193,66 +176,80 @@ export default function BrowserApp(): JSX.Element {
           title={t('browser.openExternal')}
           onClick={() => state.url && window.api.openExternal(state.url)}
         >
-          <ExternalLink size={15} />
+          <ExternalLink size={14} />
         </button>
-      </div>
 
-      {/* Page + media panel */}
+        {!isMac && (
+          <div className="ml-1 flex shrink-0 items-center">
+            <button
+              className="no-drag inline-flex h-8 w-9 cursor-pointer items-center justify-center text-ink-3 transition-colors duration-fast ease-ease hover:bg-sink hover:text-ink"
+              onClick={() => window.api.minimizeWindow()}
+              aria-label="Minimize"
+            >
+              <Minus size={15} />
+            </button>
+            <button
+              className="no-drag inline-flex h-8 w-9 cursor-pointer items-center justify-center text-ink-3 transition-colors duration-fast ease-ease hover:bg-sink hover:text-ink"
+              onClick={() => window.api.maximizeWindow()}
+              aria-label="Maximize"
+            >
+              <Square size={11} />
+            </button>
+            <button
+              className="no-drag inline-flex h-8 w-9 cursor-pointer items-center justify-center text-ink-3 transition-colors duration-fast ease-ease hover:bg-bad hover:text-white"
+              onClick={() => window.api.closeWindow()}
+              aria-label="Close"
+            >
+              <X size={15} />
+            </button>
+          </div>
+        )}
+      </header>
+
+      {/* Page + the streams found on it */}
       <div className="relative flex min-h-0 flex-1">
         {/* The native view is painted over this element by the main process. */}
-        <div ref={stageRef} className="min-w-0 flex-1 bg-ink-950" />
+        <div ref={stageRef} className="min-w-0 flex-1 bg-canvas" />
 
         <aside
-          className="flex shrink-0 flex-col border-l border-fg/[0.06] bg-ink-900"
+          className="flex shrink-0 flex-col border-l border-edge bg-canvas"
           style={{ width: PANEL_WIDTH }}
         >
-          <div className="flex items-center justify-between px-4 pb-2 pt-4">
-            <p className="group-title mb-0">{t('browser.found')}</p>
+          <div className="flex items-center justify-between border-b border-edge px-4 py-3">
+            <p className="label">{t('browser.found')}</p>
             {media.length > 0 && (
-              <button
-                className="btn-icon h-7 w-7"
-                title={t('browser.clear')}
-                onClick={() => window.api.browserClearMedia()}
-              >
+              <button className="btn-icon" title={t('browser.clear')} onClick={() => window.api.browserClearMedia()}>
                 <Trash2 size={13} />
               </button>
             )}
           </div>
 
-          <div className="min-h-0 flex-1 space-y-1.5 overflow-y-auto px-3 pb-3">
+          <div className="min-h-0 flex-1 overflow-y-auto">
             <AnimatePresence initial={false}>
               {media.map((entry) => (
                 <motion.div
                   key={entry.id}
                   layout
-                  initial={{ opacity: 0, y: 8 }}
-                  animate={{ opacity: 1, y: 0 }}
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
                   exit={{ opacity: 0 }}
-                  className="rounded-2xl border border-fg/[0.06] bg-ink-850 p-3"
+                  transition={enter}
+                  className="border-b border-edge px-4 py-3"
                 >
-                  <div className="flex items-start gap-2">
-                    <span className="mt-0.5 shrink-0 text-fg/50">
-                      {entry.kind === 'hls' || entry.kind === 'dash' ? (
-                        <Radio size={13} />
-                      ) : (
-                        <Film size={13} />
-                      )}
-                    </span>
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate text-[12px] font-medium text-cream" title={entry.url}>
-                        {entry.label}
-                      </p>
-                      <p className="mono mt-0.5 text-[10px] uppercase text-fg/50">{entry.kind}</p>
-                    </div>
-                  </div>
+                  <p className="truncate text-[12px] text-ink" title={entry.url}>
+                    {entry.label}
+                  </p>
+                  <p className="mono mt-1 text-[10px] uppercase tracking-[0.1em] text-ink-3">
+                    {entry.kind}
+                  </p>
                   <button
-                    className={`btn mt-2.5 w-full py-1.5 text-[11px] ${
-                      queued.has(entry.id) ? 'bg-good/15 text-good' : 'btn-primary'
+                    className={`mt-2.5 w-full py-2 ${
+                      queued.has(entry.id) ? 'btn bg-good/12 text-good' : 'btn-quiet'
                     }`}
                     disabled={queued.has(entry.id)}
                     onClick={() => download({ mediaId: entry.id }, entry.id)}
                   >
-                    <Download size={12} />
+                    {queued.has(entry.id) ? <Check size={12} /> : <Download size={12} />}
                     {queued.has(entry.id) ? t('search.queued') : t('common.download')}
                   </button>
                 </motion.div>
@@ -260,21 +257,18 @@ export default function BrowserApp(): JSX.Element {
             </AnimatePresence>
 
             {media.length === 0 && (
-              <div className="px-1 py-8 text-center">
-                <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-fg/[0.03] text-fg/35">
-                  <Film size={22} />
-                </div>
-                <p className="mt-3 text-xs font-medium text-fg/50">{t('browser.foundNone')}</p>
-                <p className="mono mt-1 text-[10px] leading-relaxed text-fg/50">
+              <div className="px-4 py-10 text-center">
+                <p className="text-[12px] font-medium text-ink-2">{t('browser.foundNone')}</p>
+                <p className="mono mt-2 text-[10px] leading-relaxed text-ink-3">
                   {t('browser.foundHint')}
                 </p>
               </div>
             )}
           </div>
 
-          <div className="border-t border-fg/[0.06] p-3">
+          <div className="border-t border-edge p-3">
             <button
-              className="btn-ghost w-full py-2 text-xs"
+              className="btn-quiet w-full py-2.5"
               disabled={!state.url || queued.has('page')}
               onClick={() => download({ url: state.url }, 'page')}
             >

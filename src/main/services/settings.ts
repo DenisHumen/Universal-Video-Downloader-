@@ -1,7 +1,7 @@
 import { app } from 'electron'
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'fs'
 import { join } from 'path'
-import { ACCENTS, THEMES, type AccentId, type AppSettings, type ThemeId } from '@shared/types'
+import { LEGACY_THEMES, THEMES, type AppSettings, type ThemeId } from '@shared/types'
 
 const SETTINGS_FILE = (): string => join(app.getPath('userData'), 'settings.json')
 
@@ -25,8 +25,7 @@ function defaults(): AppSettings {
     speedLimit: '',
     playlistLimit: 500,
     autoUpdate: true,
-    theme: 'midnight',
-    accent: 'indigo',
+    theme: 'night',
     language: 'auto',
     notifications: true,
     clipboardWatch: false,
@@ -38,11 +37,20 @@ function defaults(): AppSettings {
   }
 }
 
-/** Older builds stored theme names that no longer exist. */
+/**
+ * Older builds stored settings this one no longer understands.
+ *
+ * The redesign collapsed four palettes into two and dropped the accent picker
+ * entirely, so an existing config will name a theme that isn't there any more.
+ * Map it onto the nearest survivor rather than resetting to the default — a
+ * user who chose `daylight` wants a light window, not a dark one.
+ */
 function migrate(raw: Record<string, unknown>): Partial<AppSettings> {
-  const next = { ...raw } as Partial<AppSettings>
-  if (raw.theme !== undefined && !THEMES.includes(raw.theme as ThemeId)) next.theme = 'midnight'
-  if (raw.accent !== undefined && !ACCENTS.includes(raw.accent as AccentId)) next.accent = 'indigo'
+  const next = { ...raw } as Partial<AppSettings> & { accent?: unknown }
+  if (raw.theme !== undefined && !THEMES.includes(raw.theme as ThemeId)) {
+    next.theme = LEGACY_THEMES[String(raw.theme)] ?? 'night'
+  }
+  delete next.accent
   if (typeof next.concurrentDownloads === 'number') {
     next.concurrentDownloads = Math.min(8, Math.max(1, Math.round(next.concurrentDownloads)))
   }

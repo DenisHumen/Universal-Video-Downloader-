@@ -3,33 +3,27 @@ interface LogoProps {
 }
 
 /**
- * The Universal Video Downloader mark: an orbital ring (the "universal" web)
- * wrapping a download arrow whose head doubles as a play glyph. Monochrome to
- * suit the cobalt-style palette.
+ * The mark: three bars converging onto a baseline — a stream narrowing into a
+ * file on disk.
+ *
+ * Pure geometry on the 24px grid, no gradient and no stroke, so it stays legible
+ * at 16px in the title bar and inherits whatever colour it sits in. The previous
+ * mark was a gradient-filled orbital ring, which needed its own light source to
+ * make sense; this system doesn't have one.
  */
 export default function Logo({ className }: LogoProps): JSX.Element {
   return (
-    <svg className={className} viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
-      <defs>
-        <linearGradient id="uvd-grad" x1="12" y1="8" x2="52" y2="58" gradientUnits="userSpaceOnUse">
-          <stop stopColor="#ffffff" />
-          <stop offset="1" stopColor="#b9b9c4" />
-        </linearGradient>
-      </defs>
-      <circle
-        cx="32"
-        cy="32"
-        r="25"
-        stroke="url(#uvd-grad)"
-        strokeWidth="4"
-        strokeLinecap="round"
-        strokeDasharray="118 39"
-        opacity="0.92"
-      />
-      <path
-        d="M32 14.5C33.66 14.5 35 15.84 35 17.5V30.5H40.7C42.33 30.5 43.2 32.42 42.12 33.64L33.42 43.5C32.66 44.36 31.34 44.36 30.58 43.5L21.88 33.64C20.8 32.42 21.67 30.5 23.3 30.5H29V17.5C29 15.84 30.34 14.5 32 14.5Z"
-        fill="url(#uvd-grad)"
-      />
+    <svg
+      className={className}
+      viewBox="0 0 24 24"
+      fill="currentColor"
+      xmlns="http://www.w3.org/2000/svg"
+      aria-hidden="true"
+    >
+      <rect x="3" y="3" width="18" height="3.2" rx="1.6" />
+      <rect x="6.4" y="9.4" width="11.2" height="3.2" rx="1.6" />
+      <rect x="9.8" y="15.8" width="4.4" height="3.2" rx="1.6" />
+      <rect x="3" y="21.4" width="18" height="1.6" rx="0.8" opacity="0.45" />
     </svg>
   )
 }

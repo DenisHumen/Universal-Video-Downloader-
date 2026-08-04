@@ -1,24 +1,25 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
-import { enter } from '../lib/motion'
+import { collapse, enter } from '../lib/motion'
 import {
-  AlertCircle,
+  ArrowRight,
   ChevronDown,
   ClipboardPaste,
-  Clock,
-  Download,
-  Eye,
   Globe,
   Layers,
   Loader2,
-  Radio,
   Scissors,
   Search,
-  Sparkles,
-  User,
   X
 } from 'lucide-react'
-import { hasTrim, type DetectStage, type DownloadMode, type MediaInfo, type QualityPreset, type TrimRange } from '@shared/types'
+import {
+  hasTrim,
+  type DetectStage,
+  type DownloadMode,
+  type MediaInfo,
+  type QualityPreset,
+  type TrimRange
+} from '@shared/types'
 import { useStore } from '../store'
 import { formatCount, formatDuration, isProbablyUrl } from '../lib/format'
 import { availableHeights, initialMode, initialQuality, maxHeightOf } from '../lib/quality'
@@ -50,8 +51,15 @@ const STAGE_LABEL: Record<DetectStage, TranslationKey> = {
   done: 'detect.probing'
 }
 
-const SITE_HINTS = ['youtube', 'vimeo', 'tiktok', 'twitter / x', 'instagram', 'twitch', 'reddit']
-
+/**
+ * One field, centred, and nothing competing with it.
+ *
+ * The old home screen led with a gradient headline, a subtitle, a chip cloud of
+ * site names and six capability cards — four blocks of chrome the user has to
+ * read past before reaching the only control that matters. Here the input is
+ * the first thing on screen and everything else is either a consequence of it
+ * or filed underneath a rule.
+ */
 export default function HomeView(): JSX.Element {
   const t = useT()
   const settings = useStore((s) => s.settings)
@@ -233,103 +241,85 @@ export default function HomeView(): JSX.Element {
   }
 
   const isSearchQuery = url.trim().length > 0 && !isProbablyUrl(url)
+  const busy = status === 'detecting'
 
   return (
-    <div className="mx-auto flex w-full max-w-2xl flex-col px-8 py-12">
-      <motion.div
-        initial={{ opacity: 0, y: 10 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={enter}
-        className="mb-8 text-center"
-      >
-        <h1
-          className="text-[34px] font-semibold leading-[1.1] tracking-[-0.02em]"
-          style={{
-            background:
-              'linear-gradient(180deg, rgb(var(--cream)) 30%, rgb(var(--cream) / 0.62) 100%)',
-            WebkitBackgroundClip: 'text',
-            WebkitTextFillColor: 'transparent'
-          }}
-        >
+    <div className="h-full overflow-y-auto">
+      <div className="mx-auto flex w-full max-w-[680px] flex-col px-6 pb-16 pt-14">
+      {/* The focal control. Everything on this screen is downstream of it. */}
+      <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={enter}>
+        <label className="label mb-2.5 block" htmlFor="uvd-url">
           {t('home.title')}
-        </h1>
-        <p className="mx-auto mt-3 max-w-md text-sm leading-relaxed text-fg/60">
-          {t('home.subtitle')}
-        </p>
+        </label>
+        <div className="field flex items-center gap-1.5 rounded-3 p-2">
+          <input
+            id="uvd-url"
+            ref={inputRef}
+            value={url}
+            onChange={(e) => setUrl(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && detect()}
+            placeholder={t('home.placeholder')}
+            className="no-drag min-w-0 flex-1 bg-transparent px-2.5 py-2 text-[15px] text-ink outline-none placeholder:text-ink-3"
+            spellCheck={false}
+            autoComplete="off"
+          />
+          <button className="btn-icon" onClick={paste} title={t('common.paste')}>
+            <ClipboardPaste size={16} />
+          </button>
+          <button
+            className="btn-solid px-4 py-3"
+            onClick={() => detect()}
+            disabled={!url.trim() || busy}
+          >
+            {busy ? (
+              <Loader2 size={15} className="animate-spin" />
+            ) : isSearchQuery ? (
+              <Search size={15} />
+            ) : (
+              <ArrowRight size={15} />
+            )}
+            {isSearchQuery ? t('common.search') : t('home.get')}
+          </button>
+        </div>
+
+        {/* Secondary entry points, set as quiet text rather than buttons: they
+            are alternatives to the field above, not competitors to it. */}
+        <div className="mt-2.5 flex items-center gap-4 px-1">
+          <button
+            onClick={() => setBatchOpen((v) => !v)}
+            className="mono flex items-center gap-1.5 text-[11px] text-ink-3 transition-colors duration-fast ease-ease hover:text-ink"
+          >
+            <Layers size={12} /> {t('home.batchOpen')}
+          </button>
+          <button
+            onClick={() => window.api.openBrowser()}
+            className="mono flex items-center gap-1.5 text-[11px] text-ink-3 transition-colors duration-fast ease-ease hover:text-ink"
+          >
+            <Globe size={12} /> {t('browser.open')}
+          </button>
+        </div>
       </motion.div>
 
-      {/* URL input — the one thing on this screen that must catch the eye. */}
-      <motion.div
-        initial={{ opacity: 0, y: 10 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ ...enter, delay: 0.06 }}
-        className="flex items-center gap-2 rounded-panel border border-fg/[0.1] bg-ink-900/70 p-2 shadow-soft backdrop-blur-xl transition-all duration-200 ease-expo focus-within:border-accent/50 focus-within:shadow-glow"
-      >
-        <Search className="ml-2.5 shrink-0 text-fg/50" size={19} />
-        <input
-          ref={inputRef}
-          value={url}
-          onChange={(e) => setUrl(e.target.value)}
-          onKeyDown={(e) => e.key === 'Enter' && detect()}
-          placeholder={t('home.placeholder')}
-          className="no-drag min-w-0 flex-1 bg-transparent px-1 py-2 text-sm text-cream placeholder:text-fg/50 outline-none"
-          spellCheck={false}
-        />
-        <button className="btn-ghost px-3 py-2.5" onClick={paste} title={t('common.paste')}>
-          <ClipboardPaste size={16} />
-        </button>
-        <button
-          className="btn-primary px-5 py-2.5"
-          onClick={() => detect()}
-          disabled={!url.trim() || status === 'detecting'}
-        >
-          {status === 'detecting' ? (
-            <Loader2 size={16} className="animate-spin" />
-          ) : isSearchQuery ? (
-            <Search size={16} />
-          ) : (
-            <Download size={16} />
-          )}
-          {isSearchQuery ? t('common.search') : t('home.get')}
-        </button>
-      </motion.div>
-
-      {/* Batch links */}
-      <div className="mt-2 flex justify-center">
-        <button
-          onClick={() => setBatchOpen((v) => !v)}
-          className="mono flex items-center gap-1.5 rounded-full px-3 py-1 text-[11px] text-fg/50 transition-colors hover:text-fg/70"
-        >
-          <Layers size={12} /> {t('home.batchOpen')}
-        </button>
-      </div>
       <AnimatePresence initial={false}>
         {batchOpen && (
-          <motion.div
-            initial={{ height: 0, opacity: 0 }}
-            animate={{ height: 'auto', opacity: 1 }}
-            exit={{ height: 0, opacity: 0 }}
-            className="overflow-hidden"
-          >
-            <div className="card mt-2 space-y-3 p-4">
-              <div>
-                <p className="group-title mb-1.5">{t('home.batch')}</p>
-                <p className="mono mb-2 text-[11px] text-fg/50">{t('home.batchHint')}</p>
-                <textarea
-                  value={batchText}
-                  onChange={(e) => setBatchText(e.target.value)}
-                  rows={5}
-                  spellCheck={false}
-                  className="input mono resize-none text-xs"
-                  placeholder={'https://…\nhttps://…'}
-                />
-              </div>
+          <motion.div {...collapse} className="overflow-hidden">
+            <div className="well mt-4 p-4">
+              <p className="label mb-1.5">{t('home.batch')}</p>
+              <p className="mono mb-3 text-[11px] text-ink-3">{t('home.batchHint')}</p>
+              <textarea
+                value={batchText}
+                onChange={(e) => setBatchText(e.target.value)}
+                rows={5}
+                spellCheck={false}
+                className="field mono resize-none bg-canvas text-[12px]"
+                placeholder={'https://…\nhttps://…'}
+              />
               <button
-                className="btn-primary w-full py-2.5"
+                className="btn-solid mt-3 w-full py-3"
                 disabled={!batchLinks.length || starting}
                 onClick={queueBatch}
               >
-                {starting ? <Loader2 size={16} className="animate-spin" /> : <Download size={16} />}
+                {starting ? <Loader2 size={15} className="animate-spin" /> : null}
                 {t('home.batchAdd', { count: batchLinks.length })}
               </button>
             </div>
@@ -337,11 +327,9 @@ export default function HomeView(): JSX.Element {
         )}
       </AnimatePresence>
 
-      {/* Results */}
-      <div className="mt-5">
-        {/* popLayout, not "wait": the incoming state (skeleton, result, error)
-            must appear the moment it exists, without waiting for the previous
-            one's exit animation to report back. */}
+      <div className="mt-6">
+        {/* popLayout, not "wait": the incoming state must appear the moment it
+            exists, without waiting for the previous one's exit to report back. */}
         <AnimatePresence mode="popLayout">
           {status === 'detecting' && (
             <DetectingCard
@@ -357,30 +345,35 @@ export default function HomeView(): JSX.Element {
           {status === 'error' && (
             <motion.div
               key="error"
-              initial={{ opacity: 0, y: 8 }}
+              initial={{ opacity: 0, y: 6 }}
               animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -8 }}
-              className="card flex items-start gap-3 p-4"
+              exit={{ opacity: 0 }}
+              transition={enter}
+              className="block overflow-hidden"
             >
-              <AlertCircle className="mt-0.5 shrink-0 text-bad" size={18} />
-              <div className="min-w-0">
-                <p className="text-sm font-medium text-cream">{t('home.errorTitle')}</p>
-                <p className="mt-0.5 text-xs text-fg/60">{error}</p>
-                <div className="mt-3 flex flex-wrap gap-2">
+              <div className="flex items-center gap-2.5 border-b border-edge px-4 py-3">
+                <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-bad" />
+                <p className="text-[13px] font-medium text-ink">{t('home.errorTitle')}</p>
+              </div>
+              <div className="p-4">
+                <p className="mono selectable break-words text-[12px] leading-relaxed text-ink-2">
+                  {error}
+                </p>
+                <div className="mt-4 flex flex-wrap items-center gap-2">
                   {/* The honest escape hatch: let the user find it by hand. */}
                   <button
-                    className="btn-primary py-1.5 text-xs"
+                    className="btn-solid"
                     onClick={() => window.api.openBrowser(url || undefined)}
                   >
-                    <Globe size={13} /> {t('browser.open')}
+                    <Globe size={14} /> {t('browser.open')}
                   </button>
                   {/Settings|настрой/i.test(error) && (
-                    <button className="btn-ghost py-1.5 text-xs" onClick={() => setView('settings')}>
+                    <button className="btn-quiet" onClick={() => setView('settings')}>
                       {t('home.openAccessSettings')}
                     </button>
                   )}
                 </div>
-                <p className="mono mt-2 text-[11px] text-fg/50">{t('browser.openHint')}</p>
+                <p className="mono mt-3 text-[11px] text-ink-3">{t('browser.openHint')}</p>
               </div>
             </motion.div>
           )}
@@ -388,9 +381,9 @@ export default function HomeView(): JSX.Element {
           {info && info.streaming && status === 'idle' && (
             <motion.div
               key="streaming"
-              initial={{ opacity: 0, y: 12 }}
+              initial={{ opacity: 0, y: 6 }}
               animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -8 }}
+              exit={{ opacity: 0 }}
               transition={enter}
             >
               <StreamingCard info={info} onDone={() => setInfo(null)} />
@@ -400,9 +393,9 @@ export default function HomeView(): JSX.Element {
           {info && info.isPlaylist && !info.streaming && status === 'idle' && (
             <motion.div
               key="playlist"
-              initial={{ opacity: 0, y: 12 }}
+              initial={{ opacity: 0, y: 6 }}
               animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -8 }}
+              exit={{ opacity: 0 }}
               transition={enter}
             >
               <PlaylistCard info={info} onDone={() => setInfo(null)} />
@@ -412,84 +405,61 @@ export default function HomeView(): JSX.Element {
           {info && !info.isPlaylist && !info.streaming && status === 'idle' && settings && (
             <motion.div
               key="info"
-              initial={{ opacity: 0, y: 12 }}
+              initial={{ opacity: 0, y: 6 }}
               animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -8 }}
+              exit={{ opacity: 0 }}
               transition={enter}
-              className="card overflow-hidden"
+              className="block overflow-hidden"
             >
-              {/* Preview header */}
-              <div className="flex gap-4 border-b border-fg/[0.06] p-4">
-                <div className="relative aspect-video w-40 shrink-0 overflow-hidden rounded-2xl bg-ink-950">
+              {/* What was found */}
+              <div className="flex gap-4 border-b border-edge p-4">
+                <div className="relative aspect-video w-36 shrink-0 overflow-hidden rounded-2 bg-sink">
                   <Thumbnail
                     src={info.thumbnail}
                     pageUrl={info.webpageUrl}
                     className="h-full w-full object-cover"
                     loading="eager"
-                    fallback={
-                      <div className="flex h-full items-center justify-center text-fg/35">
-                        <Download size={28} />
-                      </div>
-                    }
+                    fallback={<div className="h-full w-full bg-sink" />}
                   />
                   {info.isLive && (
-                    <span className="chip absolute left-1.5 top-1.5 bg-red-500/90 text-white">
-                      <Radio size={10} /> LIVE
+                    <span className="mono absolute left-1.5 top-1.5 rounded-1 bg-bad px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-white">
+                      live
                     </span>
                   )}
                 </div>
                 <div className="min-w-0 flex-1">
-                  <h2 className="line-clamp-2 text-sm font-semibold text-cream" title={info.title}>
+                  <h2 className="line-clamp-2 text-[14px] font-medium leading-snug text-ink" title={info.title}>
                     {info.title}
                   </h2>
-                  <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-fg/55">
-                    {info.uploader && (
-                      <span className="flex items-center gap-1">
-                        <User size={12} /> {info.uploader}
-                      </span>
-                    )}
-                    {info.viewCount != null && (
-                      <span className="flex items-center gap-1">
-                        <Eye size={12} /> {formatCount(info.viewCount)}
-                      </span>
-                    )}
-                    {info.duration != null && (
-                      <span className="flex items-center gap-1">
-                        <Clock size={12} /> {formatDuration(info.duration)}
-                      </span>
-                    )}
-                  </div>
-                  <div className="mt-2 flex flex-wrap items-center gap-1.5">
-                    <span className="mono rounded-lg bg-fg/[0.06] px-2 py-0.5 text-[10px] text-fg/50">
-                      {info.extractor}
-                    </span>
+                  <p className="mono mt-1.5 truncate text-[11px] text-ink-3">
+                    {[
+                      info.uploader,
+                      info.viewCount != null ? formatCount(info.viewCount) : null,
+                      info.duration != null ? formatDuration(info.duration) : null
+                    ]
+                      .filter(Boolean)
+                      .join('  ·  ')}
+                  </p>
+                  <div className="mt-2.5 flex flex-wrap items-center gap-1">
+                    <span className="tag">{info.extractor}</span>
                     {maxHeightOf(info.formats) > 0 && (
-                      <span className="mono rounded-lg bg-fg/[0.06] px-2 py-0.5 text-[10px] text-fg/50">
-                        {t('format.upTo', { height: maxHeightOf(info.formats) })}
-                      </span>
+                      <span className="tag">{t('format.upTo', { height: maxHeightOf(info.formats) })}</span>
                     )}
                     {info.subtitleLanguages && info.subtitleLanguages.length > 0 && (
-                      <span className="mono rounded-lg bg-fg/[0.06] px-2 py-0.5 text-[10px] text-fg/50">
+                      <span className="tag">
                         {t('format.subtitles', { count: info.subtitleLanguages.length })}
+                      </span>
+                    )}
+                    {info.viaUniversal && (
+                      <span className="tag text-accent-ink" title={t('home.universalHint')}>
+                        {t('home.universal')}
                       </span>
                     )}
                   </div>
                 </div>
               </div>
 
-              {info.viaUniversal && (
-                <div className="flex items-start gap-2.5 border-b border-fg/[0.06] bg-accent/[0.06] px-4 py-2.5">
-                  <Sparkles size={14} className="mt-0.5 shrink-0 text-accent" />
-                  <div className="min-w-0">
-                    <p className="text-xs font-medium text-cream">{t('home.universal')}</p>
-                    <p className="mt-0.5 text-[11px] leading-relaxed text-fg/60">
-                      {t('home.universalHint')}
-                    </p>
-                  </div>
-                </div>
-              )}
-
-              {/* Format selection + CTA */}
+              {/* Choose, then commit */}
               <div className="p-4">
                 <FormatSelector
                   info={info}
@@ -499,37 +469,33 @@ export default function HomeView(): JSX.Element {
                   onChangeAudioFormat={(fmt) => saveSettings({ audioFormat: fmt })}
                   onSelectionChange={setSelection}
                 />
+
                 {/* Trim before downloading: the engine fetches only this
                     section, so clipping a highlight out of a long stream costs
                     seconds instead of the whole file. */}
                 {selection.mode === 'video' && (
-                  <div className="mt-5 border-t border-fg/[0.06] pt-4">
+                  <div className="mt-5 border-t border-edge pt-4">
                     <button
                       onClick={() => setTrimOpen((v) => !v)}
-                      className="flex w-full items-center justify-between rounded-xl px-1 py-1 text-xs font-medium text-fg/60 transition-colors hover:text-cream"
+                      className="flex w-full items-center justify-between text-[12px] font-medium text-ink-2 transition-colors duration-fast ease-ease hover:text-ink"
                     >
-                      <span className="flex items-center gap-1.5">
+                      <span className="flex items-center gap-2">
                         <Scissors size={13} /> {t('trim.enable')}
                         {trimOpen && hasTrim(section) && (
-                          <span className="mono rounded bg-accent/15 px-1.5 py-0.5 text-[10px] text-accent">
+                          <span className="mono text-[11px] text-accent-ink">
                             {toClock(section.start ?? 0)}
                             {section.end != null ? ` → ${toClock(section.end)}` : ' →'}
                           </span>
                         )}
                       </span>
-                      <motion.span animate={{ rotate: trimOpen ? 180 : 0 }}>
+                      <motion.span animate={{ rotate: trimOpen ? 180 : 0 }} transition={enter}>
                         <ChevronDown size={15} />
                       </motion.span>
                     </button>
                     <AnimatePresence initial={false}>
                       {trimOpen && (
-                        <motion.div
-                          initial={{ height: 0, opacity: 0 }}
-                          animate={{ height: 'auto', opacity: 1 }}
-                          exit={{ height: 0, opacity: 0 }}
-                          className="overflow-hidden"
-                        >
-                          <div className="pt-3">
+                        <motion.div {...collapse} className="overflow-hidden">
+                          <div className="pt-4">
                             <TrimEditor
                               duration={info.duration}
                               value={section}
@@ -544,11 +510,11 @@ export default function HomeView(): JSX.Element {
                 )}
 
                 <button
-                  className="btn-primary mt-5 w-full py-3 text-[15px]"
+                  className="btn-solid mt-5 w-full py-3.5 text-[14px]"
                   onClick={start}
                   disabled={starting}
                 >
-                  {starting ? <Loader2 size={18} className="animate-spin" /> : <Download size={18} />}
+                  {starting ? <Loader2 size={16} className="animate-spin" /> : null}
                   {trimOpen && hasTrim(section) ? t('trim.apply') : t('common.download')}
                 </button>
               </div>
@@ -561,27 +527,23 @@ export default function HomeView(): JSX.Element {
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              className="space-y-4"
+              transition={enter}
             >
-              <div className="flex flex-wrap justify-center gap-2">
-                {[...SITE_HINTS, t('home.moreSites')].map((site) => (
-                  <span
-                    key={site}
-                    className="mono rounded-full border border-fg/[0.06] bg-fg/[0.02] px-3 py-1 text-xs text-fg/50"
-                  >
-                    {site}
-                  </span>
-                ))}
-              </div>
               <CapabilitiesPanel />
             </motion.div>
           )}
         </AnimatePresence>
+        </div>
       </div>
     </div>
   )
 }
 
+/**
+ * The waiting state. Blocks pulse in place rather than sweeping a gradient
+ * across themselves — a shimmer repaints every frame to communicate nothing the
+ * pulse doesn't, and detection can run for half a minute on an unknown site.
+ */
 function DetectingCard({
   stage,
   label,
@@ -601,36 +563,32 @@ function DetectingCard({
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      className="card overflow-hidden"
+      transition={enter}
+      className="block overflow-hidden"
     >
-      <div className="flex items-center gap-3 border-b border-fg/[0.06] px-4 py-3">
-        <span className="relative flex h-2.5 w-2.5 shrink-0">
-          <span className="absolute inset-0 rounded-full bg-accent/60 animate-pulse-ring" />
-          <span className="relative h-2.5 w-2.5 rounded-full bg-accent" />
-        </span>
+      <div className="flex items-center gap-2.5 border-b border-edge px-4 py-3">
+        <span className="h-1.5 w-1.5 shrink-0 animate-idle-pulse rounded-full bg-accent" />
         <div className="min-w-0 flex-1">
-          <p className="truncate text-sm font-medium text-cream">{label}</p>
-          {slow && <p className="mono mt-0.5 truncate text-[11px] text-fg/50">{slowHint}</p>}
+          <p className="truncate text-[13px] font-medium text-ink">{label}</p>
+          {slow && <p className="mono mt-0.5 truncate text-[11px] text-ink-3">{slowHint}</p>}
         </div>
-        <button className="btn-ghost shrink-0 px-3 py-1.5 text-xs" onClick={onCancel}>
+        <button className="btn-quiet shrink-0 px-3 py-1.5" onClick={onCancel}>
           <X size={13} /> {cancelLabel}
         </button>
       </div>
       <div className="flex gap-4 p-4">
-        <div className="relative aspect-video w-40 shrink-0 overflow-hidden rounded-2xl bg-fg/[0.04]">
-          <div className="absolute inset-0 -translate-x-full animate-shimmer bg-gradient-to-r from-transparent via-fg/[0.08] to-transparent" />
-        </div>
+        <div className="skeleton aspect-video w-36 shrink-0 rounded-2" />
         <div className="flex-1 space-y-2 py-1">
-          <div className="h-4 w-3/4 rounded bg-fg/[0.05]" />
-          <div className="h-3 w-1/2 rounded bg-fg/[0.05]" />
-          <div className="h-5 w-20 rounded-lg bg-fg/[0.05]" />
+          <div className="skeleton h-3.5 w-3/4 rounded-1" />
+          <div className="skeleton h-3 w-1/2 rounded-1" />
+          <div className="skeleton h-4 w-20 rounded-1" />
         </div>
       </div>
-      <div className="space-y-3 px-4 pb-4">
-        <div className="h-10 w-full rounded-2xl bg-fg/[0.04]" />
-        <div className="grid grid-cols-3 gap-2">
+      <div className="space-y-2 px-4 pb-4">
+        <div className="skeleton h-9 w-full rounded-2" />
+        <div className="flex flex-wrap gap-1.5">
           {Array.from({ length: 6 }).map((_, i) => (
-            <div key={i} className="h-12 rounded-xl bg-fg/[0.04]" />
+            <div key={i} className="skeleton h-8 w-[72px] rounded-full" />
           ))}
         </div>
       </div>

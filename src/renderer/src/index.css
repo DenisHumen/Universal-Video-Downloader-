@@ -1,34 +1,44 @@
-/* Inter, bundled rather than fetched: the app must look identical offline and
-   the window's CSP blocks remote stylesheets. The variable file covers every
-   weight we use, and fontsource sets font-display: swap for us. */
+/* Bundled, never fetched: the window's CSP blocks remote stylesheets and the
+   app must look identical offline. Inter carries the interface; JetBrains Mono
+   carries every number, path and identifier — in this design, data is always
+   set in mono so you can tell a measurement from a label at a glance. */
 @import '@fontsource-variable/inter';
+@import '@fontsource-variable/jetbrains-mono';
 
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-/* ------------------------------------------------------------------ *
- * Themes — "Modern Dark (Cinema)"
+/* ==================================================================== *
+ * UVD — Precision
  *
- * Every surface colour is an `R G B` triple in a CSS variable so Tailwind
- * can apply opacity to it (`bg-fg/[0.06]`) and so switching themes is a
- * single attribute change on <html> — no rebuild, no flash.
+ * A Swiss-modernist system: a strict 8px grid, hairline rules instead of
+ * shadows, near-monochrome surfaces, and exactly one saturated colour.
+ * Depth comes from stacking flat planes, never from blur or glow.
  *
- * The dark themes deliberately bottom out around #060608 rather than pure
- * black: on OLED panels #000 smears during motion, and a true-black backdrop
- * gives elevated surfaces nothing to sit against.
- * ------------------------------------------------------------------ */
+ * Colour tokens are `R G B` triples so Tailwind can alpha them
+ * (`bg-accent/10`) and so a theme swap is one attribute on <html>.
+ *
+ * Text colours are explicit tokens, not alphas over a foreground. An alpha
+ * reads differently on every surface it lands on, which is how a palette
+ * silently drifts under 4.5:1; naming the three tiers outright means
+ * `scripts/check-contrast.mjs` can verify all of them against every surface.
+ * ==================================================================== */
 
 :root {
-  /* Shared shape and motion language. */
-  --radius-card: 16px;
-  --radius-panel: 20px;
-  --radius-control: 12px;
-  /* Expo-out: leaves fast, settles slowly. Everything uses it. */
-  --ease: cubic-bezier(0.16, 1, 0.3, 1);
-  --duration: 200ms;
+  /* ---- Shape. Four steps, no in-between values. ---- */
+  --r-1: 8px; /* tags, swatches, icon buttons */
+  --r-2: 14px; /* fields, buttons, list rows */
+  --r-3: 22px; /* blocks, dialogs */
+  --r-pill: 999px;
 
-  /* Z-index scale — a fixed ladder beats ad-hoc numbers. */
+  /* ---- Motion. Decelerate-emphasised: starts immediately, lands soft. ---- */
+  --ease: cubic-bezier(0.2, 0, 0, 1);
+  --t-fast: 160ms;
+  --t-base: 240ms;
+  --t-slow: 320ms;
+
+  /* ---- Depth ladder. A fixed ladder beats ad-hoc z-indexes. ---- */
   --z-nav: 20;
   --z-chrome: 30;
   --z-banner: 40;
@@ -37,141 +47,48 @@
   --z-modal: 70;
 }
 
+/* ---- Night (default) ----
+   Bottoms out at #09090B rather than pure black: on OLED panels #000 smears
+   during motion, and a true-black canvas gives raised planes nothing to sit
+   against. */
 :root,
-[data-theme='midnight'] {
+[data-theme='night'] {
   color-scheme: dark;
-  --ink-950: 6 6 8;
-  --ink-900: 10 10 14;
-  --ink-850: 15 15 20;
-  --ink-800: 20 20 26;
-  --ink-750: 26 26 34;
-  --ink-700: 33 33 43;
-  --ink-600: 44 44 57;
-  --ink-500: 62 62 79;
-  --fg: 255 255 255;
-  --cream: 237 237 239;
-  --cream-dim: 138 143 152;
-  --shadow: 0 0 0;
+  --bg: 9 9 11;
+  --surface: 20 20 23;
+  --surface-2: 28 28 32;
+  --line: 39 39 44;
+  --line-strong: 63 63 70;
+  --text: 244 244 245;
+  --text-2: 168 168 178;
+  --text-3: 135 135 146;
+  --accent: 47 91 255;
+  --accent-fg: 255 255 255;
+  --accent-ink: 138 168 255;
   --good: 74 222 128;
   --warn: 250 204 21;
-  --bad: 248 113 113;
-  --grain: 0.022;
+  --bad: 251 113 133;
 }
 
-[data-theme='carbon'] {
-  color-scheme: dark;
-  --ink-950: 12 11 10;
-  --ink-900: 18 17 15;
-  --ink-850: 25 23 21;
-  --ink-800: 32 30 27;
-  --ink-750: 40 37 34;
-  --ink-700: 50 46 42;
-  --ink-600: 64 59 54;
-  --ink-500: 84 78 71;
-  --fg: 255 250 244;
-  --cream: 243 238 231;
-  --cream-dim: 163 154 144;
-  --shadow: 0 0 0;
-  --good: 110 223 150;
-  --warn: 240 199 92;
-  --bad: 246 125 110;
-  --grain: 0.026;
-}
-
-[data-theme='nebula'] {
-  color-scheme: dark;
-  --ink-950: 8 8 18;
-  --ink-900: 13 13 27;
-  --ink-850: 18 18 38;
-  --ink-800: 24 24 49;
-  --ink-750: 31 31 61;
-  --ink-700: 40 40 76;
-  --ink-600: 53 53 97;
-  --ink-500: 73 73 127;
-  --fg: 236 238 255;
-  --cream: 233 235 253;
-  --cream-dim: 154 159 196;
-  --shadow: 2 2 12;
-  --good: 94 231 165;
-  --warn: 246 208 105;
-  --bad: 249 128 142;
-  --grain: 0.03;
-}
-
-[data-theme='daylight'] {
+/* ---- Day ----
+   Not a tint-inverted Night: light interfaces need a canvas *darker* than the
+   raised planes, otherwise every block dissolves into the page. */
+[data-theme='day'] {
   color-scheme: light;
-  --ink-950: 240 241 245;
-  --ink-900: 246 247 250;
-  --ink-850: 255 255 255;
-  --ink-800: 255 255 255;
-  --ink-750: 255 255 255;
-  --ink-700: 236 238 243;
-  --ink-600: 223 226 233;
-  --ink-500: 201 205 214;
-  --fg: 15 17 26;
-  --cream: 20 22 32;
-  --cream-dim: 88 94 110;
-  --shadow: 96 102 130;
-  --good: 21 128 82;
-  --warn: 154 106 12;
-  --bad: 190 50 50;
-  --grain: 0.01;
-}
-
-/* ---- Accents ----
-   Each pairs a hue with a foreground that clears 4.5:1 against it, so accent
-   buttons stay readable whichever theme they sit on. */
-
-[data-accent='indigo'] {
-  --accent: 94 106 210;
+  --bg: 240 240 243;
+  --surface: 255 255 255;
+  --surface-2: 248 248 250;
+  --line: 224 224 229;
+  --line-strong: 198 198 206;
+  --text: 9 9 11;
+  --text-2: 82 82 91;
+  --text-3: 100 100 110;
+  --accent: 37 78 235;
   --accent-fg: 255 255 255;
-}
-[data-accent='cream'] {
-  --accent: var(--cream);
-  --accent-fg: var(--ink-950);
-}
-[data-accent='violet'] {
-  --accent: 112 82 240;
-  --accent-fg: 255 255 255;
-}
-[data-accent='cyan'] {
-  --accent: 45 212 233;
-  --accent-fg: 6 22 26;
-}
-[data-accent='emerald'] {
-  --accent: 34 197 94;
-  --accent-fg: 8 25 15;
-}
-[data-accent='amber'] {
-  --accent: 251 191 36;
-  --accent-fg: 34 22 0;
-}
-[data-accent='rose'] {
-  --accent: 225 29 72;
-  --accent-fg: 255 255 255;
-}
-
-/*
- * Light mode needs more ink for the same readability.
- *
- * The dim text tiers are alphas over `--fg`, and the same alpha lands very
- * differently depending on what's behind it: white at 50% over a near-black
- * card reads 5.4:1, but near-black at 50% over a white card is only 3.6:1 —
- * under the 4.5:1 floor. These overrides raise the light theme's tiers until
- * they clear it, without touching the dark themes where the originals are
- * already correct.
- */
-[data-theme='daylight'] .text-fg\/50 {
-  color: rgb(var(--fg) / 0.62);
-}
-[data-theme='daylight'] .text-fg\/55 {
-  color: rgb(var(--fg) / 0.68);
-}
-[data-theme='daylight'] .text-fg\/60 {
-  color: rgb(var(--fg) / 0.74);
-}
-[data-theme='daylight'] .placeholder\:text-fg\/50::placeholder {
-  color: rgb(var(--fg) / 0.62);
+  --accent-ink: 30 64 214;
+  --good: 20 107 53;
+  --warn: 140 88 6;
+  --bad: 200 32 40;
 }
 
 * {
@@ -188,15 +105,16 @@ body,
 
 body {
   font-family: theme('fontFamily.sans');
-  /* A base gradient rather than a flat fill — it gives the ambient light
-     something to sit in and keeps large dark areas from looking like a void. */
-  background-color: rgb(var(--ink-950));
-  background-image: linear-gradient(180deg, rgb(var(--ink-900)) 0%, rgb(var(--ink-950)) 60%);
-  color: rgb(var(--cream));
+  /* Flat. The old build painted drifting light blobs behind everything; this
+     one earns its depth from stacked planes and rules, so the canvas is a
+     single honest colour. */
+  background-color: rgb(var(--bg));
+  color: rgb(var(--text));
   overflow: hidden;
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
   user-select: none;
+  font-feature-settings: 'cv05', 'ss03';
 }
 
 #root {
@@ -211,13 +129,26 @@ body {
   -webkit-app-region: no-drag;
 }
 
+/* Every measurement, path, URL and identifier. Tabular figures so a column of
+   percentages or byte counts never shifts as the digits change. */
 .mono {
   font-family: theme('fontFamily.mono');
-  font-feature-settings: 'ss01';
-  letter-spacing: -0.01em;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.015em;
 }
 
-/* Text inside inputs must stay selectable even though the app disables it. */
+/* The system's one label style: small, uppercase, wide-tracked. It marks every
+   group heading, so hierarchy never needs a bigger font or a heavier weight. */
+.label {
+  font-family: theme('fontFamily.mono');
+  font-size: 10px;
+  line-height: 1;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  color: rgb(var(--text-3));
+}
+
 input,
 textarea,
 [contenteditable],
@@ -226,90 +157,131 @@ textarea,
 }
 
 @layer components {
-  /* Elevated surfaces. Frosted rather than opaque: the ambient light behind
-     them shows through just enough to give the window depth. */
-  .panel {
-    border-radius: var(--radius-panel);
-    @apply border border-fg/[0.08] bg-ink-850/80 backdrop-blur-xl;
+  /* ---------------- Planes ---------------- */
+
+  /* A raised plane. One hairline, one flat fill, no shadow — elevation reads
+     from the rule, which stays crisp at any scale factor. */
+  .block {
+    border-radius: var(--r-3);
+    @apply border border-edge bg-raise;
   }
-  .card {
-    border-radius: var(--radius-card);
-    @apply border border-fg/[0.07] bg-ink-800/70 backdrop-blur-md;
-  }
-  /* A hairline highlight along the top edge reads as light falling on the
-     surface — the cheapest way to make a flat card look physical. */
-  .card-lit {
-    position: relative;
-  }
-  .card-lit::before {
-    content: '';
-    position: absolute;
-    inset-inline: 12%;
-    top: 0;
-    height: 1px;
-    background: linear-gradient(90deg, transparent, rgb(var(--fg) / 0.16), transparent);
-    pointer-events: none;
+  /* An inset plane: nests inside .block for secondary content. */
+  .well {
+    border-radius: var(--r-2);
+    @apply border border-edge bg-sink;
   }
 
-  /* Buttons */
+  /* ---------------- Buttons ---------------- */
+
   .btn {
-    border-radius: var(--radius-control);
-    transition-timing-function: var(--ease);
-    @apply no-drag inline-flex cursor-pointer select-none items-center justify-center gap-2 px-4 py-2.5 text-sm font-medium transition-all duration-200 disabled:cursor-not-allowed disabled:opacity-40;
+    border-radius: var(--r-pill);
+    transition:
+      background-color var(--t-fast) var(--ease),
+      color var(--t-fast) var(--ease),
+      border-color var(--t-fast) var(--ease),
+      transform var(--t-fast) var(--ease);
+    @apply no-drag inline-flex cursor-pointer select-none items-center justify-center gap-2 whitespace-nowrap px-4 py-2.5 text-[13px] font-medium leading-none active:scale-[0.97] disabled:pointer-events-none disabled:opacity-40;
   }
-  .btn-primary {
-    box-shadow: 0 6px 22px -8px rgb(var(--accent) / 0.7);
-    @apply btn bg-accent text-accent-fg hover:brightness-110 active:scale-[0.97];
+  /* The single loud element on any screen. There is never more than one. */
+  .btn-solid {
+    @apply btn bg-accent text-accent-fg hover:bg-accent/90;
   }
-  .btn-ghost {
-    @apply btn bg-fg/[0.06] text-cream-dim hover:bg-fg/[0.1] hover:text-cream active:scale-[0.97];
+  /* Everything else: a filled neutral that reads as a control, not a link. */
+  .btn-quiet {
+    @apply btn bg-sink text-ink-2 hover:bg-edge hover:text-ink;
   }
   .btn-danger {
-    @apply btn bg-bad/15 text-bad hover:bg-bad/25 active:scale-[0.97];
+    @apply btn bg-bad/12 text-bad hover:bg-bad/20;
   }
+  /* Square icon buttons, sized to the 44px touch floor at their outer bounds. */
   .btn-icon {
-    transition-timing-function: var(--ease);
-    @apply no-drag inline-flex h-9 w-9 cursor-pointer items-center justify-center rounded-xl text-fg/55 transition-all duration-200 hover:bg-fg/[0.09] hover:text-cream active:scale-95 disabled:cursor-not-allowed disabled:opacity-30;
+    border-radius: var(--r-1);
+    transition:
+      background-color var(--t-fast) var(--ease),
+      color var(--t-fast) var(--ease);
+    @apply no-drag inline-flex h-8 w-8 shrink-0 cursor-pointer items-center justify-center text-ink-3 hover:bg-sink hover:text-ink disabled:pointer-events-none disabled:opacity-30;
   }
 
-  /* Inputs */
-  .input {
-    border-radius: var(--radius-control);
-    transition-timing-function: var(--ease);
-    @apply no-drag w-full border border-fg/[0.08] bg-ink-900/70 px-4 py-3 text-sm text-cream outline-none transition-all duration-200 placeholder:text-fg/50 focus:border-accent/60 focus:bg-ink-850 focus:ring-4 focus:ring-accent/15;
+  /* ---------------- Fields ---------------- */
+
+  /* Text entry. Solid fill, hairline border, and on focus the border takes the
+     accent and grows a soft ring — no glow, no colour shift in the fill. */
+  .field {
+    border-radius: var(--r-2);
+    transition:
+      border-color var(--t-fast) var(--ease),
+      box-shadow var(--t-fast) var(--ease);
+    @apply no-drag w-full border border-edge bg-sink px-3.5 py-3 text-[13px] text-ink outline-none placeholder:text-ink-3;
+  }
+  .field:focus,
+  .field:focus-within {
+    @apply border-accent;
+    box-shadow: 0 0 0 3px rgb(var(--accent) / 0.16);
+  }
+  /* The home screen's focal input: the same field at display scale. */
+  .field-lg {
+    @apply field px-5 py-4 text-[15px];
+    border-radius: var(--r-3);
   }
 
-  /* Segmented control */
-  .seg {
-    border-radius: var(--radius-control);
-    @apply inline-flex flex-wrap gap-1 border border-fg/[0.05] bg-ink-900/70 p-1;
+  /* ---------------- Choices ---------------- */
+
+  /* Replaces the old segmented control everywhere: a row of independent pills.
+     Selected is a solid accent fill — no sliding indicator, so a choice that
+     re-renders (quality lists rebuild per video) can't animate from nowhere. */
+  .choice {
+    border-radius: var(--r-pill);
+    transition:
+      background-color var(--t-fast) var(--ease),
+      color var(--t-fast) var(--ease),
+      border-color var(--t-fast) var(--ease);
+    @apply no-drag inline-flex cursor-pointer select-none items-center justify-center gap-1.5 whitespace-nowrap border border-edge bg-transparent px-3.5 py-2 text-[12px] font-medium leading-none text-ink-2 hover:border-ink-3 hover:text-ink;
   }
-  .seg-item {
-    transition-timing-function: var(--ease);
-    @apply no-drag relative inline-flex cursor-pointer items-center justify-center gap-1.5 rounded-[9px] px-3.5 py-2 text-[13px] font-medium text-fg/55 transition-colors duration-200 hover:text-cream;
+  .choice-on {
+    @apply border-accent bg-accent text-accent-fg hover:border-accent hover:text-accent-fg;
   }
-  .seg-item-active {
-    @apply text-accent-fg hover:text-accent-fg;
+  .choice-off {
+    @apply opacity-40;
   }
 
-  /* Settings group title */
-  .group-title {
-    @apply mb-3 text-[13px] font-semibold uppercase tracking-[0.12em] text-fg/55;
+  /* ---------------- Navigation ---------------- */
+
+  /* Top-bar tabs. The active one is marked by a 2px accent rule sitting on the
+     bar's own bottom hairline — the indicator is part of the structure rather
+     than a shape floating behind the label. */
+  .tab {
+    transition:
+      color var(--t-fast) var(--ease),
+      border-color var(--t-fast) var(--ease);
+    @apply no-drag relative inline-flex cursor-pointer select-none items-center gap-2 border-b-2 border-transparent px-3 pb-2.5 pt-3 text-[13px] font-medium text-ink-3 hover:text-ink;
+  }
+  .tab-on {
+    @apply border-accent text-ink;
   }
 
-  .chip {
-    @apply inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium;
+  /* ---------------- Small parts ---------------- */
+
+  /* A read-only fact: extractor name, container, count. Never interactive. */
+  .tag {
+    border-radius: var(--r-1);
+    @apply inline-flex items-center gap-1 bg-sink px-1.5 py-1 font-mono text-[10px] leading-none text-ink-3;
+  }
+  .kbd {
+    border-radius: var(--r-1);
+    @apply inline-flex items-center border border-edge-strong bg-sink px-1.5 py-1 font-mono text-[10px] leading-none text-ink-2;
   }
 
-  /* Keyboard focus must stay visible even where the mouse styling is subtle. */
+  /* Focus must survive every hover style above it. */
   .btn:focus-visible,
   .btn-icon:focus-visible,
-  .seg-item:focus-visible {
-    @apply outline-none ring-2 ring-accent/70 ring-offset-2 ring-offset-ink-900;
+  .choice:focus-visible,
+  .tab:focus-visible,
+  .field:focus-visible {
+    @apply outline-none ring-2 ring-accent ring-offset-2 ring-offset-canvas;
   }
 }
 
-/* Scrollbar */
+/* Thin, inset, and only as visible as it needs to be. */
 ::-webkit-scrollbar {
   width: 10px;
   height: 10px;
@@ -318,45 +290,60 @@ textarea,
   background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: rgb(var(--fg) / 0.14);
+  background: rgb(var(--line-strong));
   border-radius: 999px;
-  border: 2px solid transparent;
+  border: 3px solid transparent;
   background-clip: content-box;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: rgb(var(--fg) / 0.26);
+  background: rgb(var(--text-3));
   background-clip: content-box;
 }
 
-/* Range input */
+/* Native controls, restyled to the system rather than left at browser default. */
 input[type='range'] {
   -webkit-appearance: none;
   appearance: none;
-  height: 6px;
+  height: 4px;
   border-radius: 999px;
-  background: rgb(var(--fg) / 0.14);
+  background: rgb(var(--line-strong));
 }
 input[type='range']::-webkit-slider-thumb {
   -webkit-appearance: none;
   appearance: none;
-  width: 18px;
-  height: 18px;
-  border-radius: 50%;
+  width: 16px;
+  height: 16px;
+  border-radius: 999px;
   background: rgb(var(--accent));
   cursor: pointer;
-  border: 3px solid rgb(var(--ink-950));
+  border: 3px solid rgb(var(--surface));
 }
 
-select.input {
+select.field {
   -webkit-appearance: none;
   appearance: none;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%23888' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23888' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
   background-repeat: no-repeat;
   background-position: right 0.9rem center;
   padding-right: 2.4rem;
 }
 
-/* Respect the OS "reduce motion" setting. */
+/* Placeholder blocks breathe in place. The old build swept a gradient across
+   them, which animates a paint every frame for no information gain. */
+@keyframes idle-pulse {
+  0%,
+  100% {
+    opacity: 0.55;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+.skeleton {
+  background-color: rgb(var(--surface-2));
+  animation: idle-pulse 1.6s var(--ease) infinite;
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
@@ -364,15 +351,5 @@ select.input {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
-  }
-}
-
-/* Backdrop blur is the most expensive thing on screen. Where the compositor
-   can't do it cheaply, fall back to opaque surfaces rather than a smeared,
-   half-drawn approximation. */
-@supports not (backdrop-filter: blur(1px)) {
-  .panel,
-  .card {
-    background-color: rgb(var(--ink-850));
   }
 }

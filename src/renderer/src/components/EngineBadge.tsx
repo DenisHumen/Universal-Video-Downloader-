@@ -1,17 +1,20 @@
-import { motion } from 'framer-motion'
 import { useStore } from '../store'
 import { useT } from '../i18n'
 
+/**
+ * Engine state as a status dot plus a mono label — no pill, no container.
+ *
+ * The dot is the whole signal; the label only exists because a colour alone
+ * can't say *what* is ready, and colour-only status fails for anyone who can't
+ * separate the hues. It stays out of the way at tertiary weight and never
+ * animates unless something is genuinely in flight.
+ */
 export default function EngineBadge(): JSX.Element {
   const t = useT()
   const ytdlp = useStore((s) => s.ytdlp)
 
-  const color =
-    ytdlp.state === 'ready'
-      ? 'rgb(var(--good))'
-      : ytdlp.state === 'error'
-        ? 'rgb(var(--bad))'
-        : 'rgb(var(--warn))'
+  const tone =
+    ytdlp.state === 'ready' ? 'bg-good' : ytdlp.state === 'error' ? 'bg-bad' : 'bg-warn'
 
   const label =
     ytdlp.state === 'ready'
@@ -24,20 +27,15 @@ export default function EngineBadge(): JSX.Element {
             ? t('engine.error')
             : t('engine.idle')
 
-  const pulsing = ytdlp.state === 'checking' || ytdlp.state === 'downloading'
+  const busy = ytdlp.state === 'checking' || ytdlp.state === 'downloading'
 
   return (
     <div
-      className="no-drag flex items-center gap-2 rounded-full bg-fg/[0.04] px-2.5 py-1"
+      className="no-drag mr-1 hidden items-center gap-2 md:flex"
       title={ytdlp.version ? `yt-dlp ${ytdlp.version}` : ytdlp.message || label}
     >
-      <motion.span
-        className="h-1.5 w-1.5 rounded-full"
-        style={{ background: color }}
-        animate={pulsing ? { opacity: [1, 0.3, 1] } : { opacity: 1 }}
-        transition={{ duration: 1.2, repeat: pulsing ? Infinity : 0 }}
-      />
-      <span className="mono text-[11px] font-medium text-fg/60">{label}</span>
+      <span className={`h-1.5 w-1.5 rounded-full ${tone} ${busy ? 'animate-idle-pulse' : ''}`} />
+      <span className="mono text-[10px] uppercase tracking-[0.1em] text-ink-3">{label}</span>
     </div>
   )
 }

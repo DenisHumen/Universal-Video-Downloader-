@@ -1,5 +1,5 @@
 import { AnimatePresence, motion } from 'framer-motion'
-import { modalSpring } from '../lib/motion'
+import { dialog, overlay } from '../lib/motion'
 import { X } from 'lucide-react'
 import { useStore } from '../store'
 import { useT, type TranslationKey } from '../i18n'
@@ -25,39 +25,34 @@ export default function ShortcutsOverlay(): JSX.Element {
     <AnimatePresence>
       {open && (
         <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-6 backdrop-blur-sm"
+          {...overlay}
+          role="dialog"
+          aria-modal="true"
+          className="fixed inset-0 flex items-center justify-center bg-canvas/80 p-6"
+          style={{ zIndex: 'var(--z-overlay)' }}
           onClick={() => setOpen(false)}
         >
           <motion.div
-            initial={{ opacity: 0, scale: 0.97, y: 10 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.97, y: 10 }}
-            transition={modalSpring}
-            className="card w-full max-w-md overflow-hidden"
+            {...dialog}
+            className="block w-full max-w-sm overflow-hidden"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="flex items-center justify-between border-b border-fg/[0.06] px-5 py-4">
-              <h2 className="text-sm font-semibold text-cream">{t('shortcuts.title')}</h2>
+            <div className="flex items-center justify-between border-b border-edge px-4 py-3">
+              <h2 className="label">{t('shortcuts.title')}</h2>
               <button className="btn-icon" onClick={() => setOpen(false)} aria-label={t('common.close')}>
-                <X size={16} />
+                <X size={15} />
               </button>
             </div>
-            <div className="space-y-1 p-3">
+            <div className="px-4">
               {ROWS.map((row) => (
                 <div
                   key={row.label}
-                  className="flex items-center justify-between rounded-xl px-2.5 py-2 transition-colors hover:bg-fg/[0.03]"
+                  className="flex items-center justify-between gap-4 border-b border-edge py-2.5 last:border-b-0"
                 >
-                  <span className="text-[13px] text-cream-dim">{t(row.label)}</span>
-                  <span className="flex items-center gap-1">
+                  <span className="text-[12px] text-ink-2">{t(row.label)}</span>
+                  <span className="flex shrink-0 items-center gap-1">
                     {row.keys.map((key) => (
-                      <kbd
-                        key={key}
-                        className="mono rounded-lg border border-fg/[0.09] bg-fg/[0.05] px-2 py-1 text-[11px] text-fg/70"
-                      >
+                      <kbd key={key} className="kbd">
                         {key === 'mod' ? mod : key}
                       </kbd>
                     ))}

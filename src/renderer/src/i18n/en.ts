@@ -94,6 +94,7 @@ export const en = {
   'queue.filterDone': 'done',
   'queue.filterFailed': 'failed',
   'queue.searchPlaceholder': 'filter by title…',
+  'queue.remaining': '{size} left',
   'queue.log': 'engine output',
   'queue.copyError': 'copy the error',
   'queue.retryingIn': 'retrying automatically…',
@@ -171,11 +172,8 @@ export const en = {
   'settings.language': 'language',
   'settings.language.auto': 'system',
   'settings.theme': 'theme',
-  'settings.theme.midnight': 'midnight',
-  'settings.theme.carbon': 'carbon',
-  'settings.theme.nebula': 'nebula',
-  'settings.theme.daylight': 'daylight',
-  'settings.accent': 'accent',
+  'settings.theme.night': 'night',
+  'settings.theme.day': 'day',
 
   'settings.saveLocation': 'save location',
   'settings.subfolders': 'sort into subfolders',
@@ -275,6 +273,7 @@ export const en = {
   'shortcuts.escape': 'clear / close',
 
   // ---- capabilities panel ----
+  'cap.title': 'what this does',
   'cap.link.title': 'paste any link',
   'cap.link.body':
     '1800+ sites natively, and for the rest the app reads the page — or watches it in a hidden browser — to find the stream itself.',

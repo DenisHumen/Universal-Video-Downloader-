@@ -1,28 +1,11 @@
 import { useEffect, useRef, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
-import { modalSpring, pill, staggerChild, staggerParent } from '../lib/motion'
-import {
-  AlertCircle,
-  Check,
-  Clock,
-  Download,
-  ExternalLink,
-  Eye,
-  Film,
-  Globe,
-  Layers,
-  Loader2,
-  Music,
-  Search,
-  SearchX,
-  Tv,
-  Video,
-  X,
-  Youtube
-} from 'lucide-react'
+import { dialog, enter, overlay, staggerChild, staggerParent } from '../lib/motion'
+import { Check, Download, ExternalLink, Loader2, Search, X } from 'lucide-react'
 import type { AppSettings, MediaInfo, SearchResult, SearchScope, SearchService } from '@shared/types'
 import StreamingCard from '../components/StreamingCard'
 import Thumbnail from '../components/Thumbnail'
+import Choice from '../components/Choice'
 import { formatCount, formatDuration } from '../lib/format'
 import { initialMode, initialQuality, maxHeightOf } from '../lib/quality'
 import { toast } from '../lib/toast'
@@ -43,21 +26,23 @@ interface Props {
   embedded?: boolean
 }
 
-interface ServiceMeta {
-  value: SearchScope
-  label: string
-  icon: JSX.Element
-}
-
-const SERVICES: ServiceMeta[] = [
-  { value: 'all', label: 'all services', icon: <Globe size={16} /> },
-  { value: 'youtube', label: 'youtube', icon: <Youtube size={16} /> },
-  { value: 'soundcloud', label: 'soundcloud', icon: <Music size={16} /> },
-  { value: 'dailymotion', label: 'dailymotion', icon: <Video size={16} /> },
-  { value: 'yummyani', label: 'anime', icon: <Tv size={16} /> },
-  { value: 'bilibili', label: 'bilibili', icon: <Video size={16} /> },
-  { value: 'niconico', label: 'niconico', icon: <Video size={16} /> },
-  { value: 'pornhub', label: 'pornhub', icon: <Film size={16} /> }
+/**
+ * Services are a wrapping pill row, not a 176px vertical rail.
+ *
+ * The rail cost a fixed column of the window on eight one-word labels and put
+ * the scope control as far from the query field as the layout allowed. Sitting
+ * the pills directly under the field says what they are — a filter on the thing
+ * above — and gives the results the full width.
+ */
+const SERVICES: { value: SearchScope; label: string }[] = [
+  { value: 'all', label: 'all' },
+  { value: 'youtube', label: 'youtube' },
+  { value: 'soundcloud', label: 'soundcloud' },
+  { value: 'dailymotion', label: 'dailymotion' },
+  { value: 'yummyani', label: 'anime' },
+  { value: 'bilibili', label: 'bilibili' },
+  { value: 'niconico', label: 'niconico' },
+  { value: 'pornhub', label: 'pornhub' }
 ]
 
 // Services whose results carry real thumbnails + a probe-able quality.
@@ -107,7 +92,7 @@ export default function SearchView({ settings, embedded = false }: Props): JSX.E
   }
 
   // Lazily discover each result's best quality + thumbnail (2 probes at a time)
-  // so cards fill in as answers arrive. Only for services that carry both.
+  // so tiles fill in as answers arrive. Only for services that carry both.
   const probeQualities = async (list: SearchResult[], gen: number): Promise<void> => {
     const queue = list.filter((r) => PROBE_SERVICES.includes(r.service))
     const worker = async (): Promise<void> => {
@@ -201,190 +186,148 @@ export default function SearchView({ settings, embedded = false }: Props): JSX.E
     }
   }
 
-  const activeService = SERVICES.find((s) => s.value === service)
-  const activeLabel = service === 'all' ? t('search.allServices') : (activeService?.label ?? '')
+  const activeLabel =
+    service === 'all' ? t('search.allServices') : (SERVICES.find((s) => s.value === service)?.label ?? '')
 
   return (
-    <div className="flex h-full">
-      {/* Services — vertical, scrollable (room for many more) */}
-      <aside className="flex w-[176px] shrink-0 flex-col border-r border-fg/[0.06]">
-        <p className="group-title mb-2 px-4 pt-6">{t('search.services')}</p>
-        <div className="flex-1 space-y-1 overflow-y-auto px-2.5 pb-4">
-          {SERVICES.map((s) => {
-            const isActive = s.value === service
-            return (
-              <button
-                key={s.value}
-                onClick={() => changeService(s.value)}
-                className="no-drag group relative flex w-full items-center gap-2.5 rounded-2xl px-3 py-2.5 text-left"
-              >
-                {isActive && (
-                  <motion.span
-                    layoutId="search-service-active"
-                    className="absolute inset-0 rounded-2xl bg-accent"
-                    transition={pill}
-                  />
-                )}
-                <span
-                  className={`relative z-10 transition-colors ${
-                    isActive ? 'text-accent-fg' : 'text-fg/60 group-hover:text-cream'
-                  }`}
-                >
-                  {s.icon}
-                </span>
-                <span
-                  className={`relative z-10 truncate text-[13px] font-medium transition-colors ${
-                    isActive ? 'text-accent-fg' : 'text-fg/70 group-hover:text-cream'
-                  }`}
-                >
-                  {s.value === 'all' ? t('search.allServices') : s.label}
-                </span>
-              </button>
-            )
-          })}
-        </div>
-      </aside>
-
-      {/* Search + results */}
-      <div className="flex min-w-0 flex-1 flex-col">
-        <div className="px-7 pt-7">
-          <motion.div
-            initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.3 }}
-            className="flex items-center gap-2 rounded-3xl border border-fg/[0.08] bg-ink-900 p-2 transition-colors focus-within:border-accent/40"
+    <div className="flex h-full flex-col">
+      <div className="mx-auto w-full max-w-[1080px] shrink-0 px-6 pt-10">
+        <label className="label mb-2.5 block" htmlFor="uvd-search">
+          {t('search.title')}
+        </label>
+        <div className="field flex items-center gap-1.5 rounded-3 p-2">
+          <Search size={16} className="ml-2 shrink-0 text-ink-3" />
+          <input
+            id="uvd-search"
+            ref={inputRef}
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && search()}
+            placeholder={t('search.placeholder')}
+            className="no-drag min-w-0 flex-1 bg-transparent px-1.5 py-2 text-[15px] text-ink outline-none placeholder:text-ink-3"
+            spellCheck={false}
+            autoComplete="off"
+          />
+          <button
+            className="btn-solid px-4 py-3"
+            onClick={() => search()}
+            disabled={!query.trim() || status === 'searching'}
           >
-            <Search className="ml-2.5 shrink-0 text-fg/50" size={19} />
-            <input
-              ref={inputRef}
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && search()}
-              placeholder={t('search.placeholder')}
-              className="no-drag min-w-0 flex-1 bg-transparent px-1 py-2 text-sm text-cream placeholder:text-fg/50 outline-none"
-              spellCheck={false}
-            />
-            <button
-              className="btn-primary px-5 py-2.5"
-              onClick={() => search()}
-              disabled={!query.trim() || status === 'searching'}
+            {status === 'searching' ? <Loader2 size={15} className="animate-spin" /> : null}
+            {t('common.search')}
+          </button>
+        </div>
+
+        <div className="mt-3.5 flex flex-wrap items-center gap-3">
+          <Choice
+            label={t('search.services')}
+            value={service}
+            onChange={(v) => changeService(v as SearchScope)}
+            options={SERVICES.map((s) => ({
+              value: s.value,
+              label: s.value === 'all' ? t('search.allServices') : s.label
+            }))}
+          />
+          {results && (
+            <span className="mono ml-auto shrink-0 text-[11px] text-ink-3">
+              {t('search.results', { count: results.length })}
+            </span>
+          )}
+        </div>
+      </div>
+
+      <div className="mx-auto min-h-0 w-full max-w-[1080px] flex-1 overflow-y-auto px-6 pb-8 pt-6">
+        <AnimatePresence mode="popLayout">
+          {status === 'searching' && (
+            <motion.div
+              key="skeleton"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="grid grid-cols-2 gap-x-5 gap-y-7 md:grid-cols-3 xl:grid-cols-4"
             >
-              {status === 'searching' ? (
-                <Loader2 size={16} className="animate-spin" />
-              ) : (
-                <Search size={16} />
-              )}
-              {t('common.search')}
-            </button>
-          </motion.div>
-          <div className="mt-2.5 flex items-center justify-between px-1">
-            <p className="mono text-xs text-fg/50">{t('search.searching', { service: activeLabel })}</p>
-            {results && (
-              <span className="mono text-xs text-fg/50">
-                {t('search.results', { count: results.length })}
-              </span>
-            )}
-          </div>
-        </div>
-
-        <div className="flex-1 overflow-y-auto px-7 pb-7 pt-4">
-          <AnimatePresence mode="popLayout">
-            {status === 'searching' && (
-              <motion.div
-                key="skeleton"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                className="grid grid-cols-2 gap-3 lg:grid-cols-3"
-              >
-                {Array.from({ length: 6 }).map((_, i) => (
-                  <div key={i} className="card overflow-hidden">
-                    <div className="relative aspect-video bg-fg/[0.04]">
-                      <div className="absolute inset-0 -translate-x-full animate-shimmer bg-gradient-to-r from-transparent via-fg/[0.08] to-transparent" />
-                    </div>
-                    <div className="space-y-2 p-3">
-                      <div className="h-3.5 w-5/6 rounded bg-fg/[0.05]" />
-                      <div className="h-3 w-1/2 rounded bg-fg/[0.05]" />
-                      <div className="h-8 w-full rounded-xl bg-fg/[0.04]" />
-                    </div>
-                  </div>
-                ))}
-              </motion.div>
-            )}
-
-            {status === 'error' && (
-              <motion.div
-                key="error"
-                initial={{ opacity: 0, y: 8 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -8 }}
-                className="card flex items-start gap-3 p-4"
-              >
-                <AlertCircle className="mt-0.5 shrink-0 text-bad" size={18} />
-                <div className="min-w-0">
-                  <p className="text-sm font-medium text-cream">{t('search.failed')}</p>
-                  <p className="mt-0.5 text-xs text-fg/60">{error}</p>
+              {Array.from({ length: 8 }).map((_, i) => (
+                <div key={i}>
+                  <div className="skeleton aspect-video w-full rounded-2" />
+                  <div className="skeleton mt-2.5 h-3.5 w-5/6 rounded-1" />
+                  <div className="skeleton mt-1.5 h-3 w-1/2 rounded-1" />
                 </div>
-              </motion.div>
-            )}
+              ))}
+            </motion.div>
+          )}
 
-            {status === 'idle' && results && results.length === 0 && (
-              <motion.div
-                key="empty"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                className="flex flex-col items-center justify-center py-16 text-center"
-              >
-                <div className="flex h-16 w-16 items-center justify-center rounded-3xl bg-fg/[0.03] text-fg/35">
-                  <SearchX size={28} />
-                </div>
-                <p className="mt-4 text-sm font-medium text-fg/70">{t('search.nothing')}</p>
-                <p className="mono mt-1 text-xs text-fg/50">{t('search.nothingHint')}</p>
-              </motion.div>
-            )}
+          {status === 'error' && (
+            <motion.div
+              key="error"
+              initial={{ opacity: 0, y: 6 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0 }}
+              transition={enter}
+              className="block p-4"
+            >
+              <p className="flex items-center gap-2 text-[13px] font-medium text-ink">
+                <span className="h-1.5 w-1.5 rounded-full bg-bad" /> {t('search.failed')}
+              </p>
+              <p className="mono selectable mt-2 break-words text-[12px] leading-relaxed text-ink-2">
+                {error}
+              </p>
+            </motion.div>
+          )}
 
-            {status === 'idle' && results && results.length > 0 && (
-              <motion.div
-                key="results"
-                variants={staggerParent}
-                initial="hidden"
-                animate="show"
-                exit={{ opacity: 0 }}
-                className="grid grid-cols-2 gap-3 lg:grid-cols-3"
-              >
-                {results.map((r, i) => (
-                  <ResultCard
-                    key={`${r.service}-${r.id}-${i}`}
-                    result={r}
-                    probe={probes[r.url]}
-                    added={added.has(r.url)}
-                    busy={pickerBusy === r.url}
-                    t={t}
-                    onDownload={() => download(r)}
-                    onOpenPicker={() => openPicker(r)}
-                  />
-                ))}
-              </motion.div>
-            )}
+          {status === 'idle' && results && results.length === 0 && (
+            <motion.div
+              key="empty"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="flex flex-col items-center justify-center py-24 text-center"
+            >
+              <p className="text-[14px] font-medium text-ink">{t('search.nothing')}</p>
+              <p className="mono mt-1.5 text-[11px] text-ink-3">{t('search.nothingHint')}</p>
+            </motion.div>
+          )}
 
-            {status === 'idle' && !results && (
-              <motion.div
-                key="hint"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                className="flex flex-col items-center justify-center py-16 text-center"
-              >
-                <div className="flex h-16 w-16 items-center justify-center rounded-3xl bg-fg/[0.03] text-fg/35">
-                  <Search size={28} />
-                </div>
-                <p className="mt-4 text-sm font-medium text-fg/70">{t('search.title')}</p>
-                <p className="mono mt-1 text-xs text-fg/50">{t('search.hint')}</p>
-              </motion.div>
-            )}
-          </AnimatePresence>
-        </div>
+          {status === 'idle' && results && results.length > 0 && (
+            <motion.div
+              key="results"
+              variants={staggerParent}
+              initial="hidden"
+              animate="show"
+              exit={{ opacity: 0 }}
+              className="grid grid-cols-2 gap-x-5 gap-y-7 md:grid-cols-3 xl:grid-cols-4"
+            >
+              {results.map((r, i) => (
+                <ResultTile
+                  key={`${r.service}-${r.id}-${i}`}
+                  result={r}
+                  probe={probes[r.url]}
+                  added={added.has(r.url)}
+                  busy={pickerBusy === r.url}
+                  t={t}
+                  onDownload={() => download(r)}
+                  onOpenPicker={() => openPicker(r)}
+                />
+              ))}
+            </motion.div>
+          )}
+
+          {status === 'idle' && !results && (
+            <motion.div
+              key="hint"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="flex flex-col items-center justify-center py-24 text-center"
+            >
+              <p className="mono text-[11px] uppercase tracking-[0.14em] text-ink-3">
+                {t('search.searching', { service: activeLabel })}
+              </p>
+              <p className="mt-3 max-w-sm text-[13px] leading-relaxed text-ink-2">
+                {t('search.hint')}
+              </p>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
 
       {/* Anime episode/translator/quality picker */}
@@ -392,26 +335,22 @@ export default function SearchView({ settings, embedded = false }: Props): JSX.E
         {picker && (
           <motion.div
             key="picker-backdrop"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-6 backdrop-blur-sm"
+            {...overlay}
+            className="fixed inset-0 flex items-center justify-center bg-canvas/80 p-6"
+            style={{ zIndex: 'var(--z-modal)' }}
             onClick={() => setPicker(null)}
           >
             <motion.div
-              initial={{ opacity: 0, scale: 0.97, y: 12 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.97, y: 12 }}
-              transition={modalSpring}
+              {...dialog}
               className="relative max-h-[86vh] w-full max-w-lg overflow-y-auto"
               onClick={(e) => e.stopPropagation()}
             >
               <button
-                className="btn-icon absolute right-2 top-2 z-10 bg-black/40"
+                className="btn-icon absolute right-2 top-2 z-10 bg-raise"
                 onClick={() => setPicker(null)}
                 aria-label={t('common.close')}
               >
-                <X size={16} />
+                <X size={15} />
               </button>
               <StreamingCard
                 info={picker}
@@ -428,50 +367,24 @@ export default function SearchView({ settings, embedded = false }: Props): JSX.E
   )
 }
 
-function qualityBadge(
-  probe: QualityProbe | undefined,
-  service: SearchService,
-  t: TranslateFn
-): JSX.Element | null {
-  if (service === 'yummyani') {
-    return (
-      <span className="chip bg-black/70 text-[10px] font-semibold text-white/90">
-        <Tv size={9} /> {t('search.anime')}
-      </span>
-    )
-  }
-  if (service === 'soundcloud') {
-    return (
-      <span className="chip bg-black/70 text-[10px] text-white/85">
-        <Music size={9} /> {t('search.audio')}
-      </span>
-    )
-  }
-  if (!probe || probe.status === 'loading') {
-    return (
-      <span className="chip bg-black/70 text-[10px] text-white/60">
-        <Loader2 size={9} className="animate-spin" /> {t('search.qualityProbe')}
-      </span>
-    )
-  }
-  if (probe.status === 'done' && probe.maxHeight > 0) {
-    return (
-      <span className="chip bg-black/70 text-[10px] font-semibold text-white/90">
-        {probe.maxHeight}p
-      </span>
-    )
-  }
-  if (probe.status === 'done') {
-    return (
-      <span className="chip bg-black/70 text-[10px] text-white/85">
-        <Music size={9} /> {t('search.audio')}
-      </span>
-    )
-  }
+/** The quality/kind marker in the thumbnail's corner. */
+function marker(probe: QualityProbe | undefined, service: SearchService, t: TranslateFn): string | null {
+  if (service === 'yummyani') return t('search.anime')
+  if (service === 'soundcloud') return t('search.audio')
+  if (!probe || probe.status === 'loading') return t('search.qualityProbe')
+  if (probe.status === 'done' && probe.maxHeight > 0) return `${probe.maxHeight}p`
+  if (probe.status === 'done') return t('search.audio')
   return null
 }
 
-function ResultCard({
+/**
+ * A result tile with no frame.
+ *
+ * The old card had a border, a lit top edge, a hover lift and a hover shadow —
+ * four devices to say "this is one item", in a grid where the gaps already say
+ * it. Here the thumbnail is the object and everything else is set beneath it.
+ */
+function ResultTile({
   result,
   probe,
   added,
@@ -491,6 +404,7 @@ function ResultCard({
   const [downloading, setDownloading] = useState(false)
   const isAnime = result.service === 'yummyani'
   const thumb = result.thumbnail || probe?.thumbnail
+  const badge = marker(probe, result.service, t)
 
   const handle = async (): Promise<void> => {
     if (isAnime) {
@@ -502,75 +416,65 @@ function ResultCard({
     setDownloading(false)
   }
 
+  const meta = [result.uploader, result.viewCount != null ? formatCount(result.viewCount) : null]
+    .filter(Boolean)
+    .join('  ·  ')
+
   return (
-    <motion.div
-      variants={staggerChild}
-      className="card card-lit group flex cursor-default flex-col overflow-hidden transition-all duration-200 ease-expo hover:-translate-y-0.5 hover:border-accent/25 hover:shadow-soft"
-    >
+    <motion.div variants={staggerChild} className="group flex flex-col">
       <button
-        className="relative block aspect-video w-full cursor-pointer overflow-hidden bg-ink-950 text-left"
+        className="relative block aspect-video w-full cursor-pointer overflow-hidden rounded-2 bg-sink text-left"
         title={t('common.openInBrowser')}
         onClick={() => window.api.openExternal(result.url)}
       >
         <Thumbnail
           src={thumb}
           pageUrl={result.url}
-          className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.04]"
-          fallback={
-            <div className="flex h-full items-center justify-center text-fg/35">
-              {isAnime ? <Tv size={26} /> : <Search size={26} />}
-            </div>
-          }
+          className="h-full w-full object-cover"
+          fallback={<div className="h-full w-full bg-sink" />}
         />
-        <div className="absolute left-1.5 top-1.5">{qualityBadge(probe, result.service, t)}</div>
-        <span className="chip absolute right-1.5 top-1.5 bg-black/70 text-[10px] text-white/75">
-          {result.service}
-        </span>
+        {badge && (
+          <span className="mono absolute left-1.5 top-1.5 rounded-1 bg-canvas/85 px-1.5 py-1 text-[10px] leading-none text-ink">
+            {badge}
+          </span>
+        )}
         {result.duration != null && result.duration > 0 && (
-          <span className="chip absolute bottom-1.5 right-1.5 bg-black/70 text-[10px] font-medium text-white/90">
-            <Clock size={9} /> {formatDuration(result.duration)}
+          <span className="mono absolute bottom-1.5 right-1.5 rounded-1 bg-canvas/85 px-1.5 py-1 text-[10px] leading-none text-ink">
+            {formatDuration(result.duration)}
           </span>
         )}
       </button>
 
-      <div className="flex flex-1 flex-col p-3">
-        <p className="line-clamp-2 text-[13px] font-medium leading-snug text-cream" title={result.title}>
-          {result.title}
-        </p>
-        <div className="mono mt-1.5 flex items-center gap-2 text-[11px] text-fg/50">
-          {result.uploader && <span className="truncate">{result.uploader}</span>}
-          {result.viewCount != null && (
-            <span className="flex shrink-0 items-center gap-1">
-              <Eye size={10} /> {formatCount(result.viewCount)}
-            </span>
-          )}
-        </div>
+      <p
+        className="mt-2.5 line-clamp-2 text-[13px] font-medium leading-snug text-ink"
+        title={result.title}
+      >
+        {result.title}
+      </p>
+      <p className="mono mt-1 truncate text-[11px] text-ink-3">{meta || result.service}</p>
 
-        <div className="mt-auto flex items-center gap-1.5 pt-3">
-          <button
-            className={`btn flex-1 py-2 text-xs ${added ? 'bg-good/15 text-good' : 'btn-primary'}`}
-            onClick={handle}
-            disabled={downloading || busy || added}
-          >
-            {downloading || busy ? (
-              <Loader2 size={14} className="animate-spin" />
-            ) : added ? (
-              <Check size={14} />
-            ) : isAnime ? (
-              <Layers size={14} />
-            ) : (
-              <Download size={14} />
-            )}
-            {added ? t('search.queued') : isAnime ? t('search.episodes') : t('common.download')}
-          </button>
-          <button
-            className="btn-icon shrink-0"
-            title={t('common.openInBrowser')}
-            onClick={() => window.api.openExternal(result.url)}
-          >
-            <ExternalLink size={15} />
-          </button>
-        </div>
+      <div className="mt-auto flex items-center gap-1 pt-2.5">
+        <button
+          className={`flex-1 py-2 ${added ? 'btn bg-good/12 text-good' : 'btn-quiet'}`}
+          onClick={handle}
+          disabled={downloading || busy || added}
+        >
+          {downloading || busy ? (
+            <Loader2 size={13} className="animate-spin" />
+          ) : added ? (
+            <Check size={13} />
+          ) : (
+            <Download size={13} />
+          )}
+          {added ? t('search.queued') : isAnime ? t('search.episodes') : t('common.download')}
+        </button>
+        <button
+          className="btn-icon"
+          title={t('common.openInBrowser')}
+          onClick={() => window.api.openExternal(result.url)}
+        >
+          <ExternalLink size={14} />
+        </button>
       </div>
     </motion.div>
   )

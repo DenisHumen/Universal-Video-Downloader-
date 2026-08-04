@@ -1,5 +1,5 @@
 import { Component, type ErrorInfo, type ReactNode } from 'react'
-import { RefreshCw, TriangleAlert } from 'lucide-react'
+import { RefreshCw } from 'lucide-react'
 import { translate, useI18n } from '../i18n'
 
 interface Props {
@@ -12,7 +12,7 @@ interface State {
 
 /**
  * Last line of defence: React 18 unmounts the whole tree on an uncaught render
- * error, which used to leave the user staring at a black window until Ctrl+R.
+ * error, which used to leave the user staring at an empty window until Ctrl+R.
  * This boundary swallows the crash and offers a one-click reload instead.
  */
 export default class ErrorBoundary extends Component<Props, State> {
@@ -31,18 +31,16 @@ export default class ErrorBoundary extends Component<Props, State> {
     // A class component can't use hooks; read the language directly instead.
     const language = useI18n.getState().language
     return (
-      <div className="flex h-full flex-col items-center justify-center gap-4 px-8 text-center">
-        <div className="flex h-16 w-16 items-center justify-center rounded-3xl bg-bad/10 text-bad">
-          <TriangleAlert size={28} />
-        </div>
+      <div className="flex h-full flex-col items-center justify-center gap-5 px-8 text-center">
         <div>
-          <p className="text-base font-semibold text-cream">{translate(language, 'error.title')}</p>
-          <p className="mono mx-auto mt-1.5 max-w-md break-words text-xs text-fg/55">
+          <p className="label mb-2 text-bad">error</p>
+          <p className="text-[15px] font-medium text-ink">{translate(language, 'error.title')}</p>
+          <p className="mono selectable mx-auto mt-2 max-w-md break-words text-[11px] leading-relaxed text-ink-3">
             {this.state.error.message}
           </p>
         </div>
-        <button className="btn-primary" onClick={() => window.location.reload()}>
-          <RefreshCw size={16} /> {translate(language, 'error.reload')}
+        <button className="btn-solid" onClick={() => window.location.reload()}>
+          <RefreshCw size={14} /> {translate(language, 'error.reload')}
         </button>
       </div>
     )
