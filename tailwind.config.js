@@ -4,21 +4,31 @@ module.exports = {
   theme: {
     extend: {
       colors: {
-        // Monochrome "cobalt-like" dark palette
+        // Every colour is a CSS variable so themes can be swapped at runtime
+        // without rebuilding the stylesheet. See src/renderer/src/index.css.
         ink: {
-          950: '#08080a',
-          900: '#0c0c0f',
-          850: '#121216',
-          800: '#17171c',
-          750: '#1c1c22',
-          700: '#222229',
-          600: '#2b2b33',
-          500: '#3a3a44'
+          950: 'rgb(var(--ink-950) / <alpha-value>)',
+          900: 'rgb(var(--ink-900) / <alpha-value>)',
+          850: 'rgb(var(--ink-850) / <alpha-value>)',
+          800: 'rgb(var(--ink-800) / <alpha-value>)',
+          750: 'rgb(var(--ink-750) / <alpha-value>)',
+          700: 'rgb(var(--ink-700) / <alpha-value>)',
+          600: 'rgb(var(--ink-600) / <alpha-value>)',
+          500: 'rgb(var(--ink-500) / <alpha-value>)'
         },
         cream: {
-          DEFAULT: '#ededf2',
-          dim: '#c9c9d2'
-        }
+          DEFAULT: 'rgb(var(--cream) / <alpha-value>)',
+          dim: 'rgb(var(--cream-dim) / <alpha-value>)'
+        },
+        /** Foreground tint for every translucent overlay: text-fg/40, bg-fg/[0.05]. */
+        fg: 'rgb(var(--fg) / <alpha-value>)',
+        accent: {
+          DEFAULT: 'rgb(var(--accent) / <alpha-value>)',
+          fg: 'rgb(var(--accent-fg) / <alpha-value>)'
+        },
+        good: 'rgb(var(--good) / <alpha-value>)',
+        warn: 'rgb(var(--warn) / <alpha-value>)',
+        bad: 'rgb(var(--bad) / <alpha-value>)'
       },
       fontFamily: {
         sans: [
@@ -45,8 +55,9 @@ module.exports = {
         '4xl': '1.75rem'
       },
       boxShadow: {
-        panel: '0 24px 70px -28px rgba(0, 0, 0, 0.85)',
-        soft: '0 8px 30px -14px rgba(0, 0, 0, 0.7)'
+        panel: '0 24px 70px -28px rgb(var(--shadow) / 0.85)',
+        soft: '0 8px 30px -14px rgb(var(--shadow) / 0.7)',
+        glow: '0 0 0 1px rgb(var(--accent) / 0.35), 0 10px 34px -14px rgb(var(--accent) / 0.5)'
       },
       keyframes: {
         shimmer: {
@@ -55,11 +66,16 @@ module.exports = {
         'fade-up': {
           '0%': { opacity: '0', transform: 'translateY(8px)' },
           '100%': { opacity: '1', transform: 'translateY(0)' }
+        },
+        'pulse-ring': {
+          '0%': { transform: 'scale(0.9)', opacity: '0.7' },
+          '100%': { transform: 'scale(1.9)', opacity: '0' }
         }
       },
       animation: {
         shimmer: 'shimmer 1.6s infinite',
-        'fade-up': 'fade-up 0.35s ease-out'
+        'fade-up': 'fade-up 0.35s ease-out',
+        'pulse-ring': 'pulse-ring 1.8s ease-out infinite'
       }
     }
   },

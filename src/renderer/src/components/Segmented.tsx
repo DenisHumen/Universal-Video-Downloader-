@@ -38,7 +38,7 @@ export default function Segmented({
             {active && (
               <motion.span
                 layoutId={layoutId}
-                className="absolute inset-0 rounded-xl bg-cream"
+                className="absolute inset-0 rounded-xl bg-accent"
                 transition={{ type: 'spring', stiffness: 480, damping: 40 }}
               />
             )}

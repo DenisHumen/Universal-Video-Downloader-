@@ -3,6 +3,7 @@ import { AnimatePresence, motion } from 'framer-motion'
 import { ChevronDown, Film, Music, Sparkles, Video } from 'lucide-react'
 import type { AppSettings, DownloadMode, MediaInfo, QualityPreset, VideoFormat } from '@shared/types'
 import { formatBytes } from '../lib/format'
+import { useT } from '../i18n'
 import Segmented from './Segmented'
 
 interface Props {
@@ -35,6 +36,7 @@ export default function FormatSelector({
   onChangeAudioFormat,
   onSelectionChange
 }: Props): JSX.Element {
+  const t = useT()
   const [mode, setMode] = useState<DownloadMode>(initialMode)
   const [quality, setQuality] = useState<QualityPreset>(initialQuality)
   const [formatId, setFormatId] = useState<string | undefined>(undefined)
@@ -53,7 +55,7 @@ export default function FormatSelector({
     const m = next.mode ?? mode
     onSelectionChange({
       mode: m,
-      quality: m === 'audio' ? 'audio' : next.quality ?? quality,
+      quality: m === 'audio' ? 'audio' : (next.quality ?? quality),
       formatId: m === 'audio' ? undefined : 'formatId' in next ? next.formatId : formatId
     })
   }
@@ -76,14 +78,14 @@ export default function FormatSelector({
   return (
     <div className="space-y-5">
       <div>
-        <p className="group-title">format</p>
+        <p className="group-title">{t('common.format')}</p>
         <Segmented
           layoutId="seg-mode"
           value={mode}
           onChange={(v) => selectMode(v as DownloadMode)}
           options={[
-            { value: 'video', label: 'video', icon: <Video size={15} /> },
-            { value: 'audio', label: 'audio only', icon: <Music size={15} /> }
+            { value: 'video', label: t('common.video'), icon: <Video size={15} /> },
+            { value: 'audio', label: t('common.audioOnly'), icon: <Music size={15} /> }
           ]}
         />
       </div>
@@ -91,7 +93,7 @@ export default function FormatSelector({
       {mode === 'video' ? (
         <>
           <div>
-            <p className="group-title">quality</p>
+            <p className="group-title">{t('common.quality')}</p>
             <div className="seg w-full">
               {availablePresets.map((p) => {
                 const active = !formatId && quality === p.q
@@ -104,13 +106,13 @@ export default function FormatSelector({
                     {active && (
                       <motion.span
                         layoutId="seg-quality"
-                        className="absolute inset-0 rounded-xl bg-cream"
+                        className="absolute inset-0 rounded-xl bg-accent"
                         transition={{ type: 'spring', stiffness: 480, damping: 40 }}
                       />
                     )}
                     <span className="relative z-10 flex items-center gap-1">
                       {p.q === 'best' && <Sparkles size={12} />}
-                      {p.label}
+                      {p.q === 'best' ? t('common.best') : p.label}
                     </span>
                   </button>
                 )
@@ -118,14 +120,14 @@ export default function FormatSelector({
             </div>
           </div>
 
-          {videoFormats.length > 0 && (
+          {videoFormats.length > 1 && (
             <div>
               <button
                 onClick={() => setShowAdvanced((v) => !v)}
-                className="flex w-full items-center justify-between rounded-xl px-1 py-1 text-xs font-medium text-white/45 transition-colors hover:text-cream"
+                className="flex w-full items-center justify-between rounded-xl px-1 py-1 text-xs font-medium text-fg/45 transition-colors hover:text-cream"
               >
                 <span className="flex items-center gap-1.5">
-                  <Film size={13} /> choose exact stream ({videoFormats.length})
+                  <Film size={13} /> {t('format.exactStream', { count: videoFormats.length })}
                 </span>
                 <motion.span animate={{ rotate: showAdvanced ? 180 : 0 }}>
                   <ChevronDown size={15} />
@@ -149,21 +151,21 @@ export default function FormatSelector({
                             onClick={() => selectFormat(f)}
                             className={`flex w-full items-center justify-between rounded-xl border px-3 py-2 text-left text-xs transition-all ${
                               active
-                                ? 'border-white/30 bg-white/[0.08]'
-                                : 'border-white/[0.05] bg-white/[0.02] hover:bg-white/[0.05]'
+                                ? 'border-accent/50 bg-accent/[0.08]'
+                                : 'border-fg/[0.05] bg-fg/[0.02] hover:bg-fg/[0.05]'
                             }`}
                           >
                             <span className="flex items-center gap-2">
                               <span className="w-14 font-semibold text-cream">{f.resolution}</span>
-                              <span className="mono rounded bg-white/[0.06] px-1.5 py-0.5 uppercase text-white/45">
+                              <span className="mono rounded bg-fg/[0.06] px-1.5 py-0.5 uppercase text-fg/45">
                                 {f.ext}
                               </span>
-                              <span className="text-white/30">{f.vcodec?.split('.')[0]}</span>
+                              <span className="text-fg/30">{f.vcodec?.split('.')[0]}</span>
                               {f.kind === 'video' && (
-                                <span className="text-[10px] text-white/30">+ audio</span>
+                                <span className="text-[10px] text-fg/30">{t('format.plusAudio')}</span>
                               )}
                             </span>
-                            <span className="mono text-white/35">
+                            <span className="mono text-fg/35">
                               {formatBytes(f.filesize || f.filesizeApprox)}
                             </span>
                           </button>
@@ -178,7 +180,7 @@ export default function FormatSelector({
         </>
       ) : (
         <div>
-          <p className="group-title">audio format</p>
+          <p className="group-title">{t('format.audioFormat')}</p>
           <div className="seg w-full">
             {AUDIO_FORMATS.map((fmt) => {
               const active = settings.audioFormat === fmt
@@ -191,7 +193,7 @@ export default function FormatSelector({
                   {active && (
                     <motion.span
                       layoutId="seg-audio"
-                      className="absolute inset-0 rounded-xl bg-cream"
+                      className="absolute inset-0 rounded-xl bg-accent"
                       transition={{ type: 'spring', stiffness: 480, damping: 40 }}
                     />
                   )}

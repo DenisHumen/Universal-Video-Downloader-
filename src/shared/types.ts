@@ -54,6 +54,15 @@ export interface MediaInfo {
   entries?: PlaylistEntry[]
   // For streaming sites needing translator/episode/quality selection
   streaming?: StreamingInfo
+  /**
+   * The URL the queue should store. Differs from `webpageUrl` when the stream
+   * has to be re-resolved on every start (universal detection, scraped sites).
+   */
+  downloadUrl?: string
+  /** The stream was found by the universal resolver rather than the engine. */
+  viaUniversal?: boolean
+  /** Subtitle languages the engine reported for this video. */
+  subtitleLanguages?: string[]
 }
 
 export interface PlaylistEntry {
@@ -119,6 +128,12 @@ export interface DownloadRequest {
 export interface DownloadItem {
   id: string
   url: string
+  /** Extra HTTP headers the stream needs, filled in when the URL is resolved. */
+  headers?: Record<string, string>
+  /** Tail of the engine's output — shown in the card's details drawer. */
+  log?: string
+  /** How many automatic retries this item has already burned. */
+  attempts?: number
   /** The URL the user originally submitted — re-resolved on every (re)start so
    *  short-lived CDN stream links are always fresh. */
   sourceUrl?: string
@@ -154,6 +169,14 @@ export interface DownloadProgress {
   fragmentCount?: number
 }
 
+export const THEMES = ['midnight', 'carbon', 'nebula', 'daylight'] as const
+export type ThemeId = (typeof THEMES)[number]
+
+export const ACCENTS = ['cream', 'violet', 'cyan', 'emerald', 'amber', 'rose'] as const
+export type AccentId = (typeof ACCENTS)[number]
+
+export type LanguageId = 'auto' | 'en' | 'ru'
+
 export interface AppSettings {
   downloadDir: string
   concurrentDownloads: number
@@ -163,10 +186,34 @@ export interface AppSettings {
   embedThumbnail: boolean
   embedSubtitles: boolean
   embedMetadata: boolean
+  embedChapters: boolean
+  /** Save subtitles next to the video as .srt files too. */
+  writeSubtitles: boolean
+  /** Comma-separated language codes, or 'all'. */
+  subtitleLanguages: string
+  /** Strip sponsor/intro segments from YouTube videos via SponsorBlock. */
+  sponsorBlock: boolean
   restrictFilenames: boolean
   filenameTemplate: string
+  /** Put each download in a subfolder named after the site. */
+  createSubfolders: boolean
+  /** Engine rate limit, e.g. '2M' or '500K'. Empty = unlimited. */
+  speedLimit: string
   autoUpdate: boolean
-  theme: 'dark' | 'midnight' | 'aurora'
+  theme: ThemeId
+  accent: AccentId
+  language: LanguageId
+  /** Show a desktop notification when a download finishes. */
+  notifications: boolean
+  /** Watch the clipboard and offer to download links copied elsewhere. */
+  clipboardWatch: boolean
+  /** Keep running in the tray when the window is closed. */
+  trayEnabled: boolean
+  /**
+   * Let the app open unknown pages in a hidden browser to find their stream.
+   * This is what makes sites without a dedicated resolver work.
+   */
+  universalFallback: boolean
   proxy: string
   /** Read cookies from this installed browser (e.g. 'chrome', 'firefox', 'safari'). Empty = off. */
   cookiesFromBrowser: string
@@ -211,6 +258,13 @@ export interface UpdateStatus {
   percent?: number
   bytesPerSecond?: number
   message?: string
+  /**
+   * True when this build can't install updates itself (unsigned macOS builds,
+   * .deb/.rpm installs). The UI then offers the download page instead.
+   */
+  manual?: boolean
+  /** Where to send the user when `manual` is set. */
+  downloadUrl?: string
 }
 
 export interface DetectResult {
@@ -219,16 +273,53 @@ export interface DetectResult {
   error?: string
 }
 
+/** What the detector is currently doing, streamed to the UI while it works. */
+export type DetectStage =
+  | 'idle'
+  | 'resolving'
+  | 'engine'
+  | 'scraping'
+  | 'browsing'
+  | 'probing'
+  | 'done'
+
+export interface DetectStatus {
+  stage: DetectStage
+  url: string
+}
+
 // ---- Title search ----
 
-/** Services searchable by title (verified to return real results). */
-export type SearchService = 'youtube' | 'soundcloud' | 'pornhub' | 'yummyani'
+/** Services searchable by title (each verified to return real results). */
+export type SearchService =
+  | 'youtube'
+  | 'soundcloud'
+  | 'dailymotion'
+  | 'bilibili'
+  | 'niconico'
+  | 'pornhub'
+  | 'yummyani'
 
 export const SEARCH_SERVICES: readonly SearchService[] = [
   'youtube',
   'soundcloud',
+  'dailymotion',
+  'bilibili',
+  'niconico',
   'pornhub',
   'yummyani'
+] as const
+
+/**
+ * The subset queried when the user searches "everything". Kept small on
+ * purpose: every extra service is another round trip before results appear.
+ */
+export const SEARCH_ALL_SERVICES: readonly SearchService[] = [
+  'youtube',
+  'soundcloud',
+  'dailymotion',
+  'yummyani',
+  'pornhub'
 ] as const
 
 /** What the user searches: one service, or all of them in parallel. */

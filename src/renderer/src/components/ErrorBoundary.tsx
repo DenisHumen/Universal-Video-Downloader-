@@ -1,5 +1,6 @@
 import { Component, type ErrorInfo, type ReactNode } from 'react'
 import { RefreshCw, TriangleAlert } from 'lucide-react'
+import { translate, useI18n } from '../i18n'
 
 interface Props {
   children: ReactNode
@@ -27,19 +28,21 @@ export default class ErrorBoundary extends Component<Props, State> {
 
   render(): ReactNode {
     if (!this.state.error) return this.props.children
+    // A class component can't use hooks; read the language directly instead.
+    const language = useI18n.getState().language
     return (
       <div className="flex h-full flex-col items-center justify-center gap-4 px-8 text-center">
-        <div className="flex h-16 w-16 items-center justify-center rounded-3xl bg-red-500/10 text-red-300/80">
+        <div className="flex h-16 w-16 items-center justify-center rounded-3xl bg-bad/10 text-bad">
           <TriangleAlert size={28} />
         </div>
         <div>
-          <p className="text-base font-semibold text-cream">something went wrong</p>
-          <p className="mono mx-auto mt-1.5 max-w-md break-words text-xs text-white/40">
+          <p className="text-base font-semibold text-cream">{translate(language, 'error.title')}</p>
+          <p className="mono mx-auto mt-1.5 max-w-md break-words text-xs text-fg/40">
             {this.state.error.message}
           </p>
         </div>
         <button className="btn-primary" onClick={() => window.location.reload()}>
-          <RefreshCw size={16} /> reload the app
+          <RefreshCw size={16} /> {translate(language, 'error.reload')}
         </button>
       </div>
     )

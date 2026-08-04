@@ -1,8 +1,10 @@
 import { AnimatePresence, motion } from 'framer-motion'
-import { Download, RefreshCw, Rocket, X } from 'lucide-react'
+import { Download, ExternalLink, RefreshCw, Rocket, X } from 'lucide-react'
 import { useStore } from '../store'
+import { useT } from '../i18n'
 
 export default function UpdateBanner(): JSX.Element | null {
+  const t = useT()
   const update = useStore((s) => s.update)
   const dismissed = useStore((s) => s.updateDismissed)
   const dismiss = useStore((s) => s.dismissUpdate)
@@ -10,6 +12,10 @@ export default function UpdateBanner(): JSX.Element | null {
   const visible =
     !dismissed &&
     (update.state === 'available' || update.state === 'downloading' || update.state === 'downloaded')
+
+  // Builds that can't self-install (unsigned macOS, .deb/.rpm) send the user to
+  // the releases page instead of pretending the app can restart into a new one.
+  const manual = Boolean(update.manual)
 
   // Centering is done by this static flex parent — not by a transform on the
   // motion element — because framer-motion's inline transform (y/scale) would
@@ -25,25 +31,27 @@ export default function UpdateBanner(): JSX.Element | null {
             transition={{ type: 'spring', stiffness: 380, damping: 30 }}
             className="pointer-events-auto w-full max-w-[600px]"
           >
-            <div className="flex items-center gap-3 rounded-3xl border border-white/[0.09] bg-ink-750 px-4 py-3.5 shadow-soft backdrop-blur-xl">
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-white/[0.06] text-cream">
+            <div className="flex items-center gap-3 rounded-3xl border border-fg/[0.09] bg-ink-750 px-4 py-3.5 shadow-soft backdrop-blur-xl">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-fg/[0.06] text-cream">
                 <Rocket size={19} />
               </div>
               <div className="min-w-0 flex-1">
                 {update.state === 'available' && (
                   <>
                     <p className="truncate text-sm font-semibold text-cream">
-                      version {update.version} is available
+                      {t('update.available', { version: update.version ?? '' })}
                     </p>
-                    <p className="mono truncate text-xs text-white/45">ready to download and install</p>
+                    <p className="mono truncate text-xs text-fg/45">
+                      {manual ? t('update.availableManualHint') : t('update.availableHint')}
+                    </p>
                   </>
                 )}
                 {update.state === 'downloading' && (
                   <>
-                    <p className="text-sm font-semibold text-cream">downloading update…</p>
-                    <div className="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-white/10">
+                    <p className="text-sm font-semibold text-cream">{t('update.downloading')}</p>
+                    <div className="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-fg/10">
                       <motion.div
-                        className="h-full rounded-full bg-cream"
+                        className="h-full rounded-full bg-accent"
                         animate={{ width: `${update.percent ?? 0}%` }}
                         transition={{ ease: 'easeOut' }}
                       />
@@ -53,9 +61,9 @@ export default function UpdateBanner(): JSX.Element | null {
                 {update.state === 'downloaded' && (
                   <>
                     <p className="truncate text-sm font-semibold text-cream">
-                      update {update.version} ready
+                      {t('update.ready', { version: update.version ?? '' })}
                     </p>
-                    <p className="mono truncate text-xs text-white/45">the app will restart to apply it</p>
+                    <p className="mono truncate text-xs text-fg/45">{t('update.readyHint')}</p>
                   </>
                 )}
               </div>
@@ -63,15 +71,16 @@ export default function UpdateBanner(): JSX.Element | null {
               <div className="flex shrink-0 items-center gap-1.5">
                 {update.state === 'available' && (
                   <button className="btn-primary px-3.5" onClick={() => window.api.downloadUpdate()}>
-                    <Download size={16} /> update
+                    {manual ? <ExternalLink size={16} /> : <Download size={16} />}
+                    {manual ? t('update.getIt') : t('update.action')}
                   </button>
                 )}
                 {update.state === 'downloaded' && (
                   <button className="btn-primary px-3.5" onClick={() => window.api.installUpdate()}>
-                    <RefreshCw size={16} /> restart
+                    <RefreshCw size={16} /> {t('update.restart')}
                   </button>
                 )}
-                <button className="btn-icon" onClick={dismiss} aria-label="Dismiss">
+                <button className="btn-icon" onClick={dismiss} aria-label={t('common.close')}>
                   <X size={16} />
                 </button>
               </div>

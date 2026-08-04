@@ -1,28 +1,34 @@
 import { motion } from 'framer-motion'
 import { useStore } from '../store'
+import { useT } from '../i18n'
 
 export default function EngineBadge(): JSX.Element {
+  const t = useT()
   const ytdlp = useStore((s) => s.ytdlp)
 
   const color =
-    ytdlp.state === 'ready' ? '#7ee0a8' : ytdlp.state === 'error' ? '#f0857d' : '#e0c97e'
+    ytdlp.state === 'ready'
+      ? 'rgb(var(--good))'
+      : ytdlp.state === 'error'
+        ? 'rgb(var(--bad))'
+        : 'rgb(var(--warn))'
 
   const label =
     ytdlp.state === 'ready'
-      ? 'engine ready'
+      ? t('engine.ready')
       : ytdlp.state === 'downloading'
-        ? `engine ${ytdlp.percent ?? 0}%`
+        ? t('engine.downloading', { percent: ytdlp.percent ?? 0 })
         : ytdlp.state === 'checking'
-          ? 'engine…'
+          ? t('engine.checking')
           : ytdlp.state === 'error'
-            ? 'engine error'
-            : 'engine'
+            ? t('engine.error')
+            : t('engine.idle')
 
   const pulsing = ytdlp.state === 'checking' || ytdlp.state === 'downloading'
 
   return (
     <div
-      className="no-drag flex items-center gap-2 rounded-full bg-white/[0.04] px-2.5 py-1"
+      className="no-drag flex items-center gap-2 rounded-full bg-fg/[0.04] px-2.5 py-1"
       title={ytdlp.version ? `yt-dlp ${ytdlp.version}` : ytdlp.message || label}
     >
       <motion.span
@@ -31,7 +37,7 @@ export default function EngineBadge(): JSX.Element {
         animate={pulsing ? { opacity: [1, 0.3, 1] } : { opacity: 1 }}
         transition={{ duration: 1.2, repeat: pulsing ? Infinity : 0 }}
       />
-      <span className="mono text-[11px] font-medium text-white/45">{label}</span>
+      <span className="mono text-[11px] font-medium text-fg/45">{label}</span>
     </div>
   )
 }

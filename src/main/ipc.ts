@@ -1,6 +1,12 @@
-import { app, BrowserWindow, dialog, ipcMain, Notification, shell } from 'electron'
+import { app, BrowserWindow, clipboard, dialog, ipcMain, Notification, shell } from 'electron'
 import { IPC } from '@shared/ipc'
-import type { AppSettings, DownloadItem, DownloadRequest, SearchScope } from '@shared/types'
+import type {
+  AppSettings,
+  DetectStage,
+  DownloadItem,
+  DownloadRequest,
+  SearchScope
+} from '@shared/types'
 import { detect } from './services/detector'
 import { searchVideos } from './services/search'
 import {
@@ -8,37 +14,61 @@ import {
   clearFinished,
   downloadEvents,
   listDownloads,
+  pauseAll,
   pauseDownload,
   removeDownload,
+  resumeAll,
   resumeDownload,
   retryDownload,
+  retryFailed,
   startDownload
 } from './services/downloader'
-import { getSettings, setSettings } from './services/settings'
+import { getSettings, resetSettings, setSettings } from './services/settings'
 import { ensureYtdlp, getYtdlpStatus, updateYtdlp, ytdlpEvents } from './services/ytdlp'
 import {
   checkForUpdates,
   downloadUpdate,
   getUpdateStatus,
+  isManualPlatform,
+  openReleasesPage,
   quitAndInstall,
   updateEvents
 } from './services/updater'
 
-export function registerIpc(
-  getWindow: () => BrowserWindow | null,
+export interface IpcContext {
+  getWindow: () => BrowserWindow | null
   openSearchWindow: (query: string) => void
-): void {
+  onSettingsChanged: (settings: AppSettings) => void
+}
+
+/** In-flight detections, so the UI can cancel a slow universal scan. */
+const detections = new Map<string, AbortController>()
+
+export function registerIpc({ getWindow, openSearchWindow, onSettingsChanged }: IpcContext): void {
   const send = (channel: string, payload: unknown): void => {
     const win = getWindow()
-    if (win && !win.isDestroyed()) {
-      win.webContents.send(channel, payload)
-    }
+    if (win && !win.isDestroyed()) win.webContents.send(channel, payload)
   }
 
   // ---- Media detection & search ----
-  ipcMain.handle(IPC.detect, async (_e, url: string) => {
+  ipcMain.handle(IPC.detect, async (event, url: string, requestId?: string) => {
     await ensureYtdlp()
-    return detect(url)
+    const controller = new AbortController()
+    if (requestId) detections.set(requestId, controller)
+    const report = (stage: DetectStage): void => {
+      if (!event.sender.isDestroyed()) {
+        event.sender.send(IPC.evtDetectStatus, { stage, url })
+      }
+    }
+    try {
+      return await detect(url, report, controller.signal)
+    } finally {
+      if (requestId) detections.delete(requestId)
+    }
+  })
+  ipcMain.handle(IPC.detectCancel, (_e, requestId: string) => {
+    detections.get(requestId)?.abort()
+    detections.delete(requestId)
   })
   ipcMain.handle(IPC.search, (_e, query: string, scope: SearchScope, limit?: number) =>
     searchVideos(query, scope, limit)
@@ -54,23 +84,57 @@ export function registerIpc(
   ipcMain.handle(IPC.downloadRemove, (_e, id: string) => removeDownload(id))
   ipcMain.handle(IPC.downloadClearFinished, () => clearFinished())
   ipcMain.handle(IPC.downloadList, () => listDownloads())
+  ipcMain.handle(IPC.downloadPauseAll, () => pauseAll())
+  ipcMain.handle(IPC.downloadResumeAll, () => resumeAll())
+  ipcMain.handle(IPC.downloadRetryFailed, () => retryFailed())
 
   // ---- Settings ----
   ipcMain.handle(IPC.settingsGet, () => getSettings())
-  ipcMain.handle(IPC.settingsSet, (_e, partial: Partial<AppSettings>) => setSettings(partial))
+  ipcMain.handle(IPC.settingsSet, (_e, partial: Partial<AppSettings>) => {
+    const next = setSettings(partial)
+    onSettingsChanged(next)
+    return next
+  })
+  ipcMain.handle(IPC.settingsReset, () => {
+    const next = resetSettings()
+    onSettingsChanged(next)
+    return next
+  })
 
   // ---- Shell / dialogs ----
-  ipcMain.handle(IPC.chooseDirectory, async () => {
-    const win = getWindow()
+  ipcMain.handle(IPC.chooseDirectory, async (event) => {
+    const win = BrowserWindow.fromWebContents(event.sender) ?? getWindow() ?? undefined
     const result = await dialog.showOpenDialog(win!, {
       properties: ['openDirectory', 'createDirectory']
     })
     if (result.canceled || !result.filePaths.length) return null
     return result.filePaths[0]
   })
+  ipcMain.handle(IPC.chooseCookiesFile, async (event) => {
+    const win = BrowserWindow.fromWebContents(event.sender) ?? getWindow() ?? undefined
+    const result = await dialog.showOpenDialog(win!, {
+      properties: ['openFile'],
+      filters: [
+        { name: 'Cookies', extensions: ['txt'] },
+        { name: 'All files', extensions: ['*'] }
+      ]
+    })
+    if (result.canceled || !result.filePaths.length) return null
+    return result.filePaths[0]
+  })
   ipcMain.handle(IPC.openPath, (_e, path: string) => shell.openPath(path))
   ipcMain.handle(IPC.showInFolder, (_e, path: string) => shell.showItemInFolder(path))
-  ipcMain.handle(IPC.openExternal, (_e, url: string) => shell.openExternal(url))
+  ipcMain.handle(IPC.openExternal, (_e, url: string) => {
+    if (!/^https?:\/\//i.test(url)) return Promise.resolve()
+    return shell.openExternal(url)
+  })
+  ipcMain.handle(IPC.clipboardRead, () => {
+    try {
+      return clipboard.readText().trim()
+    } catch {
+      return ''
+    }
+  })
 
   // ---- yt-dlp engine ----
   ipcMain.handle(IPC.ytdlpEnsure, async () => {
@@ -87,6 +151,7 @@ export function registerIpc(
   ipcMain.handle(IPC.updateCheck, () => checkForUpdates())
   ipcMain.handle(IPC.updateDownload, () => downloadUpdate())
   ipcMain.handle(IPC.updateInstall, () => quitAndInstall())
+  ipcMain.handle(IPC.updateOpenPage, () => openReleasesPage())
 
   // ---- App / window ----
   ipcMain.handle(IPC.appInfo, () => ({
@@ -94,6 +159,8 @@ export function registerIpc(
     name: app.getName(),
     platform: process.platform,
     arch: process.arch,
+    locale: app.getLocale(),
+    manualUpdates: isManualPlatform(),
     ytdlp: getYtdlpStatus(),
     update: getUpdateStatus()
   }))
@@ -135,7 +202,7 @@ const notified = new Set<string>()
 function maybeNotify(item: DownloadItem): void {
   if (item.state === 'completed' && !notified.has(item.id)) {
     notified.add(item.id)
-    if (Notification.isSupported()) {
+    if (getSettings().notifications && Notification.isSupported()) {
       const n = new Notification({
         title: 'Download complete',
         body: item.title,

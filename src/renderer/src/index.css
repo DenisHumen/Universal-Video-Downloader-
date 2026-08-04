@@ -2,8 +2,120 @@
 @tailwind components;
 @tailwind utilities;
 
-:root {
+/* ------------------------------------------------------------------ *
+ * Themes
+ *
+ * Every surface colour is an `R G B` triple in a CSS variable so Tailwind
+ * can apply opacity to it (`bg-fg/[0.06]`) and so switching themes is a
+ * single attribute change on <html> — no rebuild, no flash.
+ * ------------------------------------------------------------------ */
+
+:root,
+[data-theme='midnight'] {
   color-scheme: dark;
+  --ink-950: 8 8 10;
+  --ink-900: 12 12 15;
+  --ink-850: 18 18 22;
+  --ink-800: 23 23 28;
+  --ink-750: 28 28 34;
+  --ink-700: 34 34 41;
+  --ink-600: 43 43 51;
+  --ink-500: 58 58 68;
+  --fg: 255 255 255;
+  --cream: 237 237 242;
+  --cream-dim: 201 201 210;
+  --shadow: 0 0 0;
+  --good: 126 224 168;
+  --warn: 224 201 126;
+  --bad: 240 133 125;
+  --grain: 0.02;
+}
+
+[data-theme='carbon'] {
+  color-scheme: dark;
+  --ink-950: 15 14 13;
+  --ink-900: 20 19 17;
+  --ink-850: 27 25 23;
+  --ink-800: 33 31 28;
+  --ink-750: 40 37 34;
+  --ink-700: 48 45 41;
+  --ink-600: 60 56 51;
+  --ink-500: 78 73 67;
+  --fg: 255 250 244;
+  --cream: 242 237 230;
+  --cream-dim: 206 199 190;
+  --shadow: 0 0 0;
+  --good: 134 219 163;
+  --warn: 230 197 122;
+  --bad: 240 138 122;
+  --grain: 0.025;
+}
+
+[data-theme='nebula'] {
+  color-scheme: dark;
+  --ink-950: 10 10 20;
+  --ink-900: 14 14 28;
+  --ink-850: 19 19 37;
+  --ink-800: 25 25 47;
+  --ink-750: 31 31 57;
+  --ink-700: 39 39 70;
+  --ink-600: 50 50 88;
+  --ink-500: 68 68 115;
+  --fg: 236 238 255;
+  --cream: 232 234 252;
+  --cream-dim: 192 196 228;
+  --shadow: 2 2 12;
+  --good: 122 226 178;
+  --warn: 232 202 128;
+  --bad: 244 136 148;
+  --grain: 0.028;
+}
+
+[data-theme='daylight'] {
+  color-scheme: light;
+  --ink-950: 243 243 246;
+  --ink-900: 249 249 251;
+  --ink-850: 255 255 255;
+  --ink-800: 255 255 255;
+  --ink-750: 255 255 255;
+  --ink-700: 238 238 243;
+  --ink-600: 226 226 233;
+  --ink-500: 205 205 214;
+  --fg: 18 18 26;
+  --cream: 24 24 32;
+  --cream-dim: 78 78 92;
+  --shadow: 90 90 120;
+  --good: 22 143 92;
+  --warn: 168 118 20;
+  --bad: 198 60 60;
+  --grain: 0.012;
+}
+
+/* ---- Accents ---- */
+
+[data-accent='cream'] {
+  --accent: var(--cream);
+  --accent-fg: var(--ink-950);
+}
+[data-accent='violet'] {
+  --accent: 133 108 255;
+  --accent-fg: 255 255 255;
+}
+[data-accent='cyan'] {
+  --accent: 45 212 233;
+  --accent-fg: 6 22 26;
+}
+[data-accent='emerald'] {
+  --accent: 52 211 153;
+  --accent-fg: 4 26 18;
+}
+[data-accent='amber'] {
+  --accent: 251 191 36;
+  --accent-fg: 34 22 0;
+}
+[data-accent='rose'] {
+  --accent: 251 113 133;
+  --accent-fg: 40 6 14;
 }
 
 * {
@@ -20,8 +132,8 @@ body,
 
 body {
   font-family: theme('fontFamily.sans');
-  background-color: #08080a;
-  color: #e7e7ec;
+  background-color: rgb(var(--ink-950));
+  color: rgb(var(--cream));
   overflow: hidden;
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
@@ -46,32 +158,43 @@ body {
   letter-spacing: -0.01em;
 }
 
+/* Text inside inputs must stay selectable even though the app disables it. */
+input,
+textarea,
+[contenteditable],
+.selectable {
+  user-select: text;
+}
+
 @layer components {
   /* Elevated surfaces */
   .panel {
-    @apply rounded-4xl border border-white/[0.07] bg-ink-850;
+    @apply rounded-4xl border border-fg/[0.07] bg-ink-850;
   }
   .card {
-    @apply rounded-3xl border border-white/[0.07] bg-ink-800;
+    @apply rounded-3xl border border-fg/[0.07] bg-ink-800;
   }
 
   /* Buttons */
   .btn {
-    @apply no-drag inline-flex items-center justify-center gap-2 rounded-2xl px-4 py-2.5 text-sm font-medium transition-all duration-150 disabled:opacity-40 disabled:cursor-not-allowed select-none;
+    @apply no-drag inline-flex select-none items-center justify-center gap-2 rounded-2xl px-4 py-2.5 text-sm font-medium transition-all duration-150 disabled:cursor-not-allowed disabled:opacity-40;
   }
   .btn-primary {
-    @apply btn bg-cream text-ink-950 hover:bg-white active:scale-[0.98];
+    @apply btn bg-accent text-accent-fg hover:brightness-110 active:scale-[0.98];
   }
   .btn-ghost {
-    @apply btn bg-white/[0.05] text-cream-dim hover:bg-white/[0.09] hover:text-cream active:scale-[0.98];
+    @apply btn bg-fg/[0.05] text-cream-dim hover:bg-fg/[0.09] hover:text-cream active:scale-[0.98];
+  }
+  .btn-danger {
+    @apply btn bg-bad/15 text-bad hover:bg-bad/25 active:scale-[0.98];
   }
   .btn-icon {
-    @apply no-drag inline-flex h-9 w-9 items-center justify-center rounded-xl text-white/55 transition-all hover:bg-white/[0.08] hover:text-cream active:scale-95;
+    @apply no-drag inline-flex h-9 w-9 items-center justify-center rounded-xl text-fg/55 transition-all hover:bg-fg/[0.08] hover:text-cream active:scale-95 disabled:opacity-30;
   }
 
   /* Inputs */
   .input {
-    @apply no-drag w-full rounded-2xl bg-ink-900 border border-white/[0.08] px-4 py-3 text-sm text-cream placeholder-white/25 outline-none transition-all focus:border-white/25 focus:bg-ink-850;
+    @apply no-drag w-full rounded-2xl border border-fg/[0.08] bg-ink-900 px-4 py-3 text-sm text-cream outline-none transition-all placeholder:text-fg/25 focus:border-accent/50 focus:bg-ink-850;
   }
 
   /* Segmented control (the cobalt-style row of choices) */
@@ -79,15 +202,15 @@ body {
     @apply inline-flex flex-wrap gap-1 rounded-2xl bg-ink-900 p-1;
   }
   .seg-item {
-    @apply no-drag relative inline-flex items-center justify-center gap-1.5 rounded-xl px-3.5 py-2 text-[13px] font-medium text-white/55 transition-colors duration-150 hover:text-cream;
+    @apply no-drag relative inline-flex items-center justify-center gap-1.5 rounded-xl px-3.5 py-2 text-[13px] font-medium text-fg/55 transition-colors duration-150 hover:text-cream;
   }
   .seg-item-active {
-    @apply text-ink-950 hover:text-ink-950;
+    @apply text-accent-fg hover:text-accent-fg;
   }
 
   /* Settings group title */
   .group-title {
-    @apply mb-3 text-[13px] font-semibold uppercase tracking-[0.12em] text-white/40;
+    @apply mb-3 text-[13px] font-semibold uppercase tracking-[0.12em] text-fg/40;
   }
 
   .chip {
@@ -104,13 +227,13 @@ body {
   background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.12);
+  background: rgb(var(--fg) / 0.14);
   border-radius: 999px;
   border: 2px solid transparent;
   background-clip: content-box;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.22);
+  background: rgb(var(--fg) / 0.26);
   background-clip: content-box;
 }
 
@@ -120,7 +243,7 @@ input[type='range'] {
   appearance: none;
   height: 6px;
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.12);
+  background: rgb(var(--fg) / 0.14);
 }
 input[type='range']::-webkit-slider-thumb {
   -webkit-appearance: none;
@@ -128,9 +251,9 @@ input[type='range']::-webkit-slider-thumb {
   width: 18px;
   height: 18px;
   border-radius: 50%;
-  background: #ededf2;
+  background: rgb(var(--accent));
   cursor: pointer;
-  border: 3px solid #08080a;
+  border: 3px solid rgb(var(--ink-950));
 }
 
 select.input {
@@ -140,4 +263,15 @@ select.input {
   background-repeat: no-repeat;
   background-position: right 0.9rem center;
   padding-right: 2.4rem;
+}
+
+/* Respect the OS "reduce motion" setting. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }

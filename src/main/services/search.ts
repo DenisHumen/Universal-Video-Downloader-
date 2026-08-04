@@ -2,8 +2,8 @@ import { spawn } from 'child_process'
 import { ytdlpBinaryPath, ytdlpSpawnOptions, ensureYtdlp } from './ytdlp'
 import { getSettings } from './settings'
 import { humanizeYtdlpError } from './options'
-import { searchYummyani } from './resolvers'
-import { SEARCH_SERVICES } from '@shared/types'
+import { searchYummyani } from '../resolvers'
+import { SEARCH_ALL_SERVICES } from '@shared/types'
 import type { SearchResponse, SearchResult, SearchScope, SearchService } from '@shared/types'
 
 interface FlatEntry {
@@ -26,12 +26,15 @@ interface FlatPlaylist {
 /** Services searched through the engine's `<prefix>N:query` search extractors. */
 const PREFIX: Partial<Record<SearchService, string>> = {
   youtube: 'ytsearch',
-  soundcloud: 'scsearch'
+  soundcloud: 'scsearch',
+  bilibili: 'bilisearch',
+  niconico: 'nicosearch'
 }
 
 /** Services searched by handing the engine a site search-results URL. */
 const URL_SEARCH: Partial<Record<SearchService, (q: string) => string>> = {
-  pornhub: (q) => `https://www.pornhub.com/video/search?search=${encodeURIComponent(q)}`
+  pornhub: (q) => `https://www.pornhub.com/video/search?search=${encodeURIComponent(q)}`,
+  dailymotion: (q) => `https://www.dailymotion.com/search/${encodeURIComponent(q)}/videos`
 }
 
 function thumbnailOf(entry: FlatEntry, service: SearchService): string | undefined {
@@ -57,21 +60,24 @@ function ytdlpSearch(target: string, service: SearchService, limit: number): Pro
     const child = spawn(ytdlpBinaryPath(), args, ytdlpSpawnOptions())
     let stdout = ''
     let stderr = ''
+    let settled = false
+    const done = (value: SearchResponse): void => {
+      if (settled) return
+      settled = true
+      clearTimeout(timeout)
+      resolve(value)
+    }
     const timeout = setTimeout(() => {
       child.kill()
-      resolve({ ok: false, error: 'Search timed out. Check your connection and try again.' })
+      done({ ok: false, error: 'Search timed out. Check your connection and try again.' })
     }, 45_000)
 
     child.stdout.on('data', (d) => (stdout += d.toString()))
     child.stderr.on('data', (d) => (stderr += d.toString()))
-    child.on('error', (err) => {
-      clearTimeout(timeout)
-      resolve({ ok: false, error: err.message })
-    })
+    child.on('error', (err) => done({ ok: false, error: err.message }))
     child.on('close', (code) => {
-      clearTimeout(timeout)
       if (code !== 0 || !stdout.trim()) {
-        resolve({ ok: false, error: humanizeYtdlpError(stderr.trim() || 'Search failed.', true) })
+        done({ ok: false, error: humanizeYtdlpError(stderr.trim() || 'Search failed.', true) })
         return
       }
       try {
@@ -88,9 +94,9 @@ function ytdlpSearch(target: string, service: SearchService, limit: number): Pro
             viewCount: e.view_count,
             service
           }))
-        resolve({ ok: true, results })
+        done({ ok: true, results })
       } catch {
-        resolve({ ok: false, error: 'Could not parse search results.' })
+        done({ ok: false, error: 'Could not parse search results.' })
       }
     })
   })
@@ -116,10 +122,15 @@ async function searchOne(query: string, service: SearchService, limit: number): 
 /** Round-robin merge so no single service dominates the top of the grid. */
 function interleave(lists: SearchResult[][]): SearchResult[] {
   const out: SearchResult[] = []
+  const seen = new Set<string>()
   const longest = Math.max(0, ...lists.map((l) => l.length))
   for (let i = 0; i < longest; i++) {
     for (const list of lists) {
-      if (i < list.length) out.push(list[i])
+      const item = list[i]
+      if (!item) continue
+      if (seen.has(item.url)) continue
+      seen.add(item.url)
+      out.push(item)
     }
   }
   return out
@@ -139,13 +150,11 @@ export async function searchVideos(
   if (!q) return { ok: false, error: 'Empty search query.' }
   await ensureYtdlp()
 
-  if (scope !== 'all') {
-    return searchOne(q, scope, limit)
-  }
+  if (scope !== 'all') return searchOne(q, scope, limit)
 
   // In 'all' mode the limit applies per service, so the grid stays balanced.
   const perService = Math.max(3, Math.min(12, limit))
-  const settled = await Promise.all(SEARCH_SERVICES.map((s) => searchOne(q, s, perService)))
+  const settled = await Promise.all(SEARCH_ALL_SERVICES.map((s) => searchOne(q, s, perService)))
   const successes = settled.filter((r) => r.ok && r.results?.length).map((r) => r.results!)
   if (!successes.length) {
     const firstError = settled.find((r) => !r.ok)?.error

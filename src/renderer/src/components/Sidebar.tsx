@@ -1,26 +1,31 @@
 import { motion } from 'framer-motion'
-import { Download, ListVideo, Settings as SettingsIcon } from 'lucide-react'
+import { Download, Keyboard, ListVideo, Search, Settings as SettingsIcon } from 'lucide-react'
 import { useStore, type ViewId } from '../store'
+import { useT, type TranslationKey } from '../i18n'
 import Logo from './Logo'
 
 interface NavItem {
   id: ViewId
-  label: string
+  label: TranslationKey
   icon: JSX.Element
+  hint: string
 }
 
 const items: NavItem[] = [
-  { id: 'home', label: 'download', icon: <Download size={18} /> },
-  { id: 'downloads', label: 'queue', icon: <ListVideo size={18} /> },
-  { id: 'settings', label: 'settings', icon: <SettingsIcon size={18} /> }
+  { id: 'home', label: 'nav.home', icon: <Download size={18} />, hint: '1' },
+  { id: 'search', label: 'nav.search', icon: <Search size={18} />, hint: '2' },
+  { id: 'downloads', label: 'nav.queue', icon: <ListVideo size={18} />, hint: '3' },
+  { id: 'settings', label: 'nav.settings', icon: <SettingsIcon size={18} />, hint: '4' }
 ]
 
 export default function Sidebar(): JSX.Element {
+  const t = useT()
   const view = useStore((s) => s.view)
   const setView = useStore((s) => s.setView)
   const downloads = useStore((s) => s.downloads)
+  const openShortcuts = useStore((s) => s.setShortcutsOpen)
   const active = downloads.filter((d) =>
-    ['downloading', 'processing', 'queued', 'paused'].includes(d.state)
+    ['downloading', 'processing', 'queued', 'paused', 'detecting'].includes(d.state)
   ).length
 
   return (
@@ -36,33 +41,34 @@ export default function Sidebar(): JSX.Element {
           <button
             key={item.id}
             onClick={() => setView(item.id)}
+            title={`${t(item.label)} · Ctrl/⌘ ${item.hint}`}
             className="no-drag group relative flex items-center gap-3 rounded-2xl px-3.5 py-2.5 text-left"
           >
             {isActive && (
               <motion.span
                 layoutId="nav-active"
-                className="absolute inset-0 rounded-2xl bg-cream"
+                className="absolute inset-0 rounded-2xl bg-accent"
                 transition={{ type: 'spring', stiffness: 480, damping: 40 }}
               />
             )}
             <span
               className={`relative z-10 transition-colors ${
-                isActive ? 'text-ink-950' : 'text-white/55 group-hover:text-cream'
+                isActive ? 'text-accent-fg' : 'text-fg/55 group-hover:text-cream'
               }`}
             >
               {item.icon}
             </span>
             <span
               className={`relative z-10 text-sm font-medium transition-colors ${
-                isActive ? 'text-ink-950' : 'text-white/55 group-hover:text-cream'
+                isActive ? 'text-accent-fg' : 'text-fg/55 group-hover:text-cream'
               }`}
             >
-              {item.label}
+              {t(item.label)}
             </span>
             {item.id === 'downloads' && active > 0 && (
               <span
                 className={`relative z-10 ml-auto flex h-5 min-w-5 items-center justify-center rounded-full px-1.5 text-[10px] font-bold ${
-                  isActive ? 'bg-ink-950/15 text-ink-950' : 'bg-white/10 text-cream'
+                  isActive ? 'bg-accent-fg/15 text-accent-fg' : 'bg-fg/10 text-cream'
                 }`}
               >
                 {active}
@@ -72,14 +78,20 @@ export default function Sidebar(): JSX.Element {
         )
       })}
 
-      <div className="mt-auto px-3 pb-1">
+      <div className="mt-auto space-y-2 px-3 pb-1">
+        <button
+          onClick={() => openShortcuts(true)}
+          className="no-drag mono flex items-center gap-1.5 text-[11px] text-fg/30 transition-colors hover:text-fg/60"
+        >
+          <Keyboard size={13} /> {t('shortcuts.open')}
+        </button>
         <button
           onClick={() =>
             window.api.openExternal('https://github.com/DenisHumen/Universal-Video-Downloader-')
           }
-          className="no-drag mono text-[11px] text-white/30 transition-colors hover:text-white/60"
+          className="no-drag mono block text-[11px] text-fg/30 transition-colors hover:text-fg/60"
         >
-          open source · github
+          {t('nav.github')}
         </button>
       </div>
     </nav>

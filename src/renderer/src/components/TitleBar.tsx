@@ -24,7 +24,7 @@ export default function TitleBar(): JSX.Element {
     >
       <div className="flex items-center gap-2">
         {appInfo && (
-          <span className="mono rounded-lg bg-white/[0.04] px-2 py-0.5 text-[10px] font-medium text-white/35">
+          <span className="mono rounded-lg bg-fg/[0.04] px-2 py-0.5 text-[10px] font-medium text-fg/35">
             v{appInfo.version}
           </span>
         )}
@@ -41,7 +41,7 @@ export default function TitleBar(): JSX.Element {
               {maximized ? <Copy size={13} /> : <Square size={12} />}
             </button>
             <button
-              className="no-drag inline-flex h-9 w-9 items-center justify-center rounded-xl text-white/55 transition-all hover:bg-red-500/80 hover:text-white active:scale-95"
+              className="no-drag inline-flex h-9 w-9 items-center justify-center rounded-xl text-fg/55 transition-all hover:bg-red-500/80 hover:text-white active:scale-95"
               onClick={() => window.api.closeWindow()}
               aria-label="Close"
             >

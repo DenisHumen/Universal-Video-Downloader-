@@ -1,10 +1,5 @@
 import type { UvdApi, AppInfo } from '../../../preload/index'
-import type {
-  AppSettings,
-  DownloadItem,
-  MediaInfo,
-  SearchResult
-} from '@shared/types'
+import type { AppSettings, DownloadItem, MediaInfo, SearchResult } from '@shared/types'
 
 /**
  * Browser-only stand-in for the preload bridge so the renderer can be opened
@@ -21,10 +16,22 @@ const settings: AppSettings = {
   embedThumbnail: true,
   embedSubtitles: false,
   embedMetadata: true,
+  embedChapters: true,
+  writeSubtitles: false,
+  subtitleLanguages: 'en,ru',
+  sponsorBlock: false,
   restrictFilenames: false,
   filenameTemplate: '%(title)s [%(id)s].%(ext)s',
+  createSubfolders: false,
+  speedLimit: '',
   autoUpdate: true,
   theme: 'midnight',
+  accent: 'cream',
+  language: 'auto',
+  notifications: true,
+  clipboardWatch: false,
+  trayEnabled: false,
+  universalFallback: true,
   proxy: '',
   cookiesFromBrowser: '',
   cookiesFile: ''
@@ -35,6 +42,8 @@ const appInfo: AppInfo = {
   name: 'universal-video-downloader',
   platform: 'win32' as NodeJS.Platform,
   arch: 'x64',
+  locale: 'en-US',
+  manualUpdates: false,
   ytdlp: { state: 'ready', version: 'mock' },
   update: { state: 'idle' }
 }
@@ -53,10 +62,27 @@ function fakeInfo(url: string): MediaInfo {
     extractor: 'youtube',
     isLive: false,
     viewCount: 1234567,
+    subtitleLanguages: ['en', 'ru', 'de'],
     formats: [
       { id: '137', ext: 'mp4', kind: 'video', resolution: '1080p', height: 1080, vcodec: 'avc1' },
-      { id: '22', ext: 'mp4', kind: 'video+audio', resolution: '720p', height: 720, vcodec: 'avc1', acodec: 'mp4a' },
-      { id: '18', ext: 'mp4', kind: 'video+audio', resolution: '360p', height: 360, vcodec: 'avc1', acodec: 'mp4a' },
+      {
+        id: '22',
+        ext: 'mp4',
+        kind: 'video+audio',
+        resolution: '720p',
+        height: 720,
+        vcodec: 'avc1',
+        acodec: 'mp4a'
+      },
+      {
+        id: '18',
+        ext: 'mp4',
+        kind: 'video+audio',
+        resolution: '360p',
+        height: 360,
+        vcodec: 'avc1',
+        acodec: 'mp4a'
+      },
       { id: '140', ext: 'm4a', kind: 'audio', resolution: 'audio', acodec: 'mp4a' }
     ]
   }
@@ -65,7 +91,7 @@ function fakeInfo(url: string): MediaInfo {
 function fakeResults(query: string, scope: string): SearchResult[] {
   const services =
     scope === 'all'
-      ? (['youtube', 'soundcloud', 'yummyani', 'pornhub'] as const)
+      ? (['youtube', 'soundcloud', 'dailymotion', 'yummyani', 'pornhub'] as const)
       : ([scope] as unknown as readonly SearchResult['service'][])
   return Array.from({ length: scope === 'all' ? 12 : 9 }, (_, i) => {
     const service = services[i % services.length]
@@ -117,6 +143,7 @@ function fakeAnimeInfo(url: string): MediaInfo {
 }
 
 let itemSeq = 0
+const items: DownloadItem[] = []
 
 export function installMockApi(): void {
   const api: UvdApi = {
@@ -125,6 +152,7 @@ export function installMockApi(): void {
       if (url.startsWith('uvd-yummy-item://')) return { ok: true, info: fakeAnimeInfo(url) }
       return { ok: true, info: fakeInfo(url) }
     },
+    cancelDetect: async () => undefined,
     searchVideos: async (query, scope) => {
       await delay(800)
       return { ok: true, results: fakeResults(query, scope) }
@@ -139,6 +167,7 @@ export function installMockApi(): void {
       const item: DownloadItem = {
         id: `mock-item-${++itemSeq}`,
         url: req.url,
+        sourceUrl: req.url,
         title: req.title || req.url,
         thumbnail: req.thumbnail,
         mode: req.mode,
@@ -148,6 +177,7 @@ export function installMockApi(): void {
         outputDir: settings.downloadDir,
         createdAt: Date.now()
       }
+      items.unshift(item)
       return item
     },
     pauseDownload: async () => undefined,
@@ -156,20 +186,27 @@ export function installMockApi(): void {
     retryDownload: async () => undefined,
     removeDownload: async () => undefined,
     clearFinished: async () => undefined,
-    listDownloads: async () => [],
+    listDownloads: async () => items,
+    pauseAll: async () => undefined,
+    resumeAll: async () => undefined,
+    retryFailed: async () => undefined,
     getSettings: async () => ({ ...settings }),
     setSettings: async (partial) => Object.assign(settings, partial),
+    resetSettings: async () => ({ ...settings }),
     chooseDirectory: async () => null,
+    chooseCookiesFile: async () => null,
     openPath: async () => '',
     showInFolder: async () => undefined,
     openExternal: async (url) => {
       window.open(url, '_blank')
     },
+    readClipboard: async () => '',
     ensureYtdlp: async () => appInfo.ytdlp,
     updateYtdlp: async () => 'mock',
     checkForUpdates: async () => appInfo.update,
     downloadUpdate: async () => undefined,
     installUpdate: async () => undefined,
+    openReleasesPage: async () => undefined,
     getAppInfo: async () => appInfo,
     minimizeWindow: async () => undefined,
     maximizeWindow: async () => false,
@@ -178,7 +215,10 @@ export function installMockApi(): void {
     onDownloadProgress: () => () => undefined,
     onDownloadUpdated: () => () => undefined,
     onYtdlpStatus: () => () => undefined,
-    onUpdateStatus: () => () => undefined
+    onUpdateStatus: () => () => undefined,
+    onDetectStatus: () => () => undefined,
+    onClipboardLink: () => () => undefined,
+    onNavigate: () => () => undefined
   }
   window.api = api
 }

@@ -15,6 +15,7 @@ import {
   Search,
   SearchX,
   Tv,
+  Video,
   X,
   Youtube
 } from 'lucide-react'
@@ -23,6 +24,8 @@ import StreamingCard from '../components/StreamingCard'
 import { formatCount, formatDuration } from '../lib/format'
 import { initialMode, initialQuality, maxHeightOf } from '../lib/quality'
 import { toast } from '../lib/toast'
+import { useT, type TranslateFn } from '../i18n'
+import { useStore } from '../store'
 
 type Status = 'idle' | 'searching' | 'error'
 
@@ -34,6 +37,8 @@ interface QualityProbe {
 
 interface Props {
   settings: AppSettings | null
+  /** Rendered inside the main window (rather than the standalone search window). */
+  embedded?: boolean
 }
 
 interface ServiceMeta {
@@ -46,20 +51,25 @@ const SERVICES: ServiceMeta[] = [
   { value: 'all', label: 'all services', icon: <Globe size={16} /> },
   { value: 'youtube', label: 'youtube', icon: <Youtube size={16} /> },
   { value: 'soundcloud', label: 'soundcloud', icon: <Music size={16} /> },
+  { value: 'dailymotion', label: 'dailymotion', icon: <Video size={16} /> },
   { value: 'yummyani', label: 'anime', icon: <Tv size={16} /> },
+  { value: 'bilibili', label: 'bilibili', icon: <Video size={16} /> },
+  { value: 'niconico', label: 'niconico', icon: <Video size={16} /> },
   { value: 'pornhub', label: 'pornhub', icon: <Film size={16} /> }
 ]
 
 // Services whose results carry real thumbnails + a probe-able quality.
-const PROBE_SERVICES: SearchService[] = ['youtube', 'pornhub']
+const PROBE_SERVICES: SearchService[] = ['youtube', 'pornhub', 'dailymotion']
 
 function queryFromHash(): string {
   const m = window.location.hash.match(/[?&]q=([^&]*)/)
   return m ? decodeURIComponent(m[1]) : ''
 }
 
-export default function SearchView({ settings }: Props): JSX.Element {
-  const [query, setQuery] = useState(queryFromHash)
+export default function SearchView({ settings, embedded = false }: Props): JSX.Element {
+  const t = useT()
+  const setView = useStore((s) => s.setView)
+  const [query, setQuery] = useState(embedded ? '' : queryFromHash)
   const [service, setService] = useState<SearchScope>('all')
   const [status, setStatus] = useState<Status>('idle')
   const [error, setError] = useState('')
@@ -89,7 +99,7 @@ export default function SearchView({ settings }: Props): JSX.Element {
       setStatus('idle')
       void probeQualities(res.results, generation.current)
     } else {
-      setError(res.error || 'Search failed.')
+      setError(res.error || t('search.failed'))
       setStatus('error')
     }
   }
@@ -124,16 +134,29 @@ export default function SearchView({ settings }: Props): JSX.Element {
     await Promise.all([worker(), worker()])
   }
 
-  // Auto-run the query this window was opened with + follow-up queries sent
-  // from the main window while this one is already open.
+  // Auto-run the query this view was opened with, plus follow-up queries sent
+  // from the main window (standalone) or the home view (embedded).
   useEffect(() => {
     if (query) void search(query)
     else inputRef.current?.focus()
-    const off = window.api.onSearchQuery((q) => {
+
+    const offIpc = embedded
+      ? undefined
+      : window.api.onSearchQuery((q) => {
+          setQuery(q)
+          void search(q)
+        })
+    const onLocalQuery = (e: Event): void => {
+      const q = (e as CustomEvent<string>).detail
+      if (!q) return
       setQuery(q)
       void search(q)
-    })
-    return off
+    }
+    window.addEventListener('uvd:search-query', onLocalQuery)
+    return () => {
+      offIpc?.()
+      window.removeEventListener('uvd:search-query', onLocalQuery)
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
@@ -142,7 +165,7 @@ export default function SearchView({ settings }: Props): JSX.Element {
     if (results || status === 'error') void search(undefined, s)
   }
 
-  // Regular video/audio: queue straight to the main window's downloads.
+  // Regular video/audio: queue straight to the downloads list.
   const download = async (r: SearchResult): Promise<void> => {
     const probe = probes[r.url]
     const mode = r.service === 'soundcloud' ? 'audio' : initialMode(settings)
@@ -155,9 +178,9 @@ export default function SearchView({ settings }: Props): JSX.Element {
         quality: mode === 'audio' ? 'audio' : initialQuality(settings, probe?.maxHeight || 0)
       })
       setAdded((prev) => new Set(prev).add(r.url))
-      toast('Added to the queue — see the main window', 'success')
+      toast(embedded ? t('home.addedToQueue') : t('search.addedRemote'), 'success')
     } catch (err) {
-      toast(err instanceof Error ? err.message : 'Could not start the download', 'error')
+      toast(err instanceof Error ? err.message : t('home.startFailed'), 'error')
     }
   }
 
@@ -167,25 +190,23 @@ export default function SearchView({ settings }: Props): JSX.Element {
     setPickerBusy(r.url)
     try {
       const res = await window.api.detect(r.pickerUrl)
-      if (res.ok && res.info?.streaming) {
-        setPicker(res.info)
-      } else {
-        toast(res.error || 'Could not load this title.', 'error')
-      }
+      if (res.ok && res.info?.streaming) setPicker(res.info)
+      else toast(res.error || t('search.failed'), 'error')
     } catch (err) {
-      toast(err instanceof Error ? err.message : 'Could not load this title.', 'error')
+      toast(err instanceof Error ? err.message : t('search.failed'), 'error')
     } finally {
       setPickerBusy(null)
     }
   }
 
   const activeService = SERVICES.find((s) => s.value === service)
+  const activeLabel = service === 'all' ? t('search.allServices') : (activeService?.label ?? '')
 
   return (
     <div className="flex h-full">
       {/* Services — vertical, scrollable (room for many more) */}
-      <aside className="flex w-[184px] shrink-0 flex-col border-r border-white/[0.06]">
-        <p className="group-title mb-2 px-4 pt-6">services</p>
+      <aside className="flex w-[176px] shrink-0 flex-col border-r border-fg/[0.06]">
+        <p className="group-title mb-2 px-4 pt-6">{t('search.services')}</p>
         <div className="flex-1 space-y-1 overflow-y-auto px-2.5 pb-4">
           {SERVICES.map((s) => {
             const isActive = s.value === service
@@ -198,23 +219,23 @@ export default function SearchView({ settings }: Props): JSX.Element {
                 {isActive && (
                   <motion.span
                     layoutId="search-service-active"
-                    className="absolute inset-0 rounded-2xl bg-cream"
+                    className="absolute inset-0 rounded-2xl bg-accent"
                     transition={{ type: 'spring', stiffness: 480, damping: 40 }}
                   />
                 )}
                 <span
                   className={`relative z-10 transition-colors ${
-                    isActive ? 'text-ink-950' : 'text-white/45 group-hover:text-cream'
+                    isActive ? 'text-accent-fg' : 'text-fg/45 group-hover:text-cream'
                   }`}
                 >
                   {s.icon}
                 </span>
                 <span
-                  className={`relative z-10 text-[13px] font-medium transition-colors ${
-                    isActive ? 'text-ink-950' : 'text-white/55 group-hover:text-cream'
+                  className={`relative z-10 truncate text-[13px] font-medium transition-colors ${
+                    isActive ? 'text-accent-fg' : 'text-fg/55 group-hover:text-cream'
                   }`}
                 >
-                  {s.label}
+                  {s.value === 'all' ? t('search.allServices') : s.label}
                 </span>
               </button>
             )
@@ -229,16 +250,16 @@ export default function SearchView({ settings }: Props): JSX.Element {
             initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.3 }}
-            className="flex items-center gap-2 rounded-3xl border border-white/[0.08] bg-ink-900 p-2 transition-colors focus-within:border-white/25"
+            className="flex items-center gap-2 rounded-3xl border border-fg/[0.08] bg-ink-900 p-2 transition-colors focus-within:border-accent/40"
           >
-            <Search className="ml-2.5 shrink-0 text-white/30" size={19} />
+            <Search className="ml-2.5 shrink-0 text-fg/30" size={19} />
             <input
               ref={inputRef}
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && search()}
-              placeholder="search videos & anime by title"
-              className="no-drag min-w-0 flex-1 bg-transparent px-1 py-2 text-sm text-cream placeholder-white/25 outline-none"
+              placeholder={t('search.placeholder')}
+              className="no-drag min-w-0 flex-1 bg-transparent px-1 py-2 text-sm text-cream placeholder:text-fg/25 outline-none"
               spellCheck={false}
             />
             <button
@@ -251,23 +272,21 @@ export default function SearchView({ settings }: Props): JSX.Element {
               ) : (
                 <Search size={16} />
               )}
-              search
+              {t('common.search')}
             </button>
           </motion.div>
           <div className="mt-2.5 flex items-center justify-between px-1">
-            <p className="mono text-xs text-white/35">
-              searching {activeService?.label ?? 'all services'}
-            </p>
+            <p className="mono text-xs text-fg/35">{t('search.searching', { service: activeLabel })}</p>
             {results && (
-              <span className="mono text-xs text-white/35">
-                {results.length} result{results.length === 1 ? '' : 's'}
+              <span className="mono text-xs text-fg/35">
+                {t('search.results', { count: results.length })}
               </span>
             )}
           </div>
         </div>
 
         <div className="flex-1 overflow-y-auto px-7 pb-7 pt-4">
-          <AnimatePresence mode="wait">
+          <AnimatePresence mode="popLayout">
             {status === 'searching' && (
               <motion.div
                 key="skeleton"
@@ -278,13 +297,13 @@ export default function SearchView({ settings }: Props): JSX.Element {
               >
                 {Array.from({ length: 6 }).map((_, i) => (
                   <div key={i} className="card overflow-hidden">
-                    <div className="relative aspect-video bg-white/[0.04]">
-                      <div className="absolute inset-0 -translate-x-full animate-shimmer bg-gradient-to-r from-transparent via-white/[0.08] to-transparent" />
+                    <div className="relative aspect-video bg-fg/[0.04]">
+                      <div className="absolute inset-0 -translate-x-full animate-shimmer bg-gradient-to-r from-transparent via-fg/[0.08] to-transparent" />
                     </div>
                     <div className="space-y-2 p-3">
-                      <div className="h-3.5 w-5/6 rounded bg-white/[0.05]" />
-                      <div className="h-3 w-1/2 rounded bg-white/[0.05]" />
-                      <div className="h-8 w-full rounded-xl bg-white/[0.04]" />
+                      <div className="h-3.5 w-5/6 rounded bg-fg/[0.05]" />
+                      <div className="h-3 w-1/2 rounded bg-fg/[0.05]" />
+                      <div className="h-8 w-full rounded-xl bg-fg/[0.04]" />
                     </div>
                   </div>
                 ))}
@@ -299,10 +318,10 @@ export default function SearchView({ settings }: Props): JSX.Element {
                 exit={{ opacity: 0, y: -8 }}
                 className="card flex items-start gap-3 p-4"
               >
-                <AlertCircle className="mt-0.5 shrink-0 text-red-400/80" size={18} />
+                <AlertCircle className="mt-0.5 shrink-0 text-bad" size={18} />
                 <div className="min-w-0">
-                  <p className="text-sm font-medium text-cream">search failed</p>
-                  <p className="mt-0.5 text-xs text-white/45">{error}</p>
+                  <p className="text-sm font-medium text-cream">{t('search.failed')}</p>
+                  <p className="mt-0.5 text-xs text-fg/45">{error}</p>
                 </div>
               </motion.div>
             )}
@@ -315,11 +334,11 @@ export default function SearchView({ settings }: Props): JSX.Element {
                 exit={{ opacity: 0 }}
                 className="flex flex-col items-center justify-center py-16 text-center"
               >
-                <div className="flex h-16 w-16 items-center justify-center rounded-3xl bg-white/[0.03] text-white/20">
+                <div className="flex h-16 w-16 items-center justify-center rounded-3xl bg-fg/[0.03] text-fg/20">
                   <SearchX size={28} />
                 </div>
-                <p className="mt-4 text-sm font-medium text-white/55">nothing found</p>
-                <p className="mono mt-1 text-xs text-white/30">try different keywords</p>
+                <p className="mt-4 text-sm font-medium text-fg/55">{t('search.nothing')}</p>
+                <p className="mono mt-1 text-xs text-fg/30">{t('search.nothingHint')}</p>
               </motion.div>
             )}
 
@@ -339,6 +358,7 @@ export default function SearchView({ settings }: Props): JSX.Element {
                     probe={probes[r.url]}
                     added={added.has(r.url)}
                     busy={pickerBusy === r.url}
+                    t={t}
                     onDownload={() => download(r)}
                     onOpenPicker={() => openPicker(r)}
                   />
@@ -354,11 +374,11 @@ export default function SearchView({ settings }: Props): JSX.Element {
                 exit={{ opacity: 0 }}
                 className="flex flex-col items-center justify-center py-16 text-center"
               >
-                <div className="flex h-16 w-16 items-center justify-center rounded-3xl bg-white/[0.03] text-white/20">
+                <div className="flex h-16 w-16 items-center justify-center rounded-3xl bg-fg/[0.03] text-fg/20">
                   <Search size={28} />
                 </div>
-                <p className="mt-4 text-sm font-medium text-white/55">search across every service</p>
-                <p className="mono mt-1 text-xs text-white/30">videos & anime — type a title and press enter</p>
+                <p className="mt-4 text-sm font-medium text-fg/55">{t('search.title')}</p>
+                <p className="mono mt-1 text-xs text-fg/30">{t('search.hint')}</p>
               </motion.div>
             )}
           </AnimatePresence>
@@ -387,11 +407,17 @@ export default function SearchView({ settings }: Props): JSX.Element {
               <button
                 className="btn-icon absolute right-2 top-2 z-10 bg-black/40"
                 onClick={() => setPicker(null)}
-                aria-label="Close"
+                aria-label={t('common.close')}
               >
                 <X size={16} />
               </button>
-              <StreamingCard info={picker} onDone={() => setPicker(null)} />
+              <StreamingCard
+                info={picker}
+                onDone={() => {
+                  setPicker(null)
+                  if (embedded) setView('downloads')
+                }}
+              />
             </motion.div>
           </motion.div>
         )}
@@ -402,36 +428,41 @@ export default function SearchView({ settings }: Props): JSX.Element {
 
 function qualityBadge(
   probe: QualityProbe | undefined,
-  service: SearchService
+  service: SearchService,
+  t: TranslateFn
 ): JSX.Element | null {
   if (service === 'yummyani') {
     return (
       <span className="chip bg-black/70 text-[10px] font-semibold text-white/90">
-        <Tv size={9} /> anime
+        <Tv size={9} /> {t('search.anime')}
       </span>
     )
   }
   if (service === 'soundcloud') {
     return (
       <span className="chip bg-black/70 text-[10px] text-white/85">
-        <Music size={9} /> audio
+        <Music size={9} /> {t('search.audio')}
       </span>
     )
   }
   if (!probe || probe.status === 'loading') {
     return (
       <span className="chip bg-black/70 text-[10px] text-white/60">
-        <Loader2 size={9} className="animate-spin" /> quality…
+        <Loader2 size={9} className="animate-spin" /> {t('search.qualityProbe')}
       </span>
     )
   }
   if (probe.status === 'done' && probe.maxHeight > 0) {
-    return <span className="chip bg-black/70 text-[10px] font-semibold text-white/90">{probe.maxHeight}p</span>
+    return (
+      <span className="chip bg-black/70 text-[10px] font-semibold text-white/90">
+        {probe.maxHeight}p
+      </span>
+    )
   }
   if (probe.status === 'done') {
     return (
       <span className="chip bg-black/70 text-[10px] text-white/85">
-        <Music size={9} /> audio
+        <Music size={9} /> {t('search.audio')}
       </span>
     )
   }
@@ -444,6 +475,7 @@ function ResultCard({
   probe,
   added,
   busy,
+  t,
   onDownload,
   onOpenPicker
 }: {
@@ -452,6 +484,7 @@ function ResultCard({
   probe?: QualityProbe
   added: boolean
   busy: boolean
+  t: TranslateFn
   onDownload: () => Promise<void>
   onOpenPicker: () => Promise<void>
 }): JSX.Element {
@@ -474,11 +507,11 @@ function ResultCard({
       initial={{ opacity: 0, y: 12 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.25, delay: Math.min(index * 0.03, 0.35) }}
-      className="card group flex flex-col overflow-hidden transition-colors hover:border-white/[0.16]"
+      className="card group flex flex-col overflow-hidden transition-colors hover:border-fg/[0.16]"
     >
       <button
         className="relative block aspect-video w-full cursor-pointer overflow-hidden bg-ink-950 text-left"
-        title="Open in browser"
+        title={t('common.openInBrowser')}
         onClick={() => window.api.openExternal(result.url)}
       >
         {thumb ? (
@@ -490,13 +523,13 @@ function ResultCard({
             referrerPolicy="no-referrer"
           />
         ) : (
-          <div className="flex h-full items-center justify-center text-white/15">
+          <div className="flex h-full items-center justify-center text-fg/15">
             {isAnime ? <Tv size={26} /> : <Search size={26} />}
           </div>
         )}
-        <div className="absolute left-1.5 top-1.5">{qualityBadge(probe, result.service)}</div>
+        <div className="absolute left-1.5 top-1.5">{qualityBadge(probe, result.service, t)}</div>
         <span className="chip absolute right-1.5 top-1.5 bg-black/70 text-[10px] text-white/75">
-          {result.service === 'yummyani' ? 'yummyani' : result.service}
+          {result.service}
         </span>
         {result.duration != null && result.duration > 0 && (
           <span className="chip absolute bottom-1.5 right-1.5 bg-black/70 text-[10px] font-medium text-white/90">
@@ -509,7 +542,7 @@ function ResultCard({
         <p className="line-clamp-2 text-[13px] font-medium leading-snug text-cream" title={result.title}>
           {result.title}
         </p>
-        <div className="mono mt-1.5 flex items-center gap-2 text-[11px] text-white/35">
+        <div className="mono mt-1.5 flex items-center gap-2 text-[11px] text-fg/35">
           {result.uploader && <span className="truncate">{result.uploader}</span>}
           {result.viewCount != null && (
             <span className="flex shrink-0 items-center gap-1">
@@ -520,9 +553,7 @@ function ResultCard({
 
         <div className="mt-auto flex items-center gap-1.5 pt-3">
           <button
-            className={`btn flex-1 py-2 text-xs ${
-              added ? 'bg-emerald-400/15 text-emerald-300' : 'btn-primary'
-            }`}
+            className={`btn flex-1 py-2 text-xs ${added ? 'bg-good/15 text-good' : 'btn-primary'}`}
             onClick={handle}
             disabled={downloading || busy || added}
           >
@@ -535,11 +566,11 @@ function ResultCard({
             ) : (
               <Download size={14} />
             )}
-            {added ? 'queued' : isAnime ? 'episodes' : 'download'}
+            {added ? t('search.queued') : isAnime ? t('search.episodes') : t('common.download')}
           </button>
           <button
             className="btn-icon shrink-0"
-            title="Open in browser"
+            title={t('common.openInBrowser')}
             onClick={() => window.api.openExternal(result.url)}
           >
             <ExternalLink size={15} />

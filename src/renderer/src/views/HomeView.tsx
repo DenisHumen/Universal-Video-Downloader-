@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import {
   AlertCircle,
@@ -6,16 +6,20 @@ import {
   Clock,
   Download,
   Eye,
+  Layers,
   Loader2,
   Radio,
   Search,
-  User
+  Sparkles,
+  User,
+  X
 } from 'lucide-react'
-import type { DownloadMode, MediaInfo, QualityPreset } from '@shared/types'
+import type { DetectStage, DownloadMode, MediaInfo, QualityPreset } from '@shared/types'
 import { useStore } from '../store'
 import { formatCount, formatDuration, isProbablyUrl } from '../lib/format'
 import { initialMode, initialQuality, maxHeightOf } from '../lib/quality'
 import { toast } from '../lib/toast'
+import { useT, type TranslationKey } from '../i18n'
 import FormatSelector from '../components/FormatSelector'
 import PlaylistCard from '../components/PlaylistCard'
 import StreamingCard from '../components/StreamingCard'
@@ -28,10 +32,24 @@ interface Selection {
   formatId?: string
 }
 
+const STAGE_LABEL: Record<DetectStage, TranslationKey> = {
+  idle: 'detect.resolving',
+  resolving: 'detect.resolving',
+  engine: 'detect.engine',
+  scraping: 'detect.scraping',
+  browsing: 'detect.browsing',
+  probing: 'detect.probing',
+  done: 'detect.probing'
+}
+
+const SITE_HINTS = ['youtube', 'vimeo', 'tiktok', 'twitter / x', 'instagram', 'twitch', 'reddit']
+
 export default function HomeView(): JSX.Element {
+  const t = useT()
   const settings = useStore((s) => s.settings)
   const setView = useStore((s) => s.setView)
   const saveSettings = useStore((s) => s.saveSettings)
+  const detectStatus = useStore((s) => s.detect)
 
   const [url, setUrl] = useState('')
   const [status, setStatus] = useState<Status>('idle')
@@ -39,11 +57,59 @@ export default function HomeView(): JSX.Element {
   const [error, setError] = useState('')
   const [selection, setSelection] = useState<Selection>({ mode: 'video', quality: 'best' })
   const [starting, setStarting] = useState(false)
+  const [batchOpen, setBatchOpen] = useState(false)
+  const [batchText, setBatchText] = useState('')
   const inputRef = useRef<HTMLInputElement>(null)
+  const requestRef = useRef<string | null>(null)
 
   useEffect(() => {
     inputRef.current?.focus()
   }, [])
+
+  const detect = async (value?: string): Promise<void> => {
+    const target = (value ?? url).trim()
+    if (!target) return
+    // Plain text (not a link) → search video services by title.
+    if (!isProbablyUrl(target)) {
+      setView('search')
+      window.dispatchEvent(new CustomEvent<string>('uvd:search-query', { detail: target }))
+      return
+    }
+    const requestId = `${Date.now()}-${Math.random().toString(36).slice(2)}`
+    requestRef.current = requestId
+    setStatus('detecting')
+    setError('')
+    setInfo(null)
+    const res = await window.api.detect(target, requestId)
+    if (requestRef.current !== requestId) return
+    requestRef.current = null
+    if (res.ok && res.info) {
+      setInfo(res.info)
+      // Preselect the user's defaults, falling back to automatic "best" when
+      // their default quality isn't available for this particular video.
+      setSelection({
+        mode: initialMode(settings),
+        quality: initialQuality(settings, maxHeightOf(res.info.formats))
+      })
+      setStatus('idle')
+    } else {
+      setError(res.error || t('home.errorTitle'))
+      setStatus('error')
+    }
+  }
+
+  const cancelDetect = (): void => {
+    if (requestRef.current) void window.api.cancelDetect(requestRef.current)
+    requestRef.current = null
+    setStatus('idle')
+  }
+
+  const reset = (): void => {
+    setInfo(null)
+    setError('')
+    setStatus('idle')
+    setUrl('')
+  }
 
   // Paste a link anywhere to auto-detect; Esc clears; drop a link onto the window.
   useEffect(() => {
@@ -57,12 +123,7 @@ export default function HomeView(): JSX.Element {
       }
     }
     const onKey = (e: KeyboardEvent): void => {
-      if (e.key === 'Escape') {
-        setInfo(null)
-        setError('')
-        setStatus('idle')
-        setUrl('')
-      }
+      if (e.key === 'Escape') reset()
     }
     const onDrop = (e: DragEvent): void => {
       e.preventDefault()
@@ -72,57 +133,33 @@ export default function HomeView(): JSX.Element {
         void detect(text)
       }
     }
+    const onExternalUrl = (e: Event): void => {
+      const link = (e as CustomEvent<string>).detail
+      if (!link) return
+      setUrl(link)
+      void detect(link)
+    }
     const prevent = (e: DragEvent): void => e.preventDefault()
     window.addEventListener('paste', onPaste)
     window.addEventListener('keydown', onKey)
     window.addEventListener('drop', onDrop)
     window.addEventListener('dragover', prevent)
+    window.addEventListener('uvd:detect-url', onExternalUrl)
     return () => {
       window.removeEventListener('paste', onPaste)
       window.removeEventListener('keydown', onKey)
       window.removeEventListener('drop', onDrop)
       window.removeEventListener('dragover', prevent)
+      window.removeEventListener('uvd:detect-url', onExternalUrl)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  const detect = async (value?: string): Promise<void> => {
-    const target = (value ?? url).trim()
-    if (!target) return
-    // Plain text (not a link) → search video services by title in a new window.
-    if (!isProbablyUrl(target)) {
-      void window.api.openSearchWindow(target)
-      return
-    }
-    setStatus('detecting')
-    setError('')
-    setInfo(null)
-    const res = await window.api.detect(target)
-    if (res.ok && res.info) {
-      setInfo(res.info)
-      // Preselect the user's defaults, falling back to automatic "best" when
-      // their default quality isn't available for this particular video.
-      setSelection({
-        mode: initialMode(settings),
-        quality: initialQuality(settings, maxHeightOf(res.info.formats))
-      })
-      setStatus('idle')
-    } else {
-      setError(res.error || 'Could not detect a video at this link.')
-      setStatus('error')
-    }
-  }
-
   const paste = async (): Promise<void> => {
-    try {
-      const text = await navigator.clipboard.readText()
-      if (text) {
-        setUrl(text)
-        if (isProbablyUrl(text)) void detect(text)
-      }
-    } catch {
-      /* clipboard unavailable */
-    }
+    const text = await window.api.readClipboard().catch(() => '')
+    if (!text) return
+    setUrl(text)
+    if (isProbablyUrl(text)) void detect(text)
   }
 
   const start = async (): Promise<void> => {
@@ -130,7 +167,7 @@ export default function HomeView(): JSX.Element {
     setStarting(true)
     try {
       await window.api.startDownload({
-        url: info.webpageUrl || url,
+        url: info.downloadUrl || info.webpageUrl || url,
         title: info.title,
         thumbnail: info.thumbnail,
         mode: selection.mode,
@@ -138,17 +175,51 @@ export default function HomeView(): JSX.Element {
         formatId: selection.formatId
       })
     } catch (err) {
-      toast(err instanceof Error ? err.message : 'Could not start the download', 'error')
+      toast(err instanceof Error ? err.message : t('home.startFailed'), 'error')
       return
     } finally {
       setStarting(false)
     }
-    setInfo(null)
-    setUrl('')
-    setStatus('idle')
-    toast('Added to the queue', 'success')
+    reset()
+    toast(t('home.addedToQueue'), 'success')
     setView('downloads')
   }
+
+  const batchLinks = useMemo(
+    () =>
+      batchText
+        .split(/[\n\s]+/)
+        .map((line) => line.trim())
+        .filter((line) => isProbablyUrl(line)),
+    [batchText]
+  )
+
+  const queueBatch = async (): Promise<void> => {
+    if (!batchLinks.length) return
+    setStarting(true)
+    const mode = initialMode(settings)
+    try {
+      for (const link of batchLinks) {
+        await window.api.startDownload({
+          url: link,
+          title: link,
+          mode,
+          quality: mode === 'audio' ? 'audio' : initialQuality(settings)
+        })
+      }
+    } catch (err) {
+      toast(err instanceof Error ? err.message : t('home.startFailed'), 'error')
+      return
+    } finally {
+      setStarting(false)
+    }
+    toast(t('playlist.added', { count: batchLinks.length }), 'success')
+    setBatchText('')
+    setBatchOpen(false)
+    setView('downloads')
+  }
+
+  const isSearchQuery = url.trim().length > 0 && !isProbablyUrl(url)
 
   return (
     <div className="mx-auto flex w-full max-w-2xl flex-col px-8 py-12">
@@ -158,12 +229,8 @@ export default function HomeView(): JSX.Element {
         transition={{ duration: 0.35 }}
         className="mb-8 text-center"
       >
-        <h1 className="text-[28px] font-semibold tracking-tight text-cream">
-          paste a link, get the video
-        </h1>
-        <p className="mt-2 text-sm text-white/40">
-          automatic stream detection for thousands of sites — or type a title to search.
-        </p>
+        <h1 className="text-[28px] font-semibold tracking-tight text-cream">{t('home.title')}</h1>
+        <p className="mt-2 text-sm text-fg/40">{t('home.subtitle')}</p>
       </motion.div>
 
       {/* URL input */}
@@ -171,19 +238,19 @@ export default function HomeView(): JSX.Element {
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.35, delay: 0.05 }}
-        className="flex items-center gap-2 rounded-3xl border border-white/[0.08] bg-ink-900 p-2 transition-colors focus-within:border-white/25"
+        className="flex items-center gap-2 rounded-3xl border border-fg/[0.08] bg-ink-900 p-2 transition-colors focus-within:border-accent/40"
       >
-        <Search className="ml-2.5 shrink-0 text-white/30" size={19} />
+        <Search className="ml-2.5 shrink-0 text-fg/30" size={19} />
         <input
           ref={inputRef}
           value={url}
           onChange={(e) => setUrl(e.target.value)}
           onKeyDown={(e) => e.key === 'Enter' && detect()}
-          placeholder="paste a video link — or search by title"
-          className="no-drag min-w-0 flex-1 bg-transparent px-1 py-2 text-sm text-cream placeholder-white/25 outline-none"
+          placeholder={t('home.placeholder')}
+          className="no-drag min-w-0 flex-1 bg-transparent px-1 py-2 text-sm text-cream placeholder:text-fg/25 outline-none"
           spellCheck={false}
         />
-        <button className="btn-ghost px-3 py-2.5" onClick={paste} title="Paste from clipboard">
+        <button className="btn-ghost px-3 py-2.5" onClick={paste} title={t('common.paste')}>
           <ClipboardPaste size={16} />
         </button>
         <button
@@ -193,19 +260,74 @@ export default function HomeView(): JSX.Element {
         >
           {status === 'detecting' ? (
             <Loader2 size={16} className="animate-spin" />
-          ) : url.trim() && !isProbablyUrl(url) ? (
+          ) : isSearchQuery ? (
             <Search size={16} />
           ) : (
             <Download size={16} />
           )}
-          {url.trim() && !isProbablyUrl(url) ? 'search' : 'get'}
+          {isSearchQuery ? t('common.search') : t('home.get')}
         </button>
       </motion.div>
 
+      {/* Batch links */}
+      <div className="mt-2 flex justify-center">
+        <button
+          onClick={() => setBatchOpen((v) => !v)}
+          className="mono flex items-center gap-1.5 rounded-full px-3 py-1 text-[11px] text-fg/35 transition-colors hover:text-fg/70"
+        >
+          <Layers size={12} /> {t('home.batchOpen')}
+        </button>
+      </div>
+      <AnimatePresence initial={false}>
+        {batchOpen && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            className="overflow-hidden"
+          >
+            <div className="card mt-2 space-y-3 p-4">
+              <div>
+                <p className="group-title mb-1.5">{t('home.batch')}</p>
+                <p className="mono mb-2 text-[11px] text-fg/30">{t('home.batchHint')}</p>
+                <textarea
+                  value={batchText}
+                  onChange={(e) => setBatchText(e.target.value)}
+                  rows={5}
+                  spellCheck={false}
+                  className="input mono resize-none text-xs"
+                  placeholder={'https://…\nhttps://…'}
+                />
+              </div>
+              <button
+                className="btn-primary w-full py-2.5"
+                disabled={!batchLinks.length || starting}
+                onClick={queueBatch}
+              >
+                {starting ? <Loader2 size={16} className="animate-spin" /> : <Download size={16} />}
+                {t('home.batchAdd', { count: batchLinks.length })}
+              </button>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* Results */}
       <div className="mt-5">
-        <AnimatePresence mode="wait">
-          {status === 'detecting' && <DetectingSkeleton key="skeleton" />}
+        {/* popLayout, not "wait": the incoming state (skeleton, result, error)
+            must appear the moment it exists, without waiting for the previous
+            one's exit animation to report back. */}
+        <AnimatePresence mode="popLayout">
+          {status === 'detecting' && (
+            <DetectingCard
+              key="skeleton"
+              stage={detectStatus?.stage ?? 'resolving'}
+              label={t(STAGE_LABEL[detectStatus?.stage ?? 'resolving'])}
+              slowHint={t('detect.slowHint')}
+              cancelLabel={t('common.cancel')}
+              onCancel={cancelDetect}
+            />
+          )}
 
           {status === 'error' && (
             <motion.div
@@ -215,13 +337,16 @@ export default function HomeView(): JSX.Element {
               exit={{ opacity: 0, y: -8 }}
               className="card flex items-start gap-3 p-4"
             >
-              <AlertCircle className="mt-0.5 shrink-0 text-red-400/80" size={18} />
+              <AlertCircle className="mt-0.5 shrink-0 text-bad" size={18} />
               <div className="min-w-0">
-                <p className="text-sm font-medium text-cream">couldn&apos;t detect a video</p>
-                <p className="mt-0.5 text-xs text-white/45">{error}</p>
-                {/Settings/.test(error) && (
-                  <button className="btn-ghost mt-2.5 py-1.5 text-xs" onClick={() => setView('settings')}>
-                    open settings → access
+                <p className="text-sm font-medium text-cream">{t('home.errorTitle')}</p>
+                <p className="mt-0.5 text-xs text-fg/45">{error}</p>
+                {/Settings|настрой/i.test(error) && (
+                  <button
+                    className="btn-ghost mt-2.5 py-1.5 text-xs"
+                    onClick={() => setView('settings')}
+                  >
+                    {t('home.openAccessSettings')}
                   </button>
                 )}
               </div>
@@ -262,7 +387,7 @@ export default function HomeView(): JSX.Element {
               className="card overflow-hidden"
             >
               {/* Preview header */}
-              <div className="flex gap-4 border-b border-white/[0.06] p-4">
+              <div className="flex gap-4 border-b border-fg/[0.06] p-4">
                 <div className="relative aspect-video w-40 shrink-0 overflow-hidden rounded-2xl bg-ink-950">
                   {info.thumbnail ? (
                     <img
@@ -272,7 +397,7 @@ export default function HomeView(): JSX.Element {
                       referrerPolicy="no-referrer"
                     />
                   ) : (
-                    <div className="flex h-full items-center justify-center text-white/20">
+                    <div className="flex h-full items-center justify-center text-fg/20">
                       <Download size={28} />
                     </div>
                   )}
@@ -286,7 +411,7 @@ export default function HomeView(): JSX.Element {
                   <h2 className="line-clamp-2 text-sm font-semibold text-cream" title={info.title}>
                     {info.title}
                   </h2>
-                  <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-white/40">
+                  <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-fg/40">
                     {info.uploader && (
                       <span className="flex items-center gap-1">
                         <User size={12} /> {info.uploader}
@@ -304,17 +429,34 @@ export default function HomeView(): JSX.Element {
                     )}
                   </div>
                   <div className="mt-2 flex flex-wrap items-center gap-1.5">
-                    <span className="mono rounded-lg bg-white/[0.06] px-2 py-0.5 text-[10px] text-white/50">
+                    <span className="mono rounded-lg bg-fg/[0.06] px-2 py-0.5 text-[10px] text-fg/50">
                       {info.extractor}
                     </span>
                     {maxHeightOf(info.formats) > 0 && (
-                      <span className="mono rounded-lg bg-white/[0.06] px-2 py-0.5 text-[10px] text-white/50">
-                        up to {maxHeightOf(info.formats)}p
+                      <span className="mono rounded-lg bg-fg/[0.06] px-2 py-0.5 text-[10px] text-fg/50">
+                        {t('format.upTo', { height: maxHeightOf(info.formats) })}
+                      </span>
+                    )}
+                    {info.subtitleLanguages && info.subtitleLanguages.length > 0 && (
+                      <span className="mono rounded-lg bg-fg/[0.06] px-2 py-0.5 text-[10px] text-fg/50">
+                        {t('format.subtitles', { count: info.subtitleLanguages.length })}
                       </span>
                     )}
                   </div>
                 </div>
               </div>
+
+              {info.viaUniversal && (
+                <div className="flex items-start gap-2.5 border-b border-fg/[0.06] bg-accent/[0.06] px-4 py-2.5">
+                  <Sparkles size={14} className="mt-0.5 shrink-0 text-accent" />
+                  <div className="min-w-0">
+                    <p className="text-xs font-medium text-cream">{t('home.universal')}</p>
+                    <p className="mt-0.5 text-[11px] leading-relaxed text-fg/45">
+                      {t('home.universalHint')}
+                    </p>
+                  </div>
+                </div>
+              )}
 
               {/* Format selection + CTA */}
               <div className="p-4">
@@ -332,7 +474,7 @@ export default function HomeView(): JSX.Element {
                   disabled={starting}
                 >
                   {starting ? <Loader2 size={18} className="animate-spin" /> : <Download size={18} />}
-                  download
+                  {t('common.download')}
                 </button>
               </div>
             </motion.div>
@@ -346,16 +488,14 @@ export default function HomeView(): JSX.Element {
               exit={{ opacity: 0 }}
               className="mt-1 flex flex-wrap justify-center gap-2"
             >
-              {['youtube', 'vimeo', 'tiktok', 'twitter / x', 'instagram', 'twitch', '+1800 more'].map(
-                (site) => (
-                  <span
-                    key={site}
-                    className="mono rounded-full border border-white/[0.06] bg-white/[0.02] px-3 py-1 text-xs text-white/35"
-                  >
-                    {site}
-                  </span>
-                )
-              )}
+              {[...SITE_HINTS, t('home.moreSites')].map((site) => (
+                <span
+                  key={site}
+                  className="mono rounded-full border border-fg/[0.06] bg-fg/[0.02] px-3 py-1 text-xs text-fg/35"
+                >
+                  {site}
+                </span>
+              ))}
             </motion.div>
           )}
         </AnimatePresence>
@@ -364,7 +504,20 @@ export default function HomeView(): JSX.Element {
   )
 }
 
-function DetectingSkeleton(): JSX.Element {
+function DetectingCard({
+  stage,
+  label,
+  slowHint,
+  cancelLabel,
+  onCancel
+}: {
+  stage: DetectStage
+  label: string
+  slowHint: string
+  cancelLabel: string
+  onCancel: () => void
+}): JSX.Element {
+  const slow = stage === 'scraping' || stage === 'browsing'
   return (
     <motion.div
       initial={{ opacity: 0 }}
@@ -372,24 +525,36 @@ function DetectingSkeleton(): JSX.Element {
       exit={{ opacity: 0 }}
       className="card overflow-hidden"
     >
-      <div className="flex gap-4 border-b border-white/[0.06] p-4">
-        <div className="relative aspect-video w-40 shrink-0 overflow-hidden rounded-2xl bg-white/[0.04]">
-          <div className="absolute inset-0 -translate-x-full animate-shimmer bg-gradient-to-r from-transparent via-white/[0.08] to-transparent" />
+      <div className="flex items-center gap-3 border-b border-fg/[0.06] px-4 py-3">
+        <span className="relative flex h-2.5 w-2.5 shrink-0">
+          <span className="absolute inset-0 rounded-full bg-accent/60 animate-pulse-ring" />
+          <span className="relative h-2.5 w-2.5 rounded-full bg-accent" />
+        </span>
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-sm font-medium text-cream">{label}</p>
+          {slow && <p className="mono mt-0.5 truncate text-[11px] text-fg/35">{slowHint}</p>}
+        </div>
+        <button className="btn-ghost shrink-0 px-3 py-1.5 text-xs" onClick={onCancel}>
+          <X size={13} /> {cancelLabel}
+        </button>
+      </div>
+      <div className="flex gap-4 p-4">
+        <div className="relative aspect-video w-40 shrink-0 overflow-hidden rounded-2xl bg-fg/[0.04]">
+          <div className="absolute inset-0 -translate-x-full animate-shimmer bg-gradient-to-r from-transparent via-fg/[0.08] to-transparent" />
         </div>
         <div className="flex-1 space-y-2 py-1">
-          <div className="h-4 w-3/4 rounded bg-white/[0.05]" />
-          <div className="h-3 w-1/2 rounded bg-white/[0.05]" />
-          <div className="h-5 w-20 rounded-lg bg-white/[0.05]" />
+          <div className="h-4 w-3/4 rounded bg-fg/[0.05]" />
+          <div className="h-3 w-1/2 rounded bg-fg/[0.05]" />
+          <div className="h-5 w-20 rounded-lg bg-fg/[0.05]" />
         </div>
       </div>
-      <div className="space-y-3 p-4">
-        <div className="h-10 w-full rounded-2xl bg-white/[0.04]" />
+      <div className="space-y-3 px-4 pb-4">
+        <div className="h-10 w-full rounded-2xl bg-fg/[0.04]" />
         <div className="grid grid-cols-3 gap-2">
           {Array.from({ length: 6 }).map((_, i) => (
-            <div key={i} className="h-12 rounded-xl bg-white/[0.04]" />
+            <div key={i} className="h-12 rounded-xl bg-fg/[0.04]" />
           ))}
         </div>
-        <div className="h-12 w-full rounded-2xl bg-white/[0.04]" />
       </div>
     </motion.div>
   )
