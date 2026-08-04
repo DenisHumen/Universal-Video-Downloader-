@@ -28,7 +28,9 @@ export default defineConfig({
     build: {
       rollupOptions: {
         input: {
-          index: resolve('src/preload/index.ts')
+          index: resolve('src/preload/index.ts'),
+          // Injected into pages loaded by the built-in browser.
+          site: resolve('src/preload/site.ts')
         }
       }
     }

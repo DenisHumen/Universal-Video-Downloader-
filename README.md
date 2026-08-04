@@ -54,6 +54,31 @@ For streaming sites the app reads the available **voiceovers (озвучки)**,
 queues each as `Title - S01E02`. Premium-only translations are flagged and can't
 be downloaded.
 
+### Trim and convert, without leaving the app
+
+- **Cut before you download.** Set a start and end on the video's timeline and
+  the engine fetches *only that section* — clipping 30 seconds out of a
+  two-hour stream costs 30 seconds of bandwidth, not the whole file.
+- **Trim what you already have.** Any finished download can be re-cut. The
+  default is a frame-accurate cut (re-encoded, so "remove the intro" actually
+  removes the intro); a stream-copy mode is one click away when speed matters
+  more than precision — it's near-instant but the clip can start seconds early.
+- **Convert** to MP4, MKV, WebM, MOV or an animated GIF, extract audio as MP3,
+  M4A, OPUS, FLAC, WAV or AAC, and downscale on the way. Conversions run in the
+  same queue as downloads, with progress, cancel and open-when-done.
+
+### Built-in browser, for when nothing is found
+
+Automatic detection is good, not omniscient. When it comes up empty, the app
+opens a real Chromium view: browse to the video, play it, and every media
+request the page makes appears in a side panel, one click from the queue. If the
+capture is ambiguous, **pick mode** highlights elements as you hover — click the
+player and the app takes that element's source.
+
+It shares its session with the headless detector, so a consent banner you
+dismiss or a login you complete here still applies when a queued item is
+re-resolved later.
+
 ### Everything else
 
 - **Title search** — type a title instead of a link. Search **all services at
@@ -61,7 +86,9 @@ be downloaded.
   PornHub and the YummyAnime catalogue. Results carry thumbnails, durations and
   a best-available-quality badge.
 - **Playlists & channels** — a playlist, channel or set link expands into a
-  pickable list with per-item checkboxes, "select all" and bulk download.
+  pickable list with per-item checkboxes, "select all", a range picker for
+  taking items 1–50 of a big channel, and bulk download. How deep to list is a
+  setting (up to 5000 videos).
 - **Batch links** — paste a whole list of URLs and queue them in one go.
 - **Quality your way** — automatic **best** by default, one-click presets
   (4K…360p) or an exact stream. A preset above what the video offers falls back
@@ -154,21 +181,27 @@ src/
 │   │       ├── static.ts      #   HTML/JSON-LD/OpenGraph/player configs
 │   │       ├── sniffer.ts     #   hidden browser + network capture
 │   │       └── candidates.ts  #   scoring & ranking of media URLs
+│   │       ├── capture.ts     #   shared, ref-counted webRequest hooks
+│   │       └── direct.ts      #   uvd-direct:// — a stream picked by hand
 │   └── services/
 │       ├── ytdlp.ts           # downloads & manages the yt-dlp binary
 │       ├── detector.ts        # the engine → scrape → browser cascade
-│       ├── downloader.ts      # queue, progress, retries, pause/resume
+│       ├── downloader.ts      # queue: downloads, trims and conversions
+│       ├── ffmpeg.ts          # bundled ffmpeg: trim, convert, probe
+│       ├── browser.ts         # the built-in browser window
 │       ├── search.ts          # title search across services
-│       ├── ffmpeg.ts          # bundled ffmpeg resolution
 │       ├── updater.ts         # auto-update (+ manual fallback)
 │       ├── clipboard.ts       # optional clipboard watcher
 │       ├── options.ts         # engine flags & error humanisation
 │       └── settings.ts        # persisted user settings
-├── preload/index.ts           # secure contextBridge API
+├── preload/
+│   ├── index.ts               # secure contextBridge API
+│   └── site.ts                # injected into pages in the built-in browser
 ├── renderer/                  # React UI
 │   └── src/
 │       ├── components/        # TitleBar, Sidebar, cards, banners…
 │       ├── views/             # Home, Search, Queue, Settings
+│       ├── BrowserApp.tsx     # shell around the built-in browser view
 │       ├── i18n/              # en + ru dictionaries
 │       └── store.ts           # Zustand store wired to IPC events
 └── shared/                    # types & IPC channel names

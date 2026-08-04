@@ -20,6 +20,7 @@ function settings(overrides: Partial<AppSettings> = {}): AppSettings {
     filenameTemplate: '%(title)s.%(ext)s',
     createSubfolders: false,
     speedLimit: '',
+    playlistLimit: 500,
     autoUpdate: true,
     theme: 'midnight',
     accent: 'cream',

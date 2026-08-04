@@ -2,12 +2,14 @@ import { cumgloryholeResolvers } from './sites/cumgloryhole'
 import { rezkaResolvers, resolveRezkaStream } from './sites/rezka'
 import { yummyaniResolvers, resolveYummyaniItem, resolveYummyaniStream } from './sites/yummyani'
 import { resolveSniffUrl, SNIFF_SCHEME } from './universal'
+import { DIRECT_SCHEME, resolveDirectUrl } from './universal/direct'
 import type { ResolvedUrl, SiteResolver } from './types'
 
 export type { ResolvedEntry, ResolvedUrl, SiteResolver } from './types'
 export { searchYummyani } from './sites/yummyani'
 export { resolveUniversal, sniffUrlFor, SNIFF_SCHEME } from './universal'
 export type { UniversalStage } from './universal'
+export { directUrlFor, DIRECT_SCHEME } from './universal/direct'
 
 /**
  * Hand-written resolvers, tried in order. Most sites never need one — the
@@ -29,7 +31,8 @@ const internalSchemes: { prefix: string; resolve: (url: string) => Promise<Resol
   { prefix: 'uvd-rezka://', resolve: resolveRezkaStream },
   { prefix: 'uvd-yummy-item://', resolve: resolveYummyaniItem },
   { prefix: 'uvd-yummy://', resolve: resolveYummyaniStream },
-  { prefix: SNIFF_SCHEME, resolve: resolveSniffUrl }
+  { prefix: SNIFF_SCHEME, resolve: resolveSniffUrl },
+  { prefix: DIRECT_SCHEME, resolve: resolveDirectUrl }
 ]
 
 export function isInternalUrl(input: string): boolean {

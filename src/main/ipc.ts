@@ -5,10 +5,13 @@ import type {
   DetectStage,
   DownloadItem,
   DownloadRequest,
+  MediaJobRequest,
   SearchScope
 } from '@shared/types'
 import { detect } from './services/detector'
 import { searchVideos } from './services/search'
+import { probeMedia } from './services/ffmpeg'
+import { registerBrowserIpc } from './services/browser'
 import {
   cancelDownload,
   clearFinished,
@@ -21,7 +24,8 @@ import {
   resumeDownload,
   retryDownload,
   retryFailed,
-  startDownload
+  startDownload,
+  startMediaJob
 } from './services/downloader'
 import { getSettings, resetSettings, setSettings } from './services/settings'
 import { ensureYtdlp, getYtdlpStatus, updateYtdlp, ytdlpEvents } from './services/ytdlp'
@@ -84,6 +88,8 @@ export function registerIpc({ getWindow, openSearchWindow, onSettingsChanged }: 
   ipcMain.handle(IPC.downloadRemove, (_e, id: string) => removeDownload(id))
   ipcMain.handle(IPC.downloadClearFinished, () => clearFinished())
   ipcMain.handle(IPC.downloadList, () => listDownloads())
+  ipcMain.handle(IPC.mediaJobStart, (_e, req: MediaJobRequest) => startMediaJob(req))
+  ipcMain.handle(IPC.mediaProbe, (_e, path: string) => probeMedia(path))
   ipcMain.handle(IPC.downloadPauseAll, () => pauseAll())
   ipcMain.handle(IPC.downloadResumeAll, () => resumeAll())
   ipcMain.handle(IPC.downloadRetryFailed, () => retryFailed())
@@ -178,6 +184,9 @@ export function registerIpc({ getWindow, openSearchWindow, onSettingsChanged }: 
     IPC.windowIsMaximized,
     (e) => BrowserWindow.fromWebContents(e.sender)?.isMaximized() ?? false
   )
+
+  // ---- Built-in browser ----
+  registerBrowserIpc()
 
   // ---- Forward service events to the renderer ----
   downloadEvents.on('progress', (p) => {

@@ -4,11 +4,13 @@ import {
   CheckCircle2,
   ChevronDown,
   Copy,
+  FileVideo,
   FolderOpen,
   Music,
   Pause,
   Play,
   RotateCw,
+  Scissors,
   Sparkles,
   Trash2,
   Video,
@@ -19,6 +21,7 @@ import type { DownloadItem } from '@shared/types'
 import { formatBytes, formatEta, formatSpeed } from '../lib/format'
 import { useT, type TranslationKey } from '../i18n'
 import { toast } from '../lib/toast'
+import MediaJobModal, { type JobMode } from './MediaJobModal'
 
 interface Props {
   item: DownloadItem
@@ -38,7 +41,10 @@ const STATE_META: Record<DownloadItem['state'], { label: TranslationKey; tone: s
 export default function DownloadCard({ item }: Props): JSX.Element {
   const t = useT()
   const [logOpen, setLogOpen] = useState(false)
+  const [jobModal, setJobModal] = useState<JobMode | null>(null)
   const meta = STATE_META[item.state]
+  const jobKindLabel =
+    item.kind === 'trim' ? t('job.trim') : item.kind === 'convert' ? t('job.convert') : null
   const active =
     item.state === 'downloading' || item.state === 'processing' || item.state === 'detecting'
   const percent = Math.round(item.percent || 0)
@@ -102,6 +108,8 @@ export default function DownloadCard({ item }: Props): JSX.Element {
               </p>
               <div className="mono mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs">
                 <span className={`font-medium ${meta.tone}`}>{t(meta.label)}</span>
+                {jobKindLabel && <span className="text-accent">· {jobKindLabel}</span>}
+                {item.jobLabel && <span className="text-fg/35">· {item.jobLabel}</span>}
                 {qualityLabel && <span className="text-fg/35">· {qualityLabel}</span>}
                 {active && item.speed ? (
                   <span className="text-fg/35">· {formatSpeed(item.speed)}</span>
@@ -130,6 +138,20 @@ export default function DownloadCard({ item }: Props): JSX.Element {
                     onClick={() => window.api.openPath(item.filepath!)}
                   >
                     <Play size={16} />
+                  </button>
+                  <button
+                    className="btn-icon"
+                    title={t('trim.openEditor')}
+                    onClick={() => setJobModal('trim')}
+                  >
+                    <Scissors size={16} />
+                  </button>
+                  <button
+                    className="btn-icon"
+                    title={t('convert.open')}
+                    onClick={() => setJobModal('convert')}
+                  >
+                    <FileVideo size={16} />
                   </button>
                   <button
                     className="btn-icon"
@@ -259,6 +281,8 @@ export default function DownloadCard({ item }: Props): JSX.Element {
           </AnimatePresence>
         </>
       )}
+
+      {jobModal && <MediaJobModal item={item} mode={jobModal} onClose={() => setJobModal(null)} />}
     </motion.div>
   )
 }

@@ -23,6 +23,7 @@ function defaults(): AppSettings {
     filenameTemplate: '%(title)s [%(id)s].%(ext)s',
     createSubfolders: false,
     speedLimit: '',
+    playlistLimit: 500,
     autoUpdate: true,
     theme: 'midnight',
     accent: 'cream',
@@ -44,6 +45,9 @@ function migrate(raw: Record<string, unknown>): Partial<AppSettings> {
   if (raw.accent !== undefined && !ACCENTS.includes(raw.accent as AccentId)) next.accent = 'cream'
   if (typeof next.concurrentDownloads === 'number') {
     next.concurrentDownloads = Math.min(8, Math.max(1, Math.round(next.concurrentDownloads)))
+  }
+  if (typeof next.playlistLimit === 'number') {
+    next.playlistLimit = Math.min(5000, Math.max(10, Math.round(next.playlistLimit)))
   }
   return next
 }

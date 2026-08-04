@@ -2,11 +2,15 @@ import { contextBridge, ipcRenderer } from 'electron'
 import { IPC } from '@shared/ipc'
 import type {
   AppSettings,
+  BrowserMedia,
+  BrowserState,
   DetectResult,
   DetectStatus,
   DownloadItem,
   DownloadProgress,
   DownloadRequest,
+  MediaJobRequest,
+  MediaProbe,
   SearchResponse,
   SearchScope,
   UpdateStatus,
@@ -53,6 +57,28 @@ const api = {
   removeDownload: (id: string): Promise<void> => ipcRenderer.invoke(IPC.downloadRemove, id),
   clearFinished: (): Promise<void> => ipcRenderer.invoke(IPC.downloadClearFinished),
   listDownloads: (): Promise<DownloadItem[]> => ipcRenderer.invoke(IPC.downloadList),
+  // Local media jobs (trim / convert)
+  startMediaJob: (req: MediaJobRequest): Promise<DownloadItem> =>
+    ipcRenderer.invoke(IPC.mediaJobStart, req),
+  probeMedia: (path: string): Promise<MediaProbe> => ipcRenderer.invoke(IPC.mediaProbe, path),
+
+  // Built-in browser
+  openBrowser: (url?: string): Promise<void> => ipcRenderer.invoke(IPC.browserOpen, url),
+  browserNavigate: (url: string): Promise<void> => ipcRenderer.invoke(IPC.browserNavigate, url),
+  browserBack: (): Promise<void> => ipcRenderer.invoke(IPC.browserBack),
+  browserForward: (): Promise<void> => ipcRenderer.invoke(IPC.browserForward),
+  browserReload: (): Promise<void> => ipcRenderer.invoke(IPC.browserReload),
+  browserStop: (): Promise<void> => ipcRenderer.invoke(IPC.browserStop),
+  browserSetBounds: (bounds: { x: number; y: number; width: number; height: number }): Promise<void> =>
+    ipcRenderer.invoke(IPC.browserSetBounds, bounds),
+  browserSetPick: (enabled: boolean): Promise<void> => ipcRenderer.invoke(IPC.browserSetPick, enabled),
+  browserClearMedia: (): Promise<void> => ipcRenderer.invoke(IPC.browserClearMedia),
+  browserDownload: (target: { mediaId?: string; url?: string }): Promise<DownloadItem | null> =>
+    ipcRenderer.invoke(IPC.browserDownload, target),
+  browserRefreshState: (): Promise<void> => ipcRenderer.invoke(IPC.browserState),
+  onBrowserState: (cb: (state: BrowserState) => void) => on<BrowserState>(IPC.evtBrowserState, cb),
+  onBrowserMedia: (cb: (media: BrowserMedia[]) => void) => on<BrowserMedia[]>(IPC.evtBrowserMedia, cb),
+
   pauseAll: (): Promise<void> => ipcRenderer.invoke(IPC.downloadPauseAll),
   resumeAll: (): Promise<void> => ipcRenderer.invoke(IPC.downloadResumeAll),
   retryFailed: (): Promise<void> => ipcRenderer.invoke(IPC.downloadRetryFailed),

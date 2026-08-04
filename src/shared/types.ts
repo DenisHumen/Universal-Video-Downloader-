@@ -109,6 +109,32 @@ export type DownloadState =
   | 'paused'
   | 'canceled'
 
+/** A section of a video, in seconds from its start. */
+export interface TrimRange {
+  start?: number
+  /** Undefined means "to the end". */
+  end?: number
+}
+
+export function hasTrim(range?: TrimRange): boolean {
+  if (!range) return false
+  return (range.start ?? 0) > 0 || range.end != null
+}
+
+export const VIDEO_CONTAINERS = ['mp4', 'mkv', 'webm', 'mov', 'gif'] as const
+export const AUDIO_CONTAINERS = ['mp3', 'm4a', 'opus', 'flac', 'wav', 'aac'] as const
+
+export interface ConvertTarget {
+  mode: DownloadMode
+  /** mp4 / mkv / webm / mov / gif, or an audio container. */
+  container: string
+  /** Optional downscale, e.g. 720. */
+  height?: number
+}
+
+/** What a queue entry is doing: fetching a video, or reworking a local file. */
+export type QueueKind = 'download' | 'trim' | 'convert'
+
 export interface DownloadRequest {
   url: string
   title?: string
@@ -123,11 +149,52 @@ export interface DownloadRequest {
   embedThumbnail?: boolean
   embedSubtitles?: boolean
   embedMetadata?: boolean
+  /**
+   * Fetch only this section of the video. The engine downloads just the
+   * requested range, so trimming a clip out of a two-hour stream costs
+   * seconds rather than the whole file.
+   */
+  section?: TrimRange
+}
+
+/** What ffmpeg found inside a local file. */
+export interface MediaProbe {
+  duration?: number
+  hasVideo: boolean
+  hasAudio: boolean
+}
+
+/** Rework a file that's already on disk. */
+export interface MediaJobRequest {
+  kind: 'trim' | 'convert'
+  sourcePath: string
+  title: string
+  thumbnail?: string
+  /** trim only */
+  range?: TrimRange
+  /** trim only — re-encode for a frame-accurate cut instead of copying. */
+  precise?: boolean
+  /** convert only */
+  target?: ConvertTarget
 }
 
 export interface DownloadItem {
   id: string
   url: string
+  /** Downloading a video, or reworking a local file. Absent means 'download'. */
+  kind?: QueueKind
+  /** For trim/convert jobs: the file being reworked. */
+  sourcePath?: string
+  /** The section this entry covers, when the user trimmed it. */
+  range?: TrimRange
+  /** Trim jobs: re-encode for a frame-accurate cut rather than copying. */
+  precise?: boolean
+  /** Convert jobs: the requested output format. */
+  convertTarget?: ConvertTarget
+  /** Human-readable summary of a trim/convert job, shown on the card. */
+  jobLabel?: string
+  /** Source duration in seconds, when known — seeds the trim editor. */
+  duration?: number
   /** Extra HTTP headers the stream needs, filled in when the URL is resolved. */
   headers?: Record<string, string>
   /** Tail of the engine's output — shown in the card's details drawer. */
@@ -199,6 +266,12 @@ export interface AppSettings {
   createSubfolders: boolean
   /** Engine rate limit, e.g. '2M' or '500K'. Empty = unlimited. */
   speedLimit: string
+  /**
+   * How many entries to pull when expanding a channel or playlist. Big
+   * channels run to thousands of videos; listing them is cheap, but the user
+   * decides how deep to go.
+   */
+  playlistLimit: number
   autoUpdate: boolean
   theme: ThemeId
   accent: AccentId
@@ -271,6 +344,34 @@ export interface DetectResult {
   ok: boolean
   info?: MediaInfo
   error?: string
+}
+
+// ---- Built-in browser ----
+
+/** A media stream seen on the page currently open in the built-in browser. */
+export interface BrowserMedia {
+  id: string
+  url: string
+  kind: 'hls' | 'dash' | 'file' | 'unknown'
+  /** Short label for the list — usually the filename. */
+  label: string
+  /** How confident we are that this is the real video. */
+  score: number
+  /** Where it was seen. */
+  pageUrl: string
+  pageTitle?: string
+  thumbnail?: string
+  seenAt: number
+}
+
+export interface BrowserState {
+  url: string
+  title: string
+  canGoBack: boolean
+  canGoForward: boolean
+  loading: boolean
+  /** Click-to-pick mode is armed. */
+  picking: boolean
 }
 
 /** What the detector is currently doing, streamed to the UI while it works. */

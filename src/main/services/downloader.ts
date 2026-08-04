@@ -2,18 +2,30 @@ import { app } from 'electron'
 import { EventEmitter } from 'events'
 import { spawn, ChildProcess } from 'child_process'
 import { existsSync, mkdirSync, readFileSync, writeFileSync, readdirSync, rmSync, renameSync } from 'fs'
-import { join } from 'path'
+import { dirname, join } from 'path'
 import { randomUUID } from 'crypto'
 import { ytdlpBinaryPath, ensureYtdlp, ytdlpSpawnOptions } from './ytdlp'
-import { ffmpegLocation } from './ffmpeg'
+import {
+  buildConvertArgs,
+  buildTrimArgs,
+  ffmpegLocation,
+  humanizeFfmpegError,
+  probeMedia,
+  rangeDuration,
+  runFfmpeg,
+  toTimestamp,
+  uniqueOutputPath
+} from './ffmpeg'
 import { getSettings } from './settings'
 import { accessArgs, hasCookies, headerArgs, humanizeYtdlpError, isTransientError } from './options'
 import { resolveUrl } from '../resolvers'
+import { hasTrim } from '@shared/types'
 import type {
   AppSettings,
   DownloadItem,
   DownloadProgress,
   DownloadRequest,
+  MediaJobRequest,
   QualityPreset
 } from '@shared/types'
 
@@ -200,6 +212,16 @@ function buildArgs(item: DownloadItem): string[] {
     args.push('--sponsorblock-remove', 'sponsor,selfpromo,interaction')
   }
 
+  // Fetch only the requested section. The engine asks the server for that byte
+  // range, so clipping 30 seconds out of a two-hour stream costs 30 seconds of
+  // bandwidth rather than the whole file.
+  if (hasTrim(item.range)) {
+    const start = item.range!.start ?? 0
+    const end = item.range!.end
+    args.push('--download-sections', `*${start}-${end ?? 'inf'}`)
+    args.push('--force-keyframes-at-cuts')
+  }
+
   args.push(item.url)
   return args
 }
@@ -284,9 +306,106 @@ function processQueue(): void {
   for (const item of listDownloads().reverse()) {
     if (activeCount() >= limit) break
     if (item.state === 'queued' && !procs.has(item.id) && !retryTimers.has(item.id)) {
-      void runDownload(item)
+      if (item.kind && item.kind !== 'download') void runMediaJob(item)
+      else void runDownload(item)
     }
   }
+}
+
+/**
+ * Trim or convert a file that's already on disk. These run through the same
+ * queue as downloads so pause/cancel/remove, progress and history all behave
+ * identically — from the user's side it's one list of things in flight.
+ */
+async function runMediaJob(item: DownloadItem): Promise<void> {
+  const source = item.sourcePath
+  if (!source || !existsSync(source)) {
+    item.state = 'error'
+    item.error = 'The source file is gone — it may have been moved or deleted.'
+    emitUpdated(item)
+    processQueue()
+    return
+  }
+
+  item.state = 'downloading'
+  item.error = undefined
+  emitUpdated(item)
+
+  const probe = await probeMedia(source)
+  // Catch the impossible ask up front rather than letting ffmpeg fail obscurely.
+  if (item.kind === 'convert' && item.convertTarget?.mode === 'audio' && !probe.hasAudio) {
+    item.state = 'error'
+    item.error = 'This file has no audio track, so it can’t be converted to an audio format.'
+    emitUpdated(item)
+    processQueue()
+    return
+  }
+
+  // Trims render only the selected span; conversions render the whole file.
+  const totalSeconds =
+    item.kind === 'trim' ? rangeDuration(item.range ?? {}, probe.duration) : probe.duration
+
+  let args: string[]
+  try {
+    args =
+      item.kind === 'trim'
+        ? buildTrimArgs(source, item.filepath!, item.range ?? {}, item.precise ?? true)
+        : buildConvertArgs(source, item.filepath!, item.convertTarget!)
+  } catch (err) {
+    fail(item, err instanceof Error ? err.message : String(err))
+    return
+  }
+
+  let run: ReturnType<typeof runFfmpeg>
+  try {
+    run = runFfmpeg(args, {
+      totalSeconds,
+      onProgress: (percent, speed) => {
+        if (percent >= 0) item.percent = percent
+        if (speed != null) item.speed = undefined
+        emitProgress({ id: item.id, state: 'downloading', percent: item.percent })
+      }
+    })
+  } catch (err) {
+    fail(item, err instanceof Error ? err.message : String(err))
+    return
+  }
+
+  procs.set(item.id, run.child)
+  const { code, stderr } = await run.done
+  procs.delete(item.id)
+
+  // Re-read the state: pause/cancel mutate the item while ffmpeg is running.
+  const stateAfterRun = items.get(item.id)?.state
+  if (stateAfterRun === 'paused' || stateAfterRun === 'canceled') {
+    // Half-written output is useless; don't leave it lying around.
+    try {
+      if (item.filepath && existsSync(item.filepath)) rmSync(item.filepath, { force: true })
+    } catch {
+      /* best effort */
+    }
+    emitUpdated(item)
+    processQueue()
+    return
+  }
+
+  if (code === 0) {
+    item.state = 'completed'
+    item.percent = 100
+    item.finishedAt = Date.now()
+    emitUpdated(item)
+    processQueue()
+    return
+  }
+  appendLog(item, stderr)
+  // ffmpeg failures are never the flaky-network kind, so skip the retry path
+  // and give the user a plain explanation straight away.
+  item.state = 'error'
+  item.speed = undefined
+  item.eta = undefined
+  item.error = humanizeFfmpegError(stderr || `ffmpeg exited with code ${code}`)
+  emitUpdated(item)
+  processQueue()
 }
 
 async function runDownload(item: DownloadItem): Promise<void> {
@@ -421,7 +540,48 @@ export async function startDownload(req: DownloadRequest): Promise<DownloadItem>
     state: 'queued',
     percent: 0,
     attempts: 0,
+    kind: 'download',
+    range: hasTrim(req.section) ? req.section : undefined,
     outputDir: req.outputDir || settings.downloadDir,
+    createdAt: Date.now()
+  }
+  items.set(id, item)
+  emitUpdated(item)
+  processQueue()
+  return item
+}
+
+/** Queue a trim or convert job for a file that's already on disk. */
+export function startMediaJob(req: MediaJobRequest): DownloadItem {
+  const id = randomUUID()
+  const isTrim = req.kind === 'trim'
+  const container = isTrim
+    ? (req.sourcePath.split('.').pop() || 'mp4').toLowerCase()
+    : (req.target?.container ?? 'mp4')
+  const suffix = isTrim ? ' (clip)' : ` (${container})`
+  const filepath = uniqueOutputPath(req.sourcePath, suffix, container)
+
+  const label = isTrim
+    ? `${toTimestamp(req.range?.start ?? 0)} → ${req.range?.end != null ? toTimestamp(req.range.end) : '∞'}`
+    : `→ ${container.toUpperCase()}${req.target?.height ? ` · ${req.target.height}p` : ''}`
+
+  const item: DownloadItem = {
+    id,
+    kind: req.kind,
+    url: req.sourcePath,
+    sourcePath: req.sourcePath,
+    title: req.title,
+    thumbnail: req.thumbnail,
+    mode: req.target?.mode ?? 'video',
+    state: 'queued',
+    percent: 0,
+    attempts: 0,
+    range: req.range,
+    precise: req.precise ?? true,
+    convertTarget: req.target,
+    jobLabel: label,
+    filepath,
+    outputDir: dirname(filepath),
     createdAt: Date.now()
   }
   items.set(id, item)

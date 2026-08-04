@@ -114,6 +114,8 @@ export const en = {
   'playlist.downloadOne': 'download this one',
   'playlist.selected': 'download selected ({count})',
   'playlist.selectAll': 'select all',
+  'playlist.range': 'items',
+  'playlist.selectRange': 'select range',
   'playlist.added': 'added {count} videos to the queue',
 
   // ---- streaming picker ----
@@ -187,6 +189,9 @@ export const en = {
   'settings.concurrent': 'simultaneous downloads',
   'settings.speedLimit': 'speed limit',
   'settings.speedLimitHint': 'e.g. 2M or 500K — leave empty for unlimited',
+  'settings.playlistLimit': 'channel & playlist depth',
+  'settings.playlistLimitHint':
+    'how many videos to list when you paste a channel or playlist link',
 
   'settings.embedThumbnail': 'embed thumbnail',
   'settings.embedThumbnailHint': 'adds cover art to the file',
@@ -268,6 +273,75 @@ export const en = {
   'shortcuts.paste': 'paste a link and detect',
   'shortcuts.help': 'this list',
   'shortcuts.escape': 'clear / close',
+
+  // ---- capabilities panel ----
+  'cap.link.title': 'paste any link',
+  'cap.link.body':
+    '1800+ sites natively, and for the rest the app reads the page — or watches it in a hidden browser — to find the stream itself.',
+  'cap.search.title': 'search by title',
+  'cap.search.body': 'YouTube, SoundCloud, Dailymotion, Bilibili, Niconico, anime and more, at once.',
+  'cap.trim.title': 'cut before you download',
+  'cap.trim.body':
+    'Pick a start and end — only that part is fetched. Already-downloaded files can be trimmed too.',
+  'cap.convert.title': 'convert anything',
+  'cap.convert.body': 'MP4, MKV, WebM, MOV, GIF, or extract audio as MP3, FLAC, OPUS…',
+  'cap.channel.title': 'whole channels & playlists',
+  'cap.channel.body': 'Paste a channel or playlist link and queue all of it — or just a range.',
+  'cap.browser.title': 'built-in browser',
+  'cap.browser.body':
+    'Nothing found automatically? Browse to the video, click it, and download it by hand.',
+
+  // ---- trim ----
+  'trim.title': 'trim',
+  'trim.enable': 'cut a section',
+  'trim.start': 'from',
+  'trim.end': 'to',
+  'trim.end.full': 'end',
+  'trim.length': 'length',
+  'trim.reset': 'whole video',
+  'trim.precise': 'exact cut',
+  'trim.preciseHint': 're-encodes so the cut lands exactly here — slower, but no leftover intro',
+  'trim.fastHint':
+    'copies the stream — near-instant, but the clip can start seconds early and run longer than asked',
+  'trim.downloadHint': 'only the selected part is downloaded',
+  'trim.invalid': 'the end must come after the start',
+  'trim.apply': 'trim',
+  'trim.openEditor': 'trim',
+
+  // ---- convert ----
+  'convert.title': 'convert',
+  'convert.open': 'convert',
+  'convert.format': 'format',
+  'convert.resolution': 'resolution',
+  'convert.keepResolution': 'keep',
+  'convert.apply': 'convert',
+  'convert.gifHint': 'GIFs get large fast — trim to a few seconds first',
+  'convert.noAudio': 'this file has no audio track, so only video formats are offered',
+
+  // ---- queue job kinds ----
+  'job.trim': 'trimming',
+  'job.convert': 'converting',
+  'job.sourceMissing': 'source file not found',
+
+  // ---- built-in browser ----
+  'browser.open': 'open the built-in browser',
+  'browser.openHint': 'browse to the video and grab it by hand',
+  'browser.title': 'browser',
+  'browser.urlPlaceholder': 'address or search',
+  'browser.back': 'back',
+  'browser.forward': 'forward',
+  'browser.reload': 'reload',
+  'browser.stop': 'stop',
+  'browser.pick': 'pick the video',
+  'browser.pickActive': 'click the video on the page…',
+  'browser.pickHint': 'point at the player and click — Esc cancels',
+  'browser.found': 'found on this page',
+  'browser.foundNone': 'nothing yet',
+  'browser.foundHint': 'play the video — streams show up here as the page requests them',
+  'browser.downloadPage': 'download this page',
+  'browser.clear': 'clear',
+  'browser.openExternal': 'open in your browser',
+  'browser.queued': 'added to the queue',
 
   // ---- errors ----
   'error.title': 'something went wrong',

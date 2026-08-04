@@ -309,11 +309,12 @@ async function probeCollection(url: string, signal?: AbortSignal): Promise<Media
     '--no-progress',
     '--ignore-config',
     '--playlist-end',
-    '200',
+    String(settings.playlistLimit),
     ...accessArgs(settings),
     url
   ]
-  const result = await spawnJson(args, signal, 60_000)
+  // Listing a big channel is cheap but not instant — give it room.
+  const result = await spawnJson(args, signal, 120_000)
   if (!result.ok) return null
   const raw = result.raw
   if (raw._type !== 'playlist' || !raw.entries || raw.entries.length < 2) return null

@@ -2,27 +2,33 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import {
   AlertCircle,
+  ChevronDown,
   ClipboardPaste,
   Clock,
   Download,
   Eye,
+  Globe,
   Layers,
   Loader2,
   Radio,
+  Scissors,
   Search,
   Sparkles,
   User,
   X
 } from 'lucide-react'
-import type { DetectStage, DownloadMode, MediaInfo, QualityPreset } from '@shared/types'
+import { hasTrim, type DetectStage, type DownloadMode, type MediaInfo, type QualityPreset, type TrimRange } from '@shared/types'
 import { useStore } from '../store'
 import { formatCount, formatDuration, isProbablyUrl } from '../lib/format'
 import { initialMode, initialQuality, maxHeightOf } from '../lib/quality'
 import { toast } from '../lib/toast'
+import { toClock } from '../lib/time'
 import { useT, type TranslationKey } from '../i18n'
 import FormatSelector from '../components/FormatSelector'
 import PlaylistCard from '../components/PlaylistCard'
 import StreamingCard from '../components/StreamingCard'
+import TrimEditor from '../components/TrimEditor'
+import CapabilitiesPanel from '../components/CapabilitiesPanel'
 
 type Status = 'idle' | 'detecting' | 'error'
 
@@ -59,6 +65,8 @@ export default function HomeView(): JSX.Element {
   const [starting, setStarting] = useState(false)
   const [batchOpen, setBatchOpen] = useState(false)
   const [batchText, setBatchText] = useState('')
+  const [trimOpen, setTrimOpen] = useState(false)
+  const [section, setSection] = useState<TrimRange>({ start: 0 })
   const inputRef = useRef<HTMLInputElement>(null)
   const requestRef = useRef<string | null>(null)
 
@@ -91,6 +99,8 @@ export default function HomeView(): JSX.Element {
         mode: initialMode(settings),
         quality: initialQuality(settings, maxHeightOf(res.info.formats))
       })
+      setTrimOpen(false)
+      setSection({ start: 0 })
       setStatus('idle')
     } else {
       setError(res.error || t('home.errorTitle'))
@@ -172,7 +182,8 @@ export default function HomeView(): JSX.Element {
         thumbnail: info.thumbnail,
         mode: selection.mode,
         quality: selection.quality,
-        formatId: selection.formatId
+        formatId: selection.formatId,
+        section: trimOpen && hasTrim(section) ? section : undefined
       })
     } catch (err) {
       toast(err instanceof Error ? err.message : t('home.startFailed'), 'error')
@@ -341,14 +352,21 @@ export default function HomeView(): JSX.Element {
               <div className="min-w-0">
                 <p className="text-sm font-medium text-cream">{t('home.errorTitle')}</p>
                 <p className="mt-0.5 text-xs text-fg/45">{error}</p>
-                {/Settings|настрой/i.test(error) && (
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {/* The honest escape hatch: let the user find it by hand. */}
                   <button
-                    className="btn-ghost mt-2.5 py-1.5 text-xs"
-                    onClick={() => setView('settings')}
+                    className="btn-primary py-1.5 text-xs"
+                    onClick={() => window.api.openBrowser(url || undefined)}
                   >
-                    {t('home.openAccessSettings')}
+                    <Globe size={13} /> {t('browser.open')}
                   </button>
-                )}
+                  {/Settings|настрой/i.test(error) && (
+                    <button className="btn-ghost py-1.5 text-xs" onClick={() => setView('settings')}>
+                      {t('home.openAccessSettings')}
+                    </button>
+                  )}
+                </div>
+                <p className="mono mt-2 text-[11px] text-fg/30">{t('browser.openHint')}</p>
               </div>
             </motion.div>
           )}
@@ -468,13 +486,57 @@ export default function HomeView(): JSX.Element {
                   onChangeAudioFormat={(fmt) => saveSettings({ audioFormat: fmt })}
                   onSelectionChange={setSelection}
                 />
+                {/* Trim before downloading: the engine fetches only this
+                    section, so clipping a highlight out of a long stream costs
+                    seconds instead of the whole file. */}
+                {selection.mode === 'video' && (
+                  <div className="mt-5 border-t border-fg/[0.06] pt-4">
+                    <button
+                      onClick={() => setTrimOpen((v) => !v)}
+                      className="flex w-full items-center justify-between rounded-xl px-1 py-1 text-xs font-medium text-fg/45 transition-colors hover:text-cream"
+                    >
+                      <span className="flex items-center gap-1.5">
+                        <Scissors size={13} /> {t('trim.enable')}
+                        {trimOpen && hasTrim(section) && (
+                          <span className="mono rounded bg-accent/15 px-1.5 py-0.5 text-[10px] text-accent">
+                            {toClock(section.start ?? 0)}
+                            {section.end != null ? ` → ${toClock(section.end)}` : ' →'}
+                          </span>
+                        )}
+                      </span>
+                      <motion.span animate={{ rotate: trimOpen ? 180 : 0 }}>
+                        <ChevronDown size={15} />
+                      </motion.span>
+                    </button>
+                    <AnimatePresence initial={false}>
+                      {trimOpen && (
+                        <motion.div
+                          initial={{ height: 0, opacity: 0 }}
+                          animate={{ height: 'auto', opacity: 1 }}
+                          exit={{ height: 0, opacity: 0 }}
+                          className="overflow-hidden"
+                        >
+                          <div className="pt-3">
+                            <TrimEditor
+                              duration={info.duration}
+                              value={section}
+                              onChange={setSection}
+                              hint={t('trim.downloadHint')}
+                            />
+                          </div>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                  </div>
+                )}
+
                 <button
                   className="btn-primary mt-5 w-full py-3 text-[15px]"
                   onClick={start}
                   disabled={starting}
                 >
                   {starting ? <Loader2 size={18} className="animate-spin" /> : <Download size={18} />}
-                  {t('common.download')}
+                  {trimOpen && hasTrim(section) ? t('trim.apply') : t('common.download')}
                 </button>
               </div>
             </motion.div>
@@ -486,16 +548,19 @@ export default function HomeView(): JSX.Element {
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              className="mt-1 flex flex-wrap justify-center gap-2"
+              className="space-y-4"
             >
-              {[...SITE_HINTS, t('home.moreSites')].map((site) => (
-                <span
-                  key={site}
-                  className="mono rounded-full border border-fg/[0.06] bg-fg/[0.02] px-3 py-1 text-xs text-fg/35"
-                >
-                  {site}
-                </span>
-              ))}
+              <div className="flex flex-wrap justify-center gap-2">
+                {[...SITE_HINTS, t('home.moreSites')].map((site) => (
+                  <span
+                    key={site}
+                    className="mono rounded-full border border-fg/[0.06] bg-fg/[0.02] px-3 py-1 text-xs text-fg/35"
+                  >
+                    {site}
+                  </span>
+                ))}
+              </div>
+              <CapabilitiesPanel />
             </motion.div>
           )}
         </AnimatePresence>

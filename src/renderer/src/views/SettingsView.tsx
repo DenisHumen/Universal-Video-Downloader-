@@ -327,6 +327,14 @@ export default function SettingsView(): JSX.Element {
                   spellCheck={false}
                 />
               </Field>
+              <Field label={t('settings.playlistLimit')} hint={t('settings.playlistLimitHint')}>
+                <Segmented
+                  layoutId="set-playlist-limit"
+                  value={String(settings.playlistLimit)}
+                  onChange={(v) => set('playlistLimit', Number(v))}
+                  options={['50', '200', '500', '1000', '5000'].map((n) => ({ value: n, label: n }))}
+                />
+              </Field>
             </Section>
           )}
 

@@ -112,6 +112,8 @@ export const ru: Dictionary = {
   'playlist.downloadOne': 'скачать это',
   'playlist.selected': 'скачать выбранные ({count})',
   'playlist.selectAll': 'выбрать все',
+  'playlist.range': 'номера',
+  'playlist.selectRange': 'выбрать диапазон',
   'playlist.added': 'добавлено видео: {count}',
 
   // ---- streaming picker ----
@@ -185,6 +187,9 @@ export const ru: Dictionary = {
   'settings.concurrent': 'одновременных загрузок',
   'settings.speedLimit': 'ограничение скорости',
   'settings.speedLimitHint': 'например 2M или 500K — пусто = без ограничений',
+  'settings.playlistLimit': 'глубина каналов и плейлистов',
+  'settings.playlistLimitHint':
+    'сколько видео перечислять, когда вы вставляете ссылку на канал или плейлист',
 
   'settings.embedThumbnail': 'встроить обложку',
   'settings.embedThumbnailHint': 'добавляет картинку в файл',
@@ -266,6 +271,75 @@ export const ru: Dictionary = {
   'shortcuts.paste': 'вставить ссылку и определить',
   'shortcuts.help': 'этот список',
   'shortcuts.escape': 'очистить / закрыть',
+
+  // ---- capabilities panel ----
+  'cap.link.title': 'вставьте любую ссылку',
+  'cap.link.body':
+    '1800+ сайтов напрямую, а для остальных приложение само читает страницу — или смотрит её в скрытом браузере — и находит поток.',
+  'cap.search.title': 'поиск по названию',
+  'cap.search.body': 'YouTube, SoundCloud, Dailymotion, Bilibili, Niconico, аниме и другое — сразу.',
+  'cap.trim.title': 'обрезать до скачивания',
+  'cap.trim.body':
+    'Укажите начало и конец — скачается только этот кусок. Уже скачанные файлы тоже можно обрезать.',
+  'cap.convert.title': 'конвертация',
+  'cap.convert.body': 'MP4, MKV, WebM, MOV, GIF или звук отдельно — MP3, FLAC, OPUS…',
+  'cap.channel.title': 'целые каналы и плейлисты',
+  'cap.channel.body': 'Вставьте ссылку на канал или плейлист и поставьте в очередь всё — или диапазон.',
+  'cap.browser.title': 'встроенный браузер',
+  'cap.browser.body':
+    'Ничего не нашлось автоматически? Дойдите до видео, кликните по нему и заберите вручную.',
+
+  // ---- trim ----
+  'trim.title': 'обрезка',
+  'trim.enable': 'вырезать фрагмент',
+  'trim.start': 'с',
+  'trim.end': 'по',
+  'trim.end.full': 'конец',
+  'trim.length': 'длина',
+  'trim.reset': 'всё видео',
+  'trim.precise': 'точный рез',
+  'trim.preciseHint': 'перекодирует, чтобы рез был ровно здесь — дольше, но заставка не останется',
+  'trim.fastHint':
+    'копирует поток — почти мгновенно, но клип может начаться на несколько секунд раньше и выйти длиннее',
+  'trim.downloadHint': 'скачается только выбранный кусок',
+  'trim.invalid': 'конец должен быть после начала',
+  'trim.apply': 'обрезать',
+  'trim.openEditor': 'обрезать',
+
+  // ---- convert ----
+  'convert.title': 'конвертация',
+  'convert.open': 'конвертировать',
+  'convert.format': 'формат',
+  'convert.resolution': 'разрешение',
+  'convert.keepResolution': 'как есть',
+  'convert.apply': 'конвертировать',
+  'convert.gifHint': 'GIF быстро становится огромным — сначала обрежьте до нескольких секунд',
+  'convert.noAudio': 'в файле нет звуковой дорожки — доступны только видеоформаты',
+
+  // ---- queue job kinds ----
+  'job.trim': 'обрезка',
+  'job.convert': 'конвертация',
+  'job.sourceMissing': 'исходный файл не найден',
+
+  // ---- built-in browser ----
+  'browser.open': 'открыть встроенный браузер',
+  'browser.openHint': 'дойдите до видео и заберите его вручную',
+  'browser.title': 'браузер',
+  'browser.urlPlaceholder': 'адрес или поиск',
+  'browser.back': 'назад',
+  'browser.forward': 'вперёд',
+  'browser.reload': 'обновить',
+  'browser.stop': 'стоп',
+  'browser.pick': 'указать видео',
+  'browser.pickActive': 'кликните по видео на странице…',
+  'browser.pickHint': 'наведите на плеер и кликните — Esc отменяет',
+  'browser.found': 'найдено на странице',
+  'browser.foundNone': 'пока ничего',
+  'browser.foundHint': 'запустите видео — потоки появятся здесь, как только страница их запросит',
+  'browser.downloadPage': 'скачать эту страницу',
+  'browser.clear': 'очистить',
+  'browser.openExternal': 'открыть во внешнем браузере',
+  'browser.queued': 'добавлено в очередь',
 
   // ---- errors ----
   'error.title': 'что-то пошло не так',
