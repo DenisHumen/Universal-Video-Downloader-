@@ -1,5 +1,16 @@
 import { useEffect, useState } from 'react'
-import { Copy, Globe, Keyboard, Minus, Square, X } from 'lucide-react'
+import {
+  Copy,
+  Download,
+  Globe,
+  Keyboard,
+  ListVideo,
+  Minus,
+  Search,
+  Settings as SettingsIcon,
+  Square,
+  X
+} from 'lucide-react'
 import { useStore, type ViewId } from '../store'
 import { useT, type TranslationKey } from '../i18n'
 import Logo from './Logo'
@@ -8,23 +19,24 @@ import EngineBadge from './EngineBadge'
 interface NavItem {
   id: ViewId
   label: TranslationKey
+  icon: JSX.Element
   hint: string
 }
 
 /**
- * Navigation is a text tab strip, not an icon list.
+ * Navigation: icon plus label, marked by a rule on the bar's own bottom
+ * hairline so the indicator is part of the window's structure.
  *
- * Four destinations don't need icons to be told apart, and dropping them lets
- * the labels carry the hierarchy on their own — which is the whole point of the
- * system. The active tab is marked by a rule sitting *on* the bar's bottom
- * hairline, so the indicator is part of the window's structure rather than a
- * shape floating behind the label.
+ * The icons were dropped at first on the theory that four words don't need
+ * them. They do: a glyph is recognised before it is read, which is what lets
+ * someone find "queue" at a glance instead of parsing a row of same-sized
+ * lowercase words.
  */
 const ITEMS: NavItem[] = [
-  { id: 'home', label: 'nav.home', hint: '1' },
-  { id: 'search', label: 'nav.search', hint: '2' },
-  { id: 'downloads', label: 'nav.queue', hint: '3' },
-  { id: 'settings', label: 'nav.settings', hint: '4' }
+  { id: 'home', label: 'nav.home', icon: <Download size={15} />, hint: '1' },
+  { id: 'search', label: 'nav.search', icon: <Search size={15} />, hint: '2' },
+  { id: 'downloads', label: 'nav.queue', icon: <ListVideo size={15} />, hint: '3' },
+  { id: 'settings', label: 'nav.settings', icon: <SettingsIcon size={15} />, hint: '4' }
 ]
 
 const ACTIVE_STATES = ['downloading', 'processing', 'queued', 'paused', 'detecting']
@@ -80,10 +92,11 @@ export default function TopBar(): JSX.Element {
                 aria-current={on ? 'page' : undefined}
                 className={`tab -mb-px ${on ? 'tab-on' : ''}`}
               >
+                {item.icon}
                 {t(item.label)}
                 {item.id === 'downloads' && active > 0 && (
                   <span
-                    className={`mono rounded-1 px-1.5 py-0.5 text-[10px] font-semibold leading-none ${
+                    className={`mono rounded-full px-1.5 py-0.5 text-[11px] font-semibold leading-none ${
                       on ? 'bg-accent text-accent-fg' : 'bg-sink text-ink-2'
                     }`}
                   >
@@ -99,13 +112,13 @@ export default function TopBar(): JSX.Element {
       <div className="flex shrink-0 items-center gap-1 pl-3 pr-2">
         <EngineBadge />
         <button
-          className="btn-icon"
-          title={t('browser.open')}
+          className="btn-icon-bare"
+          title={t('browser.open')} aria-label={t('browser.open')}
           onClick={() => window.api.openBrowser()}
         >
           <Globe size={15} />
         </button>
-        <button className="btn-icon" title={t('shortcuts.title')} onClick={() => openShortcuts(true)}>
+        <button className="btn-icon-bare" title={t('shortcuts.title')} aria-label={t('shortcuts.title')} onClick={() => openShortcuts(true)}>
           <Keyboard size={15} />
         </button>
 

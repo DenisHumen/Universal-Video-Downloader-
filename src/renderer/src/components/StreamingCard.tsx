@@ -137,8 +137,8 @@ export default function StreamingCard({ info, onDone }: Props): JSX.Element {
           fallback={<div className="h-24 w-16 shrink-0 rounded-2 bg-sink" />}
         />
         <div className="min-w-0 flex-1">
-          <h2 className="text-[15px] font-medium text-ink">{s.title}</h2>
-          <p className="mono mt-1 text-[11px] text-ink-3">
+          <h2 className="h2">{s.title}</h2>
+          <p className="mono mt-1 text-[12px] text-ink-2">
             {s.isSeries
               ? seasonsForT.length > 1
                 ? t('streaming.seriesSeasons', { count: seasonsForT.length })
@@ -190,7 +190,7 @@ export default function StreamingCard({ info, onDone }: Props): JSX.Element {
                 <p className="label">{t('streaming.episodes')}</p>
                 <div className="flex items-center gap-3">
                   <button
-                    className="mono text-[11px] text-ink-3 transition-colors duration-fast ease-ease hover:text-ink"
+                    className="btn-quiet px-3 py-1.5"
                     onClick={() =>
                       setSelected((prev) => ({ ...prev, [season]: [...episodesOfSeason] }))
                     }
@@ -198,7 +198,7 @@ export default function StreamingCard({ info, onDone }: Props): JSX.Element {
                     {t('common.all')}
                   </button>
                   <button
-                    className="mono text-[11px] text-ink-3 transition-colors duration-fast ease-ease hover:text-ink"
+                    className="btn-quiet px-3 py-1.5"
                     onClick={() => setSelected((prev) => ({ ...prev, [season]: [] }))}
                   >
                     {t('common.clear')}
@@ -216,7 +216,7 @@ export default function StreamingCard({ info, onDone }: Props): JSX.Element {
                       key={ep}
                       onClick={() => toggleEpisode(ep)}
                       aria-pressed={on}
-                      className={`no-drag mono h-8 w-8 shrink-0 rounded-1 border text-[11px] tabular-nums transition-colors duration-fast ease-ease ${
+                      className={`no-drag mono h-9 w-9 shrink-0 rounded-1 border text-[12px] tabular-nums transition-colors duration-fast ease-ease ${
                         on
                           ? 'border-accent bg-accent text-accent-fg'
                           : 'border-edge text-ink-2 hover:border-ink-3 hover:text-ink'

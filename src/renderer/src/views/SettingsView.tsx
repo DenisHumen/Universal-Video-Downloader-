@@ -64,7 +64,7 @@ function Group({
 }): JSX.Element {
   return (
     <section id={`set-${id}`} data-section={id} className="scroll-mt-4 pt-10 first:pt-2">
-      <h2 className="label border-b border-edge pb-2">{title}</h2>
+      <h2 className="label border-b border-edge pb-2.5">{title}</h2>
       <div>{children}</div>
     </section>
   )
@@ -96,8 +96,8 @@ function Row({
       }`}
     >
       <div className="min-w-0 max-w-md">
-        <p className="text-[13px] text-ink">{label}</p>
-        {hint && <p className="mt-1 text-[11px] leading-relaxed text-ink-3">{hint}</p>}
+        <p className="text-[14px] text-ink">{label}</p>
+        {hint && <p className="hint mt-1">{hint}</p>}
       </div>
       <div className={stack ? '' : 'shrink-0'}>{children}</div>
     </div>
@@ -115,13 +115,16 @@ function Switch({ value, onChange }: { value: boolean; onChange: (v: boolean) =>
       onClick={() => onChange(!value)}
       role="switch"
       aria-checked={value}
-      className={`no-drag relative h-6 w-11 shrink-0 cursor-pointer rounded-full border transition-colors duration-fast ease-ease focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-canvas ${
+      /* 44x24 is the right *look* for a switch and a small target to hit, so
+         a pseudo-element extends the clickable area to 44x40 without changing
+         a pixel of what's drawn. */
+      className={`no-drag relative h-6 w-11 shrink-0 cursor-pointer rounded-full border outline-offset-2 transition-colors duration-fast ease-ease before:absolute before:inset-x-0 before:-inset-y-2 before:content-[''] focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent ${
         value ? 'border-accent bg-accent' : 'border-edge-strong bg-sink'
       }`}
     >
       <span
         className={`absolute top-1/2 h-4 w-4 -translate-y-1/2 rounded-full transition-[left,background-color] duration-fast ease-ease ${
-          value ? 'left-[24px] bg-accent-fg' : 'left-[3px] bg-ink-3'
+          value ? 'left-[24px] bg-accent-fg' : 'left-[3px] bg-ink-2'
         }`}
       />
     </button>
@@ -207,13 +210,21 @@ export default function SettingsView(): JSX.Element {
   return (
     <div className="flex h-full flex-col">
       <div className="mx-auto w-full max-w-[720px] shrink-0 px-6 pt-10">
-        <h1 className="text-[22px] font-semibold tracking-[-0.01em] text-ink">{t('settings.title')}</h1>
-        <nav className="mt-4 flex gap-1.5 overflow-x-auto border-b border-edge pb-3">
+        <h1 className="h1">{t('settings.title')}</h1>
+        {/*
+          An underline strip, not a pill row.
+          The index was styled with `.choice` at first, which is the app's
+          *selection* control — so the section index looked exactly like the
+          radio groups it scrolls to, and nothing said which one changed a
+          setting and which one just moved the page.
+        */}
+        <nav className="mt-4 flex gap-0.5 overflow-x-auto border-b border-edge" aria-label={t('settings.title')}>
           {SECTIONS.map((s) => (
             <button
               key={s.id}
               onClick={() => jump(s.id)}
-              className={`choice shrink-0 ${active === s.id ? 'choice-on' : ''}`}
+              aria-current={active === s.id ? 'true' : undefined}
+              className={`tab -mb-px shrink-0 ${active === s.id ? 'tab-on' : ''}`}
             >
               {t(s.label)}
             </button>
@@ -300,7 +311,7 @@ export default function SettingsView(): JSX.Element {
                 value={settings.speedLimit}
                 onChange={(e) => set('speedLimit', e.target.value)}
                 placeholder="2M"
-                className="field mono w-32 py-2 text-[12px]"
+                className="field mono w-36 text-[13px]"
                 spellCheck={false}
               />
             </Row>
@@ -335,7 +346,7 @@ export default function SettingsView(): JSX.Element {
                 value={settings.subtitleLanguages}
                 onChange={(e) => set('subtitleLanguages', e.target.value)}
                 placeholder="en,ru"
-                className="field mono w-40 py-2 text-[12px]"
+                className="field mono w-44 text-[13px]"
                 spellCheck={false}
               />
             </Row>
@@ -349,7 +360,7 @@ export default function SettingsView(): JSX.Element {
               <input
                 value={settings.filenameTemplate}
                 onChange={(e) => set('filenameTemplate', e.target.value)}
-                className="field mono text-[12px]"
+                className="field mono text-[13px]"
                 spellCheck={false}
               />
             </Row>
@@ -396,7 +407,7 @@ export default function SettingsView(): JSX.Element {
                 value={settings.proxy}
                 onChange={(e) => set('proxy', e.target.value)}
                 placeholder={t('settings.proxyPlaceholder')}
-                className="field mono text-[12px]"
+                className="field mono text-[13px]"
                 spellCheck={false}
               />
             </Row>
@@ -462,7 +473,7 @@ export default function SettingsView(): JSX.Element {
 
           <Group id="about" title={t('settings.section.about')}>
             <div className="border-b border-edge py-4">
-              <p className="max-w-md text-[12px] leading-relaxed text-ink-2">{t('settings.about')}</p>
+              <p className="hint">{t('settings.about')}</p>
               <button
                 className="btn-quiet mt-4"
                 onClick={() =>
@@ -471,7 +482,7 @@ export default function SettingsView(): JSX.Element {
               >
                 <Github size={14} /> {t('settings.viewOnGithub')}
               </button>
-              <p className="mono mt-4 text-[11px] text-ink-3">
+              <p className="mono mt-4 text-[12px] text-ink-3">
                 v{appInfo?.version} · {appInfo?.platform} · {appInfo?.arch}
               </p>
             </div>

@@ -97,7 +97,7 @@ export default function QueueRow({ item, index }: Props): JSX.Element {
       className="group relative border-b border-edge"
     >
       <div className="flex items-center gap-3.5 py-3 pl-1 pr-1 transition-colors duration-fast ease-ease group-hover:bg-raise">
-        <span className="mono w-6 shrink-0 text-center text-[11px] tabular-nums text-ink-3">
+        <span className="mono w-6 shrink-0 text-center text-[12px] tabular-nums text-ink-3">
           {String(index + 1).padStart(2, '0')}
         </span>
 
@@ -111,10 +111,10 @@ export default function QueueRow({ item, index }: Props): JSX.Element {
         </div>
 
         <div className="min-w-0 flex-1">
-          <p className="truncate text-[13px] text-ink" title={item.title}>
+          <p className="truncate text-[14px] font-medium text-ink" title={item.title}>
             {item.title}
           </p>
-          <p className="mono mt-1 flex items-center gap-2 truncate text-[11px] text-ink-3">
+          <p className="mono mt-1 flex items-center gap-2 truncate text-[12px] text-ink-2">
             <span className={`inline-flex items-center gap-1.5 ${meta.text}`}>
               <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${meta.dot}`} />
               {t(meta.label)}
@@ -123,35 +123,58 @@ export default function QueueRow({ item, index }: Props): JSX.Element {
           </p>
         </div>
 
-        {/* Percent is the only number that earns a fixed column: it's what the
-            eye scans down the list while things are running. */}
+        {/* Progress: a real bar with a visible track, plus the number.
+            This used to be a 2px line on the row's bottom border — elegant, and
+            no one reads a hairline as "62% downloaded". */}
         {!['completed', 'error', 'canceled'].includes(item.state) && (
-          <span className="mono w-10 shrink-0 text-right text-[12px] tabular-nums text-ink-2">
-            {percent}%
-          </span>
+          <div className="flex w-32 shrink-0 items-center gap-2.5">
+            <div
+              className="h-1.5 min-w-0 flex-1 overflow-hidden rounded-full bg-sink"
+              role="progressbar"
+              aria-valuenow={percent}
+              aria-valuemin={0}
+              aria-valuemax={100}
+              aria-label={t(meta.label)}
+            >
+              <motion.div
+                className="h-full rounded-full bg-accent"
+                animate={{ width: `${percent}%` }}
+                transition={{ ease: 'easeOut', duration: 0.3 }}
+              />
+            </div>
+            <span className="mono w-9 shrink-0 text-right text-[12px] tabular-nums text-ink-2">
+              {percent}%
+            </span>
+          </div>
         )}
 
-        {/* Actions stay dim until the row is hovered or focused, so a long queue
-            isn't a wall of icons — but they remain in the tab order. */}
-        <div className="flex shrink-0 items-center gap-0.5 opacity-0 transition-opacity duration-fast ease-ease focus-within:opacity-100 group-hover:opacity-100">
+        {/*
+          Always visible.
+          These were `opacity-0` until hover, which reads as tidy and means a
+          user who never moves the mouse over a row cannot discover that pause,
+          cancel or "show in folder" exist at all. Critical actions do not hide.
+        */}
+        <div className="flex shrink-0 items-center gap-1">
           {item.state === 'completed' && item.filepath && (
             <>
               <button
-                className="btn-icon"
+                className="btn-icon-bare"
                 title={t('common.play')}
+                aria-label={t('common.play')}
                 onClick={() => window.api.openPath(item.filepath!)}
               >
                 <Play size={15} />
               </button>
-              <button className="btn-icon" title={t('trim.openEditor')} onClick={() => setJobModal('trim')}>
+              <button className="btn-icon-bare" title={t('trim.openEditor')} aria-label={t('trim.openEditor')} onClick={() => setJobModal('trim')}>
                 <Scissors size={15} />
               </button>
-              <button className="btn-icon" title={t('convert.open')} onClick={() => setJobModal('convert')}>
+              <button className="btn-icon-bare" title={t('convert.open')} aria-label={t('convert.open')} onClick={() => setJobModal('convert')}>
                 <FileVideo size={15} />
               </button>
               <button
-                className="btn-icon"
+                className="btn-icon-bare"
                 title={t('common.showInFolder')}
+                aria-label={t('common.showInFolder')}
                 onClick={() => window.api.showInFolder(item.filepath!)}
               >
                 <FolderOpen size={15} />
@@ -163,8 +186,9 @@ export default function QueueRow({ item, index }: Props): JSX.Element {
             item.state === 'processing' ||
             item.state === 'detecting') && (
             <button
-              className="btn-icon"
+              className="btn-icon-bare"
               title={t('common.pause')}
+                aria-label={t('common.pause')}
               onClick={() => window.api.pauseDownload(item.id)}
             >
               <Pause size={15} />
@@ -172,8 +196,9 @@ export default function QueueRow({ item, index }: Props): JSX.Element {
           )}
           {item.state === 'paused' && (
             <button
-              className="btn-icon"
+              className="btn-icon-bare"
               title={t('common.resume')}
+                aria-label={t('common.resume')}
               onClick={() => window.api.resumeDownload(item.id)}
             >
               <Play size={15} />
@@ -181,15 +206,16 @@ export default function QueueRow({ item, index }: Props): JSX.Element {
           )}
           {(item.state === 'error' || item.state === 'canceled') && (
             <button
-              className="btn-icon"
+              className="btn-icon-bare"
               title={t('common.retry')}
+                aria-label={t('common.retry')}
               onClick={() => window.api.retryDownload(item.id)}
             >
               <RotateCw size={15} />
             </button>
           )}
           {item.state === 'error' && (
-            <button className="btn-icon" title={t('queue.copyError')} onClick={copyError}>
+            <button className="btn-icon-bare" title={t('queue.copyError')} aria-label={t('queue.copyError')} onClick={copyError}>
               <Copy size={15} />
             </button>
           )}
@@ -198,16 +224,18 @@ export default function QueueRow({ item, index }: Props): JSX.Element {
             item.state === 'queued' ||
             item.state === 'detecting') && (
             <button
-              className="btn-icon hover:text-bad"
+              className="btn-icon-bare hover:text-bad"
               title={t('common.cancel')}
+                aria-label={t('common.cancel')}
               onClick={() => window.api.cancelDownload(item.id)}
             >
               <X size={15} />
             </button>
           )}
           <button
-            className="btn-icon hover:text-bad"
+            className="btn-icon-bare hover:text-bad"
             title={t('common.remove')}
+                aria-label={t('common.remove')}
             onClick={() => window.api.removeDownload(item.id)}
           >
             <Trash2 size={15} />
@@ -215,20 +243,11 @@ export default function QueueRow({ item, index }: Props): JSX.Element {
         </div>
       </div>
 
-      {/* The row's own bottom edge, painted over by progress while it runs. */}
-      {!['completed', 'error', 'canceled'].includes(item.state) && (
-        <motion.div
-          className="absolute bottom-0 left-0 h-0.5 bg-accent"
-          animate={{ width: `${percent}%` }}
-          transition={{ ease: 'easeOut', duration: 0.3 }}
-        />
-      )}
-
       {/* Outcome: the path it landed at, or why it didn't. */}
       {(item.state === 'completed' || item.state === 'error') && (
         <div className="pb-3 pl-[124px] pr-1">
           <p
-            className={`mono selectable truncate text-[11px] ${
+            className={`mono selectable truncate text-[12px] ${
               item.state === 'error' ? 'text-bad' : 'text-ink-3'
             }`}
             title={item.state === 'error' ? item.error : item.filepath}
@@ -239,7 +258,7 @@ export default function QueueRow({ item, index }: Props): JSX.Element {
             <>
               <button
                 onClick={() => setLogOpen((v) => !v)}
-                className="mono mt-1.5 flex items-center gap-1 text-[10px] uppercase tracking-[0.1em] text-ink-3 transition-colors duration-fast ease-ease hover:text-ink"
+                className="mono mt-2 flex items-center gap-1 text-[11px] uppercase tracking-[0.08em] text-ink-2 transition-colors duration-fast ease-ease hover:text-ink"
               >
                 {t('queue.log')}
                 <motion.span animate={{ rotate: logOpen ? 180 : 0 }} transition={{ duration: 0.16 }}>
@@ -250,7 +269,7 @@ export default function QueueRow({ item, index }: Props): JSX.Element {
                 {logOpen && (
                   <motion.pre
                     {...collapse}
-                    className="selectable mono mt-2 max-h-48 overflow-auto whitespace-pre-wrap break-all rounded-1 bg-sink px-3 py-2.5 text-[10px] leading-relaxed text-ink-2"
+                    className="selectable mono mt-2 max-h-48 overflow-auto whitespace-pre-wrap break-all rounded-1 bg-sink px-3 py-2.5 text-[11px] leading-relaxed text-ink-2"
                   >
                     {item.log}
                   </motion.pre>

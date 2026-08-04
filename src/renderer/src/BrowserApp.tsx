@@ -124,7 +124,7 @@ export default function BrowserApp(): JSX.Element {
         <div className="ml-1 flex shrink-0 items-center gap-0.5">
           <button
             className="btn-icon"
-            title={t('browser.back')}
+            title={t('browser.back')} aria-label={t('browser.back')}
             disabled={!state.canGoBack}
             onClick={() => window.api.browserBack()}
           >
@@ -132,7 +132,7 @@ export default function BrowserApp(): JSX.Element {
           </button>
           <button
             className="btn-icon"
-            title={t('browser.forward')}
+            title={t('browser.forward')} aria-label={t('browser.forward')}
             disabled={!state.canGoForward}
             onClick={() => window.api.browserForward()}
           >
@@ -140,7 +140,7 @@ export default function BrowserApp(): JSX.Element {
           </button>
           <button
             className="btn-icon"
-            title={state.loading ? t('browser.stop') : t('browser.reload')}
+            title={state.loading ? t('browser.stop') : t('browser.reload')} aria-label={state.loading ? t('browser.stop') : t('browser.reload')}
             onClick={() => (state.loading ? window.api.browserStop() : window.api.browserReload())}
           >
             {state.loading ? <X size={15} /> : <RotateCw size={15} />}
@@ -159,7 +159,7 @@ export default function BrowserApp(): JSX.Element {
             onKeyDown={(e) => e.key === 'Enter' && go()}
             placeholder={t('browser.urlPlaceholder')}
             spellCheck={false}
-            className="no-drag mono min-w-0 flex-1 bg-transparent py-1 text-[12px] text-ink outline-none placeholder:text-ink-3"
+            className="no-drag mono min-w-0 flex-1 bg-transparent py-1 text-[13px] text-ink outline-none placeholder:text-ink-3"
           />
         </div>
 
@@ -173,7 +173,7 @@ export default function BrowserApp(): JSX.Element {
         </button>
         <button
           className="btn-icon"
-          title={t('browser.openExternal')}
+          title={t('browser.openExternal')} aria-label={t('browser.openExternal')}
           onClick={() => state.url && window.api.openExternal(state.url)}
         >
           <ExternalLink size={14} />
@@ -218,7 +218,7 @@ export default function BrowserApp(): JSX.Element {
           <div className="flex items-center justify-between border-b border-edge px-4 py-3">
             <p className="label">{t('browser.found')}</p>
             {media.length > 0 && (
-              <button className="btn-icon" title={t('browser.clear')} onClick={() => window.api.browserClearMedia()}>
+              <button className="btn-icon" title={t('browser.clear')} aria-label={t('browser.clear')} onClick={() => window.api.browserClearMedia()}>
                 <Trash2 size={13} />
               </button>
             )}
@@ -236,10 +236,10 @@ export default function BrowserApp(): JSX.Element {
                   transition={enter}
                   className="border-b border-edge px-4 py-3"
                 >
-                  <p className="truncate text-[12px] text-ink" title={entry.url}>
+                  <p className="truncate text-[13px] font-medium text-ink" title={entry.url}>
                     {entry.label}
                   </p>
-                  <p className="mono mt-1 text-[10px] uppercase tracking-[0.1em] text-ink-3">
+                  <p className="mono mt-1 text-[11px] uppercase tracking-[0.08em] text-ink-2">
                     {entry.kind}
                   </p>
                   <button
@@ -258,8 +258,8 @@ export default function BrowserApp(): JSX.Element {
 
             {media.length === 0 && (
               <div className="px-4 py-10 text-center">
-                <p className="text-[12px] font-medium text-ink-2">{t('browser.foundNone')}</p>
-                <p className="mono mt-2 text-[10px] leading-relaxed text-ink-3">
+                <p className="text-[13px] font-medium text-ink">{t('browser.foundNone')}</p>
+                <p className="hint mt-2">
                   {t('browser.foundHint')}
                 </p>
               </div>

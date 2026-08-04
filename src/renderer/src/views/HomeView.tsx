@@ -78,10 +78,33 @@ export default function HomeView(): JSX.Element {
   const [trimOpen, setTrimOpen] = useState(false)
   const [section, setSection] = useState<TrimRange>({ start: 0 })
   const inputRef = useRef<HTMLInputElement>(null)
+  const resultRef = useRef<HTMLDivElement>(null)
   const requestRef = useRef<string | null>(null)
 
+  /*
+    Bring a fresh result to the top of the view.
+    A detected video's card runs to ~470px — taller than what's left below the
+    input on a short window — so without this the download button lands under
+    the fold and the screen looks like nothing happened.
+
+    An effect rather than `requestAnimationFrame`, and an instant scroll rather
+    than a smooth one: both rAF and smooth scrolling are driven by the frame
+    clock, which does not tick in a throttled window — and a detect can very
+    well finish while the app is in the background. Measured with the clock
+    stalled: the smooth call moved nothing, the instant one lifted the download
+    button from 802px to 525px in a 600px window. Whether the primary action is
+    reachable is not something to leave to the compositor.
+  */
   useEffect(() => {
-    inputRef.current?.focus()
+    if (info) resultRef.current?.scrollIntoView({ block: 'start' })
+  }, [info])
+
+  useEffect(() => {
+    // `preventScroll` matters: focusing an element inside a scroll container
+    // makes the browser reveal it, and measured on a real render that scrolled
+    // this view down by 207px — putting the heading, the subtitle and the
+    // field's own label above the fold on the very first frame.
+    inputRef.current?.focus({ preventScroll: true })
   }, [])
 
   const detect = async (value?: string): Promise<void> => {
@@ -248,8 +271,17 @@ export default function HomeView(): JSX.Element {
       <div className="mx-auto flex w-full max-w-[680px] flex-col px-6 pb-16 pt-14">
       {/* The focal control. Everything on this screen is downstream of it. */}
       <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={enter}>
-        <label className="label mb-2.5 block" htmlFor="uvd-url">
-          {t('home.title')}
+        {/*
+          A real heading, then a sentence saying what the app does. The first
+          cut of this screen opened with the prompt set as an 11px uppercase
+          micro-label — visually quiet, and completely silent about what the
+          window in front of you is for.
+        */}
+        <h1 className="h1">{t('home.title')}</h1>
+        <p className="lead mt-2">{t('home.subtitle')}</p>
+
+        <label className="label mb-2 mt-7 block" htmlFor="uvd-url">
+          {t('home.linkLabel')}
         </label>
         <div className="field flex items-center gap-1.5 rounded-3 p-2">
           <input
@@ -259,43 +291,42 @@ export default function HomeView(): JSX.Element {
             onChange={(e) => setUrl(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && detect()}
             placeholder={t('home.placeholder')}
-            className="no-drag min-w-0 flex-1 bg-transparent px-2.5 py-2 text-[15px] text-ink outline-none placeholder:text-ink-3"
+            className="no-drag min-w-0 flex-1 bg-transparent px-2.5 py-2 text-[16px] text-ink outline-none placeholder:text-ink-3"
             spellCheck={false}
             autoComplete="off"
           />
-          <button className="btn-icon" onClick={paste} title={t('common.paste')}>
-            <ClipboardPaste size={16} />
+          <button
+            className="btn-icon-bare"
+            onClick={paste}
+            title={t('common.paste')}
+            aria-label={t('common.paste')}
+          >
+            <ClipboardPaste size={17} />
           </button>
           <button
-            className="btn-solid px-4 py-3"
+            className="btn-solid px-5"
             onClick={() => detect()}
             disabled={!url.trim() || busy}
           >
             {busy ? (
-              <Loader2 size={15} className="animate-spin" />
+              <Loader2 size={16} className="animate-spin" />
             ) : isSearchQuery ? (
-              <Search size={15} />
+              <Search size={16} />
             ) : (
-              <ArrowRight size={15} />
+              <ArrowRight size={16} />
             )}
             {isSearchQuery ? t('common.search') : t('home.get')}
           </button>
         </div>
 
-        {/* Secondary entry points, set as quiet text rather than buttons: they
-            are alternatives to the field above, not competitors to it. */}
-        <div className="mt-2.5 flex items-center gap-4 px-1">
-          <button
-            onClick={() => setBatchOpen((v) => !v)}
-            className="mono flex items-center gap-1.5 text-[11px] text-ink-3 transition-colors duration-fast ease-ease hover:text-ink"
-          >
-            <Layers size={12} /> {t('home.batchOpen')}
+        {/* Secondary entry points. Buttons, not bare text: they do things, and
+            an underlined-looking phrase is a weaker promise than a control. */}
+        <div className="mt-3 flex flex-wrap items-center gap-2">
+          <button className="btn-quiet" onClick={() => setBatchOpen((v) => !v)}>
+            <Layers size={15} /> {t('home.batchOpen')}
           </button>
-          <button
-            onClick={() => window.api.openBrowser()}
-            className="mono flex items-center gap-1.5 text-[11px] text-ink-3 transition-colors duration-fast ease-ease hover:text-ink"
-          >
-            <Globe size={12} /> {t('browser.open')}
+          <button className="btn-quiet" onClick={() => window.api.openBrowser()}>
+            <Globe size={15} /> {t('browser.open')}
           </button>
         </div>
       </motion.div>
@@ -305,13 +336,13 @@ export default function HomeView(): JSX.Element {
           <motion.div {...collapse} className="overflow-hidden">
             <div className="well mt-4 p-4">
               <p className="label mb-1.5">{t('home.batch')}</p>
-              <p className="mono mb-3 text-[11px] text-ink-3">{t('home.batchHint')}</p>
+              <p className="hint mb-3">{t('home.batchHint')}</p>
               <textarea
                 value={batchText}
                 onChange={(e) => setBatchText(e.target.value)}
                 rows={5}
                 spellCheck={false}
-                className="field mono resize-none bg-canvas text-[12px]"
+                className="field mono resize-none bg-canvas text-[13px]"
                 placeholder={'https://…\nhttps://…'}
               />
               <button
@@ -327,10 +358,20 @@ export default function HomeView(): JSX.Element {
         )}
       </AnimatePresence>
 
-      <div className="mt-6">
-        {/* popLayout, not "wait": the incoming state must appear the moment it
-            exists, without waiting for the previous one's exit to report back. */}
-        <AnimatePresence mode="popLayout">
+      <div className="mt-6" ref={resultRef}>
+        {/*
+          No AnimatePresence here, and no exit animations.
+
+          These four states are mutually exclusive, so an exit animation buys a
+          fade nobody asked for and costs correctness: an exiting child stays
+          mounted until it reports the animation finished, and in a window whose
+          animation loop is throttled — a backgrounded downloader, which is the
+          normal case — it never does. Measured in a real render: the capability
+          list, the loading skeleton and the result card were all in flow at
+          once, stacked, pushing the download button off the bottom of the
+          window. States now swap instantly and only animate in.
+        */}
+        <>
           {status === 'detecting' && (
             <DetectingCard
               key="skeleton"
@@ -347,16 +388,15 @@ export default function HomeView(): JSX.Element {
               key="error"
               initial={{ opacity: 0, y: 6 }}
               animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0 }}
               transition={enter}
               className="block overflow-hidden"
             >
               <div className="flex items-center gap-2.5 border-b border-edge px-4 py-3">
                 <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-bad" />
-                <p className="text-[13px] font-medium text-ink">{t('home.errorTitle')}</p>
+                <p className="h2">{t('home.errorTitle')}</p>
               </div>
               <div className="p-4">
-                <p className="mono selectable break-words text-[12px] leading-relaxed text-ink-2">
+                <p className="mono selectable break-words text-[13px] leading-relaxed text-ink-2">
                   {error}
                 </p>
                 <div className="mt-4 flex flex-wrap items-center gap-2">
@@ -373,7 +413,7 @@ export default function HomeView(): JSX.Element {
                     </button>
                   )}
                 </div>
-                <p className="mono mt-3 text-[11px] text-ink-3">{t('browser.openHint')}</p>
+                <p className="hint mt-3">{t('browser.openHint')}</p>
               </div>
             </motion.div>
           )}
@@ -383,7 +423,6 @@ export default function HomeView(): JSX.Element {
               key="streaming"
               initial={{ opacity: 0, y: 6 }}
               animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0 }}
               transition={enter}
             >
               <StreamingCard info={info} onDone={() => setInfo(null)} />
@@ -395,7 +434,6 @@ export default function HomeView(): JSX.Element {
               key="playlist"
               initial={{ opacity: 0, y: 6 }}
               animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0 }}
               transition={enter}
             >
               <PlaylistCard info={info} onDone={() => setInfo(null)} />
@@ -407,7 +445,6 @@ export default function HomeView(): JSX.Element {
               key="info"
               initial={{ opacity: 0, y: 6 }}
               animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0 }}
               transition={enter}
               className="block overflow-hidden"
             >
@@ -428,10 +465,10 @@ export default function HomeView(): JSX.Element {
                   )}
                 </div>
                 <div className="min-w-0 flex-1">
-                  <h2 className="line-clamp-2 text-[14px] font-medium leading-snug text-ink" title={info.title}>
+                  <h2 className="h2 line-clamp-2" title={info.title}>
                     {info.title}
                   </h2>
-                  <p className="mono mt-1.5 truncate text-[11px] text-ink-3">
+                  <p className="mono mt-1.5 truncate text-[12px] text-ink-2">
                     {[
                       info.uploader,
                       info.viewCount != null ? formatCount(info.viewCount) : null,
@@ -477,12 +514,12 @@ export default function HomeView(): JSX.Element {
                   <div className="mt-5 border-t border-edge pt-4">
                     <button
                       onClick={() => setTrimOpen((v) => !v)}
-                      className="flex w-full items-center justify-between text-[12px] font-medium text-ink-2 transition-colors duration-fast ease-ease hover:text-ink"
+                      className="flex w-full items-center justify-between rounded-1 py-1 text-[13px] font-medium text-ink-2 transition-colors duration-fast ease-ease hover:text-ink"
                     >
                       <span className="flex items-center gap-2">
                         <Scissors size={13} /> {t('trim.enable')}
                         {trimOpen && hasTrim(section) && (
-                          <span className="mono text-[11px] text-accent-ink">
+                          <span className="mono text-[12px] text-accent-ink">
                             {toClock(section.start ?? 0)}
                             {section.end != null ? ` → ${toClock(section.end)}` : ' →'}
                           </span>
@@ -526,13 +563,12 @@ export default function HomeView(): JSX.Element {
               key="hint"
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
               transition={enter}
             >
               <CapabilitiesPanel />
             </motion.div>
           )}
-        </AnimatePresence>
+        </>
         </div>
       </div>
     </div>
@@ -569,8 +605,8 @@ function DetectingCard({
       <div className="flex items-center gap-2.5 border-b border-edge px-4 py-3">
         <span className="h-1.5 w-1.5 shrink-0 animate-idle-pulse rounded-full bg-accent" />
         <div className="min-w-0 flex-1">
-          <p className="truncate text-[13px] font-medium text-ink">{label}</p>
-          {slow && <p className="mono mt-0.5 truncate text-[11px] text-ink-3">{slowHint}</p>}
+          <p className="h2 truncate">{label}</p>
+          {slow && <p className="hint mt-1 truncate">{slowHint}</p>}
         </div>
         <button className="btn-quiet shrink-0 px-3 py-1.5" onClick={onCancel}>
           <X size={13} /> {cancelLabel}

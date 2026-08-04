@@ -49,7 +49,7 @@ export default function ShortcutsOverlay(): JSX.Element {
                   key={row.label}
                   className="flex items-center justify-between gap-4 border-b border-edge py-2.5 last:border-b-0"
                 >
-                  <span className="text-[12px] text-ink-2">{t(row.label)}</span>
+                  <span className="text-[13px] text-ink-2">{t(row.label)}</span>
                   <span className="flex shrink-0 items-center gap-1">
                     {row.keys.map((key) => (
                       <kbd key={key} className="kbd">

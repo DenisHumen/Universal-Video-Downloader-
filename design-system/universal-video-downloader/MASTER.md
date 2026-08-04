@@ -28,9 +28,10 @@ monochrome + a single blue and the pattern discarded.
    glow, no gradient, no ambient light source.
 3. **Data is mono.** Every measurement, path, identifier and count is set in
    JetBrains Mono with tabular figures. Prose and labels are Inter.
-4. **Structure over decoration.** Indicators are part of the layout — a rule on
-   the bar's own edge, progress on the row's own bottom border — not shapes
-   floating behind content.
+4. **Structure over decoration.** Indicators are part of the layout — the active
+   tab's rule sits on the bar's own hairline — not shapes floating behind
+   content. Where structure would be *too quiet to read*, it loses: queue
+   progress is a real bar, not the row's border.
 5. **Motion explains, never decorates.** Nothing animates while idle.
 
 ## 2. Colour tokens
@@ -52,16 +53,24 @@ theme swap is one attribute on `<html>`. Two themes, no accent picker.
 | `--accent-fg` | label on accent fill | `#FFFFFF` | `#FFFFFF` |
 | `--accent-ink` | accent-coloured **text** | `#8AA8FF` | `#1E40D6` |
 | `--good` | success | `#4ADE80` | `#146B35` |
-| `--warn` | caution | `#FACC15` | `#8C5806` |
-| `--bad` | failure | `#FB7185` | `#C82028` |
+| `--warn` | caution | `#FACC15` | `#865406` |
+| `--bad` | failure | `#FB7185` | `#B81C24` |
 
 **Why `--accent-ink` exists:** the fill colour never clears 4.5:1 as text on its
 own canvas. Accent text uses a lighter (Night) or darker (Day) cut of the same
 hue. **Never write text in `--accent`.**
 
 **Gate:** `npm run check:contrast` verifies all 7 text colours against all 3
-planes in both themes, plus `--accent-fg` on `--accent` — 44 pairings, all
-≥ 4.5:1. Tightest today: Night `--text-3` on `--surface-2` at 4.78:1.
+planes in both themes, `--accent-fg` on `--accent`, **and each status colour on
+a 12% tint of itself over each plane** — 62 pairings, all ≥ 4.5:1. Tightest
+today: Day `--bad` on `--bad/12` over `--bg` at 4.70:1.
+
+> **Correction.** The tint checks were added after a live measurement caught
+> `.btn-danger` at 4.14:1 in Day while the gate reported the palette clean:
+> `bad` text on a `bad/12` fill puts the colour on *both* sides, so the margin
+> is far thinner than the same text on a plain plane. Checking text-on-plane
+> alone will never see it. Adding the case immediately turned up a second one
+> (`--warn` at 4.47:1); both colours were darkened.
 
 Tailwind names: `canvas` · `raise` · `sink` · `edge` · `edge-strong` · `ink` ·
 `ink-2` · `ink-3` · `accent` · `accent-fg` · `accent-ink` · `good` · `warn` ·
@@ -73,12 +82,24 @@ Tailwind names: `canvas` · `raise` · `sink` · `edge` · `edge-strong` · `ink
 - **JetBrains Mono Variable** — all data. Bundled via
   `@fontsource-variable/jetbrains-mono`. Applied with `.mono`, which sets
   `font-variant-numeric: tabular-nums` so a column of percentages never shifts.
-- **`.label`** — the system's one heading style: 10px mono, uppercase,
-  `letter-spacing: 0.14em`, `--text-3`. It marks every group, so hierarchy never
-  needs a larger size or a heavier weight.
+**Five type roles**, and every screen is built from these rather than ad-hoc
+sizes:
 
-Scale in use: 22px view titles · 15px focal input · 13px body and controls ·
-12px dense rows · 11px meta · 10px labels.
+| Role | Size | Use |
+|---|---|---|
+| `.h1` | 24px / 600 | The one heading per screen |
+| `.h2` | 15px / 600 | A section inside a screen |
+| `.lead` | 14px, `--text-2`, max 62ch | The sentence under an `h1` |
+| `.hint` | 12px, `--text-2`, max 62ch | Explanation under a control |
+| `.label` | 11px mono, uppercase, 0.08em, `--text-2` | Marks a **group of controls** — never what a screen is |
+
+Base body text is **14px / 1.5**. Nothing carrying prose goes below 12px; 11px
+is reserved for tags, badges, keys and short numerics.
+
+> **Correction.** The first cut ran on 13px body with 10px labels in `--text-3`,
+> and used `.label` as the home screen's headline — so the app's main question
+> was set smaller than its own metadata. Restraint is a job for colour and
+> spacing, never for legibility.
 
 Both faces are bundled, never fetched: the window's CSP blocks remote
 stylesheets and the app must look identical offline.
@@ -105,16 +126,26 @@ Tailwind: `rounded-1` · `rounded-2` · `rounded-3` · `rounded-full`.
 | `.btn-solid` | The one loud action per screen — accent fill, pill |
 | `.btn-quiet` | Neutral filled control |
 | `.btn-danger` | Destructive — `bad` at 12% |
-| `.btn-icon` | 32px square, tertiary until hovered |
+| `.btn-icon` | 36px square, filled surface, always visible |
+| `.btn-icon-bare` | 36px square, transparent — for toolbars on their own plane |
 | `.field` / `.field-lg` | Text entry; focus = accent border + 3px accent ring at 16% |
-| `.choice` / `.choice-on` | **The only single-select control.** A wrapping row of pills; selected is a solid accent fill |
+| `.choice` / `.choice-on` | **The only single-select control.** A wrapping row of pills, min 36px; unselected carries a real fill, selected is solid accent |
 | `.tab` / `.tab-on` | Top-bar navigation; active marked by a 2px accent rule sitting on the bar's own hairline |
 | `.tag` | Read-only fact (extractor, container, count) |
 | `.kbd` | Keyboard key |
 | `.skeleton` | Placeholder plane; pulses in place |
+| `EmptyState` | The one "nothing here" layout: icon, heading, hint, and always a way out |
 
-React: `components/Choice.tsx` (choice row) and `Switch` inside `SettingsView`
-(booleans).
+React: `components/Choice.tsx` (choice row), `components/EmptyState.tsx`, and
+`Switch` inside `SettingsView` (booleans).
+
+**Minimum sizes.** Buttons 38px, icon buttons and choices 36px, fields 42px.
+This sits under the 44px touch floor on purpose — the app is pointer-only
+Electron — but nothing goes below 36.
+
+**Focus** is an `outline`, not a ring with an offset colour: these controls sit
+on three different planes, so any single offset colour paints a wrong-coloured
+halo on two of them.
 
 **Deliberately absent:** segmented controls with a sliding indicator · sweeping
 shimmer gradients · hover lift · card borders inside grids · an icon on every
@@ -144,9 +175,12 @@ One curve, three durations. Defined in `src/renderer/src/lib/motion.ts`.
 - **Measures:** 680px home · 720px settings · 860px queue · 1080px search.
 - **Search results:** a 2/3/4-column grid of frameless tiles; the gaps do the
   separating.
-- **Settings:** one scrolling document with a sticky pill index driven by an
-  `IntersectionObserver` — not nine mutually exclusive panes.
-- **Queue:** one ruled list; per-row actions stay dim until hover or focus.
+- **Settings:** one scrolling document with a sticky **underline** index driven
+  by an `IntersectionObserver` — not nine mutually exclusive panes, and not
+  pills, which would look identical to the `.choice` groups it scrolls to.
+- **Queue:** one ruled list. Per-row actions are **always visible** and progress
+  is a real bar with a track — an action the user cannot see is an action they
+  do not have, and nobody reads a hairline as "62% downloaded".
 
 ## 8. Pre-delivery checklist
 
@@ -157,3 +191,7 @@ One curve, three durations. Defined in `src/renderer/src/lib/motion.ts`.
 - [x] Focus rings visible on every interactive class
 - [x] `prefers-reduced-motion` respected
 - [x] Status never conveyed by colour alone (dot **and** label)
+- [x] No control revealed only on hover
+- [x] Every icon-only button carries an `aria-label`
+- [x] Every screen opens with an `h1` and a sentence saying what it is for
+- [x] Every empty state offers a next step

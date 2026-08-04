@@ -160,7 +160,7 @@ export default function TrimEditor({ duration, value, onChange, hint }: Props): 
                     else onChange({ ...value, end: next })
                   }
                 }}
-                className="absolute top-1/2 z-10 h-[26px] w-1.5 -translate-x-1/2 -translate-y-1/2 cursor-ew-resize rounded-full bg-accent outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-canvas"
+                className="absolute top-1/2 z-10 h-[26px] w-2 -translate-x-1/2 -translate-y-1/2 cursor-ew-resize rounded-full bg-accent outline-offset-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
                 style={{ left: `${percentOf(seconds)}%` }}
               />
             )
@@ -179,7 +179,7 @@ export default function TrimEditor({ duration, value, onChange, hint }: Props): 
             onFocus={() => setDragging(null)}
             placeholder="0:00"
             spellCheck={false}
-            className="field mono py-2 text-[13px]"
+            className="field mono text-[13px]"
           />
         </label>
         <label className="min-w-[96px] flex-1">
@@ -192,7 +192,7 @@ export default function TrimEditor({ duration, value, onChange, hint }: Props): 
             onFocus={() => setDragging(null)}
             placeholder={total != null ? toClock(total) : t('trim.end.full')}
             spellCheck={false}
-            className="field mono py-2 text-[13px]"
+            className="field mono text-[13px]"
           />
         </label>
         <button className="btn-quiet px-3 py-2" onClick={() => onChange({ start: 0, end: undefined })}>
@@ -200,7 +200,7 @@ export default function TrimEditor({ duration, value, onChange, hint }: Props): 
         </button>
       </div>
 
-      <p className="mono text-[11px] text-ink-3">
+      <p className="mono text-[12px] text-ink-2">
         {invalid ? (
           <span className="text-bad">{t('trim.invalid')}</span>
         ) : (

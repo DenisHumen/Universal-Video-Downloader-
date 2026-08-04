@@ -137,10 +137,10 @@ export default function MediaJobModal({ item, mode, onClose }: Props): JSX.Eleme
         >
           <div className="flex items-center gap-3 border-b border-edge px-4 py-3">
             <div className="min-w-0 flex-1">
-              <h2 className="text-[13px] font-medium text-ink">
+              <h2 className="h2">
                 {mode === 'trim' ? t('trim.title') : t('convert.title')}
               </h2>
-              <p className="mono truncate text-[11px] text-ink-3" title={item.title}>
+              <p className="mono truncate text-[12px] text-ink-2" title={item.title}>
                 {item.title}
               </p>
             </div>
@@ -153,7 +153,7 @@ export default function MediaJobModal({ item, mode, onClose }: Props): JSX.Eleme
             {mode === 'trim' ? (
               <>
                 {probing ? (
-                  <div className="flex items-center gap-2 text-[12px] text-ink-3">
+                  <div className="flex items-center gap-2 text-[13px] text-ink-2">
                     <Loader2 size={14} className="animate-spin" /> …
                   </div>
                 ) : (
@@ -170,7 +170,7 @@ export default function MediaJobModal({ item, mode, onClose }: Props): JSX.Eleme
                       { value: 'fast', label: 'fast' }
                     ]}
                   />
-                  <p className="mt-2 text-[11px] leading-relaxed text-ink-3">
+                  <p className="hint mt-2">
                     {precise ? t('trim.preciseHint') : t('trim.fastHint')}
                   </p>
                 </div>
@@ -196,7 +196,7 @@ export default function MediaJobModal({ item, mode, onClose }: Props): JSX.Eleme
                   </div>
                 )}
                 {hasVideo && !hasAudio && (
-                  <p className="text-[11px] text-ink-3">{t('convert.noAudio')}</p>
+                  <p className="hint">{t('convert.noAudio')}</p>
                 )}
                 <div>
                   <p className="label mb-2">{t('convert.format')}</p>
@@ -210,7 +210,7 @@ export default function MediaJobModal({ item, mode, onClose }: Props): JSX.Eleme
                     }))}
                   />
                   {container === 'gif' && (
-                    <p className="mt-2 text-[11px] text-warn">{t('convert.gifHint')}</p>
+                    <p className="mt-2 text-[12px] text-warn">{t('convert.gifHint')}</p>
                   )}
                 </div>
                 {!audioOnly && container !== 'gif' && (

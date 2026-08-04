@@ -35,7 +35,7 @@ export default function EngineBadge(): JSX.Element {
       title={ytdlp.version ? `yt-dlp ${ytdlp.version}` : ytdlp.message || label}
     >
       <span className={`h-1.5 w-1.5 rounded-full ${tone} ${busy ? 'animate-idle-pulse' : ''}`} />
-      <span className="mono text-[10px] uppercase tracking-[0.1em] text-ink-3">{label}</span>
+      <span className="mono text-[11px] uppercase tracking-[0.08em] text-ink-2">{label}</span>
     </div>
   )
 }

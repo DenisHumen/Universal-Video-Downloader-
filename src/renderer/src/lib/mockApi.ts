@@ -223,7 +223,21 @@ export function installMockApi(): void {
     resumeAll: async () => undefined,
     retryFailed: async () => undefined,
     getSettings: async () => ({ ...settings }),
-    setSettings: async (partial) => Object.assign(settings, partial),
+    /**
+     * Returns a *copy*, exactly as the real bridge does.
+     *
+     * This used to hand back the same object it had just mutated. The store
+     * assigns the result straight into state, so zustand compared the old and
+     * new references, found them identical and skipped the re-render — which
+     * made every control in Settings look broken in the preview while working
+     * fine in the app. The real `setSettings` builds a fresh object and sends
+     * it over IPC (structured clone), so it can never have this problem; the
+     * stand-in has to behave the same way or it lies about the UI.
+     */
+    setSettings: async (partial) => {
+      Object.assign(settings, partial)
+      return { ...settings }
+    },
     resetSettings: async () => ({ ...settings }),
     chooseDirectory: async () => null,
     chooseCookiesFile: async () => null,

@@ -87,8 +87,8 @@
   --accent-fg: 255 255 255;
   --accent-ink: 30 64 214;
   --good: 20 107 53;
-  --warn: 140 88 6;
-  --bad: 200 32 40;
+  --warn: 134 84 6;
+  --bad: 184 28 36;
 }
 
 * {
@@ -110,6 +110,11 @@ body {
      single honest colour. */
   background-color: rgb(var(--bg));
   color: rgb(var(--text));
+  /* 14px base. The first cut of this system ran on 13px with 10–11px meta,
+     which read as "designed" in a screenshot and as squinting in daily use.
+     Restraint is a job for colour and spacing, never for legibility. */
+  font-size: 14px;
+  line-height: 1.5;
   overflow: hidden;
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
@@ -137,16 +142,55 @@ body {
   letter-spacing: -0.015em;
 }
 
-/* The system's one label style: small, uppercase, wide-tracked. It marks every
-   group heading, so hierarchy never needs a bigger font or a heavier weight. */
+/* ---- Type roles ----
+   Five of them, and every screen is built from these rather than from ad-hoc
+   sizes. Hierarchy comes from size and weight first; `.label` is for marking a
+   group of controls, never for saying what a screen is. */
+
+/* The one heading per screen. */
+.h1 {
+  font-size: 24px;
+  line-height: 1.2;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  color: rgb(var(--text));
+}
+
+/* A section inside a screen. */
+.h2 {
+  font-size: 15px;
+  line-height: 1.35;
+  font-weight: 600;
+  color: rgb(var(--text));
+}
+
+/* The sentence under an h1 that says what the screen is for. Measure-capped:
+   past ~65 characters the eye loses the line it was on. */
+.lead {
+  font-size: 14px;
+  line-height: 1.6;
+  color: rgb(var(--text-2));
+  max-width: 62ch;
+}
+
+/* Explanatory text under a control. */
+.hint {
+  font-size: 12px;
+  line-height: 1.5;
+  color: rgb(var(--text-2));
+  max-width: 62ch;
+}
+
+/* Marks a group of controls. Small and uppercase, but no longer *tiny*: at
+   10px in the third text tier this was decorative rather than readable. */
 .label {
   font-family: theme('fontFamily.mono');
-  font-size: 10px;
-  line-height: 1;
+  font-size: 11px;
+  line-height: 1.2;
   font-weight: 600;
   text-transform: uppercase;
-  letter-spacing: 0.14em;
-  color: rgb(var(--text-3));
+  letter-spacing: 0.08em;
+  color: rgb(var(--text-2));
 }
 
 input,
@@ -175,12 +219,16 @@ textarea,
 
   .btn {
     border-radius: var(--r-pill);
+    /* 38px minimum. Desktop pointing is more forgiving than touch, so this
+       sits under the 44px touch floor by design — but 32px, which is where
+       these started, is small for anyone whose hands aren't steady. */
+    min-height: 38px;
     transition:
       background-color var(--t-fast) var(--ease),
       color var(--t-fast) var(--ease),
       border-color var(--t-fast) var(--ease),
       transform var(--t-fast) var(--ease);
-    @apply no-drag inline-flex cursor-pointer select-none items-center justify-center gap-2 whitespace-nowrap px-4 py-2.5 text-[13px] font-medium leading-none active:scale-[0.97] disabled:pointer-events-none disabled:opacity-40;
+    @apply no-drag inline-flex cursor-pointer select-none items-center justify-center gap-2 whitespace-nowrap px-4 py-2 text-[13px] font-medium active:scale-[0.97] disabled:pointer-events-none disabled:opacity-40;
   }
   /* The single loud element on any screen. There is never more than one. */
   .btn-solid {
@@ -193,13 +241,24 @@ textarea,
   .btn-danger {
     @apply btn bg-bad/12 text-bad hover:bg-bad/20;
   }
-  /* Square icon buttons, sized to the 44px touch floor at their outer bounds. */
+  /*
+   * Icon-only buttons. 36px, and they carry a visible surface rather than
+   * appearing only on hover — an action the user can't see is an action they
+   * don't have. Every one of these needs an `aria-label`, since the glyph is
+   * the only thing naming it.
+   */
   .btn-icon {
     border-radius: var(--r-1);
     transition:
       background-color var(--t-fast) var(--ease),
-      color var(--t-fast) var(--ease);
-    @apply no-drag inline-flex h-8 w-8 shrink-0 cursor-pointer items-center justify-center text-ink-3 hover:bg-sink hover:text-ink disabled:pointer-events-none disabled:opacity-30;
+      color var(--t-fast) var(--ease),
+      border-color var(--t-fast) var(--ease);
+    @apply no-drag inline-flex h-9 w-9 shrink-0 cursor-pointer items-center justify-center border border-transparent bg-sink text-ink-2 hover:border-edge-strong hover:text-ink disabled:pointer-events-none disabled:opacity-30;
+  }
+  /* For dense toolbars sitting on their own plane, where a filled square per
+     action would read as a wall of chips. */
+  .btn-icon-bare {
+    @apply btn-icon border-transparent bg-transparent hover:bg-sink;
   }
 
   /* ---------------- Fields ---------------- */
@@ -208,10 +267,11 @@ textarea,
      accent and grows a soft ring — no glow, no colour shift in the fill. */
   .field {
     border-radius: var(--r-2);
+    min-height: 42px;
     transition:
       border-color var(--t-fast) var(--ease),
       box-shadow var(--t-fast) var(--ease);
-    @apply no-drag w-full border border-edge bg-sink px-3.5 py-3 text-[13px] text-ink outline-none placeholder:text-ink-3;
+    @apply no-drag w-full border border-edge bg-sink px-3.5 py-2.5 text-[14px] text-ink outline-none placeholder:text-ink-3;
   }
   .field:focus,
   .field:focus-within {
@@ -220,25 +280,32 @@ textarea,
   }
   /* The home screen's focal input: the same field at display scale. */
   .field-lg {
-    @apply field px-5 py-4 text-[15px];
+    @apply field px-5 py-4 text-[16px];
     border-radius: var(--r-3);
   }
 
   /* ---------------- Choices ---------------- */
 
-  /* Replaces the old segmented control everywhere: a row of independent pills.
-     Selected is a solid accent fill — no sliding indicator, so a choice that
-     re-renders (quality lists rebuild per video) can't animate from nowhere. */
+  /*
+   * Replaces the old segmented control everywhere: a row of independent pills.
+   * Selected is a solid accent fill — no sliding indicator, so a choice that
+   * re-renders (quality lists rebuild per video) can't animate from nowhere.
+   *
+   * Unselected pills carry a real fill. They were transparent-with-a-hairline
+   * at first, which looked composed and read as decoration: nothing about an
+   * outlined word says "this is a button you may press".
+   */
   .choice {
     border-radius: var(--r-pill);
+    min-height: 36px;
     transition:
       background-color var(--t-fast) var(--ease),
       color var(--t-fast) var(--ease),
       border-color var(--t-fast) var(--ease);
-    @apply no-drag inline-flex cursor-pointer select-none items-center justify-center gap-1.5 whitespace-nowrap border border-edge bg-transparent px-3.5 py-2 text-[12px] font-medium leading-none text-ink-2 hover:border-ink-3 hover:text-ink;
+    @apply no-drag inline-flex cursor-pointer select-none items-center justify-center gap-1.5 whitespace-nowrap border border-edge bg-sink px-3.5 py-2 text-[13px] font-medium text-ink-2 hover:border-edge-strong hover:bg-edge hover:text-ink;
   }
   .choice-on {
-    @apply border-accent bg-accent text-accent-fg hover:border-accent hover:text-accent-fg;
+    @apply border-accent bg-accent text-accent-fg hover:border-accent hover:bg-accent hover:text-accent-fg;
   }
   .choice-off {
     @apply opacity-40;
@@ -253,10 +320,10 @@ textarea,
     transition:
       color var(--t-fast) var(--ease),
       border-color var(--t-fast) var(--ease);
-    @apply no-drag relative inline-flex cursor-pointer select-none items-center gap-2 border-b-2 border-transparent px-3 pb-2.5 pt-3 text-[13px] font-medium text-ink-3 hover:text-ink;
+    @apply no-drag relative inline-flex cursor-pointer select-none items-center gap-2 border-b-2 border-transparent px-3.5 pb-2.5 pt-3 text-[13px] font-medium text-ink-2 hover:text-ink;
   }
   .tab-on {
-    @apply border-accent text-ink;
+    @apply border-accent font-semibold text-ink;
   }
 
   /* ---------------- Small parts ---------------- */
@@ -264,20 +331,29 @@ textarea,
   /* A read-only fact: extractor name, container, count. Never interactive. */
   .tag {
     border-radius: var(--r-1);
-    @apply inline-flex items-center gap-1 bg-sink px-1.5 py-1 font-mono text-[10px] leading-none text-ink-3;
+    @apply inline-flex items-center gap-1 bg-sink px-2 py-1 font-mono text-[11px] leading-none text-ink-2;
   }
   .kbd {
     border-radius: var(--r-1);
-    @apply inline-flex items-center border border-edge-strong bg-sink px-1.5 py-1 font-mono text-[10px] leading-none text-ink-2;
+    @apply inline-flex items-center border border-edge-strong bg-sink px-2 py-1 font-mono text-[11px] leading-none text-ink-2;
   }
 
-  /* Focus must survive every hover style above it. */
+  /*
+   * Focus must survive every hover style above it.
+   *
+   * `outline` rather than a ring with an offset colour: a ring offset has to
+   * name the surface behind it, and these controls sit on three different
+   * planes — so any single offset colour paints a wrong-coloured halo on two
+   * of them. An outline just draws over whatever is there.
+   */
   .btn:focus-visible,
   .btn-icon:focus-visible,
   .choice:focus-visible,
   .tab:focus-visible,
-  .field:focus-visible {
-    @apply outline-none ring-2 ring-accent ring-offset-2 ring-offset-canvas;
+  .field:focus-visible,
+  .field:has(:focus-visible) {
+    outline: 2px solid rgb(var(--accent));
+    outline-offset: 2px;
   }
 }
 

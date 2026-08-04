@@ -71,8 +71,8 @@ export default function PlaylistCard({ info, onDone }: Props): JSX.Element {
   return (
     <div className="block overflow-hidden">
       <div className="border-b border-edge p-4">
-        <h2 className="truncate text-[14px] font-medium text-ink">{info.title}</h2>
-        <p className="mono mt-1 text-[11px] text-ink-3">
+        <h2 className="h2 truncate">{info.title}</h2>
+        <p className="mono mt-1 text-[12px] text-ink-2">
           {t('playlist.videos', { count: entries.length })} · {info.extractor}
         </p>
       </div>
@@ -116,13 +116,13 @@ export default function PlaylistCard({ info, onDone }: Props): JSX.Element {
             <p className="label">{t('playlist.videos', { count: entries.length })}</p>
             <div className="flex items-center gap-3">
               <button
-                className="mono text-[11px] text-ink-3 transition-colors duration-fast ease-ease hover:text-ink"
+                className="btn-quiet px-3 py-1.5"
                 onClick={() => setSelected(new Set(entries.map((e) => e.url)))}
               >
                 {t('playlist.selectAll')}
               </button>
               <button
-                className="mono text-[11px] text-ink-3 transition-colors duration-fast ease-ease hover:text-ink"
+                className="btn-quiet px-3 py-1.5"
                 onClick={() => setSelected(new Set())}
               >
                 {t('common.clear')}
@@ -134,14 +134,14 @@ export default function PlaylistCard({ info, onDone }: Props): JSX.Element {
               a slice rather than ticking boxes one at a time. */}
           {entries.length > 8 && (
             <div className="mb-2 flex flex-wrap items-center gap-2">
-              <span className="mono shrink-0 text-[11px] text-ink-3">{t('playlist.range')}</span>
+              <span className="mono shrink-0 text-[12px] text-ink-2">{t('playlist.range')}</span>
               <input
                 type="number"
                 min={1}
                 max={entries.length}
                 value={rangeFrom}
                 onChange={(e) => setRangeFrom(e.target.value)}
-                className="field mono w-16 px-2 py-1.5 text-center text-[11px]"
+                className="field mono w-[72px] px-2 text-center text-[13px]"
               />
               <span className="text-ink-3">–</span>
               <input
@@ -150,7 +150,7 @@ export default function PlaylistCard({ info, onDone }: Props): JSX.Element {
                 max={entries.length}
                 value={rangeTo}
                 onChange={(e) => setRangeTo(e.target.value)}
-                className="field mono w-16 px-2 py-1.5 text-center text-[11px]"
+                className="field mono w-[72px] px-2 text-center text-[13px]"
               />
               <button className="btn-quiet px-3 py-1.5" onClick={selectRange}>
                 {t('playlist.selectRange')}
@@ -177,10 +177,10 @@ export default function PlaylistCard({ info, onDone }: Props): JSX.Element {
                     >
                       {on && <Check size={11} strokeWidth={3} />}
                     </span>
-                    <span className="mono w-6 shrink-0 text-[10px] tabular-nums text-ink-3">
+                    <span className="mono w-6 shrink-0 text-[11px] tabular-nums text-ink-3">
                       {String(i + 1).padStart(2, '0')}
                     </span>
-                    <span className="truncate text-[12px] text-ink" title={e.title}>
+                    <span className="truncate text-[13px] text-ink" title={e.title}>
                       {e.title}
                     </span>
                   </button>

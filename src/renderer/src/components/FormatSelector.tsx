@@ -118,7 +118,7 @@ export default function FormatSelector({
             <div>
               <button
                 onClick={() => setShowAdvanced((v) => !v)}
-                className="flex w-full items-center justify-between text-[12px] font-medium text-ink-2 transition-colors duration-fast ease-ease hover:text-ink"
+                className="flex w-full items-center justify-between py-1 text-[13px] font-medium text-ink-2 transition-colors duration-fast ease-ease hover:text-ink"
               >
                 {t('format.exactStream', { count: videoFormats.length })}
                 <motion.span animate={{ rotate: showAdvanced ? 180 : 0 }} transition={enter}>
@@ -147,17 +147,17 @@ export default function FormatSelector({
                                 on ? 'bg-accent' : 'bg-edge-strong'
                               }`}
                             />
-                            <span className="mono w-16 shrink-0 text-[11px] text-ink">
+                            <span className="mono w-16 shrink-0 text-[12px] text-ink">
                               {f.resolution}
                             </span>
-                            <span className="mono w-12 shrink-0 text-[11px] uppercase text-ink-3">
+                            <span className="mono w-12 shrink-0 text-[12px] uppercase text-ink-2">
                               {f.ext}
                             </span>
-                            <span className="mono min-w-0 flex-1 truncate text-[11px] text-ink-3">
+                            <span className="mono min-w-0 flex-1 truncate text-[12px] text-ink-2">
                               {f.vcodec?.split('.')[0]}
                               {f.kind === 'video' ? ` ${t('format.plusAudio')}` : ''}
                             </span>
-                            <span className="mono shrink-0 text-[11px] text-ink-2">
+                            <span className="mono shrink-0 text-[12px] text-ink-2">
                               {formatBytes(f.filesize || f.filesizeApprox)}
                             </span>
                           </button>

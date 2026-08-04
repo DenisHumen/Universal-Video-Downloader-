@@ -26,6 +26,10 @@ const AA_NORMAL = 4.5
 const TEXT_VARS = ['--text', '--text-2', '--text-3', '--accent-ink', '--good', '--warn', '--bad']
 /** Every plane text can sit on. */
 const PLANE_VARS = ['--bg', '--surface', '--surface-2']
+/** Status colours that are painted as text on top of a tint of themselves. */
+const TINT_VARS = ['--good', '--warn', '--bad']
+/** The tint strength those buttons use (`bg-bad/12`). */
+const TINT_ALPHA = 0.12
 
 const THEMES = [
   { name: 'night', selector: "\\[data-theme='night'\\]" },
@@ -53,6 +57,8 @@ const lin = (c) => {
   return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4)
 }
 const luminance = ([r, g, b]) => 0.2126 * lin(r) + 0.7152 * lin(g) + 0.0722 * lin(b)
+/** Flatten a translucent fill onto what's behind it. */
+const composite = (fg, bg, alpha) => fg.map((c, i) => c * alpha + bg[i] * (1 - alpha))
 const contrast = (a, b) => {
   const [hi, lo] = luminance(a) >= luminance(b) ? [a, b] : [b, a]
   return (luminance(hi) + 0.05) / (luminance(lo) + 0.05)
@@ -97,6 +103,29 @@ for (const { name, selector } of THEMES) {
     const what = `${name} · --accent-fg on --accent`
     if (ratio < worst.ratio) worst = { ratio, what }
     if (ratio < AA_NORMAL) fail(`${what} → ${ratio.toFixed(2)}:1 (needs ${AA_NORMAL}:1)`)
+  }
+
+  /*
+   * Tinted status buttons: `.btn-danger` is `bad` text on a `bad/12` fill, and
+   * the search/browser "queued" state is `good` on `good/12`. The colour is on
+   * both sides, so the margin is far thinner than the same text on a plain
+   * plane — and checking text-on-plane alone misses it entirely. Measured in a
+   * real render, day's reset button sat at 4.14:1 while this gate reported the
+   * palette clean; that gap is what these checks close.
+   */
+  for (const statusVar of TINT_VARS) {
+    const status = vars[statusVar]
+    if (!status) continue
+    for (const planeVar of PLANE_VARS) {
+      const plane = vars[planeVar]
+      if (!plane) continue
+      const fill = composite(status, plane, TINT_ALPHA)
+      const ratio = contrast(status, fill)
+      checks++
+      const what = `${name} · ${statusVar} on ${statusVar}/${TINT_ALPHA * 100} over ${planeVar}`
+      if (ratio < worst.ratio) worst = { ratio, what }
+      if (ratio < AA_NORMAL) fail(`${what} → ${ratio.toFixed(2)}:1 (needs ${AA_NORMAL}:1)`)
+    }
   }
 }
 

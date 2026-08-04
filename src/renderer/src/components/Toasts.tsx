@@ -32,7 +32,7 @@ export default function Toasts(): JSX.Element {
             className="pointer-events-auto flex items-center gap-2.5 rounded-2 border border-edge bg-raise px-3.5 py-2.5"
           >
             {ICON[t.kind]}
-            <span className="text-[13px] text-ink">{t.message}</span>
+            <span className="text-[14px] text-ink">{t.message}</span>
           </motion.div>
         ))}
       </AnimatePresence>

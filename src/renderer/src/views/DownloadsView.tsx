@@ -1,12 +1,13 @@
 import { useMemo, useState } from 'react'
 import { AnimatePresence } from 'framer-motion'
-import { FolderOpen, Pause, Play, RotateCw, Search, Trash2 } from 'lucide-react'
+import { FolderOpen, Inbox, Pause, Play, Plus, RotateCw, Search, SearchX, Trash2 } from 'lucide-react'
 import type { DownloadItem } from '@shared/types'
 import { useStore } from '../store'
 import { formatBytes, formatSpeed } from '../lib/format'
 import { useT, type TranslationKey } from '../i18n'
 import QueueRow from '../components/QueueRow'
 import Choice from '../components/Choice'
+import EmptyState from '../components/EmptyState'
 
 type Filter = 'all' | 'active' | 'done' | 'failed'
 
@@ -85,40 +86,40 @@ export default function DownloadsView(): JSX.Element {
     <div className="mx-auto flex h-full w-full max-w-[860px] flex-col px-6 pb-8 pt-10">
       <header className="flex items-end justify-between gap-4">
         <div className="min-w-0">
-          <h1 className="text-[22px] font-semibold tracking-[-0.01em] text-ink">{t('queue.title')}</h1>
-          <p className="mono mt-1 truncate text-[11px] text-ink-3">{summary.join('  ·  ')}</p>
+          <h1 className="h1">{t('queue.title')}</h1>
+          <p className="mono mt-1.5 truncate text-[12px] text-ink-2">{summary.join('  ·  ')}</p>
         </div>
         <div className="flex shrink-0 items-center gap-0.5">
           {settings?.downloadDir && (
             <button
               className="btn-icon"
-              title={t('queue.openFolder')}
+              title={t('queue.openFolder')} aria-label={t('queue.openFolder')}
               onClick={() => window.api.openPath(settings.downloadDir)}
             >
               <FolderOpen size={16} />
             </button>
           )}
           {hasRunning && (
-            <button className="btn-icon" title={t('queue.pauseAll')} onClick={() => window.api.pauseAll()}>
+            <button className="btn-icon" title={t('queue.pauseAll')} aria-label={t('queue.pauseAll')} onClick={() => window.api.pauseAll()}>
               <Pause size={16} />
             </button>
           )}
           {hasPaused && (
-            <button className="btn-icon" title={t('queue.resumeAll')} onClick={() => window.api.resumeAll()}>
+            <button className="btn-icon" title={t('queue.resumeAll')} aria-label={t('queue.resumeAll')} onClick={() => window.api.resumeAll()}>
               <Play size={16} />
             </button>
           )}
           {hasFailed && (
             <button
               className="btn-icon"
-              title={t('queue.retryFailed')}
+              title={t('queue.retryFailed')} aria-label={t('queue.retryFailed')}
               onClick={() => window.api.retryFailed()}
             >
               <RotateCw size={16} />
             </button>
           )}
           {hasFinished && (
-            <button className="btn-icon" title={t('queue.clearFinished')} onClick={clearFinished}>
+            <button className="btn-icon" title={t('queue.clearFinished')} aria-label={t('queue.clearFinished')} onClick={clearFinished}>
               <Trash2 size={16} />
             </button>
           )}
@@ -133,13 +134,13 @@ export default function DownloadsView(): JSX.Element {
             onChange={(v) => setFilter(v as Filter)}
             options={FILTERS.map((f) => ({ value: f.value, label: t(f.label) }))}
           />
-          <div className="field ml-auto flex min-w-[200px] max-w-[280px] flex-1 items-center gap-2 rounded-full px-3 py-1.5">
-            <Search size={13} className="shrink-0 text-ink-3" />
+          <div className="field ml-auto flex min-w-[220px] max-w-[300px] flex-1 items-center gap-2 rounded-full px-4 py-1.5">
+            <Search size={15} className="shrink-0 text-ink-3" />
             <input
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder={t('queue.searchPlaceholder')}
-              className="no-drag min-w-0 flex-1 bg-transparent py-1 text-[12px] text-ink outline-none placeholder:text-ink-3"
+              className="no-drag min-w-0 flex-1 bg-transparent py-1 text-[13px] text-ink outline-none placeholder:text-ink-3"
               spellCheck={false}
             />
           </div>
@@ -148,17 +149,33 @@ export default function DownloadsView(): JSX.Element {
 
       <div className="mt-5 min-h-0 flex-1 overflow-y-auto">
         {downloads.length === 0 ? (
-          <div className="flex h-full flex-col items-center justify-center text-center">
-            <p className="text-[14px] font-medium text-ink">{t('queue.empty')}</p>
-            <p className="mono mt-1.5 text-[11px] text-ink-3">{t('queue.emptyHint')}</p>
-            <button className="btn-solid mt-6" onClick={() => setView('home')}>
-              {t('queue.add')}
-            </button>
-          </div>
+          <EmptyState
+            icon={<Inbox size={24} />}
+            title={t('queue.empty')}
+            hint={t('queue.emptyHint')}
+            action={
+              <button className="btn-solid" onClick={() => setView('home')}>
+                <Plus size={15} /> {t('queue.add')}
+              </button>
+            }
+          />
         ) : visible.length === 0 ? (
-          <div className="flex h-full flex-col items-center justify-center text-center">
-            <p className="text-[14px] font-medium text-ink">{t('queue.emptyFiltered')}</p>
-          </div>
+          <EmptyState
+            icon={<SearchX size={24} />}
+            title={t('queue.emptyFiltered')}
+            hint={t('queue.emptyFilteredHint')}
+            action={
+              <button
+                className="btn-quiet"
+                onClick={() => {
+                  setFilter('all')
+                  setQuery('')
+                }}
+              >
+                {t('queue.clearFilters')}
+              </button>
+            }
+          />
         ) : (
           <ul className="border-t border-edge">
             <AnimatePresence mode="popLayout">

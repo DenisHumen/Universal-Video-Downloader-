@@ -48,8 +48,16 @@ export default function App(): JSX.Element {
         {ready ? (
           <motion.div
             key={view}
-            initial={{ opacity: 0, y: 6 }}
-            animate={{ opacity: 1, y: 0 }}
+            /*
+              Opacity only — no transform.
+              This element is the scroll host and the flex child that fills the
+              window. A transform on it paints outside those bounds (measured:
+              6px of phantom document scroll) and leaves the entire screen
+              offset if the animation ever stalls. Each view animates its own
+              content instead.
+            */
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
             transition={enter}
             /*
               Views swap instantly and only animate *in*. An AnimatePresence

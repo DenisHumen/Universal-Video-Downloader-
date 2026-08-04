@@ -34,8 +34,8 @@ export default function MacNotice(): JSX.Element | null {
     <div className="flex shrink-0 items-center gap-3 border-b border-edge bg-raise px-4 py-2.5">
       <span className="label shrink-0 text-warn">macos</span>
       <div className="min-w-0 flex-1">
-        <p className="text-[13px] text-ink">{t('mac.title')}</p>
-        <code className="mono selectable block truncate text-[11px] text-ink-3" title={COMMAND}>
+        <p className="text-[14px] font-medium text-ink">{t('mac.title')}</p>
+        <code className="mono selectable block truncate text-[12px] text-ink-2" title={COMMAND}>
           {COMMAND}
         </code>
       </div>

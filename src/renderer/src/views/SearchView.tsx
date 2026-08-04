@@ -1,11 +1,12 @@
 import { useEffect, useRef, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { dialog, enter, overlay, staggerChild, staggerParent } from '../lib/motion'
-import { Check, Download, ExternalLink, Loader2, Search, X } from 'lucide-react'
+import { Check, Download, ExternalLink, Loader2, Search, SearchX, X } from 'lucide-react'
 import type { AppSettings, MediaInfo, SearchResult, SearchScope, SearchService } from '@shared/types'
 import StreamingCard from '../components/StreamingCard'
 import Thumbnail from '../components/Thumbnail'
 import Choice from '../components/Choice'
+import EmptyState from '../components/EmptyState'
 import { formatCount, formatDuration } from '../lib/format'
 import { initialMode, initialQuality, maxHeightOf } from '../lib/quality'
 import { toast } from '../lib/toast'
@@ -125,7 +126,7 @@ export default function SearchView({ settings, embedded = false }: Props): JSX.E
   // from the main window (standalone) or the home view (embedded).
   useEffect(() => {
     if (query) void search(query)
-    else inputRef.current?.focus()
+    else inputRef.current?.focus({ preventScroll: true })
 
     const offIpc = embedded
       ? undefined
@@ -192,11 +193,13 @@ export default function SearchView({ settings, embedded = false }: Props): JSX.E
   return (
     <div className="flex h-full flex-col">
       <div className="mx-auto w-full max-w-[1080px] shrink-0 px-6 pt-10">
-        <label className="label mb-2.5 block" htmlFor="uvd-search">
-          {t('search.title')}
+        <h1 className="h1">{t('search.title')}</h1>
+        <p className="lead mt-2">{t('search.hint')}</p>
+        <label className="label mb-2 mt-7 block" htmlFor="uvd-search">
+          {t('search.placeholder')}
         </label>
         <div className="field flex items-center gap-1.5 rounded-3 p-2">
-          <Search size={16} className="ml-2 shrink-0 text-ink-3" />
+          <Search size={18} className="ml-2 shrink-0 text-ink-3" />
           <input
             id="uvd-search"
             ref={inputRef}
@@ -204,12 +207,12 @@ export default function SearchView({ settings, embedded = false }: Props): JSX.E
             onChange={(e) => setQuery(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && search()}
             placeholder={t('search.placeholder')}
-            className="no-drag min-w-0 flex-1 bg-transparent px-1.5 py-2 text-[15px] text-ink outline-none placeholder:text-ink-3"
+            className="no-drag min-w-0 flex-1 bg-transparent px-1.5 py-2 text-[16px] text-ink outline-none placeholder:text-ink-3"
             spellCheck={false}
             autoComplete="off"
           />
           <button
-            className="btn-solid px-4 py-3"
+            className="btn-solid px-5"
             onClick={() => search()}
             disabled={!query.trim() || status === 'searching'}
           >
@@ -229,7 +232,7 @@ export default function SearchView({ settings, embedded = false }: Props): JSX.E
             }))}
           />
           {results && (
-            <span className="mono ml-auto shrink-0 text-[11px] text-ink-3">
+            <span className="mono ml-auto shrink-0 text-[12px] text-ink-2">
               {t('search.results', { count: results.length })}
             </span>
           )}
@@ -237,13 +240,17 @@ export default function SearchView({ settings, embedded = false }: Props): JSX.E
       </div>
 
       <div className="mx-auto min-h-0 w-full max-w-[1080px] flex-1 overflow-y-auto px-6 pb-8 pt-6">
-        <AnimatePresence mode="popLayout">
+        {/*
+          Enter-only, like the home screen: these states are mutually exclusive,
+          and an exiting child that never reports its animation finished (a
+          throttled background window) stays in flow underneath the new one.
+        */}
+        <>
           {status === 'searching' && (
             <motion.div
               key="skeleton"
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
               className="grid grid-cols-2 gap-x-5 gap-y-7 md:grid-cols-3 xl:grid-cols-4"
             >
               {Array.from({ length: 8 }).map((_, i) => (
@@ -261,29 +268,25 @@ export default function SearchView({ settings, embedded = false }: Props): JSX.E
               key="error"
               initial={{ opacity: 0, y: 6 }}
               animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0 }}
               transition={enter}
               className="block p-4"
             >
-              <p className="flex items-center gap-2 text-[13px] font-medium text-ink">
+              <p className="h2 flex items-center gap-2">
                 <span className="h-1.5 w-1.5 rounded-full bg-bad" /> {t('search.failed')}
               </p>
-              <p className="mono selectable mt-2 break-words text-[12px] leading-relaxed text-ink-2">
+              <p className="mono selectable mt-2 break-words text-[13px] leading-relaxed text-ink-2">
                 {error}
               </p>
             </motion.div>
           )}
 
           {status === 'idle' && results && results.length === 0 && (
-            <motion.div
-              key="empty"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="flex flex-col items-center justify-center py-24 text-center"
-            >
-              <p className="text-[14px] font-medium text-ink">{t('search.nothing')}</p>
-              <p className="mono mt-1.5 text-[11px] text-ink-3">{t('search.nothingHint')}</p>
+            <motion.div key="empty" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+              <EmptyState
+                icon={<SearchX size={24} />}
+                title={t('search.nothing')}
+                hint={t('search.nothingHint')}
+              />
             </motion.div>
           )}
 
@@ -293,7 +296,6 @@ export default function SearchView({ settings, embedded = false }: Props): JSX.E
               variants={staggerParent}
               initial="hidden"
               animate="show"
-              exit={{ opacity: 0 }}
               className="grid grid-cols-2 gap-x-5 gap-y-7 md:grid-cols-3 xl:grid-cols-4"
             >
               {results.map((r, i) => (
@@ -316,18 +318,15 @@ export default function SearchView({ settings, embedded = false }: Props): JSX.E
               key="hint"
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="flex flex-col items-center justify-center py-24 text-center"
             >
-              <p className="mono text-[11px] uppercase tracking-[0.14em] text-ink-3">
-                {t('search.searching', { service: activeLabel })}
-              </p>
-              <p className="mt-3 max-w-sm text-[13px] leading-relaxed text-ink-2">
-                {t('search.hint')}
-              </p>
+              <EmptyState
+                icon={<Search size={24} />}
+                title={t('search.searching', { service: activeLabel })}
+                hint={t('search.hint')}
+              />
             </motion.div>
           )}
-        </AnimatePresence>
+        </>
       </div>
 
       {/* Anime episode/translator/quality picker */}
@@ -434,24 +433,24 @@ function ResultTile({
           fallback={<div className="h-full w-full bg-sink" />}
         />
         {badge && (
-          <span className="mono absolute left-1.5 top-1.5 rounded-1 bg-canvas/85 px-1.5 py-1 text-[10px] leading-none text-ink">
+          <span className="mono absolute left-2 top-2 rounded-1 bg-canvas/90 px-2 py-1 text-[11px] leading-none text-ink">
             {badge}
           </span>
         )}
         {result.duration != null && result.duration > 0 && (
-          <span className="mono absolute bottom-1.5 right-1.5 rounded-1 bg-canvas/85 px-1.5 py-1 text-[10px] leading-none text-ink">
+          <span className="mono absolute bottom-2 right-2 rounded-1 bg-canvas/90 px-2 py-1 text-[11px] leading-none text-ink">
             {formatDuration(result.duration)}
           </span>
         )}
       </button>
 
       <p
-        className="mt-2.5 line-clamp-2 text-[13px] font-medium leading-snug text-ink"
+        className="mt-2.5 line-clamp-2 text-[14px] font-medium leading-snug text-ink"
         title={result.title}
       >
         {result.title}
       </p>
-      <p className="mono mt-1 truncate text-[11px] text-ink-3">{meta || result.service}</p>
+      <p className="mono mt-1 truncate text-[12px] text-ink-2">{meta || result.service}</p>
 
       <div className="mt-auto flex items-center gap-1 pt-2.5">
         <button
@@ -470,7 +469,7 @@ function ResultTile({
         </button>
         <button
           className="btn-icon"
-          title={t('common.openInBrowser')}
+          title={t('common.openInBrowser')} aria-label={t('common.openInBrowser')}
           onClick={() => window.api.openExternal(result.url)}
         >
           <ExternalLink size={14} />
