@@ -1,4 +1,5 @@
 import { motion } from 'framer-motion'
+import { pill } from '../lib/motion'
 import { Download, Keyboard, ListVideo, Search, Settings as SettingsIcon } from 'lucide-react'
 import { useStore, type ViewId } from '../store'
 import { useT, type TranslationKey } from '../i18n'
@@ -29,10 +30,13 @@ export default function Sidebar(): JSX.Element {
   ).length
 
   return (
-    <nav className="z-20 flex w-[208px] shrink-0 flex-col gap-1.5 p-3">
-      <div className="mb-3 flex items-center gap-2.5 px-3 pt-1">
+    <nav
+      className="z-[var(--z-nav)] flex w-[212px] shrink-0 flex-col gap-1 p-3"
+      style={{ zIndex: 'var(--z-nav)' }}
+    >
+      <div className="mb-4 flex items-center gap-2.5 px-3 pt-1">
         <Logo className="h-7 w-7" />
-        <span className="mono text-[15px] font-semibold tracking-tight text-cream">downloader</span>
+        <span className="text-[15px] font-semibold tracking-tight text-cream">downloader</span>
       </div>
 
       {items.map((item) => {
@@ -42,25 +46,26 @@ export default function Sidebar(): JSX.Element {
             key={item.id}
             onClick={() => setView(item.id)}
             title={`${t(item.label)} · Ctrl/⌘ ${item.hint}`}
-            className="no-drag group relative flex items-center gap-3 rounded-2xl px-3.5 py-2.5 text-left"
+            aria-current={isActive ? 'page' : undefined}
+            className="no-drag group relative flex cursor-pointer items-center gap-3 rounded-control px-3.5 py-2.5 text-left transition-colors duration-200 ease-expo hover:bg-fg/[0.04] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/70"
           >
             {isActive && (
               <motion.span
                 layoutId="nav-active"
-                className="absolute inset-0 rounded-2xl bg-accent"
-                transition={{ type: 'spring', stiffness: 480, damping: 40 }}
+                className="absolute inset-0 rounded-control bg-accent shadow-accent-sm"
+                transition={pill}
               />
             )}
             <span
               className={`relative z-10 transition-colors ${
-                isActive ? 'text-accent-fg' : 'text-fg/55 group-hover:text-cream'
+                isActive ? 'text-accent-fg' : 'text-fg/70 group-hover:text-cream'
               }`}
             >
               {item.icon}
             </span>
             <span
               className={`relative z-10 text-sm font-medium transition-colors ${
-                isActive ? 'text-accent-fg' : 'text-fg/55 group-hover:text-cream'
+                isActive ? 'text-accent-fg' : 'text-fg/70 group-hover:text-cream'
               }`}
             >
               {t(item.label)}
@@ -81,7 +86,7 @@ export default function Sidebar(): JSX.Element {
       <div className="mt-auto space-y-2 px-3 pb-1">
         <button
           onClick={() => openShortcuts(true)}
-          className="no-drag mono flex items-center gap-1.5 text-[11px] text-fg/30 transition-colors hover:text-fg/60"
+          className="no-drag mono flex items-center gap-1.5 text-[11px] text-fg/50 transition-colors hover:text-fg/60"
         >
           <Keyboard size={13} /> {t('shortcuts.open')}
         </button>
@@ -89,7 +94,7 @@ export default function Sidebar(): JSX.Element {
           onClick={() =>
             window.api.openExternal('https://github.com/DenisHumen/Universal-Video-Downloader-')
           }
-          className="no-drag mono block text-[11px] text-fg/30 transition-colors hover:text-fg/60"
+          className="no-drag mono block text-[11px] text-fg/50 transition-colors hover:text-fg/60"
         >
           {t('nav.github')}
         </button>

@@ -1,5 +1,6 @@
 import { useState, type ReactNode } from 'react'
 import { motion } from 'framer-motion'
+import { pill } from '../lib/motion'
 import {
   Cookie,
   Folder,
@@ -62,12 +63,13 @@ const THEME_LABEL: Record<ThemeId, TranslationKey> = {
 }
 
 const ACCENT_SWATCH: Record<AccentId, string> = {
-  cream: '#ededf2',
-  violet: '#856cff',
+  indigo: '#5e6ad2',
+  violet: '#7052f0',
   cyan: '#2dd4e9',
-  emerald: '#34d399',
+  emerald: '#22c55e',
   amber: '#fbbf24',
-  rose: '#fb7185'
+  rose: '#e11d48',
+  cream: '#ededef'
 }
 
 const QUALITY_OPTIONS: { value: QualityPreset; label: string }[] = [
@@ -94,7 +96,7 @@ function Row({ label, hint, children }: { label: string; hint?: string; children
     <div className="flex items-center justify-between gap-4">
       <div className="min-w-0">
         <p className="text-sm text-cream">{label}</p>
-        {hint && <p className="mono mt-0.5 truncate text-xs text-fg/35">{hint}</p>}
+        {hint && <p className="mono mt-0.5 truncate text-xs text-fg/50">{hint}</p>}
       </div>
       <div className="shrink-0">{children}</div>
     </div>
@@ -106,7 +108,7 @@ function Field({ label, hint, children }: { label: string; hint?: string; childr
     <div>
       <p className="mb-2 text-sm text-cream">{label}</p>
       {children}
-      {hint && <p className="mono mt-1.5 text-[11px] leading-relaxed text-fg/30">{hint}</p>}
+      {hint && <p className="mono mt-1.5 text-[11px] leading-relaxed text-fg/50">{hint}</p>}
     </div>
   )
 }
@@ -122,7 +124,7 @@ function Toggle({ value, onChange }: { value: boolean; onChange: (v: boolean) =>
       <motion.span
         className={`absolute top-0.5 h-5 w-5 rounded-full ${value ? 'bg-accent-fg' : 'bg-fg/70'}`}
         animate={{ left: value ? 22 : 2 }}
-        transition={{ type: 'spring', stiffness: 500, damping: 30 }}
+        transition={pill}
       />
     </button>
   )
@@ -187,19 +189,19 @@ export default function SettingsView(): JSX.Element {
                   <motion.span
                     layoutId="settings-section-active"
                     className="absolute inset-0 rounded-2xl bg-accent"
-                    transition={{ type: 'spring', stiffness: 480, damping: 40 }}
+                    transition={pill}
                   />
                 )}
                 <span
                   className={`relative z-10 transition-colors ${
-                    isActive ? 'text-accent-fg' : 'text-fg/45 group-hover:text-cream'
+                    isActive ? 'text-accent-fg' : 'text-fg/60 group-hover:text-cream'
                   }`}
                 >
                   {s.icon}
                 </span>
                 <span
                   className={`relative z-10 text-[13px] font-medium transition-colors ${
-                    isActive ? 'text-accent-fg' : 'text-fg/55 group-hover:text-cream'
+                    isActive ? 'text-accent-fg' : 'text-fg/70 group-hover:text-cream'
                   }`}
                 >
                   {t(s.label)}
@@ -386,7 +388,7 @@ export default function SettingsView(): JSX.Element {
               <Row label={t('settings.universal')} hint={undefined}>
                 <Toggle value={settings.universalFallback} onChange={(v) => set('universalFallback', v)} />
               </Row>
-              <p className="text-xs leading-relaxed text-fg/40">{t('settings.universalHint')}</p>
+              <p className="text-xs leading-relaxed text-fg/55">{t('settings.universalHint')}</p>
             </Section>
           )}
 
@@ -500,7 +502,7 @@ export default function SettingsView(): JSX.Element {
 
           {section === 'about' && (
             <Section title={t('settings.section.about')}>
-              <p className="text-xs leading-relaxed text-fg/40">{t('settings.about')}</p>
+              <p className="text-xs leading-relaxed text-fg/55">{t('settings.about')}</p>
               <button
                 className="btn-ghost"
                 onClick={() =>
@@ -509,7 +511,7 @@ export default function SettingsView(): JSX.Element {
               >
                 <Github size={15} /> {t('settings.viewOnGithub')}
               </button>
-              <p className="mono text-center text-[11px] text-fg/25">
+              <p className="mono text-center text-[11px] text-fg/55">
                 v{appInfo?.version} · {appInfo?.platform} · {appInfo?.arch}
               </p>
             </Section>

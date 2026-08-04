@@ -23,7 +23,7 @@ function settings(overrides: Partial<AppSettings> = {}): AppSettings {
     playlistLimit: 500,
     autoUpdate: true,
     theme: 'midnight',
-    accent: 'cream',
+    accent: 'indigo',
     language: 'auto',
     notifications: true,
     clipboardWatch: false,

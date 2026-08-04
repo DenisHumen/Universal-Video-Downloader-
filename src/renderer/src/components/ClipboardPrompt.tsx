@@ -33,7 +33,7 @@ export default function ClipboardPrompt(): JSX.Element | null {
             <ClipboardCheck size={17} className="shrink-0 text-accent" />
             <div className="min-w-0 flex-1">
               <p className="text-xs font-medium text-cream">{t('home.clipboardFound')}</p>
-              <p className="mono truncate text-[11px] text-fg/45" title={link}>
+              <p className="mono truncate text-[11px] text-fg/60" title={link}>
                 {link}
               </p>
             </div>

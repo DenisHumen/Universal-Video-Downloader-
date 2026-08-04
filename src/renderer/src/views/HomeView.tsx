@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
+import { enter } from '../lib/motion'
 import {
   AlertCircle,
   ChevronDown,
@@ -238,28 +239,40 @@ export default function HomeView(): JSX.Element {
       <motion.div
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.35 }}
+        transition={enter}
         className="mb-8 text-center"
       >
-        <h1 className="text-[28px] font-semibold tracking-tight text-cream">{t('home.title')}</h1>
-        <p className="mt-2 text-sm text-fg/40">{t('home.subtitle')}</p>
+        <h1
+          className="text-[34px] font-semibold leading-[1.1] tracking-[-0.02em]"
+          style={{
+            background:
+              'linear-gradient(180deg, rgb(var(--cream)) 30%, rgb(var(--cream) / 0.62) 100%)',
+            WebkitBackgroundClip: 'text',
+            WebkitTextFillColor: 'transparent'
+          }}
+        >
+          {t('home.title')}
+        </h1>
+        <p className="mx-auto mt-3 max-w-md text-sm leading-relaxed text-fg/60">
+          {t('home.subtitle')}
+        </p>
       </motion.div>
 
-      {/* URL input */}
+      {/* URL input — the one thing on this screen that must catch the eye. */}
       <motion.div
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.35, delay: 0.05 }}
-        className="flex items-center gap-2 rounded-3xl border border-fg/[0.08] bg-ink-900 p-2 transition-colors focus-within:border-accent/40"
+        transition={{ ...enter, delay: 0.06 }}
+        className="flex items-center gap-2 rounded-panel border border-fg/[0.1] bg-ink-900/70 p-2 shadow-soft backdrop-blur-xl transition-all duration-200 ease-expo focus-within:border-accent/50 focus-within:shadow-glow"
       >
-        <Search className="ml-2.5 shrink-0 text-fg/30" size={19} />
+        <Search className="ml-2.5 shrink-0 text-fg/50" size={19} />
         <input
           ref={inputRef}
           value={url}
           onChange={(e) => setUrl(e.target.value)}
           onKeyDown={(e) => e.key === 'Enter' && detect()}
           placeholder={t('home.placeholder')}
-          className="no-drag min-w-0 flex-1 bg-transparent px-1 py-2 text-sm text-cream placeholder:text-fg/25 outline-none"
+          className="no-drag min-w-0 flex-1 bg-transparent px-1 py-2 text-sm text-cream placeholder:text-fg/50 outline-none"
           spellCheck={false}
         />
         <button className="btn-ghost px-3 py-2.5" onClick={paste} title={t('common.paste')}>
@@ -285,7 +298,7 @@ export default function HomeView(): JSX.Element {
       <div className="mt-2 flex justify-center">
         <button
           onClick={() => setBatchOpen((v) => !v)}
-          className="mono flex items-center gap-1.5 rounded-full px-3 py-1 text-[11px] text-fg/35 transition-colors hover:text-fg/70"
+          className="mono flex items-center gap-1.5 rounded-full px-3 py-1 text-[11px] text-fg/50 transition-colors hover:text-fg/70"
         >
           <Layers size={12} /> {t('home.batchOpen')}
         </button>
@@ -301,7 +314,7 @@ export default function HomeView(): JSX.Element {
             <div className="card mt-2 space-y-3 p-4">
               <div>
                 <p className="group-title mb-1.5">{t('home.batch')}</p>
-                <p className="mono mb-2 text-[11px] text-fg/30">{t('home.batchHint')}</p>
+                <p className="mono mb-2 text-[11px] text-fg/50">{t('home.batchHint')}</p>
                 <textarea
                   value={batchText}
                   onChange={(e) => setBatchText(e.target.value)}
@@ -352,7 +365,7 @@ export default function HomeView(): JSX.Element {
               <AlertCircle className="mt-0.5 shrink-0 text-bad" size={18} />
               <div className="min-w-0">
                 <p className="text-sm font-medium text-cream">{t('home.errorTitle')}</p>
-                <p className="mt-0.5 text-xs text-fg/45">{error}</p>
+                <p className="mt-0.5 text-xs text-fg/60">{error}</p>
                 <div className="mt-3 flex flex-wrap gap-2">
                   {/* The honest escape hatch: let the user find it by hand. */}
                   <button
@@ -367,7 +380,7 @@ export default function HomeView(): JSX.Element {
                     </button>
                   )}
                 </div>
-                <p className="mono mt-2 text-[11px] text-fg/30">{t('browser.openHint')}</p>
+                <p className="mono mt-2 text-[11px] text-fg/50">{t('browser.openHint')}</p>
               </div>
             </motion.div>
           )}
@@ -378,7 +391,7 @@ export default function HomeView(): JSX.Element {
               initial={{ opacity: 0, y: 12 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -8 }}
-              transition={{ type: 'spring', stiffness: 280, damping: 28 }}
+              transition={enter}
             >
               <StreamingCard info={info} onDone={() => setInfo(null)} />
             </motion.div>
@@ -390,7 +403,7 @@ export default function HomeView(): JSX.Element {
               initial={{ opacity: 0, y: 12 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -8 }}
-              transition={{ type: 'spring', stiffness: 280, damping: 28 }}
+              transition={enter}
             >
               <PlaylistCard info={info} onDone={() => setInfo(null)} />
             </motion.div>
@@ -402,7 +415,7 @@ export default function HomeView(): JSX.Element {
               initial={{ opacity: 0, y: 12 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -8 }}
-              transition={{ type: 'spring', stiffness: 280, damping: 28 }}
+              transition={enter}
               className="card overflow-hidden"
             >
               {/* Preview header */}
@@ -414,7 +427,7 @@ export default function HomeView(): JSX.Element {
                     className="h-full w-full object-cover"
                     loading="eager"
                     fallback={
-                      <div className="flex h-full items-center justify-center text-fg/20">
+                      <div className="flex h-full items-center justify-center text-fg/35">
                         <Download size={28} />
                       </div>
                     }
@@ -429,7 +442,7 @@ export default function HomeView(): JSX.Element {
                   <h2 className="line-clamp-2 text-sm font-semibold text-cream" title={info.title}>
                     {info.title}
                   </h2>
-                  <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-fg/40">
+                  <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-fg/55">
                     {info.uploader && (
                       <span className="flex items-center gap-1">
                         <User size={12} /> {info.uploader}
@@ -469,7 +482,7 @@ export default function HomeView(): JSX.Element {
                   <Sparkles size={14} className="mt-0.5 shrink-0 text-accent" />
                   <div className="min-w-0">
                     <p className="text-xs font-medium text-cream">{t('home.universal')}</p>
-                    <p className="mt-0.5 text-[11px] leading-relaxed text-fg/45">
+                    <p className="mt-0.5 text-[11px] leading-relaxed text-fg/60">
                       {t('home.universalHint')}
                     </p>
                   </div>
@@ -493,7 +506,7 @@ export default function HomeView(): JSX.Element {
                   <div className="mt-5 border-t border-fg/[0.06] pt-4">
                     <button
                       onClick={() => setTrimOpen((v) => !v)}
-                      className="flex w-full items-center justify-between rounded-xl px-1 py-1 text-xs font-medium text-fg/45 transition-colors hover:text-cream"
+                      className="flex w-full items-center justify-between rounded-xl px-1 py-1 text-xs font-medium text-fg/60 transition-colors hover:text-cream"
                     >
                       <span className="flex items-center gap-1.5">
                         <Scissors size={13} /> {t('trim.enable')}
@@ -554,7 +567,7 @@ export default function HomeView(): JSX.Element {
                 {[...SITE_HINTS, t('home.moreSites')].map((site) => (
                   <span
                     key={site}
-                    className="mono rounded-full border border-fg/[0.06] bg-fg/[0.02] px-3 py-1 text-xs text-fg/35"
+                    className="mono rounded-full border border-fg/[0.06] bg-fg/[0.02] px-3 py-1 text-xs text-fg/50"
                   >
                     {site}
                   </span>
@@ -597,7 +610,7 @@ function DetectingCard({
         </span>
         <div className="min-w-0 flex-1">
           <p className="truncate text-sm font-medium text-cream">{label}</p>
-          {slow && <p className="mono mt-0.5 truncate text-[11px] text-fg/35">{slowHint}</p>}
+          {slow && <p className="mono mt-0.5 truncate text-[11px] text-fg/50">{slowHint}</p>}
         </div>
         <button className="btn-ghost shrink-0 px-3 py-1.5 text-xs" onClick={onCancel}>
           <X size={13} /> {cancelLabel}

@@ -167,7 +167,7 @@ export default function TrimEditor({ duration, value, onChange, hint }: Props): 
 
       <div className="flex flex-wrap items-end gap-3">
         <label className="min-w-[92px] flex-1">
-          <span className="mono mb-1 block text-[11px] uppercase tracking-wider text-fg/40">
+          <span className="mono mb-1 block text-[11px] uppercase tracking-wider text-fg/55">
             {t('trim.start')}
           </span>
           <input
@@ -182,7 +182,7 @@ export default function TrimEditor({ duration, value, onChange, hint }: Props): 
           />
         </label>
         <label className="min-w-[92px] flex-1">
-          <span className="mono mb-1 block text-[11px] uppercase tracking-wider text-fg/40">
+          <span className="mono mb-1 block text-[11px] uppercase tracking-wider text-fg/55">
             {t('trim.end')}
           </span>
           <input
@@ -214,7 +214,7 @@ export default function TrimEditor({ duration, value, onChange, hint }: Props): 
                 <Scissors size={11} /> {t('trim.length')} {lengthLabel}
               </span>
             )}
-            {hint && <span className="text-fg/35">{hint}</span>}
+            {hint && <span className="text-fg/50">{hint}</span>}
           </>
         )}
       </div>

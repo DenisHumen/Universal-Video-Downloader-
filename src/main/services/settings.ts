@@ -26,7 +26,7 @@ function defaults(): AppSettings {
     playlistLimit: 500,
     autoUpdate: true,
     theme: 'midnight',
-    accent: 'cream',
+    accent: 'indigo',
     language: 'auto',
     notifications: true,
     clipboardWatch: false,
@@ -42,7 +42,7 @@ function defaults(): AppSettings {
 function migrate(raw: Record<string, unknown>): Partial<AppSettings> {
   const next = { ...raw } as Partial<AppSettings>
   if (raw.theme !== undefined && !THEMES.includes(raw.theme as ThemeId)) next.theme = 'midnight'
-  if (raw.accent !== undefined && !ACCENTS.includes(raw.accent as AccentId)) next.accent = 'cream'
+  if (raw.accent !== undefined && !ACCENTS.includes(raw.accent as AccentId)) next.accent = 'indigo'
   if (typeof next.concurrentDownloads === 'number') {
     next.concurrentDownloads = Math.min(8, Math.max(1, Math.round(next.concurrentDownloads)))
   }

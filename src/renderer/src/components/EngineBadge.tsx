@@ -37,7 +37,7 @@ export default function EngineBadge(): JSX.Element {
         animate={pulsing ? { opacity: [1, 0.3, 1] } : { opacity: 1 }}
         transition={{ duration: 1.2, repeat: pulsing ? Infinity : 0 }}
       />
-      <span className="mono text-[11px] font-medium text-fg/45">{label}</span>
+      <span className="mono text-[11px] font-medium text-fg/60">{label}</span>
     </div>
   )
 }

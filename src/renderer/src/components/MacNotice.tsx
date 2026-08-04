@@ -42,7 +42,7 @@ export default function MacNotice(): JSX.Element | null {
           <ShieldAlert size={17} className="shrink-0 text-warn" />
           <div className="min-w-0 flex-1">
             <p className="text-xs font-medium text-cream">{t('mac.title')}</p>
-            <code className="mono mt-1 block truncate text-[11px] text-fg/45" title={COMMAND}>
+            <code className="mono mt-1 block truncate text-[11px] text-fg/60" title={COMMAND}>
               {COMMAND}
             </code>
           </div>

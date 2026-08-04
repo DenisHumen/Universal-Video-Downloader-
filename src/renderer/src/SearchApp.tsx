@@ -48,7 +48,7 @@ export default function SearchApp(): JSX.Element {
               <Minus size={16} />
             </button>
             <button
-              className="no-drag inline-flex h-9 w-9 items-center justify-center rounded-xl text-fg/55 transition-all hover:bg-red-500/80 hover:text-white active:scale-95"
+              className="no-drag inline-flex h-9 w-9 items-center justify-center rounded-xl text-fg/70 transition-all hover:bg-red-500/80 hover:text-white active:scale-95"
               onClick={() => window.api.closeWindow()}
               aria-label="Close"
             >

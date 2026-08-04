@@ -37,7 +37,7 @@ export default class ErrorBoundary extends Component<Props, State> {
         </div>
         <div>
           <p className="text-base font-semibold text-cream">{translate(language, 'error.title')}</p>
-          <p className="mono mx-auto mt-1.5 max-w-md break-words text-xs text-fg/40">
+          <p className="mono mx-auto mt-1.5 max-w-md break-words text-xs text-fg/55">
             {this.state.error.message}
           </p>
         </div>

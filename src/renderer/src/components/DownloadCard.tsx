@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
+import { listItem } from '../lib/motion'
 import {
   CheckCircle2,
   ChevronDown,
@@ -29,14 +30,14 @@ interface Props {
 }
 
 const STATE_META: Record<DownloadItem['state'], { label: TranslationKey; tone: string }> = {
-  queued: { label: 'state.queued', tone: 'text-fg/45' },
+  queued: { label: 'state.queued', tone: 'text-fg/60' },
   detecting: { label: 'state.detecting', tone: 'text-warn' },
   downloading: { label: 'state.downloading', tone: 'text-cream' },
   processing: { label: 'state.processing', tone: 'text-cream' },
   completed: { label: 'state.completed', tone: 'text-good' },
   error: { label: 'state.error', tone: 'text-bad' },
-  paused: { label: 'state.paused', tone: 'text-fg/45' },
-  canceled: { label: 'state.canceled', tone: 'text-fg/35' }
+  paused: { label: 'state.paused', tone: 'text-fg/60' },
+  canceled: { label: 'state.canceled', tone: 'text-fg/50' }
 }
 
 export default function DownloadCard({ item }: Props): JSX.Element {
@@ -71,8 +72,8 @@ export default function DownloadCard({ item }: Props): JSX.Element {
       initial={{ opacity: 0, y: 14, scale: 0.98 }}
       animate={{ opacity: 1, y: 0, scale: 1 }}
       exit={{ opacity: 0, scale: 0.96, transition: { duration: 0.15 } }}
-      transition={{ type: 'spring', stiffness: 300, damping: 30 }}
-      className="card overflow-hidden"
+      transition={listItem}
+      className="card card-lit overflow-hidden transition-colors duration-200 ease-expo hover:border-fg/[0.13]"
     >
       <div className="flex gap-4 p-3.5">
         <div className="relative h-[68px] w-[120px] shrink-0 overflow-hidden rounded-2xl bg-ink-950">
@@ -81,7 +82,7 @@ export default function DownloadCard({ item }: Props): JSX.Element {
             pageUrl={item.sourceUrl}
             className="h-full w-full object-cover"
             fallback={
-              <div className="flex h-full items-center justify-center text-fg/15">
+              <div className="flex h-full items-center justify-center text-fg/35">
                 {item.mode === 'audio' ? <Music size={22} /> : <Video size={22} />}
               </div>
             }
@@ -108,19 +109,19 @@ export default function DownloadCard({ item }: Props): JSX.Element {
               <div className="mono mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs">
                 <span className={`font-medium ${meta.tone}`}>{t(meta.label)}</span>
                 {jobKindLabel && <span className="text-accent">· {jobKindLabel}</span>}
-                {item.jobLabel && <span className="text-fg/35">· {item.jobLabel}</span>}
-                {qualityLabel && <span className="text-fg/35">· {qualityLabel}</span>}
+                {item.jobLabel && <span className="text-fg/50">· {item.jobLabel}</span>}
+                {qualityLabel && <span className="text-fg/50">· {qualityLabel}</span>}
                 {active && item.speed ? (
-                  <span className="text-fg/35">· {formatSpeed(item.speed)}</span>
+                  <span className="text-fg/50">· {formatSpeed(item.speed)}</span>
                 ) : null}
-                {active && item.eta ? <span className="text-fg/35">· {formatEta(item.eta)}</span> : null}
+                {active && item.eta ? <span className="text-fg/50">· {formatEta(item.eta)}</span> : null}
                 {item.state === 'downloading' && item.downloadedBytes && item.totalBytes ? (
-                  <span className="text-fg/35">
+                  <span className="text-fg/50">
                     · {formatBytes(item.downloadedBytes)} / {formatBytes(item.totalBytes)}
                   </span>
                 ) : null}
                 {item.state === 'completed' && item.totalBytes ? (
-                  <span className="text-fg/35">· {formatBytes(item.totalBytes)}</span>
+                  <span className="text-fg/50">· {formatBytes(item.totalBytes)}</span>
                 ) : null}
                 {item.state === 'queued' && (item.attempts || 0) > 0 ? (
                   <span className="text-warn">· {t('queue.retryingIn')}</span>
@@ -259,7 +260,7 @@ export default function DownloadCard({ item }: Props): JSX.Element {
         <>
           <button
             onClick={() => setLogOpen((v) => !v)}
-            className="flex w-full items-center justify-between border-t border-fg/[0.06] px-4 py-2 text-[11px] font-medium text-fg/35 transition-colors hover:text-fg/70"
+            className="flex w-full items-center justify-between border-t border-fg/[0.06] px-4 py-2 text-[11px] font-medium text-fg/50 transition-colors hover:text-fg/70"
           >
             <span>{t('queue.log')}</span>
             <motion.span animate={{ rotate: logOpen ? 180 : 0 }}>
@@ -272,7 +273,7 @@ export default function DownloadCard({ item }: Props): JSX.Element {
                 initial={{ height: 0, opacity: 0 }}
                 animate={{ height: 'auto', opacity: 1 }}
                 exit={{ height: 0, opacity: 0 }}
-                className="selectable mono max-h-48 overflow-auto whitespace-pre-wrap break-all bg-ink-950/60 px-4 py-3 text-[10px] leading-relaxed text-fg/45"
+                className="selectable mono max-h-48 overflow-auto whitespace-pre-wrap break-all bg-ink-950/60 px-4 py-3 text-[10px] leading-relaxed text-fg/60"
               >
                 {item.log}
               </motion.pre>

@@ -52,12 +52,20 @@ module.exports = {
         ]
       },
       borderRadius: {
-        '4xl': '1.75rem'
+        '4xl': '1.75rem',
+        card: 'var(--radius-card)',
+        panel: 'var(--radius-panel)',
+        control: 'var(--radius-control)'
+      },
+      transitionTimingFunction: {
+        // Expo-out: leaves quickly, settles softly. The app's one easing curve.
+        expo: 'cubic-bezier(0.16, 1, 0.3, 1)'
       },
       boxShadow: {
-        panel: '0 24px 70px -28px rgb(var(--shadow) / 0.85)',
-        soft: '0 8px 30px -14px rgb(var(--shadow) / 0.7)',
-        glow: '0 0 0 1px rgb(var(--accent) / 0.35), 0 10px 34px -14px rgb(var(--accent) / 0.5)'
+        panel: '0 30px 80px -32px rgb(var(--shadow) / 0.9)',
+        soft: '0 10px 34px -16px rgb(var(--shadow) / 0.75)',
+        glow: '0 0 0 1px rgb(var(--accent) / 0.35), 0 12px 38px -14px rgb(var(--accent) / 0.55)',
+        'accent-sm': '0 6px 22px -8px rgb(var(--accent) / 0.7)'
       },
       keyframes: {
         shimmer: {
@@ -74,7 +82,7 @@ module.exports = {
       },
       animation: {
         shimmer: 'shimmer 1.6s infinite',
-        'fade-up': 'fade-up 0.35s ease-out',
+        'fade-up': 'fade-up 0.35s cubic-bezier(0.16, 1, 0.3, 1)',
         'pulse-ring': 'pulse-ring 1.8s ease-out infinite'
       }
     }

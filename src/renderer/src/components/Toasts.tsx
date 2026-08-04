@@ -1,4 +1,5 @@
 import { AnimatePresence, motion } from 'framer-motion'
+import { modalSpring } from '../lib/motion'
 import { AlertCircle, CheckCircle2, Info } from 'lucide-react'
 import { useToasts } from '../lib/toast'
 
@@ -20,7 +21,7 @@ export default function Toasts(): JSX.Element {
             initial={{ opacity: 0, y: 18, scale: 0.96 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 10, scale: 0.96 }}
-            transition={{ type: 'spring', stiffness: 400, damping: 30 }}
+            transition={modalSpring}
             className="pointer-events-auto flex items-center gap-2.5 rounded-2xl border border-fg/10 bg-ink-750/95 px-4 py-2.5 shadow-soft backdrop-blur-xl"
           >
             {ICON[t.kind]}

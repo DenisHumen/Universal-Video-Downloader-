@@ -105,7 +105,7 @@ re-resolved later.
   work by reading cookies from your browser, or from a `cookies.txt` file:
   **Settings → access & cookies**.
 - **Themes & language** — four themes (midnight, carbon, nebula and a real light
-  theme) × six accent colours, and a full **English / Русский** interface that
+  theme) × seven accent colours, and a full **English / Русский** interface that
   follows your system locale by default.
 - **Convenience** — desktop notifications, taskbar/dock progress, an optional
   tray icon that keeps downloads running when the window is closed, an optional
@@ -116,6 +116,20 @@ re-resolved later.
   the download page instead of failing silently. The yt-dlp engine keeps itself
   up to date too.
 - **Private & local** — everything runs on your machine. No accounts, no telemetry.
+
+### The look
+
+A cinematic dark interface: layered near-black surfaces (never pure `#000` — it
+smears on OLED and leaves elevated panels nothing to sit against), frosted
+panels over two slow-drifting ambient lights tinted by the accent, a hairline
+highlight along the top edge of every card, and one easing curve
+(`cubic-bezier(0.16, 1, 0.3, 1)`) shared by every transition in the app. Inter
+ships with the app rather than being fetched, so it looks identical offline.
+
+Every dim text tier is contrast-checked against every surface of every theme by
+`npm run check:contrast`, which parses the real values out of the stylesheet and
+fails CI below WCAG AA (4.5:1) — including the light theme, where the same alpha
+that reads comfortably on black falls well under the floor on white.
 
 ## 📦 Install
 
@@ -153,9 +167,10 @@ On first run the app downloads the small yt-dlp engine binary automatically.
 ```bash
 npm install        # install dependencies
 npm run dev        # launch the app with hot reload
-npm run typecheck  # type-check main + renderer
-npm test           # unit tests
-npm run build      # bundle main, preload and renderer
+npm run typecheck        # type-check main + renderer
+npm test                 # unit tests
+npm run check:contrast   # WCAG AA gate over every theme
+npm run build            # bundle main, preload and renderer
 ```
 
 Build distributables locally:

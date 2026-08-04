@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
+import { modalSpring } from '../lib/motion'
 import { FileVideo, Loader2, Scissors, X, Zap } from 'lucide-react'
 import {
   AUDIO_CONTAINERS,
@@ -122,7 +123,7 @@ export default function MediaJobModal({ item, mode, onClose }: Props): JSX.Eleme
           initial={{ opacity: 0, scale: 0.97, y: 12 }}
           animate={{ opacity: 1, scale: 1, y: 0 }}
           exit={{ opacity: 0, scale: 0.97, y: 12 }}
-          transition={{ type: 'spring', stiffness: 320, damping: 28 }}
+          transition={modalSpring}
           className="card w-full max-w-lg overflow-hidden"
           onClick={(e) => e.stopPropagation()}
         >
@@ -134,7 +135,7 @@ export default function MediaJobModal({ item, mode, onClose }: Props): JSX.Eleme
               <h2 className="text-sm font-semibold text-cream">
                 {mode === 'trim' ? t('trim.title') : t('convert.title')}
               </h2>
-              <p className="mono truncate text-[11px] text-fg/40" title={item.title}>
+              <p className="mono truncate text-[11px] text-fg/55" title={item.title}>
                 {item.title}
               </p>
             </div>
@@ -147,7 +148,7 @@ export default function MediaJobModal({ item, mode, onClose }: Props): JSX.Eleme
             {mode === 'trim' ? (
               <>
                 {probing ? (
-                  <div className="flex items-center gap-2 text-xs text-fg/45">
+                  <div className="flex items-center gap-2 text-xs text-fg/60">
                     <Loader2 size={14} className="animate-spin" /> …
                   </div>
                 ) : (
@@ -164,7 +165,7 @@ export default function MediaJobModal({ item, mode, onClose }: Props): JSX.Eleme
                       { value: 'fast', label: 'fast', icon: <Zap size={13} /> }
                     ]}
                   />
-                  <p className="mono mt-1.5 text-[11px] leading-relaxed text-fg/30">
+                  <p className="mono mt-1.5 text-[11px] leading-relaxed text-fg/50">
                     {precise ? t('trim.preciseHint') : t('trim.fastHint')}
                   </p>
                 </div>
@@ -190,7 +191,7 @@ export default function MediaJobModal({ item, mode, onClose }: Props): JSX.Eleme
                   </div>
                 )}
                 {hasVideo && !hasAudio && (
-                  <p className="mono text-[11px] text-fg/35">{t('convert.noAudio')}</p>
+                  <p className="mono text-[11px] text-fg/50">{t('convert.noAudio')}</p>
                 )}
                 <div>
                   <p className="group-title">{t('convert.format')}</p>

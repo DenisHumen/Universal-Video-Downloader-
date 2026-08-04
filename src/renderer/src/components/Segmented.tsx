@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react'
 import { motion } from 'framer-motion'
+import { pill } from '../lib/motion'
 
 export interface SegOption {
   value: string
@@ -39,7 +40,7 @@ export default function Segmented({
               <motion.span
                 layoutId={layoutId}
                 className="absolute inset-0 rounded-xl bg-accent"
-                transition={{ type: 'spring', stiffness: 480, damping: 40 }}
+                transition={pill}
               />
             )}
             <span className="relative z-10 flex items-center gap-1.5">

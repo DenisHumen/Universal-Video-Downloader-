@@ -76,14 +76,14 @@ export default function PlaylistCard({ info, onDone }: Props): JSX.Element {
   const chosen = entries.filter((e) => selected.has(e.url))
 
   return (
-    <div className="card overflow-hidden">
+    <div className="card card-lit overflow-hidden">
       <div className="flex items-center gap-3 border-b border-fg/[0.06] p-4">
         <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-fg/[0.06] text-cream">
           <ListVideo size={20} />
         </div>
         <div className="min-w-0 flex-1">
           <h2 className="truncate text-sm font-semibold text-cream">{info.title}</h2>
-          <p className="mono text-xs text-fg/40">
+          <p className="mono text-xs text-fg/55">
             {t('playlist.videos', { count: entries.length })} · {info.extractor}
           </p>
         </div>
@@ -139,7 +139,7 @@ export default function PlaylistCard({ info, onDone }: Props): JSX.Element {
               a slice rather than ticking boxes one at a time. */}
           {entries.length > 8 && (
             <div className="mb-2 flex items-center gap-2 rounded-xl border border-fg/[0.06] bg-fg/[0.02] px-3 py-2">
-              <span className="mono shrink-0 text-[11px] text-fg/40">{t('playlist.range')}</span>
+              <span className="mono shrink-0 text-[11px] text-fg/55">{t('playlist.range')}</span>
               <input
                 type="number"
                 min={1}
@@ -148,7 +148,7 @@ export default function PlaylistCard({ info, onDone }: Props): JSX.Element {
                 onChange={(e) => setRangeFrom(e.target.value)}
                 className="no-drag w-16 rounded-lg border border-fg/[0.08] bg-ink-900 px-2 py-1 text-center text-xs text-cream outline-none focus:border-accent/40"
               />
-              <span className="text-fg/25">–</span>
+              <span className="text-fg/50">–</span>
               <input
                 type="number"
                 min={1}

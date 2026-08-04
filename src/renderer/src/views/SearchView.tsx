@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
+import { modalSpring, pill, staggerChild, staggerParent } from '../lib/motion'
 import {
   AlertCircle,
   Check,
@@ -221,19 +222,19 @@ export default function SearchView({ settings, embedded = false }: Props): JSX.E
                   <motion.span
                     layoutId="search-service-active"
                     className="absolute inset-0 rounded-2xl bg-accent"
-                    transition={{ type: 'spring', stiffness: 480, damping: 40 }}
+                    transition={pill}
                   />
                 )}
                 <span
                   className={`relative z-10 transition-colors ${
-                    isActive ? 'text-accent-fg' : 'text-fg/45 group-hover:text-cream'
+                    isActive ? 'text-accent-fg' : 'text-fg/60 group-hover:text-cream'
                   }`}
                 >
                   {s.icon}
                 </span>
                 <span
                   className={`relative z-10 truncate text-[13px] font-medium transition-colors ${
-                    isActive ? 'text-accent-fg' : 'text-fg/55 group-hover:text-cream'
+                    isActive ? 'text-accent-fg' : 'text-fg/70 group-hover:text-cream'
                   }`}
                 >
                   {s.value === 'all' ? t('search.allServices') : s.label}
@@ -253,14 +254,14 @@ export default function SearchView({ settings, embedded = false }: Props): JSX.E
             transition={{ duration: 0.3 }}
             className="flex items-center gap-2 rounded-3xl border border-fg/[0.08] bg-ink-900 p-2 transition-colors focus-within:border-accent/40"
           >
-            <Search className="ml-2.5 shrink-0 text-fg/30" size={19} />
+            <Search className="ml-2.5 shrink-0 text-fg/50" size={19} />
             <input
               ref={inputRef}
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && search()}
               placeholder={t('search.placeholder')}
-              className="no-drag min-w-0 flex-1 bg-transparent px-1 py-2 text-sm text-cream placeholder:text-fg/25 outline-none"
+              className="no-drag min-w-0 flex-1 bg-transparent px-1 py-2 text-sm text-cream placeholder:text-fg/50 outline-none"
               spellCheck={false}
             />
             <button
@@ -277,9 +278,9 @@ export default function SearchView({ settings, embedded = false }: Props): JSX.E
             </button>
           </motion.div>
           <div className="mt-2.5 flex items-center justify-between px-1">
-            <p className="mono text-xs text-fg/35">{t('search.searching', { service: activeLabel })}</p>
+            <p className="mono text-xs text-fg/50">{t('search.searching', { service: activeLabel })}</p>
             {results && (
-              <span className="mono text-xs text-fg/35">
+              <span className="mono text-xs text-fg/50">
                 {t('search.results', { count: results.length })}
               </span>
             )}
@@ -322,7 +323,7 @@ export default function SearchView({ settings, embedded = false }: Props): JSX.E
                 <AlertCircle className="mt-0.5 shrink-0 text-bad" size={18} />
                 <div className="min-w-0">
                   <p className="text-sm font-medium text-cream">{t('search.failed')}</p>
-                  <p className="mt-0.5 text-xs text-fg/45">{error}</p>
+                  <p className="mt-0.5 text-xs text-fg/60">{error}</p>
                 </div>
               </motion.div>
             )}
@@ -335,19 +336,20 @@ export default function SearchView({ settings, embedded = false }: Props): JSX.E
                 exit={{ opacity: 0 }}
                 className="flex flex-col items-center justify-center py-16 text-center"
               >
-                <div className="flex h-16 w-16 items-center justify-center rounded-3xl bg-fg/[0.03] text-fg/20">
+                <div className="flex h-16 w-16 items-center justify-center rounded-3xl bg-fg/[0.03] text-fg/35">
                   <SearchX size={28} />
                 </div>
-                <p className="mt-4 text-sm font-medium text-fg/55">{t('search.nothing')}</p>
-                <p className="mono mt-1 text-xs text-fg/30">{t('search.nothingHint')}</p>
+                <p className="mt-4 text-sm font-medium text-fg/70">{t('search.nothing')}</p>
+                <p className="mono mt-1 text-xs text-fg/50">{t('search.nothingHint')}</p>
               </motion.div>
             )}
 
             {status === 'idle' && results && results.length > 0 && (
               <motion.div
                 key="results"
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
+                variants={staggerParent}
+                initial="hidden"
+                animate="show"
                 exit={{ opacity: 0 }}
                 className="grid grid-cols-2 gap-3 lg:grid-cols-3"
               >
@@ -355,7 +357,6 @@ export default function SearchView({ settings, embedded = false }: Props): JSX.E
                   <ResultCard
                     key={`${r.service}-${r.id}-${i}`}
                     result={r}
-                    index={i}
                     probe={probes[r.url]}
                     added={added.has(r.url)}
                     busy={pickerBusy === r.url}
@@ -375,11 +376,11 @@ export default function SearchView({ settings, embedded = false }: Props): JSX.E
                 exit={{ opacity: 0 }}
                 className="flex flex-col items-center justify-center py-16 text-center"
               >
-                <div className="flex h-16 w-16 items-center justify-center rounded-3xl bg-fg/[0.03] text-fg/20">
+                <div className="flex h-16 w-16 items-center justify-center rounded-3xl bg-fg/[0.03] text-fg/35">
                   <Search size={28} />
                 </div>
-                <p className="mt-4 text-sm font-medium text-fg/55">{t('search.title')}</p>
-                <p className="mono mt-1 text-xs text-fg/30">{t('search.hint')}</p>
+                <p className="mt-4 text-sm font-medium text-fg/70">{t('search.title')}</p>
+                <p className="mono mt-1 text-xs text-fg/50">{t('search.hint')}</p>
               </motion.div>
             )}
           </AnimatePresence>
@@ -401,7 +402,7 @@ export default function SearchView({ settings, embedded = false }: Props): JSX.E
               initial={{ opacity: 0, scale: 0.97, y: 12 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.97, y: 12 }}
-              transition={{ type: 'spring', stiffness: 300, damping: 28 }}
+              transition={modalSpring}
               className="relative max-h-[86vh] w-full max-w-lg overflow-y-auto"
               onClick={(e) => e.stopPropagation()}
             >
@@ -472,7 +473,6 @@ function qualityBadge(
 
 function ResultCard({
   result,
-  index,
   probe,
   added,
   busy,
@@ -481,7 +481,6 @@ function ResultCard({
   onOpenPicker
 }: {
   result: SearchResult
-  index: number
   probe?: QualityProbe
   added: boolean
   busy: boolean
@@ -505,10 +504,8 @@ function ResultCard({
 
   return (
     <motion.div
-      initial={{ opacity: 0, y: 12 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.25, delay: Math.min(index * 0.03, 0.35) }}
-      className="card group flex flex-col overflow-hidden transition-colors hover:border-fg/[0.16]"
+      variants={staggerChild}
+      className="card card-lit group flex cursor-default flex-col overflow-hidden transition-all duration-200 ease-expo hover:-translate-y-0.5 hover:border-accent/25 hover:shadow-soft"
     >
       <button
         className="relative block aspect-video w-full cursor-pointer overflow-hidden bg-ink-950 text-left"
@@ -520,7 +517,7 @@ function ResultCard({
           pageUrl={result.url}
           className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.04]"
           fallback={
-            <div className="flex h-full items-center justify-center text-fg/15">
+            <div className="flex h-full items-center justify-center text-fg/35">
               {isAnime ? <Tv size={26} /> : <Search size={26} />}
             </div>
           }
@@ -540,7 +537,7 @@ function ResultCard({
         <p className="line-clamp-2 text-[13px] font-medium leading-snug text-cream" title={result.title}>
           {result.title}
         </p>
-        <div className="mono mt-1.5 flex items-center gap-2 text-[11px] text-fg/35">
+        <div className="mono mt-1.5 flex items-center gap-2 text-[11px] text-fg/50">
           {result.uploader && <span className="truncate">{result.uploader}</span>}
           {result.viewCount != null && (
             <span className="flex shrink-0 items-center gap-1">

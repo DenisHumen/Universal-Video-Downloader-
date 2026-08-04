@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
+import { pill } from '../lib/motion'
 import { ChevronDown, Film, Music, Sparkles, Video } from 'lucide-react'
 import type { AppSettings, DownloadMode, MediaInfo, QualityPreset, VideoFormat } from '@shared/types'
 import { formatBytes } from '../lib/format'
@@ -118,7 +119,7 @@ export default function FormatSelector({
                       <motion.span
                         layoutId="seg-quality"
                         className="absolute inset-0 rounded-xl bg-accent"
-                        transition={{ type: 'spring', stiffness: 480, damping: 40 }}
+                        transition={pill}
                       />
                     )}
                     <span className="relative z-10 flex items-center gap-1">
@@ -135,7 +136,7 @@ export default function FormatSelector({
             <div>
               <button
                 onClick={() => setShowAdvanced((v) => !v)}
-                className="flex w-full items-center justify-between rounded-xl px-1 py-1 text-xs font-medium text-fg/45 transition-colors hover:text-cream"
+                className="flex w-full items-center justify-between rounded-xl px-1 py-1 text-xs font-medium text-fg/60 transition-colors hover:text-cream"
               >
                 <span className="flex items-center gap-1.5">
                   <Film size={13} /> {t('format.exactStream', { count: videoFormats.length })}
@@ -168,15 +169,15 @@ export default function FormatSelector({
                           >
                             <span className="flex items-center gap-2">
                               <span className="w-14 font-semibold text-cream">{f.resolution}</span>
-                              <span className="mono rounded bg-fg/[0.06] px-1.5 py-0.5 uppercase text-fg/45">
+                              <span className="mono rounded bg-fg/[0.06] px-1.5 py-0.5 uppercase text-fg/60">
                                 {f.ext}
                               </span>
-                              <span className="text-fg/30">{f.vcodec?.split('.')[0]}</span>
+                              <span className="text-fg/50">{f.vcodec?.split('.')[0]}</span>
                               {f.kind === 'video' && (
-                                <span className="text-[10px] text-fg/30">{t('format.plusAudio')}</span>
+                                <span className="text-[10px] text-fg/50">{t('format.plusAudio')}</span>
                               )}
                             </span>
-                            <span className="mono text-fg/35">
+                            <span className="mono text-fg/50">
                               {formatBytes(f.filesize || f.filesizeApprox)}
                             </span>
                           </button>
@@ -205,7 +206,7 @@ export default function FormatSelector({
                     <motion.span
                       layoutId="seg-audio"
                       className="absolute inset-0 rounded-xl bg-accent"
-                      transition={{ type: 'spring', stiffness: 480, damping: 40 }}
+                      transition={pill}
                     />
                   )}
                   <span className="relative z-10">{fmt}</span>

@@ -1,28 +1,52 @@
-import { motion } from 'framer-motion'
+import { motion, useReducedMotion } from 'framer-motion'
 
 /**
- * A calm backdrop in the spirit of cobalt.tools: the theme's darkest surface
- * with a single very subtle drifting highlight (tinted with the accent) and a
- * faint film grain. Everything is driven by CSS variables, so it follows the
- * active theme without a re-render.
+ * The cinematic backdrop: a dark gradient with two slow ambient light blobs
+ * tinted by the active accent, plus a faint film grain.
+ *
+ * The blobs drift on long, offset cycles so the window never looks frozen but
+ * nothing ever demands attention. They're transform/opacity only — the
+ * compositor handles them without touching layout — and they hold still
+ * entirely when the OS asks for reduced motion.
  */
 export default function AuroraBackground(): JSX.Element {
+  const reduced = useReducedMotion()
+
   return (
     <div className="pointer-events-none fixed inset-0 -z-10 overflow-hidden bg-ink-950">
-      <motion.div
-        className="absolute -top-40 left-1/2 h-[560px] w-[760px] -translate-x-1/2 rounded-full blur-3xl"
-        style={{
-          background:
-            'radial-gradient(circle, rgb(var(--accent) / 0.10), rgb(var(--fg) / 0.03) 45%, transparent 70%)'
-        }}
-        animate={{ opacity: [0.5, 0.85, 0.5], scale: [1, 1.06, 1] }}
-        transition={{ duration: 16, repeat: Infinity, ease: 'easeInOut' }}
-      />
       <div
         className="absolute inset-0"
         style={{
           background:
-            'radial-gradient(ellipse at top, transparent 30%, rgb(var(--ink-950) / 0.55) 100%)'
+            'linear-gradient(165deg, rgb(var(--ink-900)) 0%, rgb(var(--ink-950)) 55%, rgb(var(--ink-950)) 100%)'
+        }}
+      />
+
+      <motion.div
+        className="absolute -top-48 left-[12%] h-[620px] w-[720px] rounded-full blur-3xl"
+        style={{
+          background:
+            'radial-gradient(circle, rgb(var(--accent) / 0.16), rgb(var(--accent) / 0.04) 45%, transparent 70%)'
+        }}
+        animate={reduced ? undefined : { x: [0, 70, -30, 0], y: [0, 40, 20, 0], opacity: [0.7, 1, 0.8, 0.7] }}
+        transition={{ duration: 34, repeat: Infinity, ease: 'easeInOut' }}
+      />
+      <motion.div
+        className="absolute -bottom-64 right-[8%] h-[560px] w-[640px] rounded-full blur-3xl"
+        style={{
+          background:
+            'radial-gradient(circle, rgb(var(--fg) / 0.05), rgb(var(--accent) / 0.05) 50%, transparent 72%)'
+        }}
+        animate={reduced ? undefined : { x: [0, -60, 25, 0], y: [0, -35, -15, 0], opacity: [0.6, 0.9, 0.7, 0.6] }}
+        transition={{ duration: 42, repeat: Infinity, ease: 'easeInOut' }}
+      />
+
+      {/* Vignette: pulls the eye to the middle of the window. */}
+      <div
+        className="absolute inset-0"
+        style={{
+          background:
+            'radial-gradient(ellipse at 50% 15%, transparent 25%, rgb(var(--ink-950) / 0.7) 100%)'
         }}
       />
       <div

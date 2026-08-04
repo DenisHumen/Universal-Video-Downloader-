@@ -236,7 +236,7 @@ export interface DownloadProgress {
 export const THEMES = ['midnight', 'carbon', 'nebula', 'daylight'] as const
 export type ThemeId = (typeof THEMES)[number]
 
-export const ACCENTS = ['cream', 'violet', 'cyan', 'emerald', 'amber', 'rose'] as const
+export const ACCENTS = ['indigo', 'violet', 'cyan', 'emerald', 'amber', 'rose', 'cream'] as const
 export type AccentId = (typeof ACCENTS)[number]
 
 export type LanguageId = 'auto' | 'en' | 'ru'

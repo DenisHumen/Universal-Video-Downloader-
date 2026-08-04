@@ -128,7 +128,7 @@ export default function BrowserApp(): JSX.Element {
               <Square size={12} />
             </button>
             <button
-              className="no-drag inline-flex h-9 w-9 items-center justify-center rounded-xl text-fg/55 transition-all hover:bg-red-500/80 hover:text-white active:scale-95"
+              className="no-drag inline-flex h-9 w-9 items-center justify-center rounded-xl text-fg/70 transition-all hover:bg-red-500/80 hover:text-white active:scale-95"
               onClick={() => window.api.closeWindow()}
               aria-label="Close"
             >
@@ -165,7 +165,7 @@ export default function BrowserApp(): JSX.Element {
         </button>
 
         <div className="flex min-w-0 flex-1 items-center gap-2 rounded-2xl border border-fg/[0.08] bg-ink-850 px-3 py-1.5 transition-colors focus-within:border-accent/40">
-          {state.loading && <Loader2 size={13} className="shrink-0 animate-spin text-fg/40" />}
+          {state.loading && <Loader2 size={13} className="shrink-0 animate-spin text-fg/55" />}
           <input
             value={address}
             onChange={(e) => {
@@ -176,7 +176,7 @@ export default function BrowserApp(): JSX.Element {
             onKeyDown={(e) => e.key === 'Enter' && go()}
             placeholder={t('browser.urlPlaceholder')}
             spellCheck={false}
-            className="no-drag min-w-0 flex-1 bg-transparent py-1 text-xs text-cream placeholder:text-fg/25 outline-none"
+            className="no-drag min-w-0 flex-1 bg-transparent py-1 text-xs text-cream placeholder:text-fg/50 outline-none"
           />
         </div>
 
@@ -231,7 +231,7 @@ export default function BrowserApp(): JSX.Element {
                   className="rounded-2xl border border-fg/[0.06] bg-ink-850 p-3"
                 >
                   <div className="flex items-start gap-2">
-                    <span className="mt-0.5 shrink-0 text-fg/35">
+                    <span className="mt-0.5 shrink-0 text-fg/50">
                       {entry.kind === 'hls' || entry.kind === 'dash' ? (
                         <Radio size={13} />
                       ) : (
@@ -242,7 +242,7 @@ export default function BrowserApp(): JSX.Element {
                       <p className="truncate text-[12px] font-medium text-cream" title={entry.url}>
                         {entry.label}
                       </p>
-                      <p className="mono mt-0.5 text-[10px] uppercase text-fg/35">{entry.kind}</p>
+                      <p className="mono mt-0.5 text-[10px] uppercase text-fg/50">{entry.kind}</p>
                     </div>
                   </div>
                   <button
@@ -261,11 +261,11 @@ export default function BrowserApp(): JSX.Element {
 
             {media.length === 0 && (
               <div className="px-1 py-8 text-center">
-                <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-fg/[0.03] text-fg/20">
+                <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-fg/[0.03] text-fg/35">
                   <Film size={22} />
                 </div>
                 <p className="mt-3 text-xs font-medium text-fg/50">{t('browser.foundNone')}</p>
-                <p className="mono mt-1 text-[10px] leading-relaxed text-fg/30">
+                <p className="mono mt-1 text-[10px] leading-relaxed text-fg/50">
                   {t('browser.foundHint')}
                 </p>
               </div>

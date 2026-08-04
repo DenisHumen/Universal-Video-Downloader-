@@ -128,7 +128,7 @@ export default function StreamingCard({ info, onDone }: Props): JSX.Element {
   }
 
   return (
-    <div className="card overflow-hidden">
+    <div className="card card-lit overflow-hidden">
       <div className="flex gap-4 border-b border-fg/[0.06] p-4">
         <Thumbnail
           src={s.thumbnail}
@@ -136,14 +136,14 @@ export default function StreamingCard({ info, onDone }: Props): JSX.Element {
           className="h-24 w-16 shrink-0 rounded-xl object-cover"
           loading="eager"
           fallback={
-            <div className="flex h-24 w-16 shrink-0 items-center justify-center rounded-xl bg-fg/[0.05] text-fg/25">
+            <div className="flex h-24 w-16 shrink-0 items-center justify-center rounded-xl bg-fg/[0.05] text-fg/50">
               {s.isSeries ? <Tv size={20} /> : <Film size={20} />}
             </div>
           }
         />
         <div className="min-w-0 flex-1">
           <h2 className="text-base font-semibold text-cream">{s.title}</h2>
-          <p className="mono mt-0.5 text-xs text-fg/40">
+          <p className="mono mt-0.5 text-xs text-fg/55">
             {s.isSeries
               ? seasonsForT.length > 1
                 ? t('streaming.seriesSeasons', { count: seasonsForT.length })
@@ -173,7 +173,7 @@ export default function StreamingCard({ info, onDone }: Props): JSX.Element {
                     title={tr.premium ? t('streaming.premiumHint') : undefined}
                     className={`no-drag flex items-center gap-1.5 rounded-xl px-3 py-2 text-xs font-medium transition-colors ${
                       tr.premium
-                        ? 'cursor-not-allowed bg-fg/[0.02] text-fg/30'
+                        ? 'cursor-not-allowed bg-fg/[0.02] text-fg/50'
                         : active
                           ? 'bg-accent text-accent-fg'
                           : 'bg-fg/[0.05] text-fg/60 hover:text-cream'
@@ -231,7 +231,7 @@ export default function StreamingCard({ info, onDone }: Props): JSX.Element {
                       className={`no-drag h-9 w-9 rounded-xl text-xs font-semibold transition-colors ${
                         active
                           ? 'bg-accent text-accent-fg'
-                          : 'bg-fg/[0.05] text-fg/55 hover:bg-fg/[0.1] hover:text-cream'
+                          : 'bg-fg/[0.05] text-fg/70 hover:bg-fg/[0.1] hover:text-cream'
                       }`}
                     >
                       {ep}

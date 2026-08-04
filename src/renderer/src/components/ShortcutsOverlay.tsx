@@ -1,4 +1,5 @@
 import { AnimatePresence, motion } from 'framer-motion'
+import { modalSpring } from '../lib/motion'
 import { X } from 'lucide-react'
 import { useStore } from '../store'
 import { useT, type TranslationKey } from '../i18n'
@@ -34,7 +35,7 @@ export default function ShortcutsOverlay(): JSX.Element {
             initial={{ opacity: 0, scale: 0.97, y: 10 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.97, y: 10 }}
-            transition={{ type: 'spring', stiffness: 320, damping: 28 }}
+            transition={modalSpring}
             className="card w-full max-w-md overflow-hidden"
             onClick={(e) => e.stopPropagation()}
           >

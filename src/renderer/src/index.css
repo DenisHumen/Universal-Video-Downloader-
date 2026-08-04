@@ -1,104 +1,137 @@
+/* Inter, bundled rather than fetched: the app must look identical offline and
+   the window's CSP blocks remote stylesheets. The variable file covers every
+   weight we use, and fontsource sets font-display: swap for us. */
+@import '@fontsource-variable/inter';
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 /* ------------------------------------------------------------------ *
- * Themes
+ * Themes — "Modern Dark (Cinema)"
  *
  * Every surface colour is an `R G B` triple in a CSS variable so Tailwind
  * can apply opacity to it (`bg-fg/[0.06]`) and so switching themes is a
  * single attribute change on <html> — no rebuild, no flash.
+ *
+ * The dark themes deliberately bottom out around #060608 rather than pure
+ * black: on OLED panels #000 smears during motion, and a true-black backdrop
+ * gives elevated surfaces nothing to sit against.
  * ------------------------------------------------------------------ */
+
+:root {
+  /* Shared shape and motion language. */
+  --radius-card: 16px;
+  --radius-panel: 20px;
+  --radius-control: 12px;
+  /* Expo-out: leaves fast, settles slowly. Everything uses it. */
+  --ease: cubic-bezier(0.16, 1, 0.3, 1);
+  --duration: 200ms;
+
+  /* Z-index scale — a fixed ladder beats ad-hoc numbers. */
+  --z-nav: 20;
+  --z-chrome: 30;
+  --z-banner: 40;
+  --z-toast: 50;
+  --z-overlay: 60;
+  --z-modal: 70;
+}
 
 :root,
 [data-theme='midnight'] {
   color-scheme: dark;
-  --ink-950: 8 8 10;
-  --ink-900: 12 12 15;
-  --ink-850: 18 18 22;
-  --ink-800: 23 23 28;
-  --ink-750: 28 28 34;
-  --ink-700: 34 34 41;
-  --ink-600: 43 43 51;
-  --ink-500: 58 58 68;
+  --ink-950: 6 6 8;
+  --ink-900: 10 10 14;
+  --ink-850: 15 15 20;
+  --ink-800: 20 20 26;
+  --ink-750: 26 26 34;
+  --ink-700: 33 33 43;
+  --ink-600: 44 44 57;
+  --ink-500: 62 62 79;
   --fg: 255 255 255;
-  --cream: 237 237 242;
-  --cream-dim: 201 201 210;
+  --cream: 237 237 239;
+  --cream-dim: 138 143 152;
   --shadow: 0 0 0;
-  --good: 126 224 168;
-  --warn: 224 201 126;
-  --bad: 240 133 125;
-  --grain: 0.02;
+  --good: 74 222 128;
+  --warn: 250 204 21;
+  --bad: 248 113 113;
+  --grain: 0.022;
 }
 
 [data-theme='carbon'] {
   color-scheme: dark;
-  --ink-950: 15 14 13;
-  --ink-900: 20 19 17;
-  --ink-850: 27 25 23;
-  --ink-800: 33 31 28;
+  --ink-950: 12 11 10;
+  --ink-900: 18 17 15;
+  --ink-850: 25 23 21;
+  --ink-800: 32 30 27;
   --ink-750: 40 37 34;
-  --ink-700: 48 45 41;
-  --ink-600: 60 56 51;
-  --ink-500: 78 73 67;
+  --ink-700: 50 46 42;
+  --ink-600: 64 59 54;
+  --ink-500: 84 78 71;
   --fg: 255 250 244;
-  --cream: 242 237 230;
-  --cream-dim: 206 199 190;
+  --cream: 243 238 231;
+  --cream-dim: 163 154 144;
   --shadow: 0 0 0;
-  --good: 134 219 163;
-  --warn: 230 197 122;
-  --bad: 240 138 122;
-  --grain: 0.025;
+  --good: 110 223 150;
+  --warn: 240 199 92;
+  --bad: 246 125 110;
+  --grain: 0.026;
 }
 
 [data-theme='nebula'] {
   color-scheme: dark;
-  --ink-950: 10 10 20;
-  --ink-900: 14 14 28;
-  --ink-850: 19 19 37;
-  --ink-800: 25 25 47;
-  --ink-750: 31 31 57;
-  --ink-700: 39 39 70;
-  --ink-600: 50 50 88;
-  --ink-500: 68 68 115;
+  --ink-950: 8 8 18;
+  --ink-900: 13 13 27;
+  --ink-850: 18 18 38;
+  --ink-800: 24 24 49;
+  --ink-750: 31 31 61;
+  --ink-700: 40 40 76;
+  --ink-600: 53 53 97;
+  --ink-500: 73 73 127;
   --fg: 236 238 255;
-  --cream: 232 234 252;
-  --cream-dim: 192 196 228;
+  --cream: 233 235 253;
+  --cream-dim: 154 159 196;
   --shadow: 2 2 12;
-  --good: 122 226 178;
-  --warn: 232 202 128;
-  --bad: 244 136 148;
-  --grain: 0.028;
+  --good: 94 231 165;
+  --warn: 246 208 105;
+  --bad: 249 128 142;
+  --grain: 0.03;
 }
 
 [data-theme='daylight'] {
   color-scheme: light;
-  --ink-950: 243 243 246;
-  --ink-900: 249 249 251;
+  --ink-950: 240 241 245;
+  --ink-900: 246 247 250;
   --ink-850: 255 255 255;
   --ink-800: 255 255 255;
   --ink-750: 255 255 255;
-  --ink-700: 238 238 243;
-  --ink-600: 226 226 233;
-  --ink-500: 205 205 214;
-  --fg: 18 18 26;
-  --cream: 24 24 32;
-  --cream-dim: 78 78 92;
-  --shadow: 90 90 120;
-  --good: 22 143 92;
-  --warn: 168 118 20;
-  --bad: 198 60 60;
-  --grain: 0.012;
+  --ink-700: 236 238 243;
+  --ink-600: 223 226 233;
+  --ink-500: 201 205 214;
+  --fg: 15 17 26;
+  --cream: 20 22 32;
+  --cream-dim: 88 94 110;
+  --shadow: 96 102 130;
+  --good: 21 128 82;
+  --warn: 154 106 12;
+  --bad: 190 50 50;
+  --grain: 0.01;
 }
 
-/* ---- Accents ---- */
+/* ---- Accents ----
+   Each pairs a hue with a foreground that clears 4.5:1 against it, so accent
+   buttons stay readable whichever theme they sit on. */
 
+[data-accent='indigo'] {
+  --accent: 94 106 210;
+  --accent-fg: 255 255 255;
+}
 [data-accent='cream'] {
   --accent: var(--cream);
   --accent-fg: var(--ink-950);
 }
 [data-accent='violet'] {
-  --accent: 133 108 255;
+  --accent: 112 82 240;
   --accent-fg: 255 255 255;
 }
 [data-accent='cyan'] {
@@ -106,16 +139,39 @@
   --accent-fg: 6 22 26;
 }
 [data-accent='emerald'] {
-  --accent: 52 211 153;
-  --accent-fg: 4 26 18;
+  --accent: 34 197 94;
+  --accent-fg: 8 25 15;
 }
 [data-accent='amber'] {
   --accent: 251 191 36;
   --accent-fg: 34 22 0;
 }
 [data-accent='rose'] {
-  --accent: 251 113 133;
-  --accent-fg: 40 6 14;
+  --accent: 225 29 72;
+  --accent-fg: 255 255 255;
+}
+
+/*
+ * Light mode needs more ink for the same readability.
+ *
+ * The dim text tiers are alphas over `--fg`, and the same alpha lands very
+ * differently depending on what's behind it: white at 50% over a near-black
+ * card reads 5.4:1, but near-black at 50% over a white card is only 3.6:1 —
+ * under the 4.5:1 floor. These overrides raise the light theme's tiers until
+ * they clear it, without touching the dark themes where the originals are
+ * already correct.
+ */
+[data-theme='daylight'] .text-fg\/50 {
+  color: rgb(var(--fg) / 0.62);
+}
+[data-theme='daylight'] .text-fg\/55 {
+  color: rgb(var(--fg) / 0.68);
+}
+[data-theme='daylight'] .text-fg\/60 {
+  color: rgb(var(--fg) / 0.74);
+}
+[data-theme='daylight'] .placeholder\:text-fg\/50::placeholder {
+  color: rgb(var(--fg) / 0.62);
 }
 
 * {
@@ -132,7 +188,10 @@ body,
 
 body {
   font-family: theme('fontFamily.sans');
+  /* A base gradient rather than a flat fill — it gives the ambient light
+     something to sit in and keeps large dark areas from looking like a void. */
   background-color: rgb(var(--ink-950));
+  background-image: linear-gradient(180deg, rgb(var(--ink-900)) 0%, rgb(var(--ink-950)) 60%);
   color: rgb(var(--cream));
   overflow: hidden;
   -webkit-font-smoothing: antialiased;
@@ -167,42 +226,67 @@ textarea,
 }
 
 @layer components {
-  /* Elevated surfaces */
+  /* Elevated surfaces. Frosted rather than opaque: the ambient light behind
+     them shows through just enough to give the window depth. */
   .panel {
-    @apply rounded-4xl border border-fg/[0.07] bg-ink-850;
+    border-radius: var(--radius-panel);
+    @apply border border-fg/[0.08] bg-ink-850/80 backdrop-blur-xl;
   }
   .card {
-    @apply rounded-3xl border border-fg/[0.07] bg-ink-800;
+    border-radius: var(--radius-card);
+    @apply border border-fg/[0.07] bg-ink-800/70 backdrop-blur-md;
+  }
+  /* A hairline highlight along the top edge reads as light falling on the
+     surface — the cheapest way to make a flat card look physical. */
+  .card-lit {
+    position: relative;
+  }
+  .card-lit::before {
+    content: '';
+    position: absolute;
+    inset-inline: 12%;
+    top: 0;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, rgb(var(--fg) / 0.16), transparent);
+    pointer-events: none;
   }
 
   /* Buttons */
   .btn {
-    @apply no-drag inline-flex select-none items-center justify-center gap-2 rounded-2xl px-4 py-2.5 text-sm font-medium transition-all duration-150 disabled:cursor-not-allowed disabled:opacity-40;
+    border-radius: var(--radius-control);
+    transition-timing-function: var(--ease);
+    @apply no-drag inline-flex cursor-pointer select-none items-center justify-center gap-2 px-4 py-2.5 text-sm font-medium transition-all duration-200 disabled:cursor-not-allowed disabled:opacity-40;
   }
   .btn-primary {
-    @apply btn bg-accent text-accent-fg hover:brightness-110 active:scale-[0.98];
+    box-shadow: 0 6px 22px -8px rgb(var(--accent) / 0.7);
+    @apply btn bg-accent text-accent-fg hover:brightness-110 active:scale-[0.97];
   }
   .btn-ghost {
-    @apply btn bg-fg/[0.05] text-cream-dim hover:bg-fg/[0.09] hover:text-cream active:scale-[0.98];
+    @apply btn bg-fg/[0.06] text-cream-dim hover:bg-fg/[0.1] hover:text-cream active:scale-[0.97];
   }
   .btn-danger {
-    @apply btn bg-bad/15 text-bad hover:bg-bad/25 active:scale-[0.98];
+    @apply btn bg-bad/15 text-bad hover:bg-bad/25 active:scale-[0.97];
   }
   .btn-icon {
-    @apply no-drag inline-flex h-9 w-9 items-center justify-center rounded-xl text-fg/55 transition-all hover:bg-fg/[0.08] hover:text-cream active:scale-95 disabled:opacity-30;
+    transition-timing-function: var(--ease);
+    @apply no-drag inline-flex h-9 w-9 cursor-pointer items-center justify-center rounded-xl text-fg/55 transition-all duration-200 hover:bg-fg/[0.09] hover:text-cream active:scale-95 disabled:cursor-not-allowed disabled:opacity-30;
   }
 
   /* Inputs */
   .input {
-    @apply no-drag w-full rounded-2xl border border-fg/[0.08] bg-ink-900 px-4 py-3 text-sm text-cream outline-none transition-all placeholder:text-fg/25 focus:border-accent/50 focus:bg-ink-850;
+    border-radius: var(--radius-control);
+    transition-timing-function: var(--ease);
+    @apply no-drag w-full border border-fg/[0.08] bg-ink-900/70 px-4 py-3 text-sm text-cream outline-none transition-all duration-200 placeholder:text-fg/50 focus:border-accent/60 focus:bg-ink-850 focus:ring-4 focus:ring-accent/15;
   }
 
-  /* Segmented control (the cobalt-style row of choices) */
+  /* Segmented control */
   .seg {
-    @apply inline-flex flex-wrap gap-1 rounded-2xl bg-ink-900 p-1;
+    border-radius: var(--radius-control);
+    @apply inline-flex flex-wrap gap-1 border border-fg/[0.05] bg-ink-900/70 p-1;
   }
   .seg-item {
-    @apply no-drag relative inline-flex items-center justify-center gap-1.5 rounded-xl px-3.5 py-2 text-[13px] font-medium text-fg/55 transition-colors duration-150 hover:text-cream;
+    transition-timing-function: var(--ease);
+    @apply no-drag relative inline-flex cursor-pointer items-center justify-center gap-1.5 rounded-[9px] px-3.5 py-2 text-[13px] font-medium text-fg/55 transition-colors duration-200 hover:text-cream;
   }
   .seg-item-active {
     @apply text-accent-fg hover:text-accent-fg;
@@ -210,11 +294,18 @@ textarea,
 
   /* Settings group title */
   .group-title {
-    @apply mb-3 text-[13px] font-semibold uppercase tracking-[0.12em] text-fg/40;
+    @apply mb-3 text-[13px] font-semibold uppercase tracking-[0.12em] text-fg/55;
   }
 
   .chip {
     @apply inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium;
+  }
+
+  /* Keyboard focus must stay visible even where the mouse styling is subtle. */
+  .btn:focus-visible,
+  .btn-icon:focus-visible,
+  .seg-item:focus-visible {
+    @apply outline-none ring-2 ring-accent/70 ring-offset-2 ring-offset-ink-900;
   }
 }
 
@@ -273,5 +364,15 @@ select.input {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
+  }
+}
+
+/* Backdrop blur is the most expensive thing on screen. Where the compositor
+   can't do it cheaply, fall back to opaque surfaces rather than a smeared,
+   half-drawn approximation. */
+@supports not (backdrop-filter: blur(1px)) {
+  .panel,
+  .card {
+    background-color: rgb(var(--ink-850));
   }
 }

@@ -73,13 +73,13 @@ export default function DownloadsView(): JSX.Element {
       <div className="mb-4 flex items-start justify-between gap-4">
         <div className="min-w-0">
           <h1 className="text-2xl font-semibold tracking-tight text-cream">{t('queue.title')}</h1>
-          <p className="mono text-sm text-fg/40">
+          <p className="mono text-sm text-fg/55">
             {downloads.length === 1
               ? t('queue.item', { count: 1 })
               : t('queue.items', { count: downloads.length })}
             {totalSpeed > 0 && <span className="text-fg/60"> · {formatSpeed(totalSpeed)}</span>}
             {remainingBytes > 0 && (
-              <span className="text-fg/40"> · {formatBytes(remainingBytes)} left</span>
+              <span className="text-fg/55"> · {formatBytes(remainingBytes)} left</span>
             )}
           </p>
         </div>
@@ -138,12 +138,12 @@ export default function DownloadsView(): JSX.Element {
             options={FILTERS.map((f) => ({ value: f.value, label: t(f.label) }))}
           />
           <div className="flex min-w-[160px] flex-1 items-center gap-2 rounded-2xl border border-fg/[0.08] bg-ink-900 px-3 py-1.5 transition-colors focus-within:border-accent/40">
-            <Search size={14} className="shrink-0 text-fg/30" />
+            <Search size={14} className="shrink-0 text-fg/50" />
             <input
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder={t('queue.searchPlaceholder')}
-              className="no-drag min-w-0 flex-1 bg-transparent py-1 text-xs text-cream placeholder:text-fg/25 outline-none"
+              className="no-drag min-w-0 flex-1 bg-transparent py-1 text-xs text-cream placeholder:text-fg/50 outline-none"
               spellCheck={false}
             />
           </div>
@@ -157,21 +157,21 @@ export default function DownloadsView(): JSX.Element {
             animate={{ opacity: 1, y: 0 }}
             className="flex h-full flex-col items-center justify-center text-center"
           >
-            <div className="flex h-20 w-20 items-center justify-center rounded-3xl bg-fg/[0.03] text-fg/20">
+            <div className="flex h-20 w-20 items-center justify-center rounded-3xl bg-fg/[0.03] text-fg/35">
               <Inbox size={34} />
             </div>
-            <p className="mt-4 text-sm font-medium text-fg/55">{t('queue.empty')}</p>
-            <p className="mono mt-1 text-xs text-fg/30">{t('queue.emptyHint')}</p>
+            <p className="mt-4 text-sm font-medium text-fg/70">{t('queue.empty')}</p>
+            <p className="mono mt-1 text-xs text-fg/50">{t('queue.emptyHint')}</p>
             <button className="btn-primary mt-5" onClick={() => setView('home')}>
               {t('queue.add')}
             </button>
           </motion.div>
         ) : visible.length === 0 ? (
           <div className="flex h-full flex-col items-center justify-center text-center">
-            <div className="flex h-16 w-16 items-center justify-center rounded-3xl bg-fg/[0.03] text-fg/20">
+            <div className="flex h-16 w-16 items-center justify-center rounded-3xl bg-fg/[0.03] text-fg/35">
               <Search size={26} />
             </div>
-            <p className="mt-4 text-sm font-medium text-fg/55">{t('queue.emptyFiltered')}</p>
+            <p className="mt-4 text-sm font-medium text-fg/70">{t('queue.emptyFiltered')}</p>
           </div>
         ) : (
           <div className="space-y-3 pb-4">

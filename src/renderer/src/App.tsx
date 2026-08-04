@@ -72,7 +72,7 @@ export default function App(): JSX.Element {
                 >
                   <Logo className="h-14 w-14" />
                 </motion.div>
-                <p className="mono mt-4 text-sm text-fg/40">{t('error.starting')}</p>
+                <p className="mono mt-4 text-sm text-fg/55">{t('error.starting')}</p>
               </div>
             )}
           </div>

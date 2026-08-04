@@ -65,7 +65,7 @@ export default function CapabilitiesPanel(): JSX.Element {
             <span className="mt-0.5 shrink-0 text-accent">{item.icon}</span>
             <span className="min-w-0">
               <span className="block text-[13px] font-medium text-cream">{t(item.title)}</span>
-              <span className="mt-0.5 block text-[11px] leading-relaxed text-fg/40">
+              <span className="mt-0.5 block text-[11px] leading-relaxed text-fg/55">
                 {t(item.body)}
               </span>
             </span>
