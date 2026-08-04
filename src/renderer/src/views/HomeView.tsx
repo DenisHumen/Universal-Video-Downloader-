@@ -20,7 +20,7 @@ import {
 import { hasTrim, type DetectStage, type DownloadMode, type MediaInfo, type QualityPreset, type TrimRange } from '@shared/types'
 import { useStore } from '../store'
 import { formatCount, formatDuration, isProbablyUrl } from '../lib/format'
-import { initialMode, initialQuality, maxHeightOf } from '../lib/quality'
+import { availableHeights, initialMode, initialQuality, maxHeightOf } from '../lib/quality'
 import { toast } from '../lib/toast'
 import { toClock } from '../lib/time'
 import { useT, type TranslationKey } from '../i18n'
@@ -29,6 +29,7 @@ import PlaylistCard from '../components/PlaylistCard'
 import StreamingCard from '../components/StreamingCard'
 import TrimEditor from '../components/TrimEditor'
 import CapabilitiesPanel from '../components/CapabilitiesPanel'
+import Thumbnail from '../components/Thumbnail'
 
 type Status = 'idle' | 'detecting' | 'error'
 
@@ -97,7 +98,7 @@ export default function HomeView(): JSX.Element {
       // their default quality isn't available for this particular video.
       setSelection({
         mode: initialMode(settings),
-        quality: initialQuality(settings, maxHeightOf(res.info.formats))
+        quality: initialQuality(settings, availableHeights(res.info.formats))
       })
       setTrimOpen(false)
       setSection({ start: 0 })
@@ -407,18 +408,17 @@ export default function HomeView(): JSX.Element {
               {/* Preview header */}
               <div className="flex gap-4 border-b border-fg/[0.06] p-4">
                 <div className="relative aspect-video w-40 shrink-0 overflow-hidden rounded-2xl bg-ink-950">
-                  {info.thumbnail ? (
-                    <img
-                      src={info.thumbnail}
-                      alt=""
-                      className="h-full w-full object-cover"
-                      referrerPolicy="no-referrer"
-                    />
-                  ) : (
-                    <div className="flex h-full items-center justify-center text-fg/20">
-                      <Download size={28} />
-                    </div>
-                  )}
+                  <Thumbnail
+                    src={info.thumbnail}
+                    pageUrl={info.webpageUrl}
+                    className="h-full w-full object-cover"
+                    loading="eager"
+                    fallback={
+                      <div className="flex h-full items-center justify-center text-fg/20">
+                        <Download size={28} />
+                      </div>
+                    }
+                  />
                   {info.isLive && (
                     <span className="chip absolute left-1.5 top-1.5 bg-red-500/90 text-white">
                       <Radio size={10} /> LIVE

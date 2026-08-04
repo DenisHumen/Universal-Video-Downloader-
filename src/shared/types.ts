@@ -2,15 +2,12 @@
 
 export type DownloadMode = 'video' | 'audio'
 
-export type QualityPreset =
-  | 'best'
-  | '2160'
-  | '1440'
-  | '1080'
-  | '720'
-  | '480'
-  | '360'
-  | 'audio'
+/**
+ * `best`, `audio`, or a target height as a string. Any height is allowed — the
+ * quality row is built from what a video really offers, which is not always a
+ * member of the usual ladder (240p, 576p and 1084p all turn up in the wild).
+ */
+export type QualityPreset = 'best' | 'audio' | `${number}`
 
 export type FormatKind = 'video+audio' | 'video' | 'audio' | 'unknown'
 

@@ -61,6 +61,9 @@ const api = {
   startMediaJob: (req: MediaJobRequest): Promise<DownloadItem> =>
     ipcRenderer.invoke(IPC.mediaJobStart, req),
   probeMedia: (path: string): Promise<MediaProbe> => ipcRenderer.invoke(IPC.mediaProbe, path),
+  /** Re-fetch a poster with proper headers when the direct <img> load fails. */
+  fetchThumbnail: (url: string, pageUrl?: string): Promise<string | null> =>
+    ipcRenderer.invoke(IPC.mediaThumbnail, url, pageUrl),
 
   // Built-in browser
   openBrowser: (url?: string): Promise<void> => ipcRenderer.invoke(IPC.browserOpen, url),

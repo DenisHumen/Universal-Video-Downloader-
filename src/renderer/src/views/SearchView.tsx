@@ -21,6 +21,7 @@ import {
 } from 'lucide-react'
 import type { AppSettings, MediaInfo, SearchResult, SearchScope, SearchService } from '@shared/types'
 import StreamingCard from '../components/StreamingCard'
+import Thumbnail from '../components/Thumbnail'
 import { formatCount, formatDuration } from '../lib/format'
 import { initialMode, initialQuality, maxHeightOf } from '../lib/quality'
 import { toast } from '../lib/toast'
@@ -514,19 +515,16 @@ function ResultCard({
         title={t('common.openInBrowser')}
         onClick={() => window.api.openExternal(result.url)}
       >
-        {thumb ? (
-          <img
-            src={thumb}
-            alt=""
-            loading="lazy"
-            className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.04]"
-            referrerPolicy="no-referrer"
-          />
-        ) : (
-          <div className="flex h-full items-center justify-center text-fg/15">
-            {isAnime ? <Tv size={26} /> : <Search size={26} />}
-          </div>
-        )}
+        <Thumbnail
+          src={thumb}
+          pageUrl={result.url}
+          className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.04]"
+          fallback={
+            <div className="flex h-full items-center justify-center text-fg/15">
+              {isAnime ? <Tv size={26} /> : <Search size={26} />}
+            </div>
+          }
+        />
         <div className="absolute left-1.5 top-1.5">{qualityBadge(probe, result.service, t)}</div>
         <span className="chip absolute right-1.5 top-1.5 bg-black/70 text-[10px] text-white/75">
           {result.service}

@@ -206,6 +206,7 @@ export function installMockApi(): void {
       return item
     },
     probeMedia: async () => ({ duration: 596, hasVideo: true, hasAudio: true }),
+    fetchThumbnail: async () => null,
     openBrowser: async () => undefined,
     browserNavigate: async () => undefined,
     browserBack: async () => undefined,

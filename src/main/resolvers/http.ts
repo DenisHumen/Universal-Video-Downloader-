@@ -83,6 +83,73 @@ export function fetchText(
   return request(url, 'GET', undefined, { ...options, headers })
 }
 
+export interface BinaryResponse {
+  body: Buffer
+  contentType: string
+}
+
+/** Fetch raw bytes — used for images, which must not be decoded as text. */
+export function fetchBinary(
+  url: string,
+  headers: Record<string, string> = {},
+  options: Omit<RequestOptions, 'headers'> = {}
+): Promise<BinaryResponse> {
+  const { timeout = 15_000, maxBytes = 6_000_000 } = options
+  return new Promise((resolve, reject) => {
+    let settled = false
+    const finish = (fn: () => void): void => {
+      if (settled) return
+      settled = true
+      clearTimeout(timer)
+      fn()
+    }
+
+    let req: Electron.ClientRequest
+    const timer = setTimeout(() => {
+      finish(() => reject(new Error('Request timed out')))
+      try {
+        req?.abort()
+      } catch {
+        /* already gone */
+      }
+    }, timeout)
+
+    try {
+      req = net.request({ url, method: 'GET', redirect: 'follow' })
+    } catch (err) {
+      finish(() => reject(err instanceof Error ? err : new Error(String(err))))
+      return
+    }
+
+    req.setHeader('User-Agent', UA)
+    req.setHeader('Accept', 'image/avif,image/webp,image/*,*/*;q=0.8')
+    for (const [k, v] of Object.entries(headers)) req.setHeader(k, v)
+
+    req.on('response', (response) => {
+      const status = response.statusCode ?? 0
+      if (status >= 400) {
+        finish(() => reject(new Error(`HTTP ${status}`)))
+        return
+      }
+      const rawType = response.headers['content-type']
+      const contentType = (Array.isArray(rawType) ? rawType[0] : rawType) || 'image/jpeg'
+      const chunks: Buffer[] = []
+      let size = 0
+      response.on('data', (chunk: Buffer) => {
+        if (size >= maxBytes) return
+        size += chunk.length
+        chunks.push(chunk)
+      })
+      response.on('end', () =>
+        finish(() => resolve({ body: Buffer.concat(chunks), contentType: contentType.split(';')[0] }))
+      )
+      response.on('error', (err: Error) => finish(() => reject(err)))
+    })
+    req.on('error', (err) => finish(() => reject(err)))
+    req.end()
+  })
+}
+
 export function netPost(
   url: string,
   body: string,

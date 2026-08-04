@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import { CheckCheck, Crown, Download, Film, Loader2, Sparkles, Tv, X } from 'lucide-react'
 import type { MediaInfo, QualityPreset } from '@shared/types'
 import Segmented, { type SegOption } from './Segmented'
+import Thumbnail from './Thumbnail'
 import { initialQuality, QUALITY_HEIGHTS } from '../lib/quality'
 import { toast } from '../lib/toast'
 import { useT } from '../i18n'
@@ -129,18 +130,17 @@ export default function StreamingCard({ info, onDone }: Props): JSX.Element {
   return (
     <div className="card overflow-hidden">
       <div className="flex gap-4 border-b border-fg/[0.06] p-4">
-        {s.thumbnail ? (
-          <img
-            src={s.thumbnail}
-            alt=""
-            className="h-24 w-16 shrink-0 rounded-xl object-cover"
-            referrerPolicy="no-referrer"
-          />
-        ) : (
-          <div className="flex h-24 w-16 shrink-0 items-center justify-center rounded-xl bg-fg/[0.05] text-fg/25">
-            {s.isSeries ? <Tv size={20} /> : <Film size={20} />}
-          </div>
-        )}
+        <Thumbnail
+          src={s.thumbnail}
+          pageUrl={info.webpageUrl}
+          className="h-24 w-16 shrink-0 rounded-xl object-cover"
+          loading="eager"
+          fallback={
+            <div className="flex h-24 w-16 shrink-0 items-center justify-center rounded-xl bg-fg/[0.05] text-fg/25">
+              {s.isSeries ? <Tv size={20} /> : <Film size={20} />}
+            </div>
+          }
+        />
         <div className="min-w-0 flex-1">
           <h2 className="text-base font-semibold text-cream">{s.title}</h2>
           <p className="mono mt-0.5 text-xs text-fg/40">

@@ -3,6 +3,7 @@ import { AnimatePresence, motion } from 'framer-motion'
 import { ChevronDown, Film, Music, Sparkles, Video } from 'lucide-react'
 import type { AppSettings, DownloadMode, MediaInfo, QualityPreset, VideoFormat } from '@shared/types'
 import { formatBytes } from '../lib/format'
+import { availableHeights, heightLabel, QUALITY_HEIGHTS } from '../lib/quality'
 import { useT } from '../i18n'
 import Segmented from './Segmented'
 
@@ -16,17 +17,10 @@ interface Props {
   onSelectionChange: (sel: { mode: DownloadMode; quality?: QualityPreset; formatId?: string }) => void
 }
 
-const PRESETS: { q: QualityPreset; label: string }[] = [
-  { q: 'best', label: 'best' },
-  { q: '2160', label: '4K' },
-  { q: '1440', label: '1440p' },
-  { q: '1080', label: '1080p' },
-  { q: '720', label: '720p' },
-  { q: '480', label: '480p' },
-  { q: '360', label: '360p' }
-]
-
 const AUDIO_FORMATS = ['mp3', 'm4a', 'opus', 'flac', 'wav', 'aac']
+
+/** Never show more preset buttons than fit comfortably on one row. */
+const MAX_PRESETS = 6
 
 export default function FormatSelector({
   info,
@@ -42,14 +36,31 @@ export default function FormatSelector({
   const [formatId, setFormatId] = useState<string | undefined>(undefined)
   const [showAdvanced, setShowAdvanced] = useState(false)
 
-  const maxHeight = useMemo(
-    () => info.formats.reduce((m, f) => Math.max(m, f.height || 0), 0),
-    [info.formats]
-  )
-  const availablePresets = PRESETS.filter(
-    (p) => p.q === 'best' || (maxHeight ? Number(p.q) <= maxHeight : true)
-  )
   const videoFormats = info.formats.filter((f) => f.kind !== 'audio')
+
+  /**
+   * Presets come from the heights this video really has. Offering a fixed
+   * ladder meant advertising qualities that didn't exist (a 360p button on a
+   * 720/480/240 video) while repeating the ones that did, verbatim, in the
+   * exact-stream list below.
+   */
+  const availablePresets = useMemo(() => {
+    const heights = availableHeights(info.formats)
+    if (!heights.length) {
+      // The site didn't report heights (HLS, universal detection): fall back to
+      // the standard ladder so the user can still cap the download.
+      return [
+        { q: 'best' as QualityPreset, label: t('common.best') },
+        ...QUALITY_HEIGHTS.map((h) => ({ q: String(h) as QualityPreset, label: heightLabel(h) }))
+      ]
+    }
+    return [
+      { q: 'best' as QualityPreset, label: t('common.best') },
+      ...heights
+        .slice(0, MAX_PRESETS)
+        .map((h) => ({ q: String(h) as QualityPreset, label: heightLabel(h) }))
+    ]
+  }, [info.formats, t])
 
   const emit = (next: Partial<{ mode: DownloadMode; quality: QualityPreset; formatId?: string }>): void => {
     const m = next.mode ?? mode
@@ -112,7 +123,7 @@ export default function FormatSelector({
                     )}
                     <span className="relative z-10 flex items-center gap-1">
                       {p.q === 'best' && <Sparkles size={12} />}
-                      {p.q === 'best' ? t('common.best') : p.label}
+                      {p.label}
                     </span>
                   </button>
                 )

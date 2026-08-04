@@ -22,6 +22,7 @@ import { formatBytes, formatEta, formatSpeed } from '../lib/format'
 import { useT, type TranslationKey } from '../i18n'
 import { toast } from '../lib/toast'
 import MediaJobModal, { type JobMode } from './MediaJobModal'
+import Thumbnail from './Thumbnail'
 
 interface Props {
   item: DownloadItem
@@ -75,18 +76,16 @@ export default function DownloadCard({ item }: Props): JSX.Element {
     >
       <div className="flex gap-4 p-3.5">
         <div className="relative h-[68px] w-[120px] shrink-0 overflow-hidden rounded-2xl bg-ink-950">
-          {item.thumbnail ? (
-            <img
-              src={item.thumbnail}
-              alt=""
-              className="h-full w-full object-cover"
-              referrerPolicy="no-referrer"
-            />
-          ) : (
-            <div className="flex h-full items-center justify-center text-fg/15">
-              {item.mode === 'audio' ? <Music size={22} /> : <Video size={22} />}
-            </div>
-          )}
+          <Thumbnail
+            src={item.thumbnail}
+            pageUrl={item.sourceUrl}
+            className="h-full w-full object-cover"
+            fallback={
+              <div className="flex h-full items-center justify-center text-fg/15">
+                {item.mode === 'audio' ? <Music size={22} /> : <Video size={22} />}
+              </div>
+            }
+          />
           <span className="absolute bottom-1 left-1 flex h-5 w-5 items-center justify-center rounded-md bg-black/70 text-white/80">
             {item.mode === 'audio' ? <Music size={11} /> : <Video size={11} />}
           </span>

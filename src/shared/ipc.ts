@@ -16,6 +16,7 @@ export const IPC = {
   downloadList: 'download:list',
   mediaJobStart: 'media:job-start',
   mediaProbe: 'media:probe',
+  mediaThumbnail: 'media:thumbnail',
   browserOpen: 'browser:open',
   browserNavigate: 'browser:navigate',
   browserBack: 'browser:back',

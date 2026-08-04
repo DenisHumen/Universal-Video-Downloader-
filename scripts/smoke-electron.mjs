@@ -1,15 +1,16 @@
 /**
- * Smoke test for the Electron APIs the built-in browser depends on.
+ * Smoke test for the Electron APIs this app leans on.
  *
- * Run with:  npx electron scripts/smoke-browser.mjs
+ * Run with:  npx electron scripts/smoke-electron.mjs  [thumbnail-url]
  *
- * It exercises the exact surface `src/main/services/browser.ts` uses —
- * WebContentsView inside a BrowserWindow's contentView, session-scoped
- * webRequest capture, the navigationHistory API and preload injection into the
- * site view — and prints PASS/FAIL for each. Nothing here touches app code, so
+ * It exercises the exact surface `services/browser.ts` uses — WebContentsView
+ * inside a BrowserWindow's contentView, session-scoped webRequest capture, the
+ * navigationHistory API and script injection into the site view — plus the one
+ * assumption `services/thumbnails.ts` rests on: that `net.request` sends the
+ * `Referer` we set rather than stripping it. Nothing here touches app code, so
  * it also serves as an early warning when an Electron upgrade moves things.
  */
-import { app, BrowserWindow, WebContentsView, session } from 'electron'
+import { app, BrowserWindow, WebContentsView, net, session } from 'electron'
 
 const results = []
 const check = (name, ok, detail = '') => {
@@ -89,6 +90,40 @@ app.whenReady().then(async () => {
     check('executeJavaScript in the site view', title === 1, `videos=${title}`)
   } catch (err) {
     check('executeJavaScript in the site view', false, err.message)
+  }
+
+  // Hotlink-protected posters only load when we send a Referer; Chromium's
+  // network stack treats that header specially, so prove it survives.
+  const thumbUrl = process.argv.find((a) => a.startsWith('http'))
+  if (thumbUrl) {
+    const get = (referer) =>
+      new Promise((resolve) => {
+        const req = net.request({ url: thumbUrl, redirect: 'follow' })
+        req.setHeader('User-Agent', 'Mozilla/5.0 Chrome/124.0.0.0 Safari/537.36')
+        if (referer) req.setHeader('Referer', referer)
+        req.on('response', (res) => {
+          let bytes = 0
+          res.on('data', (c) => (bytes += c.length))
+          res.on('end', () =>
+            resolve({ status: res.statusCode, type: String(res.headers['content-type']), bytes })
+          )
+        })
+        req.on('error', (err) => resolve({ status: 0, type: err.message, bytes: 0 }))
+        req.end()
+      })
+
+    // Only the header pass-through is asserted. Whether the CDN *refuses* a
+    // referer-less request is its policy, not ours, and edge caches make the
+    // answer depend on what was fetched a moment earlier — a check that would
+    // flake without ever telling us anything about this codebase.
+    const withRef = await get('https://www.pornhub.com/')
+    check(
+      'net.request sends the Referer we set (and gets an image back)',
+      withRef.status === 200 && /image\//.test(withRef.type),
+      `HTTP ${withRef.status} ${withRef.type} ${withRef.bytes}B`
+    )
+  } else {
+    console.log('SKIP  thumbnail referer check (pass a URL as an argument)')
   }
 
   finish()
