@@ -9,16 +9,30 @@ import sharp from 'sharp'
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const root = resolve(__dirname, '..')
 const svgPath = join(root, 'assets', 'logo.svg')
+const traySvgPath = join(root, 'assets', 'tray.svg')
 const buildDir = join(root, 'build')
 const iconsDir = join(buildDir, 'icons')
+/*
+ * Runtime icons, as opposed to build-time ones.
+ *
+ * `build/` is electron-builder's buildResources directory: it is used to make
+ * the installer and is deliberately *not* copied into the app, and `assets/` is
+ * excluded from the package explicitly. Anything the running app loads has to
+ * live somewhere that ships — which is what this directory is for. Loading a
+ * missing path is not an error in Electron; `nativeImage` just hands back an
+ * empty image, which is how the tray ended up as a blank square.
+ */
+const runtimeDir = join(root, 'resources', 'icons')
 
-if (!existsSync(buildDir)) mkdirSync(buildDir, { recursive: true })
-if (!existsSync(iconsDir)) mkdirSync(iconsDir, { recursive: true })
+for (const dir of [buildDir, iconsDir, runtimeDir]) {
+  if (!existsSync(dir)) mkdirSync(dir, { recursive: true })
+}
 
 const svg = readFileSync(svgPath)
+const traySvg = readFileSync(traySvgPath)
 
-async function render(size, outPath) {
-  await sharp(svg, { density: 384 })
+async function render(size, outPath, source = svg) {
+  await sharp(source, { density: 384 })
     .resize(size, size, { fit: 'contain', background: { r: 0, g: 0, b: 0, alpha: 0 } })
     .png()
     .toFile(outPath)
@@ -30,4 +44,14 @@ await render(1024, join(buildDir, 'icon.png'))
 for (const size of [512, 256, 128, 64, 32, 16]) {
   await render(size, join(iconsDir, `${size}x${size}.png`))
 }
+
+console.log('Generating runtime icons…')
+// Window icons: 256 is what Linux and the browser window ask for.
+await render(256, join(runtimeDir, 'app.png'))
+// Tray, from the dedicated glyph. The @2x/@3x suffixes are Electron's own
+// convention — it picks the representation matching the display's scale, so the
+// icon stays sharp on a 200% screen without any code choosing a size.
+await render(16, join(runtimeDir, 'tray.png'), traySvg)
+await render(32, join(runtimeDir, 'tray@2x.png'), traySvg)
+await render(48, join(runtimeDir, 'tray@3x.png'), traySvg)
 console.log('Done.')

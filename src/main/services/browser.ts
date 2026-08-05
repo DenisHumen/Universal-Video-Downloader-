@@ -59,7 +59,11 @@ function sitePreload(): string {
 
 function icon(): Electron.NativeImage | undefined {
   if (process.platform === 'darwin') return undefined
-  return nativeImage.createFromPath(join(__dirname, '../../build/icon.png'))
+  // `resources/` ships with the app; `build/` does not — see iconPath in index.ts.
+  const path = join(__dirname, '../../resources/icons/app.png')
+  const image = nativeImage.createFromPath(path)
+  if (image.isEmpty()) console.error(`Browser window icon missing at ${path}`)
+  return image
 }
 
 function labelFor(url: string): string {
