@@ -1,5 +1,6 @@
 import { spawn } from 'child_process'
 import { ytdlpBinaryPath, ytdlpSpawnOptions, ensureYtdlp } from './ytdlp'
+import { killTree } from './process'
 import { getSettings } from './settings'
 import { humanizeYtdlpError } from './options'
 import { searchYummyani } from '../resolvers'
@@ -68,7 +69,7 @@ function ytdlpSearch(target: string, service: SearchService, limit: number): Pro
       resolve(value)
     }
     const timeout = setTimeout(() => {
-      child.kill()
+      killTree(child)
       done({ ok: false, error: 'Search timed out. Check your connection and try again.' })
     }, 45_000)
 

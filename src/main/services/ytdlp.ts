@@ -14,6 +14,7 @@ import {
 } from 'fs'
 import { join } from 'path'
 import type { YtDlpStatus } from '@shared/types'
+import { groupSpawnOptions } from './process'
 
 export const ytdlpEvents = new EventEmitter()
 
@@ -66,14 +67,19 @@ function engineTmpDir(): string {
  * Spawn options shared by every yt-dlp invocation. On Windows we redirect the
  * child's TEMP/TMP to an ASCII path so the PyInstaller bootloader can extract.
  */
-export function ytdlpSpawnOptions(): { windowsHide: boolean; env: NodeJS.ProcessEnv } {
+export function ytdlpSpawnOptions(): {
+  windowsHide: boolean
+  env: NodeJS.ProcessEnv
+  detached?: boolean
+} {
   const env: NodeJS.ProcessEnv = { ...process.env }
   if (process.platform === 'win32') {
     const tmp = engineTmpDir()
     env.TMP = tmp
     env.TEMP = tmp
   }
-  return { windowsHide: true, env }
+  // Group-spawned so `killTree` can take yt-dlp's own ffmpeg children with it.
+  return { windowsHide: true, env, ...groupSpawnOptions() }
 }
 
 function assetName(): string {

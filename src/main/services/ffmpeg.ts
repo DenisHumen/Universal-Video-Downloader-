@@ -2,6 +2,7 @@ import { spawn, type ChildProcess } from 'child_process'
 import { dirname, extname, join } from 'path'
 import { existsSync } from 'fs'
 import type { ConvertTarget, TrimRange } from '@shared/types'
+import { groupSpawnOptions, killTree } from './process'
 
 /**
  * Resolve the bundled ffmpeg binary path. In a packaged app the binary lives in
@@ -62,7 +63,7 @@ export function runFfmpeg(
     '-nostats',
     ...args
   ]
-  const child = spawn(bin, full, { windowsHide: true })
+  const child = spawn(bin, full, { windowsHide: true, ...groupSpawnOptions() })
 
   let stderr = ''
   let buffer = ''
@@ -131,7 +132,7 @@ export function probeMedia(path: string): Promise<MediaProbe> {
       })
     }
     const timer = setTimeout(() => {
-      child.kill()
+      killTree(child)
       finish()
     }, 15_000)
     child.stderr?.on('data', (c: Buffer) => (stderr += c.toString()))

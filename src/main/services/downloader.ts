@@ -19,6 +19,7 @@ import {
 import { getSettings } from './settings'
 import { accessArgs, hasCookies, headerArgs, humanizeYtdlpError, isTransientError } from './options'
 import { isSameDownload } from './dedupe'
+import { killTree } from './process'
 import { pendingOrder } from './schedule'
 import { resolveUrl } from '../resolvers'
 import { hasTrim } from '@shared/types'
@@ -629,7 +630,7 @@ export function pauseDownload(id: string): void {
   item.interrupted = false
   item.speed = undefined
   item.eta = undefined
-  if (proc) proc.kill()
+  if (proc) killTree(proc)
   emitUpdated(item)
   processQueue()
 }
@@ -672,8 +673,20 @@ export function cancelDownload(id: string): void {
   item.percent = 0
   item.speed = undefined
   item.eta = undefined
-  if (proc) proc.kill()
-  cleanupPartials(item)
+  if (proc) {
+    /*
+      Clean up once the process is actually gone, not merely once it has been
+      asked to go. Termination is asynchronous everywhere — and on Windows
+      `killTree` shells out to `taskkill`, which has not even started by the
+      time this function returns. Deleting the .part files while yt-dlp or its
+      ffmpeg child still holds them open either fails outright or races them
+      into recreating the files we just removed.
+    */
+    proc.once('close', () => cleanupPartials(item))
+    killTree(proc)
+  } else {
+    cleanupPartials(item)
+  }
   emitUpdated(item)
   processQueue()
 }
@@ -694,7 +707,7 @@ export function retryDownload(id: string): void {
 export function removeDownload(id: string): void {
   clearRetry(id)
   const proc = procs.get(id)
-  if (proc) proc.kill()
+  if (proc) killTree(proc)
   procs.delete(id)
   items.delete(id)
   finalPaths.delete(id)
@@ -779,7 +792,7 @@ export function shutdownDownloads(): void {
     const item = items.get(id)
     if (item && (item.state === 'downloading' || item.state === 'processing')) item.state = 'paused'
     try {
-      proc.kill()
+      killTree(proc)
     } catch {
       /* already gone */
     }

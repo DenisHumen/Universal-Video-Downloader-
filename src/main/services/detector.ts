@@ -1,6 +1,7 @@
 import { spawn } from 'child_process'
 import { ytdlpBinaryPath, ytdlpSpawnOptions } from './ytdlp'
 import { getSettings } from './settings'
+import { killTree } from './process'
 import { accessArgs, hasCookies, headerArgs, humanizeYtdlpError } from './options'
 import { resolveUniversal, resolveUrl, type ResolvedUrl } from '../resolvers'
 import { looksLikeCollection } from '@shared/urls'
@@ -270,13 +271,13 @@ function spawnJson(args: string[], signal: AbortSignal | undefined, timeoutMs: n
     }
 
     const timer = setTimeout(() => {
-      child.kill()
+      killTree(child)
       done({ ok: false, error: 'Detection timed out. The site may be unsupported or unreachable.' })
     }, timeoutMs)
 
     if (signal) {
       signal.addEventListener('abort', () => {
-        child.kill()
+        killTree(child)
         done({ ok: false, error: 'Detection canceled.' })
       })
     }
