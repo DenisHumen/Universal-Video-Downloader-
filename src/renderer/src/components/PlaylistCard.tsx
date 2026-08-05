@@ -3,7 +3,7 @@ import { Check, Loader2 } from 'lucide-react'
 import type { DownloadMode, MediaInfo, PlaylistEntry, QualityPreset } from '@shared/types'
 import Choice from './Choice'
 import { initialMode, initialQuality } from '../lib/quality'
-import { toast } from '../lib/toast'
+import { queueDownloads } from '../lib/queue'
 import { useT } from '../i18n'
 import { useStore } from '../store'
 
@@ -45,23 +45,21 @@ export default function PlaylistCard({ info, onDone }: Props): JSX.Element {
   const run = async (list: PlaylistEntry[]): Promise<void> => {
     if (!list.length) return
     setBusy(true)
+    let ok = false
     try {
-      for (const e of list) {
-        await window.api.startDownload({
+      ok = await queueDownloads(
+        list.map((e) => ({
           url: e.url,
           title: e.title,
           thumbnail: e.thumbnail,
           mode,
           quality: mode === 'audio' ? 'audio' : quality
-        })
-      }
-    } catch (err) {
-      toast(err instanceof Error ? err.message : t('home.startFailed'), 'error')
-      return
+        }))
+      )
     } finally {
       setBusy(false)
     }
-    toast(t('playlist.added', { count: list.length }), 'success')
+    if (!ok) return
     onDone()
     setView('downloads')
   }

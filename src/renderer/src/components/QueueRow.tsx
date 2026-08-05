@@ -4,6 +4,8 @@ import { collapse, listItem } from '../lib/motion'
 import {
   ChevronDown,
   Copy,
+  ExternalLink,
+  Link2,
   FileVideo,
   FolderOpen,
   Pause,
@@ -85,6 +87,24 @@ export default function QueueRow({ item, index }: Props): JSX.Element {
     item.state === 'completed' && item.totalBytes ? formatBytes(item.totalBytes) : null,
     item.state === 'queued' && (item.attempts || 0) > 0 ? t('queue.retryingIn') : null
   ].filter(Boolean)
+
+  /*
+    The link this entry came from. Internal schemes (`uvd-rezka://`,
+    `uvd-yummy://`) are addresses the resolver invented for itself — copying one
+    hands the user a string no other program understands — so link actions only
+    appear for real web addresses.
+  */
+  const sourceLink = item.sourceUrl || item.url
+  const hasWebLink = item.kind !== 'trim' && item.kind !== 'convert' && /^https?:\/\//i.test(sourceLink)
+
+  const copyLink = async (): Promise<void> => {
+    try {
+      await navigator.clipboard.writeText(sourceLink)
+      toast(t('common.copied'), 'success')
+    } catch {
+      /* clipboard unavailable */
+    }
+  }
 
   const copyError = async (): Promise<void> => {
     try {
@@ -178,6 +198,26 @@ export default function QueueRow({ item, index }: Props): JSX.Element {
           cancel or "show in folder" exist at all. Critical actions do not hide.
         */}
         <div className="flex shrink-0 items-center gap-1">
+          {hasWebLink && (
+            <>
+              <button
+                className="btn-icon-bare"
+                title={t('queue.copyLink')}
+                aria-label={t('queue.copyLink')}
+                onClick={copyLink}
+              >
+                <Link2 size={15} />
+              </button>
+              <button
+                className="btn-icon-bare"
+                title={t('queue.openSource')}
+                aria-label={t('queue.openSource')}
+                onClick={() => window.api.openExternal(sourceLink)}
+              >
+                <ExternalLink size={15} />
+              </button>
+            </>
+          )}
           {item.state === 'completed' && item.filepath && (
             <>
               <button

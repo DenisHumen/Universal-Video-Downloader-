@@ -10,6 +10,7 @@ import EmptyState from '../components/EmptyState'
 import { formatCount, formatDuration } from '../lib/format'
 import { initialMode, initialQuality, maxHeightOf } from '../lib/quality'
 import { toast } from '../lib/toast'
+import { queueDownload } from '../lib/queue'
 import { useT, type TranslateFn } from '../i18n'
 import { useStore } from '../store'
 
@@ -157,19 +158,14 @@ export default function SearchView({ settings, embedded = false }: Props): JSX.E
   const download = async (r: SearchResult): Promise<void> => {
     const probe = probes[r.url]
     const mode = r.service === 'soundcloud' ? 'audio' : initialMode(settings)
-    try {
-      await window.api.startDownload({
-        url: r.url,
-        title: r.title,
-        thumbnail: r.thumbnail || probe?.thumbnail,
-        mode,
-        quality: mode === 'audio' ? 'audio' : initialQuality(settings, probe?.maxHeight || 0)
-      })
-      setAdded((prev) => new Set(prev).add(r.url))
-      toast(embedded ? t('home.addedToQueue') : t('search.addedRemote'), 'success')
-    } catch (err) {
-      toast(err instanceof Error ? err.message : t('home.startFailed'), 'error')
-    }
+    const ok = await queueDownload({
+      url: r.url,
+      title: r.title,
+      thumbnail: r.thumbnail || probe?.thumbnail,
+      mode,
+      quality: mode === 'audio' ? 'audio' : initialQuality(settings, probe?.maxHeight || 0)
+    })
+    if (ok) setAdded((prev) => new Set(prev).add(r.url))
   }
 
   // Anime: open the episode/translator/quality picker (like pasting the link).

@@ -5,6 +5,7 @@ import Choice, { type ChoiceOption } from './Choice'
 import Thumbnail from './Thumbnail'
 import { initialQuality, QUALITY_HEIGHTS } from '../lib/quality'
 import { toast } from '../lib/toast'
+import { queueDownload, queueDownloads } from '../lib/queue'
 import { useT } from '../i18n'
 import { useStore } from '../store'
 
@@ -74,35 +75,32 @@ export default function StreamingCard({ info, onDone }: Props): JSX.Element {
       return
     }
     setBusy(true)
-    let count = 0
+    let ok = false
     try {
-      for (const [seasonStr, eps] of Object.entries(selected)) {
-        for (const ep of eps) {
-          await window.api.startDownload({
+      ok = await queueDownloads(
+        Object.entries(selected).flatMap(([seasonStr, eps]) =>
+          eps.map((ep) => ({
             url: buildEpisodeUrl(Number(seasonStr), ep),
             title: `${s.title} - S${pad2(Number(seasonStr))}E${pad2(ep)} (${translatorName})`,
             thumbnail: s.thumbnail,
-            mode: 'video',
+            mode: 'video' as const,
             quality
-          })
-          count++
-        }
-      }
-    } catch (err) {
-      toast(err instanceof Error ? err.message : t('home.startFailed'), 'error')
-      return
+          }))
+        )
+      )
     } finally {
       setBusy(false)
     }
-    toast(t('streaming.addedEpisodes', { count }), 'success')
+    if (!ok) return
     onDone()
     setView('downloads')
   }
 
   const queueMovie = async (): Promise<void> => {
     setBusy(true)
+    let ok = false
     try {
-      await window.api.startDownload({
+      ok = await queueDownload({
         url:
           s.provider === 'yummyani'
             ? `uvd-yummy://${translatorId}/1/${quality}`
@@ -112,13 +110,10 @@ export default function StreamingCard({ info, onDone }: Props): JSX.Element {
         mode: 'video',
         quality
       })
-    } catch (err) {
-      toast(err instanceof Error ? err.message : t('home.startFailed'), 'error')
-      return
     } finally {
       setBusy(false)
     }
-    toast(t('home.addedToQueue'), 'success')
+    if (!ok) return
     onDone()
     setView('downloads')
   }

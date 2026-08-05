@@ -11,6 +11,7 @@ import SearchView from './views/SearchView'
 import Logo from './components/Logo'
 import MacNotice from './components/MacNotice'
 import Toasts from './components/Toasts'
+import LiveRegion from './components/LiveRegion'
 import ShortcutsOverlay from './components/ShortcutsOverlay'
 import ClipboardPrompt from './components/ClipboardPrompt'
 import { useShortcuts } from './hooks/useShortcuts'
@@ -33,6 +34,8 @@ export default function App(): JSX.Element {
     <>
       <TopBar />
       <Toasts />
+      {/* Outcomes as text, for anyone not watching the window. */}
+      <LiveRegion />
       <ShortcutsOverlay />
 
       {/*

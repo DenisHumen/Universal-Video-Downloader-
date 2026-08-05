@@ -52,6 +52,7 @@ export const en = {
   'home.subtitle': 'automatic stream detection for thousands of sites — or type a title to search.',
   'home.placeholder': 'paste a video link — or search by title',
   'home.linkLabel': 'video link',
+  'home.saveDefault': 'use default folder',
   'home.get': 'get video',
   'home.errorTitle': 'couldn’t detect a video',
   'home.openAccessSettings': 'open settings → access',
@@ -98,6 +99,11 @@ export const en = {
   'queue.filterFailed': 'failed',
   'queue.searchPlaceholder': 'filter by title…',
   'queue.remaining': '{size} left',
+  'queue.duplicate': 'already in the queue',
+  'queue.addedWithDuplicates': 'added {count} · {duplicates} already queued',
+  'queue.copyLink': 'copy the link',
+  'queue.openSource': 'open the source page',
+  'queue.moveUp': 'download this one next',
   'queue.log': 'engine output',
   'queue.copyError': 'copy the error',
   'queue.retryingIn': 'retrying automatically…',
@@ -344,6 +350,10 @@ export const en = {
   'browser.clear': 'clear',
   'browser.openExternal': 'open in your browser',
   'browser.queued': 'added to the queue',
+
+  // ---- screen reader announcements ----
+  'a11y.downloadFinished': '{title} finished downloading',
+  'a11y.downloadFailed': '{title} failed. {error}',
 
   // ---- errors ----
   'error.title': 'something went wrong',

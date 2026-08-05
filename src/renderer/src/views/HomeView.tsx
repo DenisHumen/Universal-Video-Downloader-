@@ -5,6 +5,7 @@ import {
   ArrowRight,
   ChevronDown,
   ClipboardPaste,
+  Folder,
   Globe,
   Layers,
   Loader2,
@@ -23,7 +24,7 @@ import {
 import { useStore } from '../store'
 import { formatCount, formatDuration, isProbablyUrl } from '../lib/format'
 import { availableHeights, initialMode, initialQuality, maxHeightOf } from '../lib/quality'
-import { toast } from '../lib/toast'
+import { queueDownload, queueDownloads } from '../lib/queue'
 import { toClock } from '../lib/time'
 import { useT, type TranslationKey } from '../i18n'
 import FormatSelector from '../components/FormatSelector'
@@ -77,6 +78,13 @@ export default function HomeView(): JSX.Element {
   const [batchText, setBatchText] = useState('')
   const [trimOpen, setTrimOpen] = useState(false)
   const [section, setSection] = useState<TrimRange>({ start: 0 })
+  /*
+    Where this download lands. `DownloadRequest.outputDir` was always honoured
+    by the main process but nothing ever set it, so every file in every project
+    went to the one folder in Settings. Deliberately sticky across downloads:
+    the reason to change it is usually "everything for this job goes here".
+  */
+  const [saveDir, setSaveDir] = useState('')
   const inputRef = useRef<HTMLInputElement>(null)
   const resultRef = useRef<HTMLDivElement>(null)
   const requestRef = useRef<string | null>(null)
@@ -198,6 +206,11 @@ export default function HomeView(): JSX.Element {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
+  const chooseSaveDir = async (): Promise<void> => {
+    const dir = await window.api.chooseDirectory()
+    if (dir) setSaveDir(dir)
+  }
+
   const paste = async (): Promise<void> => {
     const text = await window.api.readClipboard().catch(() => '')
     if (!text) return
@@ -208,24 +221,23 @@ export default function HomeView(): JSX.Element {
   const start = async (): Promise<void> => {
     if (!info) return
     setStarting(true)
+    let ok = false
     try {
-      await window.api.startDownload({
+      ok = await queueDownload({
         url: info.downloadUrl || info.webpageUrl || url,
         title: info.title,
         thumbnail: info.thumbnail,
         mode: selection.mode,
         quality: selection.quality,
         formatId: selection.formatId,
+        outputDir: saveDir || undefined,
         section: trimOpen && hasTrim(section) ? section : undefined
       })
-    } catch (err) {
-      toast(err instanceof Error ? err.message : t('home.startFailed'), 'error')
-      return
     } finally {
       setStarting(false)
     }
+    if (!ok) return
     reset()
-    toast(t('home.addedToQueue'), 'success')
     setView('downloads')
   }
 
@@ -242,22 +254,21 @@ export default function HomeView(): JSX.Element {
     if (!batchLinks.length) return
     setStarting(true)
     const mode = initialMode(settings)
+    let ok = false
     try {
-      for (const link of batchLinks) {
-        await window.api.startDownload({
+      ok = await queueDownloads(
+        batchLinks.map((link) => ({
           url: link,
           title: link,
           mode,
-          quality: mode === 'audio' ? 'audio' : initialQuality(settings)
-        })
-      }
-    } catch (err) {
-      toast(err instanceof Error ? err.message : t('home.startFailed'), 'error')
-      return
+          quality: mode === 'audio' ? 'audio' : initialQuality(settings),
+          outputDir: saveDir || undefined
+        }))
+      )
     } finally {
       setStarting(false)
     }
-    toast(t('playlist.added', { count: batchLinks.length }), 'success')
+    if (!ok) return
     setBatchText('')
     setBatchOpen(false)
     setView('downloads')
@@ -546,8 +557,30 @@ export default function HomeView(): JSX.Element {
                   </div>
                 )}
 
+                <div className="mt-5 flex flex-wrap items-end justify-between gap-3 border-t border-edge pt-4">
+                  <div className="min-w-0 flex-1">
+                    <p className="label mb-1.5">{t('settings.saveLocation')}</p>
+                    <p
+                      className="mono truncate text-[12px] text-ink-2"
+                      title={saveDir || settings.downloadDir}
+                    >
+                      {saveDir || settings.downloadDir}
+                    </p>
+                  </div>
+                  <div className="flex shrink-0 items-center gap-2">
+                    {saveDir && (
+                      <button className="btn-quiet" onClick={() => setSaveDir('')}>
+                        {t('home.saveDefault')}
+                      </button>
+                    )}
+                    <button className="btn-quiet" onClick={chooseSaveDir}>
+                      <Folder size={14} /> {t('common.change')}
+                    </button>
+                  </div>
+                </div>
+
                 <button
-                  className="btn-solid mt-5 w-full py-3.5 text-[14px]"
+                  className="btn-solid mt-4 w-full py-3.5 text-[14px]"
                   onClick={start}
                   disabled={starting}
                 >

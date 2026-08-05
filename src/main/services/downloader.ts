@@ -18,6 +18,7 @@ import {
 } from './ffmpeg'
 import { getSettings } from './settings'
 import { accessArgs, hasCookies, headerArgs, humanizeYtdlpError, isTransientError } from './options'
+import { isSameDownload } from './dedupe'
 import { resolveUrl } from '../resolvers'
 import { hasTrim } from '@shared/types'
 import type {
@@ -522,7 +523,18 @@ function fail(item: DownloadItem, rawError: string): void {
   processQueue()
 }
 
+/**
+ * The queue entry this request would collide with, if any. The rule itself
+ * lives in `dedupe.ts` so it can be tested without booting Electron.
+ */
+function findInFlight(req: DownloadRequest): DownloadItem | undefined {
+  return [...items.values()].find((item) => isSameDownload(item, req))
+}
+
 export async function startDownload(req: DownloadRequest): Promise<DownloadItem> {
+  const existing = findInFlight(req)
+  if (existing) return { ...existing }
+
   await ensureYtdlp()
   const settings = getSettings()
   const id = randomUUID()

@@ -50,6 +50,7 @@ export const ru: Dictionary = {
   'home.subtitle': 'автоопределение потока для тысяч сайтов — или введите название для поиска.',
   'home.placeholder': 'вставьте ссылку на видео — или найдите по названию',
   'home.linkLabel': 'ссылка на видео',
+  'home.saveDefault': 'папка по умолчанию',
   'home.get': 'получить',
   'home.errorTitle': 'не удалось найти видео',
   'home.openAccessSettings': 'открыть настройки → доступ',
@@ -96,6 +97,11 @@ export const ru: Dictionary = {
   'queue.filterFailed': 'с ошибкой',
   'queue.searchPlaceholder': 'фильтр по названию…',
   'queue.remaining': 'осталось {size}',
+  'queue.duplicate': 'уже в очереди',
+  'queue.addedWithDuplicates': 'добавлено: {count} · уже в очереди: {duplicates}',
+  'queue.copyLink': 'скопировать ссылку',
+  'queue.openSource': 'открыть страницу-источник',
+  'queue.moveUp': 'скачать следующим',
   'queue.log': 'вывод движка',
   'queue.copyError': 'скопировать ошибку',
   'queue.retryingIn': 'повторяю автоматически…',
@@ -342,6 +348,10 @@ export const ru: Dictionary = {
   'browser.clear': 'очистить',
   'browser.openExternal': 'открыть во внешнем браузере',
   'browser.queued': 'добавлено в очередь',
+
+  // ---- screen reader announcements ----
+  'a11y.downloadFinished': '{title} — загрузка завершена',
+  'a11y.downloadFailed': '{title} — ошибка. {error}',
 
   // ---- errors ----
   'error.title': 'что-то пошло не так',

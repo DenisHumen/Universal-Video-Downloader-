@@ -1,0 +1,57 @@
+import { useEffect, useRef, useState } from 'react'
+import type { DownloadItem } from '@shared/types'
+import { useStore } from '../store'
+import { useT } from '../i18n'
+
+/** States worth interrupting someone for. Progress is not one of them. */
+const ANNOUNCED: DownloadItem['state'][] = ['completed', 'error']
+
+/**
+ * Speaks download outcomes to screen readers.
+ *
+ * A download finishes minutes after it was started, usually while the user is
+ * on another screen or in another app — the two things the app currently used
+ * to say so were a toast that fades and a coloured dot, neither of which
+ * reaches anyone who isn't looking at the window. This is the same information
+ * as text, in a polite live region, so it is read out when the reader is next
+ * idle rather than cutting across whatever is being read now.
+ *
+ * Only terminal states are announced. Announcing progress would mean speaking
+ * over the user several times a second.
+ */
+export default function LiveRegion(): JSX.Element {
+  const t = useT()
+  const downloads = useStore((s) => s.downloads)
+  const [message, setMessage] = useState('')
+  /** Last state seen per id, so we announce transitions rather than presence. */
+  const seen = useRef(new Map<string, DownloadItem['state']>())
+  /** Skip the first pass: restored history would announce every past download. */
+  const primed = useRef(false)
+
+  useEffect(() => {
+    const next = new Map<string, DownloadItem['state']>()
+    const fresh: string[] = []
+
+    for (const item of downloads) {
+      next.set(item.id, item.state)
+      if (!primed.current) continue
+      if (seen.current.get(item.id) === item.state) continue
+      if (!ANNOUNCED.includes(item.state)) continue
+      fresh.push(
+        item.state === 'completed'
+          ? t('a11y.downloadFinished', { title: item.title })
+          : t('a11y.downloadFailed', { title: item.title, error: item.error || '' })
+      )
+    }
+
+    seen.current = next
+    primed.current = true
+    if (fresh.length) setMessage(fresh.join('. '))
+  }, [downloads, t])
+
+  return (
+    <div className="sr-only" role="status" aria-live="polite" aria-atomic="true">
+      {message}
+    </div>
+  )
+}
