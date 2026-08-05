@@ -10,6 +10,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url))
 const root = resolve(__dirname, '..')
 const svgPath = join(root, 'assets', 'logo.svg')
 const traySvgPath = join(root, 'assets', 'tray.svg')
+const trayDarkSvgPath = join(root, 'assets', 'tray-dark.svg')
 const buildDir = join(root, 'build')
 const iconsDir = join(buildDir, 'icons')
 /*
@@ -30,6 +31,7 @@ for (const dir of [buildDir, iconsDir, runtimeDir]) {
 
 const svg = readFileSync(svgPath)
 const traySvg = readFileSync(traySvgPath)
+const trayDarkSvg = readFileSync(trayDarkSvgPath)
 
 async function render(size, outPath, source = svg) {
   await sharp(source, { density: 384 })
@@ -54,4 +56,9 @@ await render(256, join(runtimeDir, 'app.png'))
 await render(16, join(runtimeDir, 'tray.png'), traySvg)
 await render(32, join(runtimeDir, 'tray@2x.png'), traySvg)
 await render(48, join(runtimeDir, 'tray@3x.png'), traySvg)
+// The dark cut, for a light taskbar. Windows has no template images, so the
+// app picks the glyph that contrasts with the system theme itself.
+await render(16, join(runtimeDir, 'tray-dark.png'), trayDarkSvg)
+await render(32, join(runtimeDir, 'tray-dark@2x.png'), trayDarkSvg)
+await render(48, join(runtimeDir, 'tray-dark@3x.png'), trayDarkSvg)
 console.log('Done.')

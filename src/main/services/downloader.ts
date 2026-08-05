@@ -20,6 +20,7 @@ import { getSettings } from './settings'
 import { accessArgs, hasCookies, headerArgs, humanizeYtdlpError, isTransientError } from './options'
 import { isSameDownload } from './dedupe'
 import { killTree } from './process'
+import { markInterrupted, shouldResume } from './resume'
 import { pendingOrder } from './schedule'
 import { resolveUrl } from '../resolvers'
 import { hasTrim } from '@shared/types'
@@ -60,18 +61,10 @@ export function loadHistory(): void {
     if (!existsSync(file)) return
     const arr = JSON.parse(readFileSync(file, 'utf-8')) as DownloadItem[]
     for (const item of arr) {
-      // Anything that was mid-flight when the app closed becomes paused.
-      if (
-        item.state === 'downloading' ||
-        item.state === 'processing' ||
-        item.state === 'queued' ||
-        item.state === 'detecting'
-      ) {
-        item.state = 'paused'
-        // Distinguish "we were quitting" from "the user pressed pause", so the
-        // next launch can pick up only the former.
-        item.interrupted = true
-      }
+      // Anything still in flight in the file was cut short — either the app was
+      // killed before it could tidy up, or the shutdown path already parked it
+      // and this is a no-op. Same rule either way; see resume.ts.
+      markInterrupted(item)
       item.attempts = 0
       items.set(item.id, item)
     }
@@ -753,7 +746,7 @@ export function resumeAll(): void {
 export function resumeInterrupted(): number {
   let count = 0
   for (const item of [...items.values()]) {
-    if (item.interrupted && item.state === 'paused') {
+    if (shouldResume(item)) {
       resumeDownload(item.id)
       count++
     }
@@ -790,13 +783,21 @@ export function shutdownDownloads(): void {
   retryTimers.clear()
   for (const [id, proc] of procs) {
     const item = items.get(id)
-    if (item && (item.state === 'downloading' || item.state === 'processing')) item.state = 'paused'
+    if (item) markInterrupted(item)
     try {
       killTree(proc)
     } catch {
       /* already gone */
     }
   }
+  /*
+    Items that never got as far as a process — still queued, or waiting on a
+    retry timer we just cleared — were cut short too, and history is about to be
+    written. Without this they persist as `queued` and are only rescued by
+    `loadHistory` on the way back in; marking them here keeps one rule for the
+    whole shutdown.
+  */
+  for (const item of items.values()) markInterrupted(item)
   procs.clear()
   flushHistory()
 }

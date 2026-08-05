@@ -27,6 +27,8 @@ export interface UniversalOptions {
   onStage?: (stage: UniversalStage) => void
   /** Hard cap for the browser pass. */
   browserTimeoutMs?: number
+  /** Cancels the browser pass; the hidden window is torn down at once. */
+  signal?: AbortSignal
 }
 
 export const SNIFF_SCHEME = 'uvd-sniff://'
@@ -65,7 +67,7 @@ export async function resolveUniversal(
   pageUrl: string,
   options: UniversalOptions = {}
 ): Promise<ResolvedUrl | null> {
-  const { allowBrowser = true, onStage, browserTimeoutMs } = options
+  const { allowBrowser = true, onStage, browserTimeoutMs, signal } = options
 
   onStage?.('scraping')
   const scraped = await scrapeStatic(pageUrl).catch(() => null)
@@ -76,9 +78,9 @@ export async function resolveUniversal(
     return toResolved(pageUrl, staticBest, scraped!)
   }
 
-  if (allowBrowser) {
+  if (allowBrowser && !signal?.aborted) {
     onStage?.('browsing')
-    const sniffed = await sniffPage(pageUrl, browserTimeoutMs).catch(() => null)
+    const sniffed = await sniffPage(pageUrl, browserTimeoutMs, signal).catch(() => null)
     if (sniffed) {
       const better =
         staticBest && staticBest.score > sniffed.candidate.score ? staticBest : sniffed.candidate

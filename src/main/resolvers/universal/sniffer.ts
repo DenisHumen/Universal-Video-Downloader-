@@ -79,8 +79,12 @@ const PROBE_SCRIPT = `(() => {
 /** Sniffs are serialised: one hidden window at a time is plenty. */
 let queue: Promise<unknown> = Promise.resolve()
 
-export function sniffPage(url: string, timeoutMs = 28_000): Promise<SniffResult | null> {
-  const run = (): Promise<SniffResult | null> => sniffOnce(url, timeoutMs)
+export function sniffPage(
+  url: string,
+  timeoutMs = 28_000,
+  signal?: AbortSignal
+): Promise<SniffResult | null> {
+  const run = (): Promise<SniffResult | null> => sniffOnce(url, timeoutMs, signal)
   const next = queue.then(run, run)
   queue = next.then(
     () => undefined,
@@ -89,9 +93,16 @@ export function sniffPage(url: string, timeoutMs = 28_000): Promise<SniffResult 
   return next
 }
 
-async function sniffOnce(pageUrl: string, timeoutMs: number): Promise<SniffResult | null> {
+async function sniffOnce(
+  pageUrl: string,
+  timeoutMs: number,
+  signal?: AbortSignal
+): Promise<SniffResult | null> {
+  if (signal?.aborted) return null
   const found: MediaCandidate[] = []
   let resolveEarly: (() => void) | null = null
+  let deadlineTimer: NodeJS.Timeout | null = null
+  let onAbort: (() => void) | null = null
 
   const detach = attachCapture(browsingSession(), (candidate) => {
     found.push(candidate)
@@ -104,6 +115,8 @@ async function sniffOnce(pageUrl: string, timeoutMs: number): Promise<SniffResul
 
   const cleanup = (): void => {
     detach()
+    if (deadlineTimer) clearTimeout(deadlineTimer)
+    if (onAbort) signal?.removeEventListener('abort', onAbort)
     if (win && !win.isDestroyed()) win.destroy()
   }
 
@@ -126,9 +139,20 @@ async function sniffOnce(pageUrl: string, timeoutMs: number): Promise<SniffResul
     win.webContents.setAudioMuted(true)
     win.webContents.setWindowOpenHandler(() => ({ action: 'deny' }))
 
+    /*
+      Three ways this ends: a manifest turns up, the clock runs out, or the user
+      cancels. Cancellation used to have no path in here at all — the hidden
+      window kept loading and playing for the full timeout after the UI had
+      already said the detection was cancelled, and because sniffs are
+      serialised the next one queued up behind it.
+    */
     const deadline = new Promise<void>((resolve) => {
       resolveEarly = resolve
-      setTimeout(resolve, timeoutMs)
+      deadlineTimer = setTimeout(resolve, timeoutMs)
+      if (signal) {
+        onAbort = (): void => resolve()
+        signal.addEventListener('abort', onAbort, { once: true })
+      }
     })
 
     // Navigation failures are fine — the player may still have fired requests.
@@ -137,9 +161,11 @@ async function sniffOnce(pageUrl: string, timeoutMs: number): Promise<SniffResul
       .catch(() => undefined)
 
     await Promise.race([navigation, deadline])
+    if (signal?.aborted) return null
 
     // Give players a few nudges: some only attach after their own scripts run.
     for (let attempt = 0; attempt < 4; attempt++) {
+      if (signal?.aborted) return null
       if (found.some((c) => c.score >= 100)) break
       const probed = await runProbe(win)
       if (probed) {
@@ -154,6 +180,7 @@ async function sniffOnce(pageUrl: string, timeoutMs: number): Promise<SniffResul
     }
 
     await Promise.race([wait(600), deadline])
+    if (signal?.aborted) return null
 
     for (const src of meta.srcs) {
       if (!/^https?:/i.test(src)) continue

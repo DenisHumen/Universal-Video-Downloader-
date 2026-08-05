@@ -1,0 +1,22 @@
+<!--
+  The tray glyph: the mark alone, no tile.
+
+  A tray icon is not a small app icon. `logo.svg` is a dark rounded tile with a
+  light mark on it, which at 16px on a dark Windows taskbar is a dark smudge —
+  and macOS wants a template image, where only the alpha channel is used at all.
+  So this is the mark by itself, solid white on transparency: legible on a dark
+  taskbar, and correct as a macOS template.
+
+  Drawn for the size rather than scaled down to it. The app's mark carries a
+  faint baseline rule under the three bars; at 16px that rule is a sub-pixel
+  smear, so it is left out and the bars are widened to keep their rhythm.
+
+  This is the dark cut, for a light taskbar. macOS never needs it — a template
+  image is recoloured by the system — but Windows has no such concept, so the
+  app has to pick a glyph that contrasts with whatever theme is in use.
+-->
+<svg width="32" height="32" viewBox="0 0 32 32" fill="#1a1a20" xmlns="http://www.w3.org/2000/svg">
+  <rect x="4" y="6" width="24" height="4" rx="2" />
+  <rect x="8.5" y="14" width="15" height="4" rx="2" />
+  <rect x="13" y="22" width="6" height="4" rx="2" />
+</svg>

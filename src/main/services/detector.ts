@@ -199,7 +199,8 @@ export async function detect(
   if (!wasRewritten && !signal?.aborted) {
     const universal = await resolveUniversal(url, {
       allowBrowser: settings.universalFallback,
-      onStage: (stage) => onStage(stage)
+      onStage: (stage) => onStage(stage),
+      signal
     }).catch(() => null)
 
     if (universal) {
