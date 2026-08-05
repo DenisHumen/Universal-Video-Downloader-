@@ -25,7 +25,22 @@ import type { BrowserMedia, BrowserState, DownloadItem } from '@shared/types'
  */
 
 const MAX_MEDIA = 60
-const TOOLBAR_HEIGHT = 96
+
+/**
+ * Where to put the page before the renderer has measured anything.
+ *
+ * Only a first-paint guess. The window's chrome and its media panel are laid
+ * out in the renderer, which reports the real rectangle over `browserSetBounds`
+ * as soon as it mounts and on every resize after that — these numbers exist so
+ * the page is roughly in place for the frame or two before that arrives.
+ *
+ * They were wrong for a while: 96px of chrome left over from a two-row toolbar
+ * that the redesign replaced with a single 48px bar, and no allowance at all
+ * for the panel, so the guess covered it. That was invisible at startup and
+ * obvious on resize, where it used to be re-applied.
+ */
+const CHROME_HEIGHT = 48
+const PANEL_WIDTH = 300
 
 let win: BrowserWindow | null = null
 let view: WebContentsView | null = null
@@ -83,7 +98,12 @@ function rememberCandidate(candidate: MediaCandidate): void {
   if (media.size >= MAX_MEDIA) {
     // Drop the weakest entry so a long browsing session can't grow unbounded.
     const weakest = [...media.values()].sort((a, b) => a.score - b.score)[0]
-    if (weakest) media.delete(weakest.url)
+    if (weakest) {
+      media.delete(weakest.url)
+      // The headers belong to that candidate; without this the map they live
+      // in keeps growing past the cap that was supposed to bound it.
+      candidateHeaders.delete(weakest.url)
+    }
   }
   const wc = view?.webContents
   media.set(candidate.url, {
@@ -109,15 +129,22 @@ function setPicking(next: boolean): void {
   sendState()
 }
 
-function layoutView(bounds?: { x: number; y: number; width: number; height: number }): void {
+type Bounds = { x: number; y: number; width: number; height: number }
+
+/** The last rectangle the renderer measured — the authority once it exists. */
+let reportedBounds: Bounds | null = null
+
+function layoutView(bounds?: Bounds): void {
+  if (bounds) reportedBounds = bounds
   if (!win || win.isDestroyed() || !view) return
   const content = win.getContentBounds()
-  const rect = bounds ?? {
-    x: 0,
-    y: TOOLBAR_HEIGHT,
-    width: content.width,
-    height: Math.max(0, content.height - TOOLBAR_HEIGHT)
-  }
+  const rect = bounds ??
+    reportedBounds ?? {
+      x: 0,
+      y: CHROME_HEIGHT,
+      width: Math.max(0, content.width - PANEL_WIDTH),
+      height: Math.max(0, content.height - CHROME_HEIGHT)
+    }
   view.setBounds({
     x: Math.round(rect.x),
     y: Math.round(rect.y),
@@ -198,7 +225,15 @@ export function openBrowserWindow(initialUrl?: string): void {
     sendState()
   })
 
-  win.on('resize', () => layoutView())
+  /*
+    Only guess until the renderer has spoken. Its ResizeObserver watches the
+    element the page actually sits in, so it re-reports on every window resize
+    anyway — re-applying the guess here just moved the page to the wrong place
+    for a frame before the correct bounds arrived.
+  */
+  win.on('resize', () => {
+    if (!reportedBounds) layoutView()
+  })
   win.on('ready-to-show', () => win?.show())
   win.on('closed', () => {
     detach?.()
@@ -206,6 +241,7 @@ export function openBrowserWindow(initialUrl?: string): void {
     view = null
     win = null
     picking = false
+    reportedBounds = null
     media.clear()
     candidateHeaders.clear()
   })

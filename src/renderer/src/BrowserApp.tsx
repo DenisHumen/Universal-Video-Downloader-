@@ -69,6 +69,20 @@ export default function BrowserApp(): JSX.Element {
     if (!editing) setAddress(state.url)
   }, [state.url, editing])
 
+  /*
+    Forget what was queued when the page changes.
+
+    `queued` marks entries the user has already sent to the queue so the button
+    reads "queued" instead of inviting a duplicate. It was only ever added to —
+    and one of its keys is the literal 'page', not an id. So after downloading
+    a page once, "download this page" stayed disabled for every page visited
+    afterwards, for the rest of the session. The media list is cleared on
+    navigation for exactly this reason; its markers have to go with it.
+  */
+  useEffect(() => {
+    setQueued(new Set())
+  }, [state.url])
+
   // The native view is positioned in window coordinates, so it has to be told
   // where our layout left room for it — on every resize, not just at start.
   useLayoutEffect(() => {

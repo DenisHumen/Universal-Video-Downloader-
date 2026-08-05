@@ -16,6 +16,19 @@ import { fetchBinary, originOf } from '../resolvers/http'
 const MAX_ENTRIES = 240
 const cache = new Map<string, string | null>()
 
+/**
+ * Fetches currently in flight, keyed the same way as the cache.
+ *
+ * The cache only helps once a fetch has finished, and these all start at the
+ * same moment: a queue or a search grid mounts, every tile's direct <img> load
+ * fails at once, and every one of them asks the main process independently.
+ * Identical URLs — the same video listed twice, a poster shared across
+ * episodes — each got their own fetch, and each of those tries up to three
+ * referers before giving up. Callers that ask for the same image while one is
+ * already running now wait on that one.
+ */
+const inFlight = new Map<string, Promise<string | null>>()
+
 function remember(key: string, value: string | null): string | null {
   if (cache.size >= MAX_ENTRIES) {
     // Plain FIFO eviction — these are cheap to re-fetch.
@@ -40,12 +53,7 @@ function refererCandidates(url: string, pageUrl?: string): (string | undefined)[
   return candidates
 }
 
-export async function fetchThumbnail(url: string, pageUrl?: string): Promise<string | null> {
-  if (!/^https?:\/\//i.test(url)) return null
-  const key = `${url}|${pageUrl ?? ''}`
-  const cached = cache.get(key)
-  if (cached !== undefined) return cached
-
+async function fetchOnce(url: string, pageUrl: string | undefined, key: string): Promise<string | null> {
   for (const referer of refererCandidates(url, pageUrl)) {
     try {
       const { body, contentType } = await fetchBinary(url, referer ? { Referer: referer } : {})
@@ -57,4 +65,18 @@ export async function fetchThumbnail(url: string, pageUrl?: string): Promise<str
   }
   // Remember the failure too, so a grid of dead thumbnails doesn't retry forever.
   return remember(key, null)
+}
+
+export function fetchThumbnail(url: string, pageUrl?: string): Promise<string | null> {
+  if (!/^https?:\/\//i.test(url)) return Promise.resolve(null)
+  const key = `${url}|${pageUrl ?? ''}`
+  const cached = cache.get(key)
+  if (cached !== undefined) return Promise.resolve(cached)
+
+  const running = inFlight.get(key)
+  if (running) return running
+
+  const task = fetchOnce(url, pageUrl, key).finally(() => inFlight.delete(key))
+  inFlight.set(key, task)
+  return task
 }

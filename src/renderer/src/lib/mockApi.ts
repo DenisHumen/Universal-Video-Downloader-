@@ -4,6 +4,8 @@ import type {
   DownloadItem,
   MediaInfo,
   SearchResult,
+  BrowserMedia,
+  BrowserState,
   UpdateStatus,
   YtDlpStatus
 } from '@shared/types'
@@ -155,8 +157,12 @@ const items: DownloadItem[] = []
 
 type YtdlpListener = (status: YtDlpStatus) => void
 type UpdateListener = (status: UpdateStatus) => void
+type BrowserStateListener = (state: BrowserState) => void
+type BrowserMediaListener = (media: BrowserMedia[]) => void
 const ytdlpListeners = new Set<YtdlpListener>()
 const updateListeners = new Set<UpdateListener>()
+const browserStateListeners = new Set<BrowserStateListener>()
+const browserMediaListeners = new Set<BrowserMediaListener>()
 
 /** Preview-only: drive a state the mock bridge would otherwise never enter. */
 declare global {
@@ -164,14 +170,29 @@ declare global {
     __uvdMock?: {
       ytdlp: (status: YtDlpStatus) => void
       update: (status: UpdateStatus) => void
+      browserState: (state: Partial<BrowserState>) => void
+      browserMedia: (media: BrowserMedia[]) => void
     }
   }
 }
 
 export function installMockApi(): void {
+  const browserState: BrowserState = {
+    url: '',
+    title: '',
+    canGoBack: false,
+    canGoForward: false,
+    loading: false,
+    picking: false
+  }
   window.__uvdMock = {
     ytdlp: (status) => ytdlpListeners.forEach((cb) => cb(status)),
-    update: (status) => updateListeners.forEach((cb) => cb(status))
+    update: (status) => updateListeners.forEach((cb) => cb(status)),
+    browserState: (patch) => {
+      Object.assign(browserState, patch)
+      browserStateListeners.forEach((cb) => cb({ ...browserState }))
+    },
+    browserMedia: (list) => browserMediaListeners.forEach((cb) => cb(list))
   }
   const api: UvdApi = {
     detect: async (url) => {
@@ -242,10 +263,33 @@ export function installMockApi(): void {
     browserSetBounds: async () => undefined,
     browserSetPick: async () => undefined,
     browserClearMedia: async () => undefined,
-    browserDownload: async () => null,
+    /* Returning null meant the browser panel's queued markers could never be
+       reached in the preview — and those markers are what the navigation reset
+       is about. */
+    browserDownload: async (target) => {
+      const item: DownloadItem = {
+        id: `mock-browser-${++itemSeq}`,
+        url: target.url ?? target.mediaId ?? 'https://site.test/stream.m3u8',
+        sourceUrl: target.url,
+        title: 'Captured stream',
+        mode: 'video',
+        state: 'queued',
+        percent: 0,
+        outputDir: settings.downloadDir,
+        createdAt: Date.now()
+      }
+      items.unshift(item)
+      return item
+    },
     browserRefreshState: async () => undefined,
-    onBrowserState: () => () => undefined,
-    onBrowserMedia: () => () => undefined,
+    onBrowserState: (cb) => {
+      browserStateListeners.add(cb)
+      return () => browserStateListeners.delete(cb)
+    },
+    onBrowserMedia: (cb) => {
+      browserMediaListeners.add(cb)
+      return () => browserMediaListeners.delete(cb)
+    },
     pauseAll: async () => undefined,
     resumeAll: async () => undefined,
     retryFailed: async () => undefined,
