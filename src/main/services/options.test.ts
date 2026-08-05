@@ -22,6 +22,7 @@ function settings(overrides: Partial<AppSettings> = {}): AppSettings {
     speedLimit: '',
     playlistLimit: 500,
     autoUpdate: true,
+    resumeOnLaunch: true,
     theme: 'night',
     language: 'auto',
     notifications: true,

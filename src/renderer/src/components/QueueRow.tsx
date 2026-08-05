@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { collapse, listItem } from '../lib/motion'
 import {
+  ArrowUp,
   ChevronDown,
   Copy,
   ExternalLink,
@@ -147,6 +148,9 @@ export default function QueueRow({ item, index }: Props): JSX.Element {
               <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${meta.dot}`} />
               {t(meta.label)}
             </span>
+            {item.state === 'queued' && (item.priority ?? 0) > 0 && (
+              <span className="text-accent-ink">{t('queue.next')}</span>
+            )}
             {facts.length > 0 && <span className="truncate">{facts.join('  ·  ')}</span>}
           </p>
         </div>
@@ -167,7 +171,7 @@ export default function QueueRow({ item, index }: Props): JSX.Element {
           known.
         */}
         {!['completed', 'error', 'canceled'].includes(item.state) && (
-          <div className="flex w-32 shrink-0 items-center gap-2.5">
+          <div className="flex w-24 shrink-0 items-center gap-2.5 lg:w-32">
             <div
               className="h-1.5 min-w-0 flex-1 overflow-hidden rounded-full bg-sink"
               role="progressbar"
@@ -185,7 +189,9 @@ export default function QueueRow({ item, index }: Props): JSX.Element {
                 />
               )}
             </div>
-            <span className="mono w-9 shrink-0 text-right text-[12px] tabular-nums text-ink-2">
+            {/* The bar already carries the number's meaning; on a narrow window
+                the title needs those 40px more than the reader does. */}
+            <span className="mono hidden w-9 shrink-0 text-right text-[12px] tabular-nums text-ink-2 md:block">
               {indeterminate ? '—' : `${percent}%`}
             </span>
           </div>
@@ -198,10 +204,26 @@ export default function QueueRow({ item, index }: Props): JSX.Element {
           cancel or "show in folder" exist at all. Critical actions do not hide.
         */}
         <div className="flex shrink-0 items-center gap-1">
+          {item.state === 'queued' && (
+            <button
+              className="btn-icon-bare"
+              title={t('queue.moveUp')}
+              aria-label={t('queue.moveUp')}
+              onClick={() => window.api.prioritizeDownload(item.id)}
+            >
+              <ArrowUp size={15} />
+            </button>
+          )}
+          {/*
+            Link actions are conveniences, so they are the first thing to yield
+            when the row runs out of width — measured at 660px, six buttons plus
+            the progress block left the title 86px, which is about ten
+            characters. Pause, cancel, remove and "next" never hide.
+          */}
           {hasWebLink && (
             <>
               <button
-                className="btn-icon-bare"
+                className="btn-icon-bare hidden lg:inline-flex"
                 title={t('queue.copyLink')}
                 aria-label={t('queue.copyLink')}
                 onClick={copyLink}
@@ -209,7 +231,7 @@ export default function QueueRow({ item, index }: Props): JSX.Element {
                 <Link2 size={15} />
               </button>
               <button
-                className="btn-icon-bare"
+                className="btn-icon-bare hidden lg:inline-flex"
                 title={t('queue.openSource')}
                 aria-label={t('queue.openSource')}
                 onClick={() => window.api.openExternal(sourceLink)}

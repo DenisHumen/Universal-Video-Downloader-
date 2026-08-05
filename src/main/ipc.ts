@@ -13,6 +13,7 @@ import { searchVideos } from './services/search'
 import { probeMedia } from './services/ffmpeg'
 import { fetchThumbnail } from './services/thumbnails'
 import { registerBrowserIpc } from './services/browser'
+import { setKeepAwake } from './services/awake'
 import {
   cancelDownload,
   clearFinished,
@@ -24,6 +25,7 @@ import {
   resumeAll,
   resumeDownload,
   retryDownload,
+  prioritizeDownload,
   retryFailed,
   startDownload,
   startMediaJob
@@ -97,6 +99,7 @@ export function registerIpc({ getWindow, openSearchWindow, onSettingsChanged }: 
   ipcMain.handle(IPC.downloadPauseAll, () => pauseAll())
   ipcMain.handle(IPC.downloadResumeAll, () => resumeAll())
   ipcMain.handle(IPC.downloadRetryFailed, () => retryFailed())
+  ipcMain.handle(IPC.downloadPrioritize, (_e, id: string) => prioritizeDownload(id))
 
   // ---- Settings ----
   ipcMain.handle(IPC.settingsGet, () => getSettings())
@@ -195,16 +198,16 @@ export function registerIpc({ getWindow, openSearchWindow, onSettingsChanged }: 
   // ---- Forward service events to the renderer ----
   downloadEvents.on('progress', (p) => {
     send(IPC.evtDownloadProgress, p)
-    updateTaskbarProgress(getWindow)
+    syncOsState(getWindow)
   })
   downloadEvents.on('updated', (item: DownloadItem) => {
     send(IPC.evtDownloadUpdated, item)
     maybeNotify(item)
-    updateTaskbarProgress(getWindow)
+    syncOsState(getWindow)
   })
   downloadEvents.on('removed', (id) => {
     send(IPC.evtDownloadUpdated, { id, removed: true })
-    updateTaskbarProgress(getWindow)
+    syncOsState(getWindow)
   })
   ytdlpEvents.on('status', (s) => send(IPC.evtYtdlpStatus, s))
   updateEvents.on('status', (s) => send(IPC.evtUpdateStatus, s))
@@ -230,10 +233,17 @@ function maybeNotify(item: DownloadItem): void {
   if (item.state === 'downloading') notified.delete(item.id)
 }
 
-function updateTaskbarProgress(getWindow: () => BrowserWindow | null): void {
+/**
+ * Everything the OS should know about the queue: the taskbar/dock progress bar,
+ * and whether the machine is allowed to go to sleep. Both derive from the same
+ * "is anything actually transferring" question, so they are answered together.
+ */
+function syncOsState(getWindow: () => BrowserWindow | null): void {
+  const active = listDownloads().filter((d) => d.state === 'downloading' || d.state === 'processing')
+  setKeepAwake(active.length > 0)
+
   const win = getWindow()
   if (!win || win.isDestroyed()) return
-  const active = listDownloads().filter((d) => d.state === 'downloading' || d.state === 'processing')
   if (!active.length) {
     win.setProgressBar(-1)
     return

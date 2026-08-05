@@ -104,6 +104,7 @@ export const en = {
   'queue.copyLink': 'copy the link',
   'queue.openSource': 'open the source page',
   'queue.moveUp': 'download this one next',
+  'queue.next': 'next up',
   'queue.log': 'engine output',
   'queue.copyError': 'copy the error',
   'queue.retryingIn': 'retrying automatically…',
@@ -194,6 +195,9 @@ export const en = {
   'settings.audioFormat': 'audio format',
   'settings.audioFormatHint': 'used for audio-only downloads',
   'settings.concurrent': 'simultaneous downloads',
+  'settings.resumeOnLaunch': 'resume interrupted downloads',
+  'settings.resumeOnLaunchHint':
+    'when the app is closed mid-download, pick it back up on the next launch. downloads you paused yourself stay paused.',
   'settings.speedLimit': 'speed limit',
   'settings.speedLimitHint': 'e.g. 2M or 500K — leave empty for unlimited',
   'settings.playlistLimit': 'channel & playlist depth',

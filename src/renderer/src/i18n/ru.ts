@@ -102,6 +102,7 @@ export const ru: Dictionary = {
   'queue.copyLink': 'скопировать ссылку',
   'queue.openSource': 'открыть страницу-источник',
   'queue.moveUp': 'скачать следующим',
+  'queue.next': 'следующий',
   'queue.log': 'вывод движка',
   'queue.copyError': 'скопировать ошибку',
   'queue.retryingIn': 'повторяю автоматически…',
@@ -192,6 +193,9 @@ export const ru: Dictionary = {
   'settings.audioFormat': 'формат звука',
   'settings.audioFormatHint': 'для загрузок «только звук»',
   'settings.concurrent': 'одновременных загрузок',
+  'settings.resumeOnLaunch': 'продолжать прерванные загрузки',
+  'settings.resumeOnLaunchHint':
+    'если приложение закрыли во время загрузки — продолжить её при следующем запуске. то, что вы поставили на паузу сами, останется на паузе.',
   'settings.speedLimit': 'ограничение скорости',
   'settings.speedLimitHint': 'например 2M или 500K — пусто = без ограничений',
   'settings.playlistLimit': 'глубина каналов и плейлистов',

@@ -26,6 +26,7 @@ const settings: AppSettings = {
   speedLimit: '',
   playlistLimit: 500,
   autoUpdate: true,
+  resumeOnLaunch: true,
   theme: 'night',
   language: 'auto',
   notifications: true,
@@ -222,6 +223,7 @@ export function installMockApi(): void {
     pauseAll: async () => undefined,
     resumeAll: async () => undefined,
     retryFailed: async () => undefined,
+    prioritizeDownload: async () => undefined,
     getSettings: async () => ({ ...settings }),
     /**
      * Returns a *copy*, exactly as the real bridge does.

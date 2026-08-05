@@ -19,6 +19,7 @@ import {
 import { getSettings } from './settings'
 import { accessArgs, hasCookies, headerArgs, humanizeYtdlpError, isTransientError } from './options'
 import { isSameDownload } from './dedupe'
+import { pendingOrder } from './schedule'
 import { resolveUrl } from '../resolvers'
 import { hasTrim } from '@shared/types'
 import type {
@@ -66,6 +67,9 @@ export function loadHistory(): void {
         item.state === 'detecting'
       ) {
         item.state = 'paused'
+        // Distinguish "we were quitting" from "the user pressed pause", so the
+        // next launch can pick up only the former.
+        item.interrupted = true
       }
       item.attempts = 0
       items.set(item.id, item)
@@ -303,13 +307,17 @@ function processQueue(): void {
   const settings = getSettings()
   const limit = Math.max(1, settings.concurrentDownloads || 1)
   if (activeCount() >= limit) return
-  // Oldest first: the queue is FIFO from the user's point of view.
-  for (const item of listDownloads().reverse()) {
+
+  // Ordering lives in `schedule.ts` so it can be tested; what belongs here is
+  // the part a test cannot construct — which ids own a process or a retry timer.
+  const pending = pendingOrder([...items.values()]).filter(
+    (item) => !procs.has(item.id) && !retryTimers.has(item.id)
+  )
+
+  for (const item of pending) {
     if (activeCount() >= limit) break
-    if (item.state === 'queued' && !procs.has(item.id) && !retryTimers.has(item.id)) {
-      if (item.kind && item.kind !== 'download') void runMediaJob(item)
-      else void runDownload(item)
-    }
+    if (item.kind && item.kind !== 'download') void runMediaJob(item)
+    else void runDownload(item)
   }
 }
 
@@ -617,6 +625,8 @@ export function pauseDownload(id: string): void {
   clearRetry(id)
   const proc = procs.get(id)
   item.state = 'paused'
+  // A deliberate pause outranks anything the previous shutdown recorded.
+  item.interrupted = false
   item.speed = undefined
   item.eta = undefined
   if (proc) proc.kill()
@@ -631,6 +641,7 @@ export function resumeDownload(id: string): void {
   item.state = 'queued'
   item.error = undefined
   item.attempts = 0
+  item.interrupted = false
   emitUpdated(item)
   processQueue()
 }
@@ -717,6 +728,41 @@ export function resumeAll(): void {
   for (const item of [...items.values()]) {
     if (item.state === 'paused') resumeDownload(item.id)
   }
+}
+
+/**
+ * Pick up downloads that were cut short by the app closing.
+ *
+ * Deliberately not `resumeAll`: that would also restart anything the user
+ * paused on purpose before quitting, which is the opposite of what they asked
+ * for. Only items the previous shutdown marked as interrupted come back.
+ */
+export function resumeInterrupted(): number {
+  let count = 0
+  for (const item of [...items.values()]) {
+    if (item.interrupted && item.state === 'paused') {
+      resumeDownload(item.id)
+      count++
+    }
+  }
+  return count
+}
+
+/**
+ * Move an item to the front of the queue.
+ *
+ * One above the current maximum, so repeated bumps keep their relative order
+ * rather than everything piling up on the same number. It only affects what
+ * starts next — anything already running is left alone, because killing a
+ * transfer at 80% to start another is never what "next" is meant to mean.
+ */
+export function prioritizeDownload(id: string): void {
+  const item = items.get(id)
+  if (!item || item.state !== 'queued') return
+  const top = Math.max(0, ...[...items.values()].map((i) => i.priority ?? 0))
+  item.priority = top + 1
+  emitUpdated(item)
+  processQueue()
 }
 
 export function retryFailed(): void {

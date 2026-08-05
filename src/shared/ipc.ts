@@ -30,6 +30,7 @@ export const IPC = {
   browserState: 'browser:state',
   downloadPauseAll: 'download:pause-all',
   downloadResumeAll: 'download:resume-all',
+  downloadPrioritize: 'download:prioritize',
   downloadRetryFailed: 'download:retry-failed',
   settingsGet: 'settings:get',
   settingsSet: 'settings:set',

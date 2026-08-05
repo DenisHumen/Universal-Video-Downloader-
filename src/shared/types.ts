@@ -198,6 +198,17 @@ export interface DownloadItem {
   log?: string
   /** How many automatic retries this item has already burned. */
   attempts?: number
+  /**
+   * Paused because the app was quitting, not because the user asked. Only
+   * these are picked back up on the next launch — a download someone
+   * deliberately paused should stay paused.
+   */
+  interrupted?: boolean
+  /**
+   * Higher runs sooner. Absent means "normal", so the queue stays first-in
+   * first-out unless somebody asks for something specific.
+   */
+  priority?: number
   /** The URL the user originally submitted — re-resolved on every (re)start so
    *  short-lived CDN stream links are always fresh. */
   sourceUrl?: string
@@ -283,6 +294,8 @@ export interface AppSettings {
    */
   playlistLimit: number
   autoUpdate: boolean
+  /** Pick interrupted downloads back up when the app starts. */
+  resumeOnLaunch: boolean
   theme: ThemeId
   language: LanguageId
   /** Show a desktop notification when a download finishes. */

@@ -85,6 +85,8 @@ const api = {
   pauseAll: (): Promise<void> => ipcRenderer.invoke(IPC.downloadPauseAll),
   resumeAll: (): Promise<void> => ipcRenderer.invoke(IPC.downloadResumeAll),
   retryFailed: (): Promise<void> => ipcRenderer.invoke(IPC.downloadRetryFailed),
+  prioritizeDownload: (id: string): Promise<void> =>
+    ipcRenderer.invoke(IPC.downloadPrioritize, id),
 
   // Settings
   getSettings: (): Promise<AppSettings> => ipcRenderer.invoke(IPC.settingsGet),

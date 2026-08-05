@@ -205,6 +205,11 @@ One curve, three durations. Defined in `src/renderer/src/lib/motion.ts`.
   appear on whichever side still has content. A 10px scrollbar inside a 48px
   bar of chrome is a band of grey noise, and it is the one affordance you
   cannot use before noticing it.
+- **When a row runs out of width, secondary actions yield first.** Measured at
+  660px, six buttons plus the progress block left a queue row's title 86px —
+  about ten characters. Link actions hide below `lg` and the percent readout
+  below `md`; pause, cancel, remove and "next" never hide, and nothing is ever
+  hidden behind hover.
 - **Queue:** one ruled list. Per-row actions are **always visible** and progress
   is a real bar with a track — an action the user cannot see is an action they
   do not have, and nobody reads a hairline as "62% downloaded".

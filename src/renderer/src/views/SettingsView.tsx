@@ -308,6 +308,9 @@ export default function SettingsView(): JSX.Element {
                 options={['1', '2', '3', '4', '5', '6'].map((n) => ({ value: n, label: n }))}
               />
             </Row>
+            <Row label={t('settings.resumeOnLaunch')} hint={t('settings.resumeOnLaunchHint')}>
+              <Switch value={settings.resumeOnLaunch} onChange={(v) => set('resumeOnLaunch', v)} />
+            </Row>
             <Row label={t('settings.speedLimit')} hint={t('settings.speedLimitHint')}>
               <input
                 value={settings.speedLimit}
