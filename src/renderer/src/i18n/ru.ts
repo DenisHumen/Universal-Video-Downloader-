@@ -44,6 +44,10 @@ export const ru: Dictionary = {
   'engine.checking': 'движок…',
   'engine.error': 'ошибка движка',
   'engine.idle': 'движок',
+  'engine.setupLabel': 'установка',
+  'engine.setupTitle': 'готовлю движок загрузок',
+  'engine.setupOnce': 'один раз, около 30 МБ',
+  'engine.setupFailed': 'не удалось установить движок загрузок',
 
   // ---- home ----
   'home.title': 'вставьте ссылку — получите видео',

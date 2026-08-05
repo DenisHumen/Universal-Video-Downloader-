@@ -46,6 +46,10 @@ export const en = {
   'engine.checking': 'engine…',
   'engine.error': 'engine error',
   'engine.idle': 'engine',
+  'engine.setupLabel': 'setup',
+  'engine.setupTitle': 'getting the download engine ready',
+  'engine.setupOnce': 'one time, about 30 MB',
+  'engine.setupFailed': 'the download engine could not be installed',
 
   // ---- home ----
   'home.title': 'paste a link, get the video',

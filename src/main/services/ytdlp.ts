@@ -1,7 +1,17 @@
 import { app, net } from 'electron'
 import { EventEmitter } from 'events'
 import { spawn, execFileSync } from 'child_process'
-import { createWriteStream, existsSync, mkdirSync, chmodSync, statSync, renameSync, rmSync } from 'fs'
+import {
+  createWriteStream,
+  existsSync,
+  mkdirSync,
+  chmodSync,
+  readFileSync,
+  statSync,
+  renameSync,
+  rmSync,
+  writeFileSync
+} from 'fs'
 import { join } from 'path'
 import type { YtDlpStatus } from '@shared/types'
 
@@ -210,8 +220,6 @@ export function ensureYtdlp(): Promise<string> {
         const version = await getVersion()
         if (version) {
           emit({ state: 'ready', version, message: 'Ready' })
-          // Refresh in background occasionally (non-blocking).
-          void backgroundUpdate()
           return path
         }
         // Present but won't run (e.g. a previously broken download) — replace it.
@@ -248,21 +256,58 @@ export async function updateYtdlp(): Promise<string | undefined> {
     // Fall back to a fresh download.
     await downloadBinary()
   }
+  markRefreshed()
   const version = await getVersion()
   emit({ state: 'ready', version, message: 'Ready' })
   return version
 }
 
-let lastBackgroundUpdate = 0
-async function backgroundUpdate(): Promise<void> {
-  const now = Date.now()
-  // At most once every 24h
-  if (now - lastBackgroundUpdate < 24 * 60 * 60 * 1000) return
-  lastBackgroundUpdate = now
+const REFRESH_INTERVAL = 24 * 60 * 60 * 1000
+
+function stateFile(): string {
+  return join(app.getPath('userData'), 'engine.json')
+}
+
+function lastRefresh(): number {
+  try {
+    const raw = JSON.parse(readFileSync(stateFile(), 'utf-8')) as { lastRefresh?: number }
+    return typeof raw.lastRefresh === 'number' ? raw.lastRefresh : 0
+  } catch {
+    return 0
+  }
+}
+
+function markRefreshed(): void {
+  try {
+    writeFileSync(stateFile(), JSON.stringify({ lastRefresh: Date.now() }), 'utf-8')
+  } catch {
+    /* the cadence is an optimisation, not a correctness requirement */
+  }
+}
+
+/**
+ * Refresh the engine at most once a day, and never while it is in use.
+ *
+ * This used to key off a module variable initialised to zero, so "at most once
+ * every 24h" really meant "on every launch": a network round trip and a binary
+ * swap each time the app opened. Worse, with downloads now resuming at startup
+ * it raced them — `yt-dlp -U` replaces the very executable those transfers are
+ * running from, which on Windows cannot even be done while it is loaded, so the
+ * update quietly failed and fell back to re-downloading it.
+ *
+ * The timestamp lives on disk, and `isBusy` lets the caller say when the engine
+ * is being used. Sites change their players constantly, so a stale engine is a
+ * real failure mode — but never at the cost of a running download.
+ */
+export async function refreshEngineIfDue(isBusy: () => boolean): Promise<void> {
+  if (Date.now() - lastRefresh() < REFRESH_INTERVAL) return
+  if (isBusy()) return
+  if (!existsSync(ytdlpBinaryPath())) return
   try {
     await spawnYtdlp(['-U'])
+    markRefreshed()
     const version = await getVersion()
-    emit({ state: 'ready', version, message: 'Ready' })
+    if (version) emit({ state: 'ready', version, message: 'Ready' })
   } catch {
     /* best-effort */
   }

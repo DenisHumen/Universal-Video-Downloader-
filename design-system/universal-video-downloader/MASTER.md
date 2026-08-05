@@ -186,6 +186,14 @@ One curve, three durations. Defined in `src/renderer/src/lib/motion.ts`.
 > exiting children out of flow — the reason three home-screen states once
 > stacked on top of each other. Exit animations were dropped from the state
 > swaps entirely.
+>
+> **Anything dismissed by an external event must not have an exit animation.**
+> An `AnimatePresence` child stays mounted until its exit reports finished, so
+> a click-dismissed banner self-heals — you cannot click in a stalled window —
+> but state-dismissed ones do not. The engine-setup strip is hidden by the
+> engine becoming ready, and with animations frozen it went on announcing
+> "getting the download engine ready" indefinitely. Render those on state, and
+> animate only the appearing, in CSS.
 
 ## 7. Layout
 

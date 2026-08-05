@@ -4,6 +4,7 @@ import { enter } from './lib/motion'
 import { useStore } from './store'
 import TopBar from './components/TopBar'
 import UpdateBanner from './components/UpdateBanner'
+import EngineNotice from './components/EngineNotice'
 import HomeView from './views/HomeView'
 import DownloadsView from './views/DownloadsView'
 import SettingsView from './views/SettingsView'
@@ -43,6 +44,7 @@ export default function App(): JSX.Element {
         cards: they're part of the window's structure while they exist, and
         pushing content down is honest about that.
       */}
+      <EngineNotice />
       <UpdateBanner />
       <MacNotice />
       <ClipboardPrompt />

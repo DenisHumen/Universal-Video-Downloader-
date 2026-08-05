@@ -1,5 +1,12 @@
 import type { UvdApi, AppInfo } from '../../../preload/index'
-import type { AppSettings, DownloadItem, MediaInfo, SearchResult } from '@shared/types'
+import type {
+  AppSettings,
+  DownloadItem,
+  MediaInfo,
+  SearchResult,
+  UpdateStatus,
+  YtDlpStatus
+} from '@shared/types'
 
 /**
  * Browser-only stand-in for the preload bridge so the renderer can be opened
@@ -146,7 +153,26 @@ function fakeAnimeInfo(url: string): MediaInfo {
 let itemSeq = 0
 const items: DownloadItem[] = []
 
+type YtdlpListener = (status: YtDlpStatus) => void
+type UpdateListener = (status: UpdateStatus) => void
+const ytdlpListeners = new Set<YtdlpListener>()
+const updateListeners = new Set<UpdateListener>()
+
+/** Preview-only: drive a state the mock bridge would otherwise never enter. */
+declare global {
+  interface Window {
+    __uvdMock?: {
+      ytdlp: (status: YtDlpStatus) => void
+      update: (status: UpdateStatus) => void
+    }
+  }
+}
+
 export function installMockApi(): void {
+  window.__uvdMock = {
+    ytdlp: (status) => ytdlpListeners.forEach((cb) => cb(status)),
+    update: (status) => updateListeners.forEach((cb) => cb(status))
+  }
   const api: UvdApi = {
     detect: async (url) => {
       await delay(700)
@@ -262,8 +288,21 @@ export function installMockApi(): void {
     isWindowMaximized: async () => false,
     onDownloadProgress: () => () => undefined,
     onDownloadUpdated: () => () => undefined,
-    onYtdlpStatus: () => () => undefined,
-    onUpdateStatus: () => () => undefined,
+    /*
+     * These two used to drop the callback on the floor, which meant the states
+     * they drive — the first-run engine download, the update banner — could
+     * never be seen in the browser preview at all. The stand-in keeps them and
+     * exposes a way to fire one, so the states are reachable while working on
+     * them. Real events come over IPC; nothing here exists in the packaged app.
+     */
+    onYtdlpStatus: (cb) => {
+      ytdlpListeners.add(cb)
+      return () => ytdlpListeners.delete(cb)
+    },
+    onUpdateStatus: (cb) => {
+      updateListeners.add(cb)
+      return () => updateListeners.delete(cb)
+    },
     onDetectStatus: () => () => undefined,
     onClipboardLink: () => () => undefined,
     onNavigate: () => () => undefined
