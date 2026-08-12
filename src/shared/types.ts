@@ -209,6 +209,16 @@ export interface DownloadItem {
    * first-out unless somebody asks for something specific.
    */
   priority?: number
+  /**
+   * Which half of the job is running. Fetching is only the first part: a
+   * trimmed download re-encodes afterwards, a video+audio download merges. The
+   * bar gives the download 0–90% and post-processing the last 10%.
+   */
+  phase?: 'download' | 'postprocess'
+  /** What that post-processing step is, when it is one worth naming. */
+  postprocess?: 'trim' | 'merge' | 'convert'
+  /** The phase has no percentage to report — show motion, not a figure. */
+  indeterminate?: boolean
   /** The URL the user originally submitted — re-resolved on every (re)start so
    *  short-lived CDN stream links are always fresh. */
   sourceUrl?: string
@@ -236,6 +246,9 @@ export interface DownloadProgress {
   id: string
   state: DownloadState
   percent: number
+  phase?: 'download' | 'postprocess'
+  postprocess?: 'trim' | 'merge' | 'convert'
+  indeterminate?: boolean
   speed?: number
   eta?: number
   downloadedBytes?: number

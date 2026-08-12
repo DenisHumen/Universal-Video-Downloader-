@@ -61,12 +61,36 @@ export default function QueueRow({ item, index }: Props): JSX.Element {
     item.state === 'downloading' || item.state === 'processing' || item.state === 'detecting'
   const percent = Math.round(item.percent || 0)
   /*
-    A running download that has never reported a percentage. Plenty of streams
-    (HLS without a byte total, sites that send no Content-Length) give yt-dlp
-    nothing to compute one from, and a bar pinned at 0% for the whole download
-    reads as "stuck", not as "unknown".
+    Whether the phase that is running can say how far along it is.
+
+    The engine answers this directly now. The fallback covers entries persisted
+    by an older build, and the case it always covered: streams with no byte
+    total (HLS, no Content-Length) give yt-dlp nothing to compute a percentage
+    from, and a bar pinned at 0% reads as "stuck", not as "unknown".
   */
-  const indeterminate = active && percent === 0 && !item.totalBytes
+  /*
+    `??`, not `||`: the engine sends `false` when it knows the figure, and only
+    the gap before its first progress line leaves this undefined. `active` gates
+    it either way — a paused or errored row must not go on animating a step that
+    is not running.
+  */
+  const indeterminate =
+    active && (item.indeterminate ?? (percent === 0 && !item.totalBytes))
+
+  /**
+   * Which post-processing step is running, when it is one worth naming — and
+   * only while something actually is. A paused or errored row that still names
+   * a step reads as though the work were carrying on without it.
+   */
+  const phaseLabel = !active
+    ? null
+    : item.postprocess === 'trim'
+      ? t('phase.trim')
+      : item.postprocess === 'merge'
+        ? t('phase.merge')
+        : item.postprocess === 'convert'
+          ? t('phase.convert')
+          : null
   const qualityLabel =
     item.mode === 'audio' || item.formatId
       ? null
@@ -75,6 +99,7 @@ export default function QueueRow({ item, index }: Props): JSX.Element {
         : null
 
   const facts = [
+    phaseLabel,
     jobKindLabel,
     item.jobLabel,
     qualityLabel,
@@ -173,26 +198,38 @@ export default function QueueRow({ item, index }: Props): JSX.Element {
         {!['completed', 'error', 'canceled'].includes(item.state) && (
           <div className="flex w-24 shrink-0 items-center gap-2.5 lg:w-32">
             <div
-              className="h-1.5 min-w-0 flex-1 overflow-hidden rounded-full bg-sink"
+              className="relative h-1.5 min-w-0 flex-1 overflow-hidden rounded-full bg-sink"
               role="progressbar"
               aria-valuenow={indeterminate ? undefined : percent}
               aria-valuemin={0}
               aria-valuemax={100}
-              aria-label={t(meta.label)}
+              aria-label={phaseLabel ?? t(meta.label)}
             >
-              {indeterminate ? (
-                <div className="progress-indeterminate h-full rounded-full bg-accent" />
-              ) : (
+              {/*
+                The bar carries both halves of the job: what is finished is
+                solid, and what is running without a figure to report is a band
+                travelling across the part that is left. A trimmed download
+                fills to 90% on the last byte, then the remaining tenth visibly
+                works while the re-encode runs — rather than standing still and
+                jumping to done.
+              */}
+              <div
+                className="h-full rounded-full bg-accent transition-[width] duration-base ease-ease"
+                style={{ width: `${percent}%` }}
+              />
+              {indeterminate && percent < 100 && (
                 <div
-                  className="h-full rounded-full bg-accent transition-[width] duration-base ease-ease"
-                  style={{ width: `${percent}%` }}
-                />
+                  className="absolute inset-y-0 right-0 overflow-hidden"
+                  style={{ left: `${percent}%` }}
+                >
+                  <div className="progress-indeterminate h-full bg-accent/45" />
+                </div>
               )}
             </div>
             {/* The bar already carries the number's meaning; on a narrow window
                 the title needs those 40px more than the reader does. */}
             <span className="mono hidden w-9 shrink-0 text-right text-[12px] tabular-nums text-ink-2 md:block">
-              {indeterminate ? '—' : `${percent}%`}
+              {indeterminate && percent === 0 ? '—' : `${percent}%`}
             </span>
           </div>
         )}

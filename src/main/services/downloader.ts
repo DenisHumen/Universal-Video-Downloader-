@@ -22,6 +22,7 @@ import { isSameDownload } from './dedupe'
 import { killTree } from './process'
 import { markInterrupted, shouldResume } from './resume'
 import { pendingOrder } from './schedule'
+import { acceptsPostprocess, overallProgress, postprocessorLabel } from './progress'
 import { resolveUrl } from '../resolvers'
 import { hasTrim } from '@shared/types'
 import type {
@@ -36,6 +37,8 @@ import type {
 export const downloadEvents = new EventEmitter()
 
 const PROGRESS_PREFIX = '@@UVD@@'
+/** Post-processing progress, on its own channel so the parser can tell them apart. */
+const POSTPROCESS_PREFIX = '@@UVDPP@@'
 /** Automatic retries for transient network failures before we bother the user. */
 const AUTO_RETRIES = 2
 const LOG_TAIL_CHARS = 4000
@@ -185,6 +188,20 @@ function buildArgs(item: DownloadItem): string[] {
     '--progress-template',
     `download:${PROGRESS_PREFIX}%(progress.status)s\t%(progress.downloaded_bytes)s\t%(progress.total_bytes)s\t%(progress.total_bytes_estimate)s\t%(progress.speed)s\t%(progress.eta)s\t%(progress.fragment_index)s\t%(progress.fragment_count)s`
   )
+  /*
+    And the second half of the job. Fetching the bytes is not the end of it: a
+    trimmed download re-encodes so the cuts land on keyframes, a video+audio
+    download merges the streams, an audio download extracts and converts. On a
+    long video that phase can take as long as the download, and it reports no
+    percentage — so without this the bar simply stopped and then jumped to done.
+
+    This at least says *which* step is running and when, which is enough to hand
+    the last tenth of the bar over to it and name what it is doing.
+  */
+  args.push(
+    '--progress-template',
+    `postprocess:${POSTPROCESS_PREFIX}%(progress.status)s\t%(progress.postprocessor)s`
+  )
 
   if (item.mode === 'audio') {
     args.push('-f', 'bestaudio/best', '-x', '--audio-format', settings.audioFormat, '--audio-quality', '0')
@@ -256,7 +273,15 @@ function handleProgressLine(line: string, item: DownloadItem): void {
   const downloadedBytes = num(downloaded)
   const fragmentIndex = num(fragIndex)
   const fragmentCount = num(fragCount)
-  let percent = item.percent
+  /*
+    Undefined, not the item's current figure. That figure is a position on the
+    whole bar, not a percentage of this phase — seeding with it told
+    `overallProgress` a number was known when none was, and the streams this
+    matters for (no Content-Length, no fragment count) then rendered a
+    confident, frozen percentage instead of the moving band that says "working,
+    size unknown".
+  */
+  let percent: number | undefined
   if (downloadedBytes != null && totalBytes) {
     percent = Math.min(100, (downloadedBytes / totalBytes) * 100)
   } else if (fragmentIndex != null && fragmentCount) {
@@ -265,14 +290,25 @@ function handleProgressLine(line: string, item: DownloadItem): void {
   }
 
   if (status === 'finished') {
-    item.state = 'processing'
-    item.percent = Math.max(item.percent, 99)
+    /*
+      One *file* is done — not the job. A default video download fetches the
+      video and audio streams separately, so this arrives once per stream. It
+      is not the hand-over to post-processing, and treating it as one flipped
+      the phase (and burned the whole download share) while a second stream had
+      not even started. The hand-over is a real post-processing event.
+
+      All this says is that we no longer know how far along we are, so the bar
+      holds its place and shows motion until the next line tells us more.
+    */
+    applyProgress(item, { phase: 'download' })
+    item.speed = undefined
+    item.eta = undefined
   } else {
     item.state = 'downloading'
-    item.percent = percent
+    applyProgress(item, { phase: 'download', phasePercent: percent })
+    item.speed = num(speed)
+    item.eta = num(eta)
   }
-  item.speed = num(speed)
-  item.eta = num(eta)
   item.downloadedBytes = downloadedBytes
   item.totalBytes = totalBytes
 
@@ -280,12 +316,91 @@ function handleProgressLine(line: string, item: DownloadItem): void {
     id: item.id,
     state: item.state,
     percent: item.percent,
+    phase: item.phase,
+    postprocess: item.postprocess,
+    indeterminate: item.indeterminate,
     speed: item.speed,
     eta: item.eta,
     downloadedBytes,
     totalBytes,
     fragmentIndex,
     fragmentCount
+  })
+}
+
+/** The bar is full and no phase is running. */
+function finishProgress(item: DownloadItem): void {
+  item.percent = 100
+  item.phase = undefined
+  item.postprocess = undefined
+  item.indeterminate = undefined
+}
+
+/**
+ * The job stopped where it was. Keep the figure — a paused item at 40% is still
+ * 40% fetched — but drop everything that describes work in progress, or the row
+ * goes on animating and naming a step that is not running.
+ */
+function clearPhase(item: DownloadItem): void {
+  item.phase = undefined
+  item.postprocess = undefined
+  item.indeterminate = undefined
+  item.speed = undefined
+  item.eta = undefined
+}
+
+/** Back to the start line: a retry, a resume, or a fresh attempt. */
+function resetProgress(item: DownloadItem): void {
+  item.percent = 0
+  item.phase = undefined
+  item.postprocess = undefined
+  item.indeterminate = undefined
+}
+
+/** Move an item's bar, keeping phase, figure and indeterminacy in step. */
+function applyProgress(
+  item: DownloadItem,
+  input: { phase: 'download' | 'postprocess'; phasePercent?: number }
+): void {
+  const view = overallProgress({ ...input, previous: item.percent })
+  item.phase = input.phase
+  item.percent = view.percent
+  item.indeterminate = view.indeterminate
+}
+
+/**
+ * A post-processing step started or finished.
+ *
+ * yt-dlp gives no percentage for these, only which one is running — so the last
+ * tenth of the bar carries motion and the step's name rather than a number the
+ * app would have to invent.
+ */
+function handlePostprocessLine(line: string, item: DownloadItem): void {
+  const [status, name] = line.slice(POSTPROCESS_PREFIX.length).split('	')
+  if (item.state !== 'downloading' && item.state !== 'processing') return
+  /*
+    Not every post-processor runs after the download. SponsorBlock's lookup is
+    registered `after_filter`, which yt-dlp runs *before* fetching anything — and
+    honouring that would floor the bar at the hand-over point before a single
+    byte had arrived. `phase` is only set once a download line has been seen, so
+    it doubles as "the download has actually started".
+  */
+  if (!acceptsPostprocess(item.phase)) return
+
+  item.state = 'processing'
+  // `finished` is one step done, not the job — the process closing says that.
+  item.postprocess = status === 'finished' ? undefined : (postprocessorLabel(name) ?? undefined)
+  applyProgress(item, { phase: 'postprocess' })
+  item.speed = undefined
+  item.eta = undefined
+
+  emitProgress({
+    id: item.id,
+    state: item.state,
+    percent: item.percent,
+    phase: item.phase,
+    postprocess: item.postprocess,
+    indeterminate: item.indeterminate
   })
 }
 
@@ -364,9 +479,17 @@ async function runMediaJob(item: DownloadItem): Promise<void> {
     run = runFfmpeg(args, {
       totalSeconds,
       onProgress: (percent, speed) => {
+        /*
+          ffmpeg keeps reporting for a moment after a cancel or a pause — the
+          kill is a signal, not an instant stop. Writing progress unconditionally
+          brought the row back to life as a running download after the user had
+          already stopped it.
+        */
+        const live = items.get(item.id)?.state
+        if (live !== 'downloading' && live !== 'processing') return
         if (percent >= 0) item.percent = percent
         if (speed != null) item.speed = undefined
-        emitProgress({ id: item.id, state: 'downloading', percent: item.percent })
+        emitProgress({ id: item.id, state: live, percent: item.percent })
       }
     })
   } catch (err) {
@@ -394,7 +517,7 @@ async function runMediaJob(item: DownloadItem): Promise<void> {
 
   if (code === 0) {
     item.state = 'completed'
-    item.percent = 100
+    finishProgress(item)
     item.finishedAt = Date.now()
     emitUpdated(item)
     processQueue()
@@ -453,6 +576,8 @@ async function runDownload(item: DownloadItem): Promise<void> {
     for (const line of lines) {
       if (line.startsWith(PROGRESS_PREFIX)) {
         handleProgressLine(line, item)
+      } else if (line.startsWith(POSTPROCESS_PREFIX)) {
+        handlePostprocessLine(line, item)
       } else if (line.trim()) {
         parseFinalPath(line, item)
         appendLog(item, line + '\n')
@@ -486,7 +611,7 @@ async function runDownload(item: DownloadItem): Promise<void> {
     }
     if (code === 0) {
       item.state = 'completed'
-      item.percent = 100
+      finishProgress(item)
       item.speed = undefined
       item.eta = undefined
       item.attempts = 0
@@ -509,6 +634,9 @@ function fail(item: DownloadItem, rawError: string): void {
   if (attempts <= AUTO_RETRIES && isTransientError(rawError) && items.has(item.id)) {
     item.state = 'queued'
     item.error = undefined
+    // The retry re-downloads from the start, so the bar has to as well —
+    // otherwise the never-backwards rule pins it wherever the failure left it.
+    resetProgress(item)
     emitUpdated(item)
     const timer = setTimeout(() => {
       retryTimers.delete(item.id)
@@ -518,8 +646,7 @@ function fail(item: DownloadItem, rawError: string): void {
     return
   }
   item.state = 'error'
-  item.speed = undefined
-  item.eta = undefined
+  clearPhase(item)
   item.error = humanizeYtdlpError(rawError, hasCookies(getSettings()))
   emitUpdated(item)
   processQueue()
@@ -621,8 +748,7 @@ export function pauseDownload(id: string): void {
   item.state = 'paused'
   // A deliberate pause outranks anything the previous shutdown recorded.
   item.interrupted = false
-  item.speed = undefined
-  item.eta = undefined
+  clearPhase(item)
   if (proc) killTree(proc)
   emitUpdated(item)
   processQueue()
@@ -636,6 +762,13 @@ export function resumeDownload(id: string): void {
   item.error = undefined
   item.attempts = 0
   item.interrupted = false
+  /*
+    A resume re-runs the engine from the beginning, so the bar has to go with
+    it. Without this the never-backwards rule pinned it at the figure the
+    previous attempt reached — an item paused during a merge would sit at 90%
+    for the whole of its fresh download.
+  */
+  resetProgress(item)
   emitUpdated(item)
   processQueue()
 }
@@ -663,7 +796,7 @@ export function cancelDownload(id: string): void {
   clearRetry(id)
   const proc = procs.get(id)
   item.state = 'canceled'
-  item.percent = 0
+  resetProgress(item)
   item.speed = undefined
   item.eta = undefined
   if (proc) {
@@ -690,7 +823,7 @@ export function retryDownload(id: string): void {
   clearRetry(id)
   item.state = 'queued'
   item.error = undefined
-  item.percent = 0
+  resetProgress(item)
   item.attempts = 0
   item.log = undefined
   emitUpdated(item)

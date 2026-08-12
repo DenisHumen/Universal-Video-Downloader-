@@ -163,6 +163,8 @@ const ytdlpListeners = new Set<YtdlpListener>()
 const updateListeners = new Set<UpdateListener>()
 const browserStateListeners = new Set<BrowserStateListener>()
 const browserMediaListeners = new Set<BrowserMediaListener>()
+type UpdatedListener = (item: DownloadItem) => void
+const updatedListeners = new Set<UpdatedListener>()
 
 /** Preview-only: drive a state the mock bridge would otherwise never enter. */
 declare global {
@@ -172,6 +174,8 @@ declare global {
       update: (status: UpdateStatus) => void
       browserState: (state: Partial<BrowserState>) => void
       browserMedia: (media: BrowserMedia[]) => void
+      /** Put a queue row into any state — including ones only the engine reaches. */
+      queue: (patch: Partial<DownloadItem>) => DownloadItem
     }
   }
 }
@@ -192,7 +196,26 @@ export function installMockApi(): void {
       Object.assign(browserState, patch)
       browserStateListeners.forEach((cb) => cb({ ...browserState }))
     },
-    browserMedia: (list) => browserMediaListeners.forEach((cb) => cb(list))
+    browserMedia: (list) => browserMediaListeners.forEach((cb) => cb(list)),
+    queue: (patch) => {
+      const item: DownloadItem = {
+        id: `mock-row-${++itemSeq}`,
+        kind: 'download',
+        url: 'https://example.com/watch?v=preview',
+        title: 'Preview item',
+        state: 'downloading',
+        percent: 0,
+        outputDir: 'C:/Downloads',
+        mode: 'video',
+        createdAt: Date.now(),
+        ...patch
+      }
+      const at = items.findIndex((i) => i.id === item.id)
+      if (at >= 0) items[at] = item
+      else items.unshift(item)
+      updatedListeners.forEach((cb) => cb({ ...item }))
+      return item
+    }
   }
   const api: UvdApi = {
     detect: async (url) => {
@@ -331,7 +354,10 @@ export function installMockApi(): void {
     closeWindow: async () => undefined,
     isWindowMaximized: async () => false,
     onDownloadProgress: () => () => undefined,
-    onDownloadUpdated: () => () => undefined,
+    onDownloadUpdated: (cb) => {
+      updatedListeners.add(cb)
+      return () => updatedListeners.delete(cb)
+    },
     /*
      * These two used to drop the callback on the floor, which meant the states
      * they drive — the first-run engine download, the update banner — could

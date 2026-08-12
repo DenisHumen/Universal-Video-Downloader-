@@ -95,6 +95,12 @@ async function runInit(set: SetState, get: GetState): Promise<void> {
       ...next[idx],
       state: p.state,
       percent: p.percent,
+      // Which half of the job is running, and whether it can say how far along
+      // it is. Post-processing reports neither speed nor a percentage, so these
+      // are what stop the row looking frozen.
+      phase: p.phase,
+      postprocess: p.postprocess,
+      indeterminate: p.indeterminate,
       speed: p.speed,
       eta: p.eta,
       downloadedBytes: p.downloadedBytes,
