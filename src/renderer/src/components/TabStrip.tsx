@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
+import { useT } from '../i18n'
 
 interface Props {
   children: ReactNode
@@ -26,6 +27,7 @@ const STEP = 220
  * looks exactly like plain tabs.
  */
 export default function TabStrip({ children, label, className }: Props): JSX.Element {
+  const t = useT()
   const ref = useRef<HTMLDivElement>(null)
   const [canLeft, setCanLeft] = useState(false)
   const [canRight, setCanRight] = useState(false)
@@ -77,7 +79,7 @@ export default function TabStrip({ children, label, className }: Props): JSX.Ele
           type="button"
           className="btn-icon-bare h-auto w-7 shrink-0 rounded-none"
           onClick={() => scrollBy(-STEP)}
-          aria-label="scroll left"
+          aria-label={t('a11y.scrollLeft')}
           tabIndex={-1}
         >
           <ChevronLeft size={16} />
@@ -98,7 +100,7 @@ export default function TabStrip({ children, label, className }: Props): JSX.Ele
           type="button"
           className="btn-icon-bare h-auto w-7 shrink-0 rounded-none"
           onClick={() => scrollBy(STEP)}
-          aria-label="scroll right"
+          aria-label={t('a11y.scrollRight')}
           tabIndex={-1}
         >
           <ChevronRight size={16} />

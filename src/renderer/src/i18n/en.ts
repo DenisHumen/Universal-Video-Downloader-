@@ -360,7 +360,17 @@ export const en = {
   'browser.openExternal': 'open in your browser',
   'browser.queued': 'added to the queue',
 
+  /*
+    The mono stamp that names each notice strip. Short by design — it is a
+    category, not a sentence — but it is still a word, and an interface that
+    is otherwise fully translated shouldn't have three English ones left in it.
+  */
+  'stamp.update': 'update',
+  'stamp.clipboard': 'clipboard',
+
   // ---- screen reader announcements ----
+  'a11y.scrollLeft': 'scroll left',
+  'a11y.scrollRight': 'scroll right',
   'a11y.downloadFinished': '{title} finished downloading',
   'a11y.downloadFailed': '{title} failed. {error}',
 

@@ -359,6 +359,11 @@ export const ru: Dictionary = {
   'browser.queued': 'добавлено в очередь',
 
   // ---- screen reader announcements ----
+  'stamp.update': 'обновление',
+  'stamp.clipboard': 'буфер',
+
+  'a11y.scrollLeft': 'прокрутить влево',
+  'a11y.scrollRight': 'прокрутить вправо',
   'a11y.downloadFinished': '{title} — загрузка завершена',
   'a11y.downloadFailed': '{title} — ошибка. {error}',
 

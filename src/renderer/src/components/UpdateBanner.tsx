@@ -32,7 +32,7 @@ export default function UpdateBanner(): JSX.Element {
       {visible && (
         <motion.div {...collapse} className="shrink-0 overflow-hidden">
           <div className="flex items-center gap-3 border-b border-edge bg-raise px-4 py-2.5">
-            <span className="label shrink-0 text-accent-ink">update</span>
+            <span className="label shrink-0 text-accent-ink">{t('stamp.update')}</span>
             <div className="min-w-0 flex-1">
               {update.state === 'available' && (
                 <p className="truncate text-[14px] font-medium text-ink">

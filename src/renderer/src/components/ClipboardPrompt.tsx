@@ -26,7 +26,7 @@ export default function ClipboardPrompt(): JSX.Element {
       {link && (
         <motion.div {...collapse} className="shrink-0 overflow-hidden">
           <div className="flex items-center gap-3 border-b border-edge bg-raise px-4 py-2.5">
-            <span className="label shrink-0 text-accent-ink">clipboard</span>
+            <span className="label shrink-0 text-accent-ink">{t('stamp.clipboard')}</span>
             <div className="min-w-0 flex-1">
               <p className="text-[14px] font-medium text-ink">{t('home.clipboardFound')}</p>
               <p className="mono truncate text-[12px] text-ink-2" title={link}>
