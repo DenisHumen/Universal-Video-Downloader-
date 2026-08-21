@@ -54,7 +54,15 @@ export default function TopBar(): JSX.Element {
   const appInfo = useStore((s) => s.appInfo)
   const view = useStore((s) => s.view)
   const setView = useStore((s) => s.setView)
-  const downloads = useStore((s) => s.downloads)
+  /*
+    A count, not the list.
+
+    Subscribing to `downloads` handed this component a new array on every
+    progress line the engine printed, so the whole title bar re-rendered
+    several times a second to display a number that changes once a minute.
+    Selecting the number instead means zustand can see that nothing moved.
+  */
+  const active = useStore((s) => s.downloads.filter((d) => ACTIVE_STATES.includes(d.state)).length)
   const openShortcuts = useStore((s) => s.setShortcutsOpen)
   const isMac = appInfo?.platform === 'darwin'
   const [maximized, setMaximized] = useState(false)
@@ -66,8 +74,6 @@ export default function TopBar(): JSX.Element {
   const onMaximize = async (): Promise<void> => {
     setMaximized(await window.api.maximizeWindow())
   }
-
-  const active = downloads.filter((d) => ACTIVE_STATES.includes(d.state)).length
 
   return (
     <header

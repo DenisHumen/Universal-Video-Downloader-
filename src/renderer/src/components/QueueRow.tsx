@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { memo, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { collapse, listItem } from '../lib/motion'
 import {
@@ -51,7 +51,7 @@ const STATE_META: Record<DownloadItem['state'], { label: TranslationKey; dot: st
  * Hairlines between rows carry the same separation at a fraction of the visual
  * cost.
  */
-export default function QueueRow({ item, index }: Props): JSX.Element {
+function QueueRow({ item, index }: Props): JSX.Element {
   const t = useT()
   const [logOpen, setLogOpen] = useState(false)
   const [jobModal, setJobModal] = useState<JobMode | null>(null)
@@ -426,3 +426,17 @@ export default function QueueRow({ item, index }: Props): JSX.Element {
     </motion.li>
   )
 }
+
+/**
+ * Memoised, because a queue redraws far more often than it changes.
+ *
+ * The store replaces one entry per progress update and leaves the rest of the
+ * array alone, but the array itself is new every time — so without this, a
+ * single download reporting its progress re-rendered every row in the list,
+ * several times a second, for the lifetime of the transfer. That is what a
+ * long queue feeling sluggish was made of.
+ *
+ * The comparison is deliberately shallow on identity: `item` is a fresh object
+ * exactly when that row's data changed, and `index` when the list reordered.
+ */
+export default memo(QueueRow, (a, b) => a.item === b.item && a.index === b.index)

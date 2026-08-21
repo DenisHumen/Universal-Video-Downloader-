@@ -24,6 +24,7 @@ import { markInterrupted, shouldResume } from './resume'
 import { pendingOrder } from './schedule'
 import { acceptsPostprocess, overallProgress, postprocessorLabel } from './progress'
 import { ffmpegProgressSeconds, isFfmpegNoise, splitOutputLines } from './ffmpeg-output'
+import { markOf, shouldEmitProgress, type ProgressMark } from './throttle'
 import { resolveUrl } from '../resolvers'
 import { normalizeUrl } from '@shared/urls'
 import { hasTrim } from '@shared/types'
@@ -112,8 +113,26 @@ function emitUpdated(item: DownloadItem): void {
   scheduleSave()
 }
 
+/** The last progress payload sent per item, so the next can be rate-limited. */
+const progressMarks = new Map<string, ProgressMark>()
+
+/**
+ * Tell the renderer where a job is, at a pace a person can read.
+ *
+ * The engine talks far faster than the interface needs to listen, and every
+ * update replaced the store's list and redrew the queue. Changes of kind — a
+ * new state, a new phase, the end of the bar — always go straight through; a
+ * figure creeping up within one phase waits its turn. See throttle.ts.
+ */
 function emitProgress(progress: DownloadProgress): void {
+  const now = Date.now()
+  if (!shouldEmitProgress(progressMarks.get(progress.id), progress, now)) return
+  progressMarks.set(progress.id, markOf(progress, now))
   downloadEvents.emit('progress', progress)
+}
+
+function forgetProgress(id: string): void {
+  progressMarks.delete(id)
 }
 
 function qualityFormat(quality: QualityPreset | undefined): string {
@@ -402,6 +421,7 @@ function clearPhase(item: DownloadItem): void {
 
 /** Back to the start line: a retry, a resume, or a fresh attempt. */
 function resetProgress(item: DownloadItem): void {
+  forgetProgress(item.id)
   item.percent = 0
   item.phase = undefined
   item.postprocess = undefined
@@ -957,6 +977,7 @@ export function retryDownload(id: string): void {
 
 export function removeDownload(id: string): void {
   clearRetry(id)
+  forgetProgress(id)
   const proc = procs.get(id)
   if (proc) killTree(proc)
   procs.delete(id)
@@ -970,6 +991,7 @@ export function clearFinished(): void {
   for (const [id, item] of items) {
     if (item.state === 'completed' || item.state === 'canceled' || item.state === 'error') {
       clearRetry(id)
+      forgetProgress(id)
       items.delete(id)
       finalPaths.delete(id)
       // Per-item 'removed' events — the only channel the renderer listens to.
