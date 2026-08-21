@@ -658,20 +658,22 @@ async function runDownload(item: DownloadItem): Promise<void> {
   let stderrTail = ''
   let buffer = ''
 
+  const onOutputLine = (line: string): void => {
+    if (line.startsWith(PROGRESS_PREFIX)) {
+      handleProgressLine(line, item)
+    } else if (line.startsWith(POSTPROCESS_PREFIX)) {
+      handlePostprocessLine(line, item)
+    } else if (line.trim()) {
+      parseFinalPath(line, item)
+      appendLog(item, line + '\n')
+    }
+  }
+
   const onData = (data: Buffer): void => {
     buffer += data.toString()
     const lines = buffer.split(/\r?\n/)
     buffer = lines.pop() || ''
-    for (const line of lines) {
-      if (line.startsWith(PROGRESS_PREFIX)) {
-        handleProgressLine(line, item)
-      } else if (line.startsWith(POSTPROCESS_PREFIX)) {
-        handlePostprocessLine(line, item)
-      } else if (line.trim()) {
-        parseFinalPath(line, item)
-        appendLog(item, line + '\n')
-      }
-    }
+    for (const line of lines) onOutputLine(line)
   }
 
   const onErrorLine = (line: string): void => {
@@ -714,10 +716,17 @@ async function runDownload(item: DownloadItem): Promise<void> {
   child.on('close', (code) => {
     procs.delete(item.id)
     /*
-      Whatever is still in the buffer. The last thing an engine writes before it
-      exits is very often the line that says why, and it has no separator after
-      it to push it out.
+      Whatever is still in either buffer, before anything reads what they said.
+
+      The last thing an engine writes before it exits has no separator after it
+      to push it out of the buffer — and it is very often the line that matters
+      most: the reason a run failed, or the path a successful one wrote to,
+      which the completion branch below is about to look up.
     */
+    if (buffer) {
+      onOutputLine(buffer)
+      buffer = ''
+    }
     if (errBuffer) {
       onErrorLine(errBuffer)
       errBuffer = ''
