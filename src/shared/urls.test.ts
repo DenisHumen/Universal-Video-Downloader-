@@ -78,9 +78,26 @@ describe('normalizeUrl', () => {
     expect(normalizeUrl('https://vimeo.com/123?h=secret')).toBe('https://vimeo.com/123?h=secret')
   })
 
+  it('drops an anchor but keeps a hash route', () => {
+    expect(normalizeUrl('https://vimeo.com/123#comments')).toBe('https://vimeo.com/123')
+    expect(normalizeUrl('https://www.youtube.com/watch?v=abc123#t=90')).toBe(
+      'https://www.youtube.com/watch?v=abc123'
+    )
+    // Single-page sites route on the fragment; there it *is* the address.
+    expect(normalizeUrl('https://site.test/#/watch/123')).toBe('https://site.test/#/watch/123')
+    expect(normalizeUrl('https://site.test/#!/video/9')).toBe('https://site.test/#!/video/9')
+  })
+
   it('is idempotent', () => {
-    const once = normalizeUrl('https://youtu.be/dQw4w9WgXcQ?si=xyz')
-    expect(normalizeUrl(once)).toBe(once)
+    for (const url of [
+      'https://youtu.be/dQw4w9WgXcQ?si=xyz',
+      'https://www.tiktok.com/@user/video/7123?is_from_webapp=1',
+      'https://site.test/#/watch/123',
+      'https://instagram.com/reels/Cabc123/'
+    ]) {
+      const once = normalizeUrl(url)
+      expect(normalizeUrl(once), url).toBe(once)
+    }
   })
 })
 

@@ -157,7 +157,14 @@ export function normalizeUrl(input: string): string {
 
   url.hostname = host
   url.pathname = path
-  url.hash = ''
+  /*
+    A fragment is usually an anchor or a start time — `#t=42`, `#comments` —
+    and dropping it is what makes two links to the same video compare equal.
+    But a single-page site can route on it, and there `#/watch/123` *is* the
+    address: stripping it would turn a link to a video into a link to the
+    site's front page. Anything that looks like a route stays.
+  */
+  if (!/^#!?\//.test(url.hash)) url.hash = ''
   url.search = params.toString() ? `?${params.toString()}` : ''
 
   // A trailing slash on a path that carries an id is noise, not structure.
