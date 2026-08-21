@@ -234,7 +234,11 @@ export interface DownloadItem {
   sourcePath?: string
   /** The section this entry covers, when the user trimmed it. */
   range?: TrimRange
-  /** Trim jobs: re-encode for a frame-accurate cut rather than copying. */
+  /**
+   * Cut exactly where asked by re-encoding, rather than landing on the nearest
+   * keyframe. Applies to a trim job on a local file and to a trimmed download
+   * alike — the engine and ffmpeg take the same instruction either way.
+   */
   precise?: boolean
   /** Convert jobs: the requested output format. */
   convertTarget?: ConvertTarget
