@@ -21,6 +21,12 @@ const HINT_ID = '__uvd_pick_hint__'
 let picking = false
 let overlay: HTMLDivElement | null = null
 let hint: HTMLDivElement | null = null
+/*
+  This preload runs inside the *site*, not the app, so it has no dictionary of
+  its own — and the one sentence it draws was therefore in English however the
+  interface was set. The main process sends the wording along with the mode.
+*/
+let hintText = 'Click the video you want · Esc to cancel'
 
 function ensureOverlay(): HTMLDivElement {
   if (overlay && overlay.isConnected) return overlay
@@ -30,9 +36,12 @@ function ensureOverlay(): HTMLDivElement {
     position: 'fixed',
     pointerEvents: 'none',
     zIndex: '2147483647',
-    border: '2px solid #7c5cff',
+    /* The system's one saturated colour. This was still the violet the
+       redesign replaced, so the app's own overlay was off-brand on every page
+       it appeared on. */
+    border: '2px solid #2f5bff',
     borderRadius: '6px',
-    background: 'rgba(124, 92, 255, 0.16)',
+    background: 'rgba(47, 91, 255, 0.16)',
     transition: 'all 60ms linear',
     display: 'none'
   } satisfies Partial<CSSStyleDeclaration>)
@@ -58,7 +67,7 @@ function ensureHint(): HTMLDivElement {
     font: '500 13px/1.2 -apple-system, Segoe UI, Roboto, sans-serif',
     boxShadow: '0 8px 30px rgba(0,0,0,0.45)'
   } satisfies Partial<CSSStyleDeclaration>)
-  hint.textContent = 'Click the video you want · Esc to cancel'
+  hint.textContent = hintText
   document.documentElement.appendChild(hint)
   return hint
 }
@@ -173,7 +182,10 @@ function setPicking(next: boolean): void {
   }
 }
 
-ipcRenderer.on(CHANNEL_SET_MODE, (_e, enabled: boolean) => setPicking(Boolean(enabled)))
+ipcRenderer.on(CHANNEL_SET_MODE, (_e, enabled: boolean, text?: string) => {
+  if (text) hintText = text
+  setPicking(Boolean(enabled))
+})
 
 window.addEventListener('mousemove', onMove, true)
 window.addEventListener('click', onClick, true)

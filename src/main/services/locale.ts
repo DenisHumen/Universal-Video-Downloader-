@@ -40,7 +40,8 @@ const EN = {
   'tray.open': 'Open',
   'tray.quit': 'Quit',
   'notify.done': 'Download complete',
-  'notify.failed': 'Download failed'
+  'notify.failed': 'Download failed',
+  'pick.hint': 'Click the video you want · Esc to cancel'
 } as const
 
 export type MainKey = keyof typeof EN
@@ -62,7 +63,8 @@ const RU: Record<MainKey, string> = {
   'tray.open': 'Открыть',
   'tray.quit': 'Выход',
   'notify.done': 'Загрузка завершена',
-  'notify.failed': 'Загрузка не удалась'
+  'notify.failed': 'Загрузка не удалась',
+  'pick.hint': 'Нажмите на нужное видео · Esc — отмена'
 }
 
 const DICTIONARIES: Record<MainLanguage, Record<MainKey, string>> = { en: EN, ru: RU }

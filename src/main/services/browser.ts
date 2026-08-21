@@ -4,10 +4,11 @@ import { randomUUID } from 'crypto'
 import { IPC } from '@shared/ipc'
 import { UA } from '../resolvers/http'
 import { attachCapture, BROWSING_PARTITION, browsingSession } from '../resolvers/universal/capture'
-import { isPlausible, type MediaCandidate } from '../resolvers/universal/candidates'
+import { isPlausible, scoreUrl, type MediaCandidate } from '../resolvers/universal/candidates'
 import { directUrlFor } from '../resolvers'
 import { startDownload } from './downloader'
 import { getSettings } from './settings'
+import { mt } from './locale'
 import type { BrowserMedia, BrowserState, DownloadItem } from '@shared/types'
 
 /**
@@ -129,7 +130,8 @@ const candidateHeaders = new Map<string, Record<string, string>>()
 
 function setPicking(next: boolean): void {
   picking = next
-  view?.webContents.send('browser-site:set-pick-mode', next)
+  // The site view has no dictionary of its own; the wording travels with the mode.
+  view?.webContents.send('browser-site:set-pick-mode', next, mt('pick.hint'))
   sendState()
 }
 
@@ -350,14 +352,25 @@ export function registerBrowserIpc(): void {
     })
   })
 
+  /*
+    Sources the page exposes on its own <video> elements.
+
+    Scored through the same ranking as everything else, with a bonus for having
+    come from the DOM rather than the wire. A flat score bypassed every penalty
+    in that table, so a pre-roll ad sitting in a <video> tag arrived rated as
+    highly as the film — and the panel is sorted by score, which put the advert
+    at the top of the list of things to download.
+  */
   ipcMain.on(
     'browser-site:media',
     (_e, payload: { items: { src: string; poster?: string }[] }) => {
       for (const item of payload?.items ?? []) {
+        const { kind, score } = scoreUrl(item.src, 8)
+        if (!score) continue
         rememberCandidate({
           url: item.src,
-          kind: 'file',
-          score: 90,
+          kind,
+          score,
           source: 'dom',
           headers: { Referer: view?.webContents.getURL() ?? '', 'User-Agent': UA }
         })
