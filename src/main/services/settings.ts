@@ -81,7 +81,7 @@ export function getSettings(): AppSettings {
 }
 
 /** Write via a temp file so a crash mid-write can't leave an unreadable config. */
-function persist(settings: AppSettings): void {
+function writeNow(settings: AppSettings): void {
   try {
     const dir = app.getPath('userData')
     if (!existsSync(dir)) mkdirSync(dir, { recursive: true })
@@ -92,6 +92,39 @@ function persist(settings: AppSettings): void {
   } catch (err) {
     console.error('Failed to persist settings', err)
   }
+}
+
+let writeTimer: NodeJS.Timeout | null = null
+
+/**
+ * Save, but not once per keystroke.
+ *
+ * Several settings are free-text — the speed limit, the filename template, the
+ * subtitle languages, the proxy — and every character typed into one of them
+ * came all the way through to a synchronous rewrite of settings.json. Typing
+ * "500K" wrote the file four times.
+ *
+ * The in-memory cache is updated immediately, so nothing ever reads a stale
+ * value; only the disk write waits. Same shape as the queue's history file,
+ * which settled this question already.
+ */
+function persist(settings: AppSettings): void {
+  if (writeTimer) clearTimeout(writeTimer)
+  writeTimer = setTimeout(() => {
+    writeTimer = null
+    writeNow(settings)
+  }, 400)
+}
+
+/**
+ * Write anything still pending, now. Called on the way out — a setting changed
+ * a quarter of a second before quitting is still a setting the user changed.
+ */
+export function flushSettings(): void {
+  if (!writeTimer) return
+  clearTimeout(writeTimer)
+  writeTimer = null
+  if (cache) writeNow(cache)
 }
 
 export function setSettings(partial: Partial<AppSettings>): AppSettings {

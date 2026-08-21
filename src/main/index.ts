@@ -11,7 +11,7 @@ import {
 import { join } from 'path'
 import { IPC } from '@shared/ipc'
 import { registerIpc } from './ipc'
-import { getSettings } from './services/settings'
+import { flushSettings, getSettings } from './services/settings'
 import { ensureYtdlp, refreshEngineIfDue } from './services/ytdlp'
 import { checkForUpdates, initUpdater } from './services/updater'
 import {
@@ -463,6 +463,10 @@ if (!gotLock) {
   app.on('before-quit', () => {
     quitting = true
     stopClipboardWatch()
+    // Settings are written on a short delay so typing into a text field doesn't
+    // rewrite the file per keystroke; a change made just before quitting is
+    // still a change the user made.
+    flushSettings()
     shutdownDownloads()
   })
 

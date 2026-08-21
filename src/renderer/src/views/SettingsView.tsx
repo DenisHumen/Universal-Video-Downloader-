@@ -174,9 +174,21 @@ export default function SettingsView(): JSX.Element {
     return () => observer.disconnect()
   }, [settings])
 
+  /*
+    An instant scroll, computed rather than smooth.
+
+    Smooth scrolling is driven by the frame clock, and this app has already
+    learned twice over what that costs: measured with the clock stalled — a
+    backgrounded window, which is the normal state of a downloader — the tab
+    strip's own arrows moved nothing at all. A section index that sometimes
+    does nothing is worse than one that jumps.
+  */
   const jump = (id: SectionId): void => {
-    const target = scrollRef.current?.querySelector(`#set-${id}`)
-    target?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    const host = scrollRef.current
+    const target = host?.querySelector<HTMLElement>(`#set-${id}`)
+    if (!host || !target) return
+    host.scrollTop = Math.max(0, target.offsetTop - host.offsetTop)
+    setActive(id)
   }
 
   if (!settings) return <div />
