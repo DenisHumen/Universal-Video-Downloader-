@@ -181,6 +181,29 @@ For streaming sites the app reads the available **voiceovers (озвучки)**,
 
 ---
 
+## 🤔 A site doesn't work?
+
+In rough order of how often it helps:
+
+1. **Turn on cookies.** *Settings → access & cookies* → pick the browser you're
+   signed into. Age gates, login walls and "members only" all disappear. Close
+   that browser while downloading — it locks its own cookie database.
+2. **Use the built-in browser.** *open the built-in browser*, go to the video,
+   press play. Every stream the page requests shows up in the side panel, one
+   click from the queue — and whatever you did to get there (a consent banner,
+   a login) is remembered for later re-downloads.
+3. **Check universal detection is on.** *Settings → detection*. Without it the
+   app can only download from sites the engine already knows.
+4. **Give it a minute.** An unknown site takes up to half a minute: the app is
+   loading the page in a hidden window and waiting for its player to ask for
+   the video.
+5. **Still nothing?** [Open an issue](https://github.com/DenisHumen/Universal-Video-Downloader-/issues/new)
+   with the link and the engine output from the queue row's *engine output*
+   drawer. Most sites need no code at all; the ones that do get a small module
+   in `src/main/resolvers/sites/`.
+
+---
+
 ## 🎨 The look
 
 **UVD — Precision**, a Swiss-modernist system: a strict grid, hairline rules instead of shadows,
