@@ -97,3 +97,44 @@ describe('best', () => {
     expect(found?.url).toBe('https://cdn.test/hls/master.m3u8')
   })
 })
+
+describe('content types', () => {
+  it('scores a manifest the same whether the path or the response says so', () => {
+    // The case this exists for: a CDN serving HLS from an extensionless path.
+    const hls = scoreUrl('https://cdn.test/hls/98213', 0, 'application/vnd.apple.mpegurl')
+    expect(hls.kind).toBe('hls')
+    // 100 for the manifest, plus the /hls/ path bonus every manifest gets.
+    expect(hls.score).toBeGreaterThanOrEqual(100)
+    expect(scoreUrl('https://cdn.test/stream/98213', 0, 'application/dash+xml').kind).toBe('dash')
+    expect(scoreUrl('https://cdn.test/v/98213', 0, 'video/mp4').score).toBe(82)
+  })
+
+  it('still prefers what the URL says when the URL says anything at all', () => {
+    // A .m3u8 served as text/plain is still a manifest.
+    expect(scoreUrl('https://cdn.test/master.m3u8', 0, 'text/plain').score).toBeGreaterThan(100)
+  })
+
+  it('ignores a response that is not media', () => {
+    expect(scoreUrl('https://cdn.test/page', 0, 'text/html').score).toBe(0)
+    expect(scoreUrl('https://cdn.test/page', 0).score).toBe(0)
+  })
+
+  it('demotes a single HLS segment, whichever way it is recognised', () => {
+    expect(scoreUrl('https://cdn.test/seg/00042', 0, 'video/mp2t').score).toBeLessThan(40)
+  })
+
+  it('ranks audio below every video container but still finds it', () => {
+    const audio = scoreUrl('https://cdn.test/episode.mp3').score
+    const video = scoreUrl('https://cdn.test/episode.mp4').score
+    expect(audio).toBeGreaterThan(40)
+    expect(audio).toBeLessThan(video)
+  })
+
+  it('lets Content-Length break a tie between two of a kind', () => {
+    const [first] = rank([
+      { url: 'https://cdn.test/a.mp4', kind: 'file', score: 82, source: 'network', bytes: 1_000 },
+      { url: 'https://cdn.test/b.mp4', kind: 'file', score: 82, source: 'network', bytes: 900_000_000 }
+    ])
+    expect(first.url).toBe('https://cdn.test/b.mp4')
+  })
+})

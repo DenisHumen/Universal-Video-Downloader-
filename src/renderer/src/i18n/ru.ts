@@ -28,7 +28,6 @@ export const ru: Dictionary = {
   'common.check': 'проверить',
   'common.update': 'обновить',
   'common.off': 'выкл',
-  'common.details': 'подробнее',
   'common.paste': 'вставить из буфера',
 
   // ---- navigation ----
@@ -36,7 +35,6 @@ export const ru: Dictionary = {
   'nav.queue': 'очередь',
   'nav.search': 'поиск',
   'nav.settings': 'настройки',
-  'nav.github': 'открытый код · github',
 
   // ---- title bar ----
   'engine.ready': 'движок готов',
@@ -58,7 +56,6 @@ export const ru: Dictionary = {
   'home.get': 'получить',
   'home.errorTitle': 'не удалось найти видео',
   'home.openAccessSettings': 'открыть настройки → доступ',
-  'home.moreSites': 'и ещё 1800+',
   'home.batch': 'несколько ссылок',
   'home.batchHint': 'по одной ссылке в строке — каждая станет отдельной загрузкой',
   'home.batchAdd': 'в очередь: {count}',
@@ -68,7 +65,6 @@ export const ru: Dictionary = {
     'движок не знает этот сайт, поэтому приложение само открыло страницу и перехватило поток.',
   'home.clipboardFound': 'в буфере обмена ссылка',
   'home.clipboardUse': 'использовать',
-  'home.dropHere': 'бросьте ссылку в любое место',
   'home.addedToQueue': 'добавлено в очередь',
   'home.startFailed': 'не удалось запустить загрузку',
 
@@ -101,6 +97,8 @@ export const ru: Dictionary = {
   'queue.filterFailed': 'с ошибкой',
   'queue.searchPlaceholder': 'фильтр по названию…',
   'queue.remaining': 'осталось {size}',
+  'queue.eta': 'осталось {time}',
+  'queue.etaAll': '≈ {time} до конца',
   'queue.duplicate': 'уже в очереди',
   'queue.addedWithDuplicates': 'добавлено: {count} · уже в очереди: {duplicates}',
   'queue.copyLink': 'скопировать ссылку',
@@ -127,7 +125,6 @@ export const ru: Dictionary = {
   // ---- playlist ----
   'playlist.videos': 'видео: {count}',
   'playlist.downloadAll': 'скачать все ({count})',
-  'playlist.downloadOne': 'скачать это',
   'playlist.selected': 'скачать выбранные ({count})',
   'playlist.selectAll': 'выбрать все',
   'playlist.range': 'номера',
@@ -145,13 +142,13 @@ export const ru: Dictionary = {
   'streaming.seriesSeasons': 'сериал · сезонов: {count}',
   'streaming.movie': 'фильм',
   'streaming.selectEpisode': 'выберите хотя бы одну серию',
-  'streaming.addedEpisodes': 'добавлено серий: {count}',
 
   // ---- format selector ----
   'format.exactStream': 'выбрать конкретный поток ({count})',
   'format.audioFormat': 'формат звука',
   'format.plusAudio': '+ звук',
   'format.upTo': 'до {height}p',
+  'format.youGet': 'получите',
   'format.subtitles': 'дорожек субтитров: {count}',
 
   // ---- search ----
@@ -167,7 +164,6 @@ export const ru: Dictionary = {
   'search.failed': 'поиск не удался',
   'search.episodes': 'серии',
   'search.queued': 'в очереди',
-  'search.addedRemote': 'добавлено в очередь — смотрите главное окно',
   'search.qualityProbe': 'качество…',
   'search.anime': 'аниме',
   'search.audio': 'звук',
@@ -278,10 +274,11 @@ export const ru: Dictionary = {
 
   // ---- mac notice ----
   'mac.title': 'macOS пишет, что приложение «повреждено» или не открывается?',
+  'mac.why':
+    'на самом деле нет — сборка без подписи, поэтому macOS помещает её в карантин. выполните один раз в терминале:',
 
   // ---- shortcuts ----
   'shortcuts.title': 'горячие клавиши',
-  'shortcuts.open': 'горячие клавиши',
   'shortcuts.newDownload': 'новая загрузка',
   'shortcuts.queue': 'открыть очередь',
   'shortcuts.search': 'поиск по названию',
@@ -338,7 +335,6 @@ export const ru: Dictionary = {
   // ---- queue job kinds ----
   'job.trim': 'обрезка',
   'job.convert': 'конвертация',
-  'job.sourceMissing': 'исходный файл не найден',
 
   // ---- built-in browser ----
   'browser.open': 'открыть встроенный браузер',
@@ -367,5 +363,37 @@ export const ru: Dictionary = {
   // ---- errors ----
   'error.title': 'что-то пошло не так',
   'error.reload': 'перезагрузить приложение',
-  'error.starting': 'запускаемся…'
+  'error.starting': 'запускаемся…',
+
+  /*
+    Ошибки — на языке пользователя.
+
+    Движок говорит только по-английски, и раньше любая неудача приходила
+    именно так: интерфейс переведён целиком ровно до момента, когда что-то
+    ломается — а это как раз тот момент, когда слова важнее всего.
+  */
+  'err.unavailable':
+    'видео недоступно — возможно, его удалили, сделали приватным или закрыли для вашего региона.',
+  'err.ageRestricted': 'контент с возрастным ограничением.',
+  'err.rateLimited': 'сайт ограничивает частоту запросов. подождите минуту или укажите прокси.',
+  'err.signIn': 'для этого видео нужно быть авторизованным на сайте.',
+  'err.forbidden': 'сайт отклонил запрос.',
+  'err.geo': 'видео недоступно в вашем регионе.',
+  'err.drm': 'видео защищено DRM — скачать его нельзя.',
+  'err.diskFull': 'на диске нет места — освободите его и попробуйте снова.',
+  'err.permission': 'нет прав на запись в папку загрузок. выберите другую в настройках.',
+  'err.postprocess': 'постобработка не удалась — видео скачалось, но не собралось.',
+  'err.noFormats': 'по этой ссылке не нашлось видео, которое можно скачать.',
+  'err.network': 'проблема с сетью. проверьте подключение или прокси.',
+  'err.timeout': 'сайт слишком долго не отвечает. проверьте подключение или прокси.',
+  'err.canceled': 'отменено.',
+  'err.sourceMissing': 'исходный файл пропал — возможно, его переместили или удалили.',
+  'err.noAudioTrack': 'в файле нет звуковой дорожки, поэтому аудиофайл из него не получится.',
+  'err.damagedSource': 'исходный файл повреждён или скачан не полностью.',
+  'err.unknownEncoder': 'встроенный ffmpeg не умеет кодировать этот формат. выберите другой.',
+  'err.ffmpegMissing': 'встроенный ffmpeg не найден — переустановите приложение.',
+  'err.streamGone': 'потока по этой ссылке больше нет.',
+  'err.corruptLink': 'ссылка на загрузку повреждена — выберите видео заново.',
+  'err.emptyPage': 'на этой странице не нашлось видео.',
+  'err.cookieHint': 'попробуйте включить cookies браузера в настройках → доступ.'
 }

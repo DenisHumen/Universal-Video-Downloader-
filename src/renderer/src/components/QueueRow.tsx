@@ -18,6 +18,7 @@ import {
 } from 'lucide-react'
 import type { DownloadItem } from '@shared/types'
 import { formatBytes, formatEta, formatSpeed } from '../lib/format'
+import { errorText } from '../lib/errors'
 import { useT, type TranslationKey } from '../i18n'
 import { toast } from '../lib/toast'
 import MediaJobModal, { type JobMode } from './MediaJobModal'
@@ -91,12 +92,23 @@ export default function QueueRow({ item, index }: Props): JSX.Element {
         : item.postprocess === 'convert'
           ? t('phase.convert')
           : null
+  /*
+    The resolution this entry will actually produce.
+
+    `best` is a promise, not a number, and the row used to print nothing at all
+    for it — so the one thing a person checks a queue for ("did it pick 1080 or
+    360?") was the one thing it wouldn't say. `targetHeight` is worked out from
+    the real format list when the download is queued; the preset is the
+    fallback for entries queued before that existed.
+  */
   const qualityLabel =
     item.mode === 'audio' || item.formatId
       ? null
-      : item.quality && item.quality !== 'best' && item.quality !== 'audio'
-        ? `${item.quality}p`
-        : null
+      : item.targetHeight
+        ? `${item.targetHeight}p`
+        : item.quality && item.quality !== 'best' && item.quality !== 'audio'
+          ? `${item.quality}p`
+          : null
 
   const facts = [
     phaseLabel,
@@ -104,7 +116,7 @@ export default function QueueRow({ item, index }: Props): JSX.Element {
     item.jobLabel,
     qualityLabel,
     active && item.speed ? formatSpeed(item.speed) : null,
-    active && item.eta ? formatEta(item.eta) : null,
+    active && item.eta ? t('queue.eta', { time: formatEta(item.eta) }) : null,
     item.state === 'downloading' && item.downloadedBytes
       ? item.totalBytes
         ? `${formatBytes(item.downloadedBytes)} / ${formatBytes(item.totalBytes)}`
@@ -341,14 +353,22 @@ export default function QueueRow({ item, index }: Props): JSX.Element {
               <Copy size={15} />
             </button>
           )}
+          {/*
+            `processing` belongs here too. It was the one running state with no
+            way out: a merge or a trim on a long video takes minutes, and while
+            it ran the row offered pause but not cancel — so the only way to
+            abandon a job that had gone wrong was to pause it and then remove
+            it, which is two steps to say one thing.
+          */}
           {(item.state === 'downloading' ||
+            item.state === 'processing' ||
             item.state === 'paused' ||
             item.state === 'queued' ||
             item.state === 'detecting') && (
             <button
               className="btn-icon-bare hover:text-bad"
               title={t('common.cancel')}
-                aria-label={t('common.cancel')}
+              aria-label={t('common.cancel')}
               onClick={() => window.api.cancelDownload(item.id)}
             >
               <X size={15} />
@@ -369,12 +389,12 @@ export default function QueueRow({ item, index }: Props): JSX.Element {
       {(item.state === 'completed' || item.state === 'error') && (
         <div className="pb-3 pl-[124px] pr-1">
           <p
-            className={`mono selectable truncate text-[12px] ${
-              item.state === 'error' ? 'text-bad' : 'text-ink-3'
+            className={`selectable truncate text-[12px] ${
+              item.state === 'error' ? 'text-bad' : 'mono text-ink-3'
             }`}
-            title={item.state === 'error' ? item.error : item.filepath}
+            title={item.state === 'error' ? errorText(t, item) : item.filepath}
           >
-            {item.state === 'error' ? item.error || t('error.title') : item.filepath}
+            {item.state === 'error' ? errorText(t, item) : item.filepath}
           </p>
           {item.log && (
             <>

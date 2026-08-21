@@ -2,10 +2,11 @@ import { spawn } from 'child_process'
 import { ytdlpBinaryPath, ytdlpSpawnOptions } from './ytdlp'
 import { getSettings } from './settings'
 import { killTree } from './process'
-import { accessArgs, hasCookies, headerArgs, humanizeYtdlpError } from './options'
+import { accessArgs, classifyYtdlpError, hasCookies, headerArgs } from './options'
 import { resolveUniversal, resolveUrl, type ResolvedUrl } from '../resolvers'
-import { looksLikeCollection } from '@shared/urls'
+import { looksLikeCollection, normalizeUrl } from '@shared/urls'
 import type {
+  AppErrorCode,
   DetectResult,
   DetectStage,
   FormatKind,
@@ -58,6 +59,21 @@ interface RawInfo {
 }
 
 export type StageReporter = (stage: DetectStage) => void
+
+/**
+ * A resolver threw.
+ *
+ * When the wording matches something the app knows how to explain, the code
+ * travels too and the UI can say it in the user's language. When it doesn't —
+ * "this translation requires Premium", say — the resolver's own sentence goes
+ * through untouched: it knows more about the site than any rule matching a
+ * substring of it ever will.
+ */
+function errorResult(err: unknown): DetectResult {
+  const raw = err instanceof Error ? err.message : String(err)
+  const { code, message, cookieHint } = classifyYtdlpError(raw, hasCookies(getSettings()))
+  return { ok: false, error: code ? message : raw, errorCode: code, cookieHint }
+}
 
 function formatKind(f: RawFormat): FormatKind {
   const hasVideo = f.vcodec && f.vcodec !== 'none'
@@ -119,18 +135,30 @@ function pickThumbnail(info: RawInfo): string | undefined {
 }
 
 export async function detect(
-  url: string,
+  input: string,
   onStage: StageReporter = () => undefined,
   signal?: AbortSignal
 ): Promise<DetectResult> {
   const settings = getSettings()
+  /*
+    Canonicalise first, and use only the canonical form from here on.
+
+    Every share button on the web hands out a different shape for the same
+    video — `youtu.be/ID?si=…`, `/shorts/ID`, a TikTok link with six analytics
+    parameters stapled to it. `wasRewritten` below compares the resolver's
+    output against this string to decide whether a custom resolver actually
+    changed anything, so normalising afterwards would make every one of those
+    links look rewritten and skip both the playlist expansion and the universal
+    fallback.
+  */
+  const url = normalizeUrl(input)
 
   onStage('resolving')
   let resolved: ResolvedUrl
   try {
     resolved = await resolveUrl(url)
   } catch (err) {
-    return { ok: false, error: err instanceof Error ? err.message : String(err) }
+    return errorResult(err)
   }
 
   // A streaming site (translator/episode/quality selection) — present its picker.
@@ -153,7 +181,9 @@ export async function detect(
   // A custom resolver found a playlist/listing — present its entries directly.
   if (resolved.isPlaylist) {
     const entries = resolved.entries || []
-    if (!entries.length) return { ok: false, error: 'No videos found on this page.' }
+    if (!entries.length) {
+      return { ok: false, error: 'No videos found on this page.', errorCode: 'emptyPage' }
+    }
     return {
       ok: true,
       info: {
@@ -255,7 +285,9 @@ function syntheticInfo(pageUrl: string, resolved: ResolvedUrl): MediaInfo {
   }
 }
 
-type JsonProbe = { ok: true; raw: RawInfo } | { ok: false; error: string }
+type JsonProbe =
+  | { ok: true; raw: RawInfo }
+  | { ok: false; error: string; errorCode?: AppErrorCode; cookieHint?: boolean }
 
 function spawnJson(args: string[], signal: AbortSignal | undefined, timeoutMs: number): Promise<JsonProbe> {
   return new Promise((resolve) => {
@@ -273,13 +305,17 @@ function spawnJson(args: string[], signal: AbortSignal | undefined, timeoutMs: n
 
     const timer = setTimeout(() => {
       killTree(child)
-      done({ ok: false, error: 'Detection timed out. The site may be unsupported or unreachable.' })
+      done({
+        ok: false,
+        error: 'Detection timed out. The site may be unsupported or unreachable.',
+        errorCode: 'timeout'
+      })
     }, timeoutMs)
 
     if (signal) {
       signal.addEventListener('abort', () => {
         killTree(child)
-        done({ ok: false, error: 'Detection canceled.' })
+        done({ ok: false, error: 'Detection canceled.', errorCode: 'canceled' })
       })
     }
 
@@ -289,7 +325,8 @@ function spawnJson(args: string[], signal: AbortSignal | undefined, timeoutMs: n
     child.on('close', (code) => {
       if (code !== 0 || !stdout.trim()) {
         const reason = stderr.trim() || 'Could not detect any media at this URL.'
-        done({ ok: false, error: humanizeYtdlpError(reason, hasCookies(settings)) })
+        const { code: errorCode, message, cookieHint } = classifyYtdlpError(reason, hasCookies(settings))
+        done({ ok: false, error: message, errorCode, cookieHint })
         return
       }
       try {
@@ -360,14 +397,25 @@ async function probeWithEngine(resolved: ResolvedUrl, signal?: AbortSignal): Pro
   args.push(resolved.url)
 
   const result = await spawnJson(args, signal, 75_000)
-  if (!result.ok) return { ok: false, error: result.error }
+  if (!result.ok) {
+    return {
+      ok: false,
+      error: result.error,
+      errorCode: result.errorCode,
+      cookieHint: result.cookieHint
+    }
+  }
 
   const raw = result.raw
   const isPlaylist = raw._type === 'playlist'
   const primary = isPlaylist && raw.entries && raw.entries.length ? raw.entries[0] : raw
   const formats = mapFormats(primary.formats)
   if (!formats.length) {
-    return { ok: false, error: 'No downloadable formats were found at this link.' }
+    return {
+      ok: false,
+      error: 'No downloadable formats were found at this link.',
+      errorCode: 'noFormats'
+    }
   }
 
   const info: MediaInfo = {

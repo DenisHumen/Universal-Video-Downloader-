@@ -4,9 +4,27 @@ import { collapse, enter } from '../lib/motion'
 import { ChevronDown } from 'lucide-react'
 import type { AppSettings, DownloadMode, MediaInfo, QualityPreset, VideoFormat } from '@shared/types'
 import { formatBytes } from '../lib/format'
-import { availableHeights, heightLabel, QUALITY_HEIGHTS } from '../lib/quality'
+import {
+  availableHeights,
+  heightLabel,
+  outcomeResolution,
+  QUALITY_HEIGHTS,
+  resolveSelection
+} from '../lib/quality'
 import { useT } from '../i18n'
 import Choice from './Choice'
+
+export interface Selection {
+  mode: DownloadMode
+  quality?: QualityPreset
+  formatId?: string
+  /**
+   * The height this selection resolves to. Worked out here because this is
+   * where the format list is; carried to the queue so a row that says `best`
+   * can also say what "best" turned out to be.
+   */
+  targetHeight?: number
+}
 
 interface Props {
   info: MediaInfo
@@ -15,7 +33,7 @@ interface Props {
   initialMode?: DownloadMode
   initialQuality?: QualityPreset
   onChangeAudioFormat: (fmt: string) => void
-  onSelectionChange: (sel: { mode: DownloadMode; quality?: QualityPreset; formatId?: string }) => void
+  onSelectionChange: (sel: Selection) => void
 }
 
 const AUDIO_FORMATS = ['mp3', 'm4a', 'opus', 'flac', 'wav', 'aac']
@@ -55,20 +73,48 @@ export default function FormatSelector({
         ...QUALITY_HEIGHTS.map((h) => ({ q: String(h) as QualityPreset, label: heightLabel(h) }))
       ]
     }
+    /*
+      "Best" says which one it is.
+
+      A row of buttons reading `best · 4K · 1080p · 720p` is the same row as
+      before plus the one fact the user was actually after: a preset is a
+      promise about a number, and the first one was the only one keeping it a
+      secret. It matters most where the ladder is short — on a video whose
+      best is 480p, a bare `best` reads like an upgrade.
+    */
     return [
-      { q: 'best' as QualityPreset, label: t('common.best') },
+      { q: 'best' as QualityPreset, label: `${t('common.best')} · ${heightLabel(heights[0])}` },
       ...heights
         .slice(0, MAX_PRESETS)
         .map((h) => ({ q: String(h) as QualityPreset, label: heightLabel(h) }))
     ]
   }, [info.formats, t])
 
-  const emit = (next: Partial<{ mode: DownloadMode; quality: QualityPreset; formatId?: string }>): void => {
+  /** What the current choice really resolves to — resolution, container, size. */
+  const outcome = useMemo(
+    () => resolveSelection(info.formats, { mode, quality, formatId }, settings.audioFormat),
+    [info.formats, mode, quality, formatId, settings.audioFormat]
+  )
+
+  const outcomeFacts = [
+    outcomeResolution(outcome),
+    outcome?.dynamicRange,
+    outcome?.ext?.toUpperCase(),
+    outcome?.vcodec,
+    outcome?.bytes ? `≈ ${formatBytes(outcome.bytes)}` : null
+  ].filter(Boolean)
+
+  const emit = (
+    next: Partial<{ mode: DownloadMode; quality: QualityPreset; formatId?: string }>
+  ): void => {
     const m = next.mode ?? mode
+    const q = m === 'audio' ? ('audio' as QualityPreset) : (next.quality ?? quality)
+    const id = m === 'audio' ? undefined : 'formatId' in next ? next.formatId : formatId
     onSelectionChange({
       mode: m,
-      quality: m === 'audio' ? 'audio' : (next.quality ?? quality),
-      formatId: m === 'audio' ? undefined : 'formatId' in next ? next.formatId : formatId
+      quality: q,
+      formatId: id,
+      targetHeight: resolveSelection(info.formats, { mode: m, quality: q, formatId: id })?.height
     })
   }
 
@@ -112,6 +158,14 @@ export default function FormatSelector({
               onChange={(v) => selectPreset(v as QualityPreset)}
               options={availablePresets.map((p) => ({ value: p.q, label: p.label }))}
             />
+            {/* The consequence of the choice above, spelled out: what arrives,
+                in what container, at roughly what size. */}
+            {outcomeFacts.length > 0 && (
+              <p className="mono mt-2 text-[12px] text-ink-2">
+                <span className="text-ink-3">{t('format.youGet')}</span>{' '}
+                {outcomeFacts.join('  ·  ')}
+              </p>
+            )}
           </div>
 
           {videoFormats.length > 1 && (
@@ -182,6 +236,11 @@ export default function FormatSelector({
               label: <span className="uppercase">{fmt}</span>
             }))}
           />
+          {outcomeFacts.length > 0 && (
+            <p className="mono mt-2 text-[12px] text-ink-2">
+              <span className="text-ink-3">{t('format.youGet')}</span> {outcomeFacts.join('  ·  ')}
+            </p>
+          )}
         </div>
       )}
     </div>

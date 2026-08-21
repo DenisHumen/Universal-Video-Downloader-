@@ -3,7 +3,7 @@ import { AnimatePresence } from 'framer-motion'
 import { FolderOpen, Inbox, Pause, Play, Plus, RotateCw, Search, SearchX, Trash2 } from 'lucide-react'
 import type { DownloadItem } from '@shared/types'
 import { useStore } from '../store'
-import { formatBytes, formatSpeed } from '../lib/format'
+import { formatBytes, formatEta, formatSpeed } from '../lib/format'
 import { useT, type TranslationKey } from '../i18n'
 import QueueRow from '../components/QueueRow'
 import Choice from '../components/Choice'
@@ -73,13 +73,23 @@ export default function DownloadsView(): JSX.Element {
     (n, d) => n + Math.max(0, (d.totalBytes || 0) - (d.downloadedBytes || 0)),
     0
   )
+  /*
+    How long the whole queue has left, not just each row.
+
+    The header already knew the bytes still to come and the combined speed, and
+    stopped one division short of the answer to the question people actually
+    open this screen with. Bytes over bytes-per-second, and only while both are
+    real — a figure derived from a stalled transfer is worse than no figure.
+  */
+  const totalEta = totalSpeed > 0 && remainingBytes > 0 ? remainingBytes / totalSpeed : 0
 
   const summary = [
     downloads.length === 1
       ? t('queue.item', { count: 1 })
       : t('queue.items', { count: downloads.length }),
     totalSpeed > 0 ? formatSpeed(totalSpeed) : null,
-    remainingBytes > 0 ? t('queue.remaining', { size: formatBytes(remainingBytes) }) : null
+    remainingBytes > 0 ? t('queue.remaining', { size: formatBytes(remainingBytes) }) : null,
+    totalEta > 0 ? t('queue.etaAll', { time: formatEta(totalEta) }) : null
   ].filter(Boolean)
 
   return (

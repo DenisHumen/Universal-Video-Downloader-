@@ -7,6 +7,7 @@ import type {
   UpdateStatus,
   YtDlpStatus
 } from '@shared/types'
+import { normalizeUrl } from '@shared/urls'
 import type { AppInfo } from '../../preload/index'
 import { applyAppearance } from './lib/theme'
 
@@ -120,8 +121,16 @@ async function runInit(set: SetState, get: GetState): Promise<void> {
   })
   window.api.onDetectStatus((s) => set({ detect: s.stage === 'done' ? null : s }))
   window.api.onClipboardLink((url) => {
-    // Ignore a link that's already in the queue — nothing new to offer.
-    if (get().downloads.some((d) => d.sourceUrl === url || d.url === url)) return
+    /*
+      Ignore a link that's already in the queue — nothing new to offer.
+
+      Compared in canonical form, because that is the form the queue stores. A
+      video copied from a share button and the same video copied from the
+      address bar are different strings and the same download; without this the
+      prompt appeared for something already sitting three rows down.
+    */
+    const link = normalizeUrl(url)
+    if (get().downloads.some((d) => normalizeUrl(d.sourceUrl || d.url) === link)) return
     set({ clipboardLink: url })
   })
   window.api.onNavigate((view) => {

@@ -1,7 +1,7 @@
 import { spawn, type ChildProcess } from 'child_process'
 import { dirname, extname, join } from 'path'
 import { existsSync } from 'fs'
-import type { ConvertTarget, TrimRange } from '@shared/types'
+import type { AppErrorCode, ConvertTarget, TrimRange } from '@shared/types'
 import { groupSpawnOptions, killTree } from './process'
 
 /**
@@ -38,6 +38,15 @@ export interface FfmpegRun {
   done: Promise<{ code: number; stderr: string }>
 }
 
+/** The bundled binary isn't where the package said it would be. */
+export class FfmpegMissingError extends Error {
+  readonly code: AppErrorCode = 'ffmpegMissing'
+  constructor() {
+    super('The bundled ffmpeg binary is missing — reinstall the app.')
+    this.name = 'FfmpegMissingError'
+  }
+}
+
 /**
  * Spawn ffmpeg with machine-readable progress on stdout. `totalSeconds` turns
  * the reported output timestamp into a percentage; without it we still report
@@ -49,7 +58,7 @@ export function runFfmpeg(
 ): FfmpegRun {
   const bin = ffmpegPath()
   if (!bin) {
-    throw new Error('The bundled ffmpeg binary is missing — reinstall the app.')
+    throw new FfmpegMissingError()
   }
   // `-progress`/`-nostats` are global options and must come before the input;
   // after the output filename ffmpeg reads them as options for a second output
@@ -146,26 +155,48 @@ export async function probeDuration(path: string): Promise<number | undefined> {
   return (await probeMedia(path)).duration
 }
 
-/** Turn ffmpeg's internal complaints into something a person can act on. */
-export function humanizeFfmpegError(raw: string): string {
+const FFMPEG_RULES: { re: RegExp; code: AppErrorCode; message: string }[] = [
+  {
+    re: /does not contain any stream/,
+    code: 'noAudioTrack',
+    message:
+      'Nothing to write — the source has no track of the kind this format needs (a silent video can’t become an audio file).'
+  },
+  {
+    re: /no such file or directory|cannot find the (file|path)/,
+    code: 'sourceMissing',
+    message: 'The source file is gone — it may have been moved or deleted.'
+  },
+  {
+    re: /permission denied|access is denied/,
+    code: 'permission',
+    message: 'No permission to write next to the source file.'
+  },
+  {
+    re: /no space left|not enough space/,
+    code: 'diskFull',
+    message: 'Your disk is full — free some space and try again.'
+  },
+  {
+    re: /unknown encoder|encoder not found/,
+    code: 'unknownEncoder',
+    message: 'The bundled ffmpeg can’t encode this format. Pick another one.'
+  },
+  {
+    re: /invalid data found|moov atom not found/,
+    code: 'damagedSource',
+    message: 'The source file looks damaged or incomplete.'
+  }
+]
+
+/**
+ * Turn ffmpeg's internal complaints into something a person can act on — and a
+ * code, so the renderer can say the same thing in the user's own language.
+ */
+export function classifyFfmpegError(raw: string): { code?: AppErrorCode; message: string } {
   const lower = raw.toLowerCase()
-  if (/does not contain any stream/.test(lower)) {
-    return 'Nothing to write — the source has no track of the kind this format needs (a silent video can’t become an audio file).'
-  }
-  if (/no such file or directory|cannot find the (file|path)/.test(lower)) {
-    return 'The source file is gone — it may have been moved or deleted.'
-  }
-  if (/permission denied|access is denied/.test(lower)) {
-    return 'No permission to write next to the source file.'
-  }
-  if (/no space left|not enough space/.test(lower)) {
-    return 'Your disk is full — free some space and try again.'
-  }
-  if (/unknown encoder|encoder not found/.test(lower)) {
-    return 'The bundled ffmpeg can’t encode this format. Pick another one.'
-  }
-  if (/invalid data found|moov atom not found/.test(lower)) {
-    return 'The source file looks damaged or incomplete.'
+  for (const rule of FFMPEG_RULES) {
+    if (rule.re.test(lower)) return { code: rule.code, message: rule.message }
   }
   const line =
     raw
@@ -173,7 +204,11 @@ export function humanizeFfmpegError(raw: string): string {
       .map((l) => l.trim())
       .filter((l) => l && !l.startsWith('['))
       .pop() || raw.trim()
-  return line.slice(0, 300) || 'Conversion failed.'
+  return { message: line.slice(0, 300) || 'Conversion failed.' }
+}
+
+export function humanizeFfmpegError(raw: string): string {
+  return classifyFfmpegError(raw).message
 }
 
 // ---------------------------------------------------------------------------

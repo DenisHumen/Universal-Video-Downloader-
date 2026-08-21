@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import type { DownloadItem } from '@shared/types'
 import { useStore } from '../store'
+import { errorText } from '../lib/errors'
 import { useT } from '../i18n'
 
 /** States worth interrupting someone for. Progress is not one of them. */
@@ -40,7 +41,7 @@ export default function LiveRegion(): JSX.Element {
       fresh.push(
         item.state === 'completed'
           ? t('a11y.downloadFinished', { title: item.title })
-          : t('a11y.downloadFailed', { title: item.title, error: item.error || '' })
+          : t('a11y.downloadFailed', { title: item.title, error: errorText(t, item) })
       )
     }
 

@@ -96,6 +96,37 @@ export interface StreamingInfo {
   qualities: string[]
 }
 
+/**
+ * Why something failed, in a form both processes agree on.
+ *
+ * The main process speaks yt-dlp and ffmpeg; the renderer speaks the user's
+ * language. A code is what crosses between them — the English sentence travels
+ * alongside it as a fallback for failures no rule has learned to recognise.
+ */
+export type AppErrorCode =
+  | 'unavailable'
+  | 'ageRestricted'
+  | 'rateLimited'
+  | 'signIn'
+  | 'forbidden'
+  | 'geo'
+  | 'drm'
+  | 'diskFull'
+  | 'permission'
+  | 'postprocess'
+  | 'noFormats'
+  | 'network'
+  | 'timeout'
+  | 'canceled'
+  | 'sourceMissing'
+  | 'noAudioTrack'
+  | 'damagedSource'
+  | 'unknownEncoder'
+  | 'ffmpegMissing'
+  | 'streamGone'
+  | 'corruptLink'
+  | 'emptyPage'
+
 export type DownloadState =
   | 'queued'
   | 'detecting'
@@ -152,6 +183,18 @@ export interface DownloadRequest {
    * seconds rather than the whole file.
    */
   section?: TrimRange
+  /**
+   * How long the source is, when detection already knew. Used to turn ffmpeg's
+   * output timestamp into a percentage for downloads the engine can only fetch
+   * through ffmpeg (trimmed sections, some live and HLS streams).
+   */
+  duration?: number
+  /**
+   * The video height this request will actually produce, when it can be worked
+   * out up front. `best` is not a resolution — the queue row should be able to
+   * say which one it resolved to.
+   */
+  targetHeight?: number
 }
 
 /** What ffmpeg found inside a local file. */
@@ -228,6 +271,8 @@ export interface DownloadItem {
   mode: DownloadMode
   quality?: QualityPreset
   formatId?: string
+  /** The height this download resolves to, when it was known at queue time. */
+  targetHeight?: number
   state: DownloadState
   percent: number
   speed?: number
@@ -237,6 +282,10 @@ export interface DownloadItem {
   filepath?: string
   outputDir: string
   error?: string
+  /** Machine-readable reason, so the UI can say it in the user's language. */
+  errorCode?: AppErrorCode
+  /** The failure looks like an access gate and cookies aren't set up yet. */
+  cookieHint?: boolean
   referer?: string
   createdAt: number
   finishedAt?: number
@@ -379,6 +428,8 @@ export interface DetectResult {
   ok: boolean
   info?: MediaInfo
   error?: string
+  errorCode?: AppErrorCode
+  cookieHint?: boolean
 }
 
 // ---- Built-in browser ----

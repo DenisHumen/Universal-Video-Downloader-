@@ -46,8 +46,33 @@ const PROBE_SCRIPT = `(() => {
   meta.title = metaContent('meta[property="og:title"]') || meta.title;
   meta.thumbnail = metaContent('meta[property="og:image"]') || undefined;
 
-  const videos = Array.from(document.querySelectorAll('video'));
-  for (const v of videos) {
+  /*
+    Walk shadow roots too.
+    A growing number of players — anything built on a web component, which
+    includes several of the big embeddable ones — keep their <video> inside a
+    shadow tree, where document.querySelectorAll cannot see it. Those pages
+    reported no media element at all and no source to fall back on.
+  */
+  const roots = [document];
+  const seenRoots = new Set();
+  const collect = (root) => {
+    if (!root || seenRoots.has(root)) return [];
+    seenRoots.add(root);
+    let all = [];
+    try { all = Array.from(root.querySelectorAll('*')); } catch (e) { return []; }
+    for (const el of all) {
+      if (el.shadowRoot) roots.push(el.shadowRoot);
+    }
+    return all;
+  };
+
+  const elements = [];
+  for (let i = 0; i < roots.length && i < 40; i++) {
+    elements.push(...collect(roots[i]));
+  }
+
+  const players = elements.filter((el) => el.tagName === 'VIDEO' || el.tagName === 'AUDIO');
+  for (const v of players) {
     try { v.muted = true; v.volume = 0; } catch (e) {}
     if (v.currentSrc) meta.srcs.push(v.currentSrc);
     if (v.getAttribute('src')) meta.srcs.push(v.getAttribute('src'));
@@ -59,22 +84,53 @@ const PROBE_SCRIPT = `(() => {
     try { const p = v.play(); if (p && p.catch) p.catch(() => {}); } catch (e) {}
   }
 
+  /*
+    Sources parked on attributes.
+    Lazy players keep the real URL in a data-* attribute until something asks
+    them to start, and plenty never get that far inside a hidden window.
+  */
+  const DATA_ATTRS = ['data-src', 'data-video', 'data-video-src', 'data-file', 'data-hls',
+    'data-mp4', 'data-url', 'data-stream', 'data-source'];
+  for (const el of elements) {
+    for (const name of DATA_ATTRS) {
+      const value = el.getAttribute && el.getAttribute(name);
+      if (value && /^(https?:|\/\/)/.test(value)) meta.srcs.push(value);
+    }
+  }
+
   const selectors = [
     '.vjs-big-play-button', '.jw-icon-display', '.plyr__control--overlaid',
     '.play-button', '.play-btn', '.player-play', '[data-testid="play-button"]',
     'button[aria-label*="lay"]', 'button[title*="lay"]', '[class*="playButton"]',
-    '[class*="play-overlay"]', '[id*="play_button"]'
+    '[class*="play-overlay"]', '[id*="play_button"]',
+    // Shapes seen on players that the list above walked straight past.
+    '.ytp-large-play-button', '.fp-play', '.mejs__overlay-button', '.vjs-poster',
+    '[class*="PlayButton"]', '[aria-label*="Play"]', '[aria-label*="роизв"]',
+    '[class*="start-button"]', '[class*="bigPlay"]', '[class*="video-overlay"]'
   ];
   let clicked = 0;
-  for (const sel of selectors) {
-    if (clicked >= 5) break;
-    for (const el of document.querySelectorAll(sel)) {
-      if (clicked >= 5) break;
-      try { el.click(); clicked++; } catch (e) {}
+  for (const el of elements) {
+    if (clicked >= 8) break;
+    // Never click a link. A player overlay that happens to sit inside an anchor
+    // would navigate the hidden window away from the page we came to watch.
+    if (el.tagName === 'A' || (el.closest && el.closest('a[href]'))) continue;
+    let match = false;
+    for (const sel of selectors) {
+      try { if (el.matches(sel)) { match = true; break } } catch (e) {}
     }
+    if (!match) continue;
+    try { el.click(); clicked++; } catch (e) {}
   }
   return meta;
 })()`
+
+/**
+ * How long to keep listening after the first manifest turns up.
+ *
+ * Long enough for the player's follow-up requests (the master, then the variant
+ * it chose) to arrive, short enough that it is not felt.
+ */
+const MANIFEST_GRACE_MS = 1200
 
 /** Sniffs are serialised: one hidden window at a time is plenty. */
 let queue: Promise<unknown> = Promise.resolve()
@@ -104,10 +160,25 @@ async function sniffOnce(
   let deadlineTimer: NodeJS.Timeout | null = null
   let onAbort: (() => void) | null = null
 
+  /*
+    A manifest is as good as it gets — but not necessarily the *first* one.
+
+    Players routinely fetch the master playlist and then immediately fetch the
+    variant they picked for the current window size, and both are manifests. We
+    used to stop on whichever arrived first, which on a fast connection was
+    often the variant — so an unknown site quietly downloaded at 480p while a
+    master listing 1080p had gone past a fraction of a second earlier.
+
+    So the first manifest starts a short grace period instead of ending the
+    wait. Ranking then does its job: `master.m3u8` and `playlist.m3u8` carry a
+    bonus over a bare variant path.
+  */
+  let graceTimer: NodeJS.Timeout | null = null
   const detach = attachCapture(browsingSession(), (candidate) => {
     found.push(candidate)
-    // A manifest is as good as it gets — stop waiting.
-    if (candidate.score >= 100 && resolveEarly) resolveEarly()
+    if (candidate.score >= 100 && !graceTimer) {
+      graceTimer = setTimeout(() => resolveEarly?.(), MANIFEST_GRACE_MS)
+    }
   })
 
   let win: BrowserWindow | null = null
@@ -115,6 +186,7 @@ async function sniffOnce(
 
   const cleanup = (): void => {
     detach()
+    if (graceTimer) clearTimeout(graceTimer)
     if (deadlineTimer) clearTimeout(deadlineTimer)
     if (onAbort) signal?.removeEventListener('abort', onAbort)
     if (win && !win.isDestroyed()) win.destroy()
@@ -166,7 +238,9 @@ async function sniffOnce(
     // Give players a few nudges: some only attach after their own scripts run.
     for (let attempt = 0; attempt < 4; attempt++) {
       if (signal?.aborted) return null
-      if (found.some((c) => c.score >= 100)) break
+      // Same rule as above: a manifest is not a reason to stop *immediately*,
+      // only a reason to stop soon. `deadline` already carries the grace timer.
+      if (graceTimer) break
       const probed = await runProbe(win)
       if (probed) {
         meta = {
@@ -179,7 +253,15 @@ async function sniffOnce(
       await Promise.race([wait(attempt === 0 ? 1500 : 3500), deadline])
     }
 
-    await Promise.race([wait(600), deadline])
+    /*
+      Let the grace period finish before ranking.
+
+      `deadline` is resolved by the grace timer, so racing it against a wait at
+      least as long means we settle the moment the window closes — and never
+      before it, which would have thrown away the very follow-up requests the
+      grace period exists to collect.
+    */
+    await Promise.race([wait(graceTimer ? MANIFEST_GRACE_MS : 600), deadline])
     if (signal?.aborted) return null
 
     for (const src of meta.srcs) {

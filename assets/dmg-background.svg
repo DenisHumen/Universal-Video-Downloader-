@@ -1,0 +1,62 @@
+<!--
+  The macOS install window.
+
+  Unsigned builds are quarantined by Gatekeeper, and on recent macOS that shows
+  up as "the app is damaged and can't be opened" — a sentence that sounds like a
+  corrupted download and sends people back to the Releases page to try again.
+  The fix is one command, and the only moment we are guaranteed to have the
+  user's attention is this window: it opens by itself, before the app has ever
+  been launched, which is exactly the point at which the in-app notice cannot
+  help because the app cannot start.
+
+  So the instructions live on the background of the drag-to-install window, and
+  the layout leaves the top two thirds clear for the two icons Finder draws.
+-->
+<svg width="660" height="520" viewBox="0 0 660 520" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="canvas" x1="0" y1="0" x2="0" y2="520" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#141417" />
+      <stop offset="1" stop-color="#09090b" />
+    </linearGradient>
+  </defs>
+
+  <rect width="660" height="520" fill="url(#canvas)" />
+
+  <!-- Identity, quiet and at the top so the icons below own the middle. -->
+  <text x="330" y="52" text-anchor="middle" fill="#f4f4f5"
+    font-family="Inter, -apple-system, BlinkMacSystemFont, Helvetica, Arial, sans-serif"
+    font-size="19" font-weight="600" letter-spacing="-0.3">Universal Video Downloader</text>
+
+  <!-- The one instruction the window exists for. -->
+  <text x="330" y="80" text-anchor="middle" fill="#a8a8b2"
+    font-family="Inter, -apple-system, BlinkMacSystemFont, Helvetica, Arial, sans-serif"
+    font-size="13">Drag the app onto Applications</text>
+
+  <!-- The arrow between the two icon slots Finder places at y≈230. -->
+  <path d="M296 232 H364" stroke="#3f3f46" stroke-width="2" stroke-linecap="round" />
+  <path d="M356 224 L366 232 L356 240" stroke="#3f3f46" stroke-width="2" stroke-linecap="round"
+    stroke-linejoin="round" fill="none" />
+
+  <!-- Below the fold of the icons: what to do when macOS calls it damaged. -->
+  <rect x="40" y="342" width="580" height="1" fill="#27272c" />
+
+  <text x="40" y="378" fill="#facc15"
+    font-family="Inter, -apple-system, BlinkMacSystemFont, Helvetica, Arial, sans-serif"
+    font-size="12" font-weight="600">macOS says it is “damaged”?</text>
+
+  <text x="40" y="400" fill="#a8a8b2"
+    font-family="Inter, -apple-system, BlinkMacSystemFont, Helvetica, Arial, sans-serif"
+    font-size="12">It isn’t. The build is unsigned, so Gatekeeper quarantines it.</text>
+  <text x="40" y="418" fill="#a8a8b2"
+    font-family="Inter, -apple-system, BlinkMacSystemFont, Helvetica, Arial, sans-serif"
+    font-size="12">Copy the app across first, then run this once in Terminal:</text>
+
+  <rect x="40" y="432" width="580" height="40" rx="8" fill="#1c1c20" stroke="#27272c" />
+  <text x="56" y="457" fill="#f4f4f5"
+    font-family="JetBrains Mono, SFMono-Regular, Menlo, Consolas, monospace"
+    font-size="11.5">xattr -dr com.apple.quarantine "/Applications/Universal Video Downloader.app"</text>
+
+  <text x="330" y="494" text-anchor="middle" fill="#65656e"
+    font-family="Inter, -apple-system, BlinkMacSystemFont, Helvetica, Arial, sans-serif"
+    font-size="11">Or: right-click the app in Applications → Open → Open.</text>
+</svg>

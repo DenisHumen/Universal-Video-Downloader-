@@ -1,6 +1,6 @@
 {
   "name": "universal-video-downloader",
-  "version": "3.8.0",
+  "version": "3.9.0",
   "description": "Universal Video Downloader — a beautiful, cross-platform desktop app that detects and downloads video streams from almost any website.",
   "author": {
     "name": "Denis Humen",
@@ -16,6 +16,7 @@
   "scripts": {
     "dev": "electron-vite dev",
     "start": "electron-vite preview",
+    "preview": "vite --config vite.preview.config.ts",
     "build": "electron-vite build",
     "typecheck:node": "tsc --noEmit -p tsconfig.node.json --composite false",
     "typecheck:web": "tsc --noEmit -p tsconfig.web.json --composite false",
@@ -23,6 +24,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "check:contrast": "node scripts/check-contrast.mjs",
+    "shots": "electron scripts/capture-screenshots.mjs",
     "make:icons": "node scripts/generate-icons.mjs",
     "pack": "npm run build && electron-builder --dir",
     "dist": "npm run build && electron-builder",

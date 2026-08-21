@@ -25,6 +25,7 @@ export function availableHeights(formats: VideoFormat[]): number[] {
 
 /** `2160` reads better as "4K"; everything else is just its height. */
 export function heightLabel(height: number): string {
+  if (height >= 4320) return '8K'
   if (height >= 2160) return '4K'
   return `${height}p`
 }
@@ -61,4 +62,117 @@ export function initialQuality(
 
 export function initialMode(settings: AppSettings | null): DownloadMode {
   return settings?.defaultMode === 'audio' ? 'audio' : 'video'
+}
+
+// ---------------------------------------------------------------------------
+// What "best" actually means for this video
+// ---------------------------------------------------------------------------
+
+/**
+ * What the current choice will really produce.
+ *
+ * "Best" is a promise, not a resolution, and the app used to leave it at that:
+ * a button reading `best` and a queue row reading `best`, with no way to find
+ * out whether that meant 4K or 360p short of opening the exact-stream list and
+ * working out which line the engine would pick. This works it out instead —
+ * with the same rules the engine uses, so what the card says is what arrives.
+ */
+export interface SelectionOutcome {
+  height?: number
+  fps?: number
+  /** Container the download lands in. */
+  ext?: string
+  /** Estimated size, counting the audio stream when it is fetched separately. */
+  bytes?: number
+  /** Codec family, e.g. `avc1` or `vp9`. */
+  vcodec?: string
+  /** `HDR`, `DV`… when the format advertises one. */
+  dynamicRange?: string
+}
+
+function sizeOf(f: VideoFormat | undefined): number | undefined {
+  return f?.filesize ?? f?.filesizeApprox
+}
+
+function videoFormats(formats: VideoFormat[]): VideoFormat[] {
+  return formats.filter((f) => f.kind === 'video' || f.kind === 'video+audio')
+}
+
+/** The audio stream the engine would merge in, i.e. the fattest one. */
+function bestAudio(formats: VideoFormat[]): VideoFormat | undefined {
+  return formats
+    .filter((f) => f.kind === 'audio')
+    .sort((a, b) => (b.abr || b.tbr || 0) - (a.abr || a.tbr || 0))[0]
+}
+
+/**
+ * Rank video streams the way `bv*` does: tallest first, then by bitrate, and
+ * — everything else equal — prefer the one that already carries its audio,
+ * because that is one fewer stream to fetch and merge.
+ */
+function byQuality(a: VideoFormat, b: VideoFormat): number {
+  if ((b.height || 0) !== (a.height || 0)) return (b.height || 0) - (a.height || 0)
+  if ((b.fps || 0) !== (a.fps || 0)) return (b.fps || 0) - (a.fps || 0)
+  const bitrate = (f: VideoFormat): number => f.tbr || f.vbr || 0
+  if (bitrate(b) !== bitrate(a)) return bitrate(b) - bitrate(a)
+  return (b.kind === 'video+audio' ? 1 : 0) - (a.kind === 'video+audio' ? 1 : 0)
+}
+
+/**
+ * The stream this selection resolves to, mirroring the format expression the
+ * download builds: an explicit id wins, then a height cap, then "best".
+ *
+ * A cap of 720 on a video that only offers 1080 and 360 resolves to 360 —
+ * `height<=?720` is what the engine asks for — and a cap above everything on
+ * offer falls back to the best there is, which is why it never errors out.
+ */
+export function resolveSelection(
+  formats: VideoFormat[],
+  selection: { mode: DownloadMode; quality?: QualityPreset; formatId?: string },
+  audioFormat?: string
+): SelectionOutcome | null {
+  if (!formats.length) return null
+
+  if (selection.mode === 'audio') {
+    const audio = bestAudio(formats)
+    return { ext: audioFormat, bytes: sizeOf(audio) }
+  }
+
+  const videos = videoFormats(formats)
+  if (!videos.length) return null
+  const audio = bestAudio(formats)
+
+  let chosen: VideoFormat | undefined
+  if (selection.formatId) {
+    chosen = formats.find((f) => f.id === selection.formatId)
+  } else {
+    const cap = Number(selection.quality)
+    const ranked = [...videos].sort(byQuality)
+    chosen = Number.isFinite(cap) && cap > 0 ? ranked.find((f) => (f.height ?? 0) <= cap) : undefined
+    // No explicit cap, or nothing at or under it — the engine takes the best.
+    chosen = chosen ?? ranked[0]
+  }
+  if (!chosen) return null
+
+  const videoBytes = sizeOf(chosen)
+  const audioBytes = chosen.kind === 'video' ? sizeOf(audio) : undefined
+  return {
+    height: chosen.height,
+    fps: chosen.fps,
+    // A merged download is remuxed to mp4; a single stream keeps its container.
+    ext: chosen.kind === 'video' && audio ? 'mp4' : chosen.ext,
+    bytes: videoBytes != null ? videoBytes + (audioBytes ?? 0) : undefined,
+    vcodec: chosen.vcodec?.split('.')[0],
+    dynamicRange:
+      chosen.dynamicRange && chosen.dynamicRange.toUpperCase() !== 'SDR'
+        ? chosen.dynamicRange
+        : undefined
+  }
+}
+
+/** `1080p60`, `4K`, or nothing when the site never said. */
+export function outcomeResolution(outcome: SelectionOutcome | null): string | null {
+  if (!outcome?.height) return null
+  const fps = outcome.fps && outcome.fps > 30 ? Math.round(outcome.fps) : ''
+  return `${heightLabel(outcome.height)}${fps}`
 }

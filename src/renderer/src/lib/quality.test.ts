@@ -1,6 +1,14 @@
 import { describe, expect, it } from 'vitest'
 import type { AppSettings, VideoFormat } from '@shared/types'
-import { availableHeights, heightLabel, initialMode, initialQuality, maxHeightOf } from './quality'
+import {
+  availableHeights,
+  heightLabel,
+  initialMode,
+  initialQuality,
+  maxHeightOf,
+  outcomeResolution,
+  resolveSelection
+} from './quality'
 
 function settings(overrides: Partial<AppSettings> = {}): AppSettings {
   return { defaultMode: 'video', defaultQuality: 'best', ...overrides } as AppSettings
@@ -93,5 +101,80 @@ describe('initialMode', () => {
     expect(initialMode(settings({ defaultMode: 'audio' }))).toBe('audio')
     expect(initialMode(settings({ defaultMode: 'video' }))).toBe('video')
     expect(initialMode(null)).toBe('video')
+  })
+})
+
+describe('resolveSelection', () => {
+  const formats: VideoFormat[] = [
+    { id: '313', ext: 'webm', kind: 'video', resolution: '2160p', height: 2160, fps: 30, vcodec: 'vp9.2', filesize: 900_000_000, dynamicRange: 'HDR' },
+    { id: '299', ext: 'mp4', kind: 'video', resolution: '1080p60', height: 1080, fps: 60, vcodec: 'avc1.64002a', filesize: 300_000_000 },
+    { id: '22', ext: 'mp4', kind: 'video+audio', resolution: '720p', height: 720, fps: 30, vcodec: 'avc1', acodec: 'mp4a', filesize: 100_000_000 },
+    { id: '18', ext: 'mp4', kind: 'video+audio', resolution: '360p', height: 360, fps: 30, vcodec: 'avc1', acodec: 'mp4a', filesize: 20_000_000 },
+    { id: '140', ext: 'm4a', kind: 'audio', resolution: 'audio', acodec: 'mp4a', abr: 128, filesize: 6_000_000 }
+  ]
+
+  it('resolves "best" to the tallest stream, so the UI can name it', () => {
+    const out = resolveSelection(formats, { mode: 'video', quality: 'best' })
+    expect(out?.height).toBe(2160)
+    expect(out?.dynamicRange).toBe('HDR')
+  })
+
+  it('adds the audio stream a video-only format will be merged with', () => {
+    const out = resolveSelection(formats, { mode: 'video', quality: 'best' })
+    expect(out?.bytes).toBe(906_000_000)
+    // A merged download is remuxed to mp4 whatever the video stream was.
+    expect(out?.ext).toBe('mp4')
+  })
+
+  it('leaves a self-contained stream alone', () => {
+    const out = resolveSelection(formats, { mode: 'video', quality: '720' })
+    expect(out?.height).toBe(720)
+    expect(out?.bytes).toBe(100_000_000)
+  })
+
+  it('honours a cap the way the engine does — at or under, never above', () => {
+    expect(resolveSelection(formats, { mode: 'video', quality: '1080' })?.height).toBe(1080)
+    expect(resolveSelection(formats, { mode: 'video', quality: '480' })?.height).toBe(360)
+  })
+
+  it('falls back to the best available when the cap is under everything', () => {
+    const tall: VideoFormat[] = [
+      { id: 'a', ext: 'mp4', kind: 'video+audio', resolution: '1080p', height: 1080 }
+    ]
+    expect(resolveSelection(tall, { mode: 'video', quality: '360' })?.height).toBe(1080)
+  })
+
+  it('follows an explicit stream choice over the preset', () => {
+    const out = resolveSelection(formats, { mode: 'video', quality: 'best', formatId: '18' })
+    expect(out?.height).toBe(360)
+  })
+
+  it('describes an audio download by its container, not a resolution', () => {
+    const out = resolveSelection(formats, { mode: 'audio' }, 'mp3')
+    expect(out?.height).toBeUndefined()
+    expect(out?.ext).toBe('mp3')
+    expect(out?.bytes).toBe(6_000_000)
+  })
+
+  it('says nothing rather than guessing when the site reported no formats', () => {
+    expect(resolveSelection([], { mode: 'video', quality: 'best' })).toBeNull()
+  })
+
+  it('prefers higher fps at the same height', () => {
+    const sameHeight: VideoFormat[] = [
+      { id: 'a', ext: 'mp4', kind: 'video+audio', resolution: '1080p', height: 1080, fps: 30 },
+      { id: 'b', ext: 'mp4', kind: 'video+audio', resolution: '1080p60', height: 1080, fps: 60 }
+    ]
+    expect(resolveSelection(sameHeight, { mode: 'video', quality: 'best' })?.fps).toBe(60)
+  })
+})
+
+describe('outcomeResolution', () => {
+  it('marks a high frame rate and leaves an ordinary one alone', () => {
+    expect(outcomeResolution({ height: 1080, fps: 60 })).toBe('1080p60')
+    expect(outcomeResolution({ height: 1080, fps: 30 })).toBe('1080p')
+    expect(outcomeResolution({ height: 2160 })).toBe('4K')
+    expect(outcomeResolution({})).toBeNull()
+    expect(outcomeResolution(null)).toBeNull()
   })
 })

@@ -9,25 +9,33 @@ import {
   Globe,
   Layers,
   Loader2,
+  RotateCw,
   Scissors,
   Search,
   X
 } from 'lucide-react'
 import {
   hasTrim,
+  type AppErrorCode,
   type DetectStage,
-  type DownloadMode,
   type MediaInfo,
-  type QualityPreset,
   type TrimRange
 } from '@shared/types'
+import { needsCookiesOften } from '@shared/urls'
 import { useStore } from '../store'
+import { errorText } from '../lib/errors'
 import { formatCount, formatDuration, isProbablyUrl } from '../lib/format'
-import { availableHeights, initialMode, initialQuality, maxHeightOf } from '../lib/quality'
+import {
+  availableHeights,
+  initialMode,
+  initialQuality,
+  maxHeightOf,
+  resolveSelection
+} from '../lib/quality'
 import { queueDownload, queueDownloads } from '../lib/queue'
 import { toClock } from '../lib/time'
 import { useT, type TranslationKey } from '../i18n'
-import FormatSelector from '../components/FormatSelector'
+import FormatSelector, { type Selection } from '../components/FormatSelector'
 import PlaylistCard from '../components/PlaylistCard'
 import StreamingCard from '../components/StreamingCard'
 import TrimEditor from '../components/TrimEditor'
@@ -35,12 +43,6 @@ import CapabilitiesPanel from '../components/CapabilitiesPanel'
 import Thumbnail from '../components/Thumbnail'
 
 type Status = 'idle' | 'detecting' | 'error'
-
-interface Selection {
-  mode: DownloadMode
-  quality?: QualityPreset
-  formatId?: string
-}
 
 const STAGE_LABEL: Record<DetectStage, TranslationKey> = {
   idle: 'detect.resolving',
@@ -72,6 +74,8 @@ export default function HomeView(): JSX.Element {
   const [status, setStatus] = useState<Status>('idle')
   const [info, setInfo] = useState<MediaInfo | null>(null)
   const [error, setError] = useState('')
+  const [errorCode, setErrorCode] = useState<AppErrorCode | undefined>()
+  const [cookieHint, setCookieHint] = useState(false)
   const [selection, setSelection] = useState<Selection>({ mode: 'video', quality: 'best' })
   const [starting, setStarting] = useState(false)
   const [batchOpen, setBatchOpen] = useState(false)
@@ -87,6 +91,7 @@ export default function HomeView(): JSX.Element {
   const [saveDir, setSaveDir] = useState('')
   const inputRef = useRef<HTMLInputElement>(null)
   const resultRef = useRef<HTMLDivElement>(null)
+  const scrollRef = useRef<HTMLDivElement>(null)
   const requestRef = useRef<string | null>(null)
 
   /*
@@ -104,7 +109,25 @@ export default function HomeView(): JSX.Element {
     reachable is not something to leave to the compositor.
   */
   useEffect(() => {
-    if (info) resultRef.current?.scrollIntoView({ block: 'start' })
+    if (!info) return
+    const result = resultRef.current
+    const host = scrollRef.current
+    if (!result || !host) return
+    /*
+      Scroll by the smallest amount that brings the whole card — and with it the
+      download button — into view.
+
+      `scrollIntoView({ block: 'start' })` always pinned the card to the very
+      top, which on a window just tall enough to hold it sliced the URL field in
+      half against the chrome: a control cut through the middle reads as a
+      rendering fault, not as a scroll position. Aligning to the card's *bottom*
+      instead, clamped so we never scroll past its top, keeps everything above
+      it whole whenever there is room and degrades to the old behaviour only
+      when the card genuinely doesn't fit.
+    */
+    const top = result.offsetTop
+    const bottom = top + result.offsetHeight
+    host.scrollTop = Math.max(0, Math.min(top, bottom - host.clientHeight))
   }, [info])
 
   useEffect(() => {
@@ -128,6 +151,8 @@ export default function HomeView(): JSX.Element {
     requestRef.current = requestId
     setStatus('detecting')
     setError('')
+    setErrorCode(undefined)
+    setCookieHint(false)
     setInfo(null)
     const res = await window.api.detect(target, requestId)
     if (requestRef.current !== requestId) return
@@ -136,15 +161,20 @@ export default function HomeView(): JSX.Element {
       setInfo(res.info)
       // Preselect the user's defaults, falling back to automatic "best" when
       // their default quality isn't available for this particular video.
+      const mode = initialMode(settings)
+      const quality = initialQuality(settings, availableHeights(res.info.formats))
       setSelection({
-        mode: initialMode(settings),
-        quality: initialQuality(settings, availableHeights(res.info.formats))
+        mode,
+        quality,
+        targetHeight: resolveSelection(res.info.formats, { mode, quality })?.height
       })
       setTrimOpen(false)
       setSection({ start: 0 })
       setStatus('idle')
     } else {
       setError(res.error || t('home.errorTitle'))
+      setErrorCode(res.errorCode)
+      setCookieHint(Boolean(res.cookieHint) || needsCookiesOften(target))
       setStatus('error')
     }
   }
@@ -158,6 +188,8 @@ export default function HomeView(): JSX.Element {
   const reset = (): void => {
     setInfo(null)
     setError('')
+    setErrorCode(undefined)
+    setCookieHint(false)
     setStatus('idle')
     setUrl('')
   }
@@ -230,6 +262,12 @@ export default function HomeView(): JSX.Element {
         mode: selection.mode,
         quality: selection.quality,
         formatId: selection.formatId,
+        // Both travel with the request so the queue can be honest about a job
+        // it hasn't started yet: what resolution `best` came out as, and how
+        // long the source is — which is what turns a trimmed download's
+        // progress into a percentage rather than a spinner.
+        targetHeight: selection.targetHeight,
+        duration: info.duration,
         outputDir: saveDir || undefined,
         section: trimOpen && hasTrim(section) ? section : undefined
       })
@@ -278,7 +316,7 @@ export default function HomeView(): JSX.Element {
   const busy = status === 'detecting'
 
   return (
-    <div className="h-full overflow-y-auto">
+    <div className="h-full overflow-y-auto" ref={scrollRef}>
       <div className="mx-auto flex w-full max-w-[680px] flex-col px-6 pb-16 pt-14">
       {/* The focal control. Everything on this screen is downstream of it. */}
       <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={enter}>
@@ -316,6 +354,7 @@ export default function HomeView(): JSX.Element {
           </button>
           <button
             className="btn-solid px-5"
+            data-uvd="detect"
             onClick={() => detect()}
             disabled={!url.trim() || busy}
           >
@@ -407,9 +446,20 @@ export default function HomeView(): JSX.Element {
                 <p className="h2">{t('home.errorTitle')}</p>
               </div>
               <div className="p-4">
-                <p className="mono selectable break-words text-[13px] leading-relaxed text-ink-2">
-                  {error}
+                <p className="selectable break-words text-[13px] leading-relaxed text-ink">
+                  {errorText(t, { error, errorCode, cookieHint })}
                 </p>
+                {/*
+                  The engine's own words, kept but demoted. The sentence above
+                  is what the user can act on; this is what they paste into a
+                  bug report — and when the two are the same, printing it twice
+                  is just noise.
+                */}
+                {error && errorCode && (
+                  <p className="mono selectable mt-2 break-words text-[12px] leading-relaxed text-ink-3">
+                    {error}
+                  </p>
+                )}
                 <div className="mt-4 flex flex-wrap items-center gap-2">
                   {/* The honest escape hatch: let the user find it by hand. */}
                   <button
@@ -418,11 +468,14 @@ export default function HomeView(): JSX.Element {
                   >
                     <Globe size={14} /> {t('browser.open')}
                   </button>
-                  {/Settings|настрой/i.test(error) && (
+                  {cookieHint && (
                     <button className="btn-quiet" onClick={() => setView('settings')}>
                       {t('home.openAccessSettings')}
                     </button>
                   )}
+                  <button className="btn-quiet" onClick={() => void detect()}>
+                    <RotateCw size={14} /> {t('common.retry')}
+                  </button>
                 </div>
                 <p className="hint mt-3">{t('browser.openHint')}</p>
               </div>

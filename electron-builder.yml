@@ -56,8 +56,33 @@ mac:
     NSCameraUsageDescription: This app does not use the camera.
     NSMicrophoneUsageDescription: This app does not use the microphone.
 
+# The install window.
+#
+# Gatekeeper quarantines unsigned builds and tells the user the app is
+# "damaged", which reads like a broken download rather than a policy — so the
+# one command that clears it is printed on the window's own background. This is
+# the only moment we are sure to be read: it opens by itself, before the app has
+# ever run, which is exactly when the notice inside the app cannot help.
+#
+# `window` must match the size the background is rendered at in
+# scripts/generate-icons.mjs, and the icon positions have to stay inside the
+# band the artwork leaves clear for them.
 dmg:
   artifactName: ${productName}-${version}-mac-${arch}.${ext}
+  background: build/background.png
+  window:
+    width: 660
+    height: 520
+  iconSize: 118
+  iconTextSize: 13
+  contents:
+    - x: 190
+      y: 232
+      type: file
+    - x: 470
+      y: 232
+      type: link
+      path: /Applications
 
 linux:
   artifactName: ${productName}-${version}-linux-${arch}.${ext}

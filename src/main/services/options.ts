@@ -1,4 +1,4 @@
-import type { AppSettings } from '@shared/types'
+import type { AppErrorCode, AppSettings } from '@shared/types'
 
 /**
  * Engine arguments that control how restricted sites are accessed: proxy and
@@ -35,11 +35,107 @@ export function hasCookies(settings: AppSettings): boolean {
 }
 
 /**
- * Turn a raw yt-dlp error into a short, actionable message. When the failure
- * looks like an access gate and cookies aren't configured, we nudge the user
- * toward enabling them.
+ * What went wrong, as a code the renderer can translate plus the English
+ * sentence to fall back on.
+ *
+ * The message used to be the only output, which meant every failure reached a
+ * Russian-speaking user in English — the app is fully translated right up to
+ * the moment something breaks, which is exactly when wording matters most. The
+ * code carries the meaning across the IPC boundary; the message stays for the
+ * log, the clipboard, and anything this table hasn't learned to recognise yet.
  */
-export function humanizeYtdlpError(raw: string, cookiesEnabled: boolean): string {
+export interface ClassifiedError {
+  code?: AppErrorCode
+  /** English fallback, always present. */
+  message: string
+  /** The failure looks like an access gate and no cookies are configured. */
+  cookieHint: boolean
+}
+
+interface Rule {
+  re: RegExp
+  code: AppErrorCode
+  message: string
+  /** Suggest cookies when they aren't configured yet. */
+  cookies?: boolean
+}
+
+const RULES: Rule[] = [
+  {
+    re: /\b410\b|http error 404|\bgone\b|\b404\b|has been removed|video.*deleted|not found/,
+    code: 'unavailable',
+    message:
+      'This video is unavailable — it may have been removed, made private, or the site is blocking access from your region.',
+    cookies: true
+  },
+  {
+    re: /age|verify your age|18 u\.s\.c|age-?restricted|sensitive content/,
+    code: 'ageRestricted',
+    message: 'This content is age-restricted.',
+    cookies: true
+  },
+  {
+    re: /\b429\b|too many requests|rate.?limit/,
+    code: 'rateLimited',
+    message:
+      'The site is rate-limiting us. Wait a minute and retry, or set a proxy in Settings → Network.'
+  },
+  {
+    re: /sign in|log ?in|logged in|private video|members? only|requires authentication|account/,
+    code: 'signIn',
+    message: 'This video requires you to be signed in.',
+    cookies: true
+  },
+  {
+    re: /\b40[13]\b|forbidden/,
+    code: 'forbidden',
+    message: 'The site refused the request.',
+    cookies: true
+  },
+  {
+    re: /geo|not available in your country|region|blocked in your/,
+    code: 'geo',
+    message: 'This video is not available in your region.'
+  },
+  {
+    re: /\bdrm\b|widevine|fairplay|playready/,
+    code: 'drm',
+    message: 'This video is DRM-protected and cannot be downloaded.'
+  },
+  {
+    re: /no space left|enospc|disk full/,
+    code: 'diskFull',
+    message: 'Your disk is full — free some space and try again.'
+  },
+  {
+    re: /permission denied|eacces|eperm/,
+    code: 'permission',
+    message: 'No permission to write to the download folder. Pick another one in Settings.'
+  },
+  {
+    re: /ffmpeg|postprocessing|conversion failed/,
+    code: 'postprocess',
+    message: 'Post-processing failed — the video downloaded but could not be merged or converted.'
+  },
+  {
+    re: /unsupported url|no video formats|unable to extract|nothing to download/,
+    code: 'noFormats',
+    message: 'Could not find a downloadable video at this link.',
+    cookies: true
+  },
+  {
+    re: /timed out|timeout/,
+    code: 'timeout',
+    message: 'The site took too long to answer. Check your connection or proxy and try again.'
+  },
+  {
+    re: /connection|network|resolve host|unreachable/,
+    code: 'network',
+    message: 'Network problem reaching the site. Check your connection or proxy and try again.'
+  }
+]
+
+export function classifyYtdlpError(raw: string, cookiesEnabled: boolean): ClassifiedError {
   const line =
     raw
       .split('\n')
@@ -47,45 +143,28 @@ export function humanizeYtdlpError(raw: string, cookiesEnabled: boolean): string
       .filter(Boolean)
       .pop() || raw.trim()
   const lower = line.toLowerCase()
-  const cookieHint = cookiesEnabled ? '' : ' Try enabling browser cookies in Settings → Access.'
 
-  if (/\b410\b|http error 404|\bgone\b|\b404\b|has been removed|video.*deleted|not found/.test(lower)) {
-    return `This video is unavailable — it may have been removed, made private, or the site is blocking access from your region.${cookieHint}`
+  for (const rule of RULES) {
+    if (!rule.re.test(lower)) continue
+    const cookieHint = Boolean(rule.cookies) && !cookiesEnabled
+    return {
+      code: rule.code,
+      message: cookieHint
+        ? `${rule.message} Try enabling browser cookies in Settings → Access.`
+        : rule.message,
+      cookieHint
+    }
   }
-  if (/age|verify your age|18 u\.s\.c|age-?restricted|sensitive content/.test(lower)) {
-    return `This content is age-restricted.${cookieHint}`
-  }
-  if (/\b429\b|too many requests|rate.?limit/.test(lower)) {
-    return 'The site is rate-limiting us. Wait a minute and retry, or set a proxy in Settings → Network.'
-  }
-  if (/sign in|log ?in|logged in|private video|members? only|requires authentication|account/.test(lower)) {
-    return `This video requires you to be signed in.${cookieHint}`
-  }
-  if (/\b40[13]\b|forbidden/.test(lower)) {
-    return `The site refused the request.${cookieHint}`
-  }
-  if (/geo|not available in your country|region|blocked in your/.test(lower)) {
-    return 'This video is not available in your region.'
-  }
-  if (/\bdrm\b|widevine|fairplay|playready/.test(lower)) {
-    return 'This video is DRM-protected and cannot be downloaded.'
-  }
-  if (/no space left|enospc|disk full/.test(lower)) {
-    return 'Your disk is full — free some space and try again.'
-  }
-  if (/permission denied|eacces|eperm/.test(lower)) {
-    return 'No permission to write to the download folder. Pick another one in Settings.'
-  }
-  if (/ffmpeg|postprocessing|conversion failed/.test(lower)) {
-    return 'Post-processing failed — the video downloaded but could not be merged or converted.'
-  }
-  if (/unsupported url|no video formats|unable to extract|nothing to download/.test(lower)) {
-    return `Could not find a downloadable video at this link.${cookieHint}`
-  }
-  if (/timed out|timeout|connection|network|resolve host|unreachable/.test(lower)) {
-    return 'Network problem reaching the site. Check your connection or proxy and try again.'
-  }
-  return line.replace(/^ERROR:\s*/i, '')
+  return { message: line.replace(/^ERROR:\s*/i, ''), cookieHint: false }
+}
+
+/**
+ * Turn a raw yt-dlp error into a short, actionable message. When the failure
+ * looks like an access gate and cookies aren't configured, we nudge the user
+ * toward enabling them.
+ */
+export function humanizeYtdlpError(raw: string, cookiesEnabled: boolean): string {
+  return classifyYtdlpError(raw, cookiesEnabled).message
 }
 
 /** Transient failures worth retrying automatically before bothering the user. */

@@ -3,6 +3,7 @@ import { rezkaResolvers, resolveRezkaStream } from './sites/rezka'
 import { yummyaniResolvers, resolveYummyaniItem, resolveYummyaniStream } from './sites/yummyani'
 import { resolveSniffUrl, SNIFF_SCHEME } from './universal'
 import { DIRECT_SCHEME, resolveDirectUrl } from './universal/direct'
+import { normalizeUrl } from '@shared/urls'
 import type { ResolvedUrl, SiteResolver } from './types'
 
 export type { ResolvedEntry, ResolvedUrl, SiteResolver } from './types'
@@ -47,11 +48,16 @@ export function isInternalUrl(input: string): boolean {
  * can have a go at it.
  */
 export async function resolveUrl(input: string): Promise<ResolvedUrl> {
-  const trimmed = input.trim()
+  const raw = input.trim()
 
   for (const scheme of internalSchemes) {
-    if (trimmed.startsWith(scheme.prefix)) return scheme.resolve(trimmed)
+    if (raw.startsWith(scheme.prefix)) return scheme.resolve(raw)
   }
+
+  // Callers normalise before queueing, but history written by an older build
+  // has not been through it — and a share link with a stale tracking parameter
+  // is one the engine may well refuse.
+  const trimmed = normalizeUrl(raw)
 
   for (const r of resolvers) {
     if (!r.match.test(trimmed)) continue
@@ -71,5 +77,5 @@ export async function resolveUrl(input: string): Promise<ResolvedUrl> {
 
 /** Whether a URL is handled by a hand-written resolver. */
 export function hasResolver(input: string): boolean {
-  return resolvers.some((r) => r.match.test(input.trim()))
+  return resolvers.some((r) => r.match.test(normalizeUrl(input)))
 }

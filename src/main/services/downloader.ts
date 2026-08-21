@@ -8,8 +8,8 @@ import { ytdlpBinaryPath, ensureYtdlp, ytdlpSpawnOptions } from './ytdlp'
 import {
   buildConvertArgs,
   buildTrimArgs,
+  classifyFfmpegError,
   ffmpegLocation,
-  humanizeFfmpegError,
   probeMedia,
   rangeDuration,
   runFfmpeg,
@@ -17,15 +17,18 @@ import {
   uniqueOutputPath
 } from './ffmpeg'
 import { getSettings } from './settings'
-import { accessArgs, hasCookies, headerArgs, humanizeYtdlpError, isTransientError } from './options'
+import { accessArgs, classifyYtdlpError, hasCookies, headerArgs, isTransientError } from './options'
 import { isSameDownload } from './dedupe'
 import { killTree } from './process'
 import { markInterrupted, shouldResume } from './resume'
 import { pendingOrder } from './schedule'
 import { acceptsPostprocess, overallProgress, postprocessorLabel } from './progress'
+import { ffmpegProgressSeconds, isFfmpegNoise, splitOutputLines } from './ffmpeg-output'
 import { resolveUrl } from '../resolvers'
+import { normalizeUrl } from '@shared/urls'
 import { hasTrim } from '@shared/types'
 import type {
+  AppErrorCode,
   AppSettings,
   DownloadItem,
   DownloadProgress,
@@ -328,6 +331,54 @@ function handleProgressLine(line: string, item: DownloadItem): void {
   })
 }
 
+/**
+ * How many seconds of video this job will end up with, when that is knowable.
+ *
+ * A trimmed download produces exactly the requested span; an untrimmed one
+ * produces the whole source. Either way it is what turns ffmpeg's output
+ * timestamp into a percentage.
+ */
+function expectedSeconds(item: DownloadItem): number | undefined {
+  if (hasTrim(item.range)) return rangeDuration(item.range!, item.duration)
+  return item.duration
+}
+
+/**
+ * ffmpeg said how far it has got. Treat it exactly like an engine progress
+ * line: it is the same phase, measured a different way.
+ *
+ * Reaching this at all means yt-dlp handed the fetch to ffmpeg — trimmed
+ * sections and most live/HLS captures — in which case no `download:` template
+ * line will ever arrive and this is the only thing that can move the bar.
+ */
+function handleFfmpegProgress(seconds: number, item: DownloadItem): void {
+  if (item.state !== 'downloading') return
+  /*
+    Only the fetching half. The engine captures its post-processors' output
+    rather than letting it through, so in practice nothing gets here during a
+    merge — but if that ever changed, treating those lines as download progress
+    would drag the bar back from the post-processing band and relabel a merge in
+    progress as a download.
+  */
+  if (item.phase === 'postprocess') return
+  const total = expectedSeconds(item)
+  const percent = total && total > 0 ? Math.min(100, (seconds / total) * 100) : undefined
+  applyProgress(item, { phase: 'download', phasePercent: percent })
+
+  emitProgress({
+    id: item.id,
+    state: item.state,
+    percent: item.percent,
+    phase: item.phase,
+    postprocess: item.postprocess,
+    indeterminate: item.indeterminate,
+    speed: item.speed,
+    eta: item.eta,
+    downloadedBytes: item.downloadedBytes,
+    totalBytes: item.totalBytes
+  })
+}
+
 /** The bar is full and no phase is running. */
 function finishProgress(item: DownloadItem): void {
   item.percent = 100
@@ -376,7 +427,7 @@ function applyProgress(
  * app would have to invent.
  */
 function handlePostprocessLine(line: string, item: DownloadItem): void {
-  const [status, name] = line.slice(POSTPROCESS_PREFIX.length).split('	')
+  const [status, name] = line.slice(POSTPROCESS_PREFIX.length).split('\t')
   if (item.state !== 'downloading' && item.state !== 'processing') return
   /*
     Not every post-processor runs after the download. SponsorBlock's lookup is
@@ -438,24 +489,31 @@ function processQueue(): void {
 async function runMediaJob(item: DownloadItem): Promise<void> {
   const source = item.sourcePath
   if (!source || !existsSync(source)) {
-    item.state = 'error'
-    item.error = 'The source file is gone — it may have been moved or deleted.'
-    emitUpdated(item)
-    processQueue()
+    failWith(item, 'sourceMissing', 'The source file is gone — it may have been moved or deleted.')
     return
   }
 
-  item.state = 'downloading'
+  /*
+    `processing`, not `downloading`. Nothing is being fetched: the file is
+    already on disk and ffmpeg is reworking it. The row used to say
+    "downloading" over a local trim, which is simply not what is happening —
+    and the state is what the queue's filters, the taskbar progress and the
+    keep-awake decision all read.
+  */
+  item.state = 'processing'
+  item.indeterminate = false
   item.error = undefined
+  item.errorCode = undefined
   emitUpdated(item)
 
   const probe = await probeMedia(source)
   // Catch the impossible ask up front rather than letting ffmpeg fail obscurely.
   if (item.kind === 'convert' && item.convertTarget?.mode === 'audio' && !probe.hasAudio) {
-    item.state = 'error'
-    item.error = 'This file has no audio track, so it can’t be converted to an audio format.'
-    emitUpdated(item)
-    processQueue()
+    failWith(
+      item,
+      'noAudioTrack',
+      'This file has no audio track, so it can’t be converted to an audio format.'
+    )
     return
   }
 
@@ -478,7 +536,7 @@ async function runMediaJob(item: DownloadItem): Promise<void> {
   try {
     run = runFfmpeg(args, {
       totalSeconds,
-      onProgress: (percent, speed) => {
+      onProgress: (percent) => {
         /*
           ffmpeg keeps reporting for a moment after a cancel or a pause — the
           kill is a signal, not an instant stop. Writing progress unconditionally
@@ -487,9 +545,17 @@ async function runMediaJob(item: DownloadItem): Promise<void> {
         */
         const live = items.get(item.id)?.state
         if (live !== 'downloading' && live !== 'processing') return
-        if (percent >= 0) item.percent = percent
-        if (speed != null) item.speed = undefined
-        emitProgress({ id: item.id, state: live, percent: item.percent })
+        if (percent < 0) return
+        item.percent = percent
+        // A job with no known duration can't report a figure; say so rather
+        // than pinning the bar at a zero that never moves.
+        item.indeterminate = !totalSeconds
+        emitProgress({
+          id: item.id,
+          state: live,
+          percent: item.percent,
+          indeterminate: item.indeterminate
+        })
       }
     })
   } catch (err) {
@@ -526,12 +592,10 @@ async function runMediaJob(item: DownloadItem): Promise<void> {
   appendLog(item, stderr)
   // ffmpeg failures are never the flaky-network kind, so skip the retry path
   // and give the user a plain explanation straight away.
-  item.state = 'error'
+  const failure = classifyFfmpegError(stderr || `ffmpeg exited with code ${code}`)
   item.speed = undefined
   item.eta = undefined
-  item.error = humanizeFfmpegError(stderr || `ffmpeg exited with code ${code}`)
-  emitUpdated(item)
-  processQueue()
+  failWith(item, failure.code ?? 'postprocess', failure.message)
 }
 
 async function runDownload(item: DownloadItem): Promise<void> {
@@ -540,6 +604,8 @@ async function runDownload(item: DownloadItem): Promise<void> {
   // on the card as a normal failure the user can see and retry.
   item.state = 'detecting'
   item.error = undefined
+  item.errorCode = undefined
+  item.cookieHint = undefined
   emitUpdated(item)
   try {
     const resolved = await resolveUrl(item.sourceUrl || item.url)
@@ -549,6 +615,9 @@ async function runDownload(item: DownloadItem): Promise<void> {
     if (resolved.extractor) item.extractor = resolved.extractor
     if (resolved.title && (!item.title || item.title === item.sourceUrl)) item.title = resolved.title
     if (!item.thumbnail && resolved.thumbnail) item.thumbnail = resolved.thumbnail
+    // The length is what turns ffmpeg's output timestamp into a percentage on
+    // the trimmed and live paths, where the engine reports nothing else.
+    if (!item.duration && resolved.duration) item.duration = resolved.duration
   } catch (err) {
     fail(item, err instanceof Error ? err.message : String(err))
     return
@@ -588,11 +657,24 @@ async function runDownload(item: DownloadItem): Promise<void> {
   child.stdout.on('data', onData)
   child.stderr.on('data', (d) => {
     const text = d.toString()
-    stderrTail = (stderrTail + text).slice(-4000)
-    appendLog(item, text)
-    // Some progress info & destinations also appear on stderr.
-    for (const line of text.split(/\r?\n/)) {
-      if (line.trim()) parseFinalPath(line, item)
+    /*
+      Split on carriage returns too. ffmpeg — which the engine spawns for
+      trimmed sections and most live captures, with its console inherited —
+      overwrites a single status line rather than printing new ones, so its
+      entire output arrives as one `\r`-separated run that a newline split
+      never breaks apart.
+    */
+    for (const line of splitOutputLines(text)) {
+      if (!line.trim()) continue
+      const seconds = ffmpegProgressSeconds(line)
+      if (seconds != null) {
+        handleFfmpegProgress(seconds, item)
+        continue
+      }
+      parseFinalPath(line, item)
+      if (isFfmpegNoise(line)) continue
+      stderrTail = (stderrTail + line + '\n').slice(-4000)
+      appendLog(item, line + '\n')
     }
   })
 
@@ -634,6 +716,8 @@ function fail(item: DownloadItem, rawError: string): void {
   if (attempts <= AUTO_RETRIES && isTransientError(rawError) && items.has(item.id)) {
     item.state = 'queued'
     item.error = undefined
+    item.errorCode = undefined
+    item.cookieHint = undefined
     // The retry re-downloads from the start, so the bar has to as well —
     // otherwise the never-backwards rule pins it wherever the failure left it.
     resetProgress(item)
@@ -645,9 +729,23 @@ function fail(item: DownloadItem, rawError: string): void {
     retryTimers.set(item.id, timer)
     return
   }
+  const { code, message, cookieHint } = classifyYtdlpError(rawError, hasCookies(getSettings()))
   item.state = 'error'
   clearPhase(item)
-  item.error = humanizeYtdlpError(rawError, hasCookies(getSettings()))
+  item.error = message
+  item.errorCode = code
+  item.cookieHint = cookieHint
+  emitUpdated(item)
+  processQueue()
+}
+
+/** A failure the app diagnosed itself, so it already knows what to call it. */
+function failWith(item: DownloadItem, code: AppErrorCode, message: string): void {
+  item.state = 'error'
+  clearPhase(item)
+  item.error = message
+  item.errorCode = code
+  item.cookieHint = false
   emitUpdated(item)
   processQueue()
 }
@@ -660,7 +758,14 @@ function findInFlight(req: DownloadRequest): DownloadItem | undefined {
   return [...items.values()].find((item) => isSameDownload(item, req))
 }
 
-export async function startDownload(req: DownloadRequest): Promise<DownloadItem> {
+export async function startDownload(request: DownloadRequest): Promise<DownloadItem> {
+  /*
+    Canonicalise before anything else looks at the URL. The duplicate check
+    below compares strings, so the same video shared twice — once from the
+    address bar, once from a share button that stapled `?si=…` on the end —
+    used to queue twice and have the two runs fight over the same output file.
+  */
+  const req: DownloadRequest = { ...request, url: normalizeUrl(request.url) }
   const existing = findInFlight(req)
   if (existing) return { ...existing }
 
@@ -678,6 +783,8 @@ export async function startDownload(req: DownloadRequest): Promise<DownloadItem>
     mode: req.mode,
     quality: req.quality,
     formatId: req.formatId,
+    targetHeight: req.targetHeight,
+    duration: req.duration,
     state: 'queued',
     percent: 0,
     attempts: 0,
@@ -760,6 +867,8 @@ export function resumeDownload(id: string): void {
   if (item.state === 'completed') return
   item.state = 'queued'
   item.error = undefined
+  item.errorCode = undefined
+  item.cookieHint = undefined
   item.attempts = 0
   item.interrupted = false
   /*
@@ -773,15 +882,29 @@ export function resumeDownload(id: string): void {
   processQueue()
 }
 
+/**
+ * The stem of this item's output file, used to recognise its own leftovers.
+ *
+ * Everything up to the *last* dot, not the first. Splitting on the first one
+ * turned "3.5 Hours of Rain.mp4" into the stem "3", which then matched — and
+ * deleted — the partial files of every other download in the folder whose name
+ * began with a 3. A cancel must only ever clean up after itself.
+ */
+export function partialStem(name: string): string {
+  const file = name.split(/[\\/]/).pop() || ''
+  const dot = file.lastIndexOf('.')
+  return (dot > 0 ? file.slice(0, dot) : file).trim()
+}
+
 function cleanupPartials(item: DownloadItem): void {
   // Best-effort: remove leftover .part/.ytdl fragments for this item's output file.
-  const base = item.filepath
-    ? (item.filepath.split(/[\\/]/).pop() || '').split('.')[0]
-    : safeName(item.title).split('.')[0]
-  if (!base) return
+  const stem = partialStem(item.filepath || safeName(item.title))
+  // Too short to identify anything in particular: refuse rather than sweep the
+  // whole folder on the strength of one or two characters.
+  if (stem.length < 3) return
   try {
     for (const f of readdirSync(item.outputDir)) {
-      if ((f.endsWith('.part') || f.endsWith('.ytdl')) && f.startsWith(base)) {
+      if ((f.endsWith('.part') || f.endsWith('.ytdl')) && f.startsWith(stem)) {
         rmSync(join(item.outputDir, f), { force: true })
       }
     }
@@ -823,6 +946,8 @@ export function retryDownload(id: string): void {
   clearRetry(id)
   item.state = 'queued'
   item.error = undefined
+  item.errorCode = undefined
+  item.cookieHint = undefined
   resetProgress(item)
   item.attempts = 0
   item.log = undefined

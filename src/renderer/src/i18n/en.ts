@@ -30,7 +30,6 @@ export const en = {
   'common.check': 'check',
   'common.update': 'update',
   'common.off': 'off',
-  'common.details': 'details',
   'common.paste': 'paste from clipboard',
 
   // ---- navigation ----
@@ -38,7 +37,6 @@ export const en = {
   'nav.queue': 'queue',
   'nav.search': 'search',
   'nav.settings': 'settings',
-  'nav.github': 'open source · github',
 
   // ---- title bar ----
   'engine.ready': 'engine ready',
@@ -60,7 +58,6 @@ export const en = {
   'home.get': 'get video',
   'home.errorTitle': 'couldn’t detect a video',
   'home.openAccessSettings': 'open settings → access',
-  'home.moreSites': '+1800 more',
   'home.batch': 'multiple links',
   'home.batchHint': 'one link per line — each becomes its own download',
   'home.batchAdd': 'queue {count} links',
@@ -70,7 +67,6 @@ export const en = {
     'the engine didn’t know this site, so the app opened the page and captured the stream itself.',
   'home.clipboardFound': 'link on your clipboard',
   'home.clipboardUse': 'use it',
-  'home.dropHere': 'drop the link anywhere',
   'home.addedToQueue': 'added to the queue',
   'home.startFailed': 'could not start the download',
 
@@ -103,6 +99,8 @@ export const en = {
   'queue.filterFailed': 'failed',
   'queue.searchPlaceholder': 'filter by title…',
   'queue.remaining': '{size} left',
+  'queue.eta': '{time} left',
+  'queue.etaAll': '≈ {time} left in total',
   'queue.duplicate': 'already in the queue',
   'queue.addedWithDuplicates': 'added {count} · {duplicates} already queued',
   'queue.copyLink': 'copy the link',
@@ -129,7 +127,6 @@ export const en = {
   // ---- playlist ----
   'playlist.videos': '{count} videos',
   'playlist.downloadAll': 'download all ({count})',
-  'playlist.downloadOne': 'download this one',
   'playlist.selected': 'download selected ({count})',
   'playlist.selectAll': 'select all',
   'playlist.range': 'items',
@@ -147,7 +144,6 @@ export const en = {
   'streaming.seriesSeasons': 'series · {count} seasons',
   'streaming.movie': 'movie',
   'streaming.selectEpisode': 'select at least one episode',
-  'streaming.addedEpisodes': 'added {count} episodes to the queue',
 
   // ---- format selector ----
   'format.exactStream': 'choose exact stream ({count})',
@@ -155,6 +151,7 @@ export const en = {
   'format.plusAudio': '+ audio',
   'format.upTo': 'up to {height}p',
   'format.subtitles': '{count} subtitle tracks',
+  'format.youGet': 'you get',
 
   // ---- search ----
   'search.title': 'search across every service',
@@ -169,7 +166,6 @@ export const en = {
   'search.failed': 'search failed',
   'search.episodes': 'episodes',
   'search.queued': 'queued',
-  'search.addedRemote': 'added to the queue — see the main window',
   'search.qualityProbe': 'quality…',
   'search.anime': 'anime',
   'search.audio': 'audio',
@@ -280,10 +276,11 @@ export const en = {
 
   // ---- mac notice ----
   'mac.title': 'macOS says the app is “damaged” or won’t open?',
+  'mac.why':
+    'It isn’t — the build is unsigned, so Gatekeeper quarantines it. Run this once in Terminal:',
 
   // ---- shortcuts ----
   'shortcuts.title': 'keyboard shortcuts',
-  'shortcuts.open': 'shortcuts',
   'shortcuts.newDownload': 'new download',
   'shortcuts.queue': 'open the queue',
   'shortcuts.search': 'search by title',
@@ -340,7 +337,6 @@ export const en = {
   // ---- queue job kinds ----
   'job.trim': 'trimming',
   'job.convert': 'converting',
-  'job.sourceMissing': 'source file not found',
 
   // ---- built-in browser ----
   'browser.open': 'open the built-in browser',
@@ -369,7 +365,40 @@ export const en = {
   // ---- errors ----
   'error.title': 'something went wrong',
   'error.reload': 'reload the app',
-  'error.starting': 'starting up…'
+  'error.starting': 'starting up…',
+
+  /*
+    Failures, in the user's own language.
+
+    The engine only speaks English, so every one of these used to reach a
+    Russian-speaking user untranslated — the interface was localised right up
+    to the moment something broke, which is when the words matter most. The
+    main process sends a code; these are what it means.
+  */
+  'err.unavailable':
+    'This video is unavailable — it may have been removed, made private, or blocked in your region.',
+  'err.ageRestricted': 'This content is age-restricted.',
+  'err.rateLimited': 'The site is rate-limiting us. Wait a minute and retry, or set a proxy.',
+  'err.signIn': 'This video requires you to be signed in.',
+  'err.forbidden': 'The site refused the request.',
+  'err.geo': 'This video is not available in your region.',
+  'err.drm': 'This video is DRM-protected and cannot be downloaded.',
+  'err.diskFull': 'Your disk is full — free some space and try again.',
+  'err.permission': 'No permission to write to the download folder. Pick another one in settings.',
+  'err.postprocess': 'Post-processing failed — the video arrived but could not be merged or converted.',
+  'err.noFormats': 'Could not find a downloadable video at this link.',
+  'err.network': 'Network problem reaching the site. Check your connection or proxy.',
+  'err.timeout': 'The site took too long to answer. Check your connection or proxy.',
+  'err.canceled': 'Canceled.',
+  'err.sourceMissing': 'The source file is gone — it may have been moved or deleted.',
+  'err.noAudioTrack': 'This file has no audio track, so it can’t become an audio file.',
+  'err.damagedSource': 'The source file looks damaged or incomplete.',
+  'err.unknownEncoder': 'The bundled ffmpeg can’t encode this format. Pick another one.',
+  'err.ffmpegMissing': 'The bundled ffmpeg is missing — reinstall the app.',
+  'err.streamGone': 'The stream this link pointed at is no longer there.',
+  'err.corruptLink': 'This download link is corrupted — pick the video again.',
+  'err.emptyPage': 'No videos found on this page.',
+  'err.cookieHint': 'Try switching on browser cookies in settings → access.'
 } as const
 
 export type TranslationKey = keyof typeof en

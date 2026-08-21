@@ -60,11 +60,35 @@ const appInfo: AppInfo = {
 
 const delay = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms))
 
+/**
+ * Poster art that always renders.
+ *
+ * These used to point at picsum.photos, which meant every tile in the preview
+ * was a grey rectangle the moment the machine was offline — and the thumbnail
+ * is half of what a card, a queue row and a search tile are made of, so the
+ * layout could not honestly be judged without it. An inline SVG needs no
+ * network and no CSP exception.
+ */
+function poster(seed: number, label: string): string {
+  const hue = (seed * 47) % 360
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="480" height="270">
+    <defs><linearGradient id="g" x1="0" y1="0" x2="480" y2="270" gradientUnits="userSpaceOnUse">
+      <stop stop-color="hsl(${hue} 42% 30%)"/><stop offset="1" stop-color="hsl(${(hue + 40) % 360} 38% 14%)"/>
+    </linearGradient></defs>
+    <rect width="480" height="270" fill="url(#g)"/>
+    <circle cx="240" cy="135" r="42" fill="rgba(255,255,255,0.14)"/>
+    <path d="M228 113 L268 135 L228 157 Z" fill="rgba(255,255,255,0.72)"/>
+    <text x="24" y="246" fill="rgba(255,255,255,0.55)" font-family="monospace" font-size="16">${label}</text>
+  </svg>`
+  return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`
+}
+
+
 function fakeInfo(url: string): MediaInfo {
   return {
     id: 'mock',
     title: 'Big Buck Bunny — official 4K remaster',
-    thumbnail: 'https://picsum.photos/seed/uvd/480/270',
+    thumbnail: poster(3, '4K · 09:56'),
     duration: 596,
     uploader: 'Blender Foundation',
     webpageUrl: url,
@@ -111,7 +135,7 @@ function fakeResults(query: string, scope: string): SearchResult[] {
       title: `${query} — result ${i + 1}: an adequately long ${isAnime ? 'anime' : 'video'} title to test clamping`,
       url: `https://example.com/watch?v=mock-${i}`,
       pickerUrl: isAnime ? `uvd-yummy-item://${100 + i}` : undefined,
-      thumbnail: `https://picsum.photos/seed/uvd${i}/480/270`,
+      thumbnail: poster(i + 1, service),
       duration: isAnime ? undefined : 63 + i * 137,
       uploader: isAnime ? '2021' : ['Blender Foundation', 'NASA', 'Kurzgesagt'][i % 3],
       viewCount: 1000 * (i + 1) ** 3,
@@ -124,7 +148,7 @@ function fakeAnimeInfo(url: string): MediaInfo {
   return {
     id: 'anime-mock',
     title: 'Mock Anime — Season 1',
-    thumbnail: 'https://picsum.photos/seed/anime/300/440',
+    thumbnail: poster(7, 'anime'),
     webpageUrl: url,
     originalUrl: url,
     extractor: 'YummyAnime',
@@ -135,7 +159,7 @@ function fakeAnimeInfo(url: string): MediaInfo {
       host: 'old.yummyani.me',
       id: 'anime-mock',
       title: 'Mock Anime',
-      thumbnail: 'https://picsum.photos/seed/anime/300/440',
+      thumbnail: poster(7, 'anime'),
       isSeries: true,
       translators: [
         { id: 'dub-a', name: 'AniLibria' },

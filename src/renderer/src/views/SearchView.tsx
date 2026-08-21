@@ -209,6 +209,7 @@ export default function SearchView({ settings, embedded = false }: Props): JSX.E
           />
           <button
             className="btn-solid px-5"
+            data-uvd="search"
             onClick={() => search()}
             disabled={!query.trim() || status === 'searching'}
           >

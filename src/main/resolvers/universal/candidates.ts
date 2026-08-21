@@ -27,8 +27,44 @@ const EXT_SCORE: { re: RegExp; kind: MediaKind; score: number }[] = [
   { re: /\.webm(\?|#|$)/i, kind: 'file', score: 74 },
   { re: /\.mov(\?|#|$)/i, kind: 'file', score: 70 },
   { re: /\.flv(\?|#|$)/i, kind: 'file', score: 60 },
+  /*
+    Audio, scored below every video container on purpose. A page that has both
+    must resolve to the video; a page that has only a podcast, a mix or a
+    lecture recording is still something the user asked to download, and used
+    to come back as "nothing found".
+  */
+  { re: /\.(mp3|m4a|flac)(\?|#|$)/i, kind: 'file', score: 56 },
+  { re: /\.(aac|ogg|oga|opus|wav)(\?|#|$)/i, kind: 'file', score: 50 },
   { re: /\.ts(\?|#|$)/i, kind: 'file', score: 12 }
 ]
+
+/**
+ * The same ladder, read off the response instead of the URL.
+ *
+ * Plenty of CDNs serve manifests from extensionless paths — `/hls/12345` with
+ * `Content-Type: application/vnd.apple.mpegurl` — and for those the filename
+ * says nothing at all. The capture hook has always watched response types for
+ * exactly this case; it just had no way to turn one into a score, so every
+ * extensionless stream it saw was silently thrown away.
+ */
+const TYPE_SCORE: { re: RegExp; kind: MediaKind; score: number }[] = [
+  { re: /application\/(x-mpegurl|vnd\.apple\.mpegurl)/i, kind: 'hls', score: 100 },
+  { re: /application\/dash\+xml/i, kind: 'dash', score: 92 },
+  { re: /video\/mp4/i, kind: 'file', score: 82 },
+  { re: /video\/webm/i, kind: 'file', score: 74 },
+  { re: /video\/quicktime/i, kind: 'file', score: 70 },
+  { re: /video\/x-flv/i, kind: 'file', score: 60 },
+  { re: /audio\/(mpeg|mp4|aac|ogg|opus|flac|wav|x-m4a)/i, kind: 'file', score: 56 },
+  // One HLS segment out of thousands — never the thing to download.
+  { re: /video\/mp2t/i, kind: 'file', score: 12 }
+]
+
+export function classifyContentType(type: string): { kind: MediaKind; score: number } {
+  for (const { re, kind, score } of TYPE_SCORE) {
+    if (re.test(type)) return { kind, score }
+  }
+  return { kind: 'unknown', score: 0 }
+}
 
 /** Junk that regularly shows up next to the real stream. */
 const NEGATIVE: { re: RegExp; penalty: number }[] = [
@@ -54,8 +90,19 @@ export function classify(url: string): { kind: MediaKind; score: number } {
   return { kind: 'unknown', score: 0 }
 }
 
-export function scoreUrl(url: string, sourceBonus = 0): { kind: MediaKind; score: number } {
-  const { kind, score } = classify(url)
+/**
+ * How likely this URL is to be the video, and what kind it is.
+ *
+ * `contentType` is the fallback for URLs that carry no extension: the response
+ * knows what it is even when the path doesn't.
+ */
+export function scoreUrl(
+  url: string,
+  sourceBonus = 0,
+  contentType?: string
+): { kind: MediaKind; score: number } {
+  const fromUrl = classify(url)
+  const { kind, score } = fromUrl.score || !contentType ? fromUrl : classifyContentType(contentType)
   if (!score) return { kind, score: 0 }
   let total = score + sourceBonus
   for (const { re, penalty } of NEGATIVE) if (re.test(url)) total -= penalty

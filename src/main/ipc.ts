@@ -14,6 +14,7 @@ import { probeMedia } from './services/ffmpeg'
 import { fetchThumbnail } from './services/thumbnails'
 import { registerBrowserIpc } from './services/browser'
 import { setKeepAwake } from './services/awake'
+import { mt } from './services/locale'
 import {
   cancelDownload,
   clearFinished,
@@ -52,6 +53,7 @@ export interface IpcContext {
 const detections = new Map<string, AbortController>()
 
 export function registerIpc({ getWindow, openSearchWindow, onSettingsChanged }: IpcContext): void {
+  notificationWindow = getWindow
   const send = (channel: string, payload: unknown): void => {
     const win = getWindow()
     if (win && !win.isDestroyed()) win.webContents.send(channel, payload)
@@ -205,7 +207,8 @@ export function registerIpc({ getWindow, openSearchWindow, onSettingsChanged }: 
     maybeNotify(item)
     syncOsState(getWindow)
   })
-  downloadEvents.on('removed', (id) => {
+  downloadEvents.on('removed', (id: string) => {
+    forgetNotified(id)
     send(IPC.evtDownloadUpdated, { id, removed: true })
     syncOsState(getWindow)
   })
@@ -213,24 +216,45 @@ export function registerIpc({ getWindow, openSearchWindow, onSettingsChanged }: 
   updateEvents.on('status', (s) => send(IPC.evtUpdateStatus, s))
 }
 
+/**
+ * Ids already announced, so a re-emitted `completed` doesn't notify twice.
+ *
+ * Cleared when an item starts again (a retry is a fresh outcome) and when it
+ * leaves the queue — without the second half this set grew for the lifetime of
+ * the process, holding a string for every download ever finished.
+ */
 const notified = new Set<string>()
 
+export function forgetNotified(id: string): void {
+  notified.delete(id)
+}
+
 function maybeNotify(item: DownloadItem): void {
-  if (item.state === 'completed' && !notified.has(item.id)) {
+  const terminal = item.state === 'completed' || item.state === 'error'
+  if (terminal && !notified.has(item.id)) {
     notified.add(item.id)
     if (getSettings().notifications && Notification.isSupported()) {
+      const done = item.state === 'completed'
       const n = new Notification({
-        title: 'Download complete',
+        title: done ? mt('notify.done') : mt('notify.failed'),
         body: item.title,
         silent: false
       })
       n.on('click', () => {
-        if (item.filepath) shell.showItemInFolder(item.filepath)
+        if (done && item.filepath) shell.showItemInFolder(item.filepath)
+        else getWindowForNotification()?.show()
       })
       n.show()
     }
   }
-  if (item.state === 'downloading') notified.delete(item.id)
+  if (item.state === 'downloading' || item.state === 'queued') notified.delete(item.id)
+}
+
+/** Set once IPC is registered, so a notification click can raise the window. */
+let notificationWindow: () => BrowserWindow | null = () => null
+function getWindowForNotification(): BrowserWindow | null {
+  const win = notificationWindow()
+  return win && !win.isDestroyed() ? win : null
 }
 
 /**

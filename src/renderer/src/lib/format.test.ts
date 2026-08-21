@@ -49,10 +49,12 @@ describe('formatEta', () => {
     expect(formatEta(0)).toBe('')
   })
 
-  it('uses the coarsest sensible unit', () => {
-    expect(formatEta(45)).toBe('45s left')
-    expect(formatEta(90)).toBe('1m 30s left')
-    expect(formatEta(3700)).toBe('1h 1m left')
+  // The word "left" belongs to the caller, which is the side that knows which
+  // language the interface is running in.
+  it('uses the coarsest sensible unit, and no words', () => {
+    expect(formatEta(45)).toBe('45s')
+    expect(formatEta(90)).toBe('1m 30s')
+    expect(formatEta(3700)).toBe('1h 1m')
   })
 })
 

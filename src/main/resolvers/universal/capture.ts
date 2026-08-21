@@ -23,9 +23,9 @@ export function browsingSession(): Session {
 const BLOCKED =
   /(doubleclick|googlesyndication|google-analytics|googletagmanager|analytics\.|adservice|adsystem|scorecardresearch|popads|propellerads|exoclick|juicyads|trafficjunky|hotjar|mc\.yandex|facebook\.net|connect\.facebook)/i
 
-const MEDIA_EXT = /\.(m3u8|mpd|mp4|m4v|webm|mov|flv)(\?|#|$)/i
+const MEDIA_EXT = /\.(m3u8|mpd|mp4|m4v|webm|mov|flv|mp3|m4a|flac|aac|ogg|oga|opus|wav)(\?|#|$)/i
 const MEDIA_TYPE =
-  /(application\/(x-mpegurl|vnd\.apple\.mpegurl|dash\+xml)|video\/(mp4|webm|x-flv|quicktime|mp2t))/i
+  /(application\/(x-mpegurl|vnd\.apple\.mpegurl|dash\+xml)|video\/(mp4|webm|x-flv|quicktime|mp2t)|audio\/(mpeg|mp4|aac|ogg|opus|flac|wav|x-m4a))/i
 
 const INTERESTING_HEADERS = ['Referer', 'Origin', 'Cookie', 'User-Agent', 'Authorization']
 
@@ -59,10 +59,21 @@ function pickHeaders(raw: OnBeforeSendHeadersListenerDetails['requestHeaders']):
 function install(ses: Session): Installation {
   const state: Installation = { sinks: new Set(), recentHeaders: new Map() }
 
-  const emit = (url: string, headers: Record<string, string>): void => {
-    const { kind, score } = scoreUrl(url, 12)
+  const emit = (
+    url: string,
+    headers: Record<string, string>,
+    meta: { contentType?: string; bytes?: number } = {}
+  ): void => {
+    const { kind, score } = scoreUrl(url, 12, meta.contentType)
     if (!score) return
-    const candidate: MediaCandidate = { url, kind, score, headers, source: 'network' }
+    const candidate: MediaCandidate = {
+      url,
+      kind,
+      score,
+      headers,
+      source: 'network',
+      bytes: meta.bytes
+    }
     for (const sink of state.sinks) {
       try {
         sink(candidate)
@@ -84,10 +95,26 @@ function install(ses: Session): Installation {
     callback({ requestHeaders: details.requestHeaders })
   })
 
+  /*
+    What the server says it sent, for the URLs whose path gives nothing away.
+
+    Plenty of CDNs serve manifests from extensionless paths, and this hook has
+    always watched for them — but it handed the URL to a scorer that only ever
+    read the file extension, so every one of those responses scored zero and was
+    dropped on the next line. Passing the content type through is what makes
+    this branch do the job it was written for.
+
+    Content-Length comes along too: it is the tie-break between a real video and
+    a decoy of the same kind, and nothing had ever filled it in.
+  */
   ses.webRequest.onHeadersReceived({ urls: ['<all_urls>'] }, (details, callback) => {
-    const type = headerValue(details.responseHeaders, 'content-type')
-    if (MEDIA_TYPE.test(type)) {
-      emit(details.url, state.recentHeaders.get(details.url) ?? { 'User-Agent': UA })
+    const contentType = headerValue(details.responseHeaders, 'content-type')
+    if (MEDIA_TYPE.test(contentType)) {
+      const length = Number(headerValue(details.responseHeaders, 'content-length'))
+      emit(details.url, state.recentHeaders.get(details.url) ?? { 'User-Agent': UA }, {
+        contentType,
+        bytes: Number.isFinite(length) && length > 0 ? length : undefined
+      })
     }
     callback({ responseHeaders: details.responseHeaders })
   })

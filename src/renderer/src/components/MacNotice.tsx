@@ -3,7 +3,17 @@ import { Check, Copy, X } from 'lucide-react'
 import { useStore } from '../store'
 import { useT } from '../i18n'
 
-const COMMAND = 'sudo xattr -rd com.apple.quarantine /Applications/Universal\\ Video\\ Downloader.app'
+/**
+ * No `sudo`.
+ *
+ * `xattr` writes an extended attribute on a file the user already owns —
+ * copying an app into /Applications makes them its owner — so elevation buys
+ * nothing and costs a password prompt on a command people are being asked to
+ * paste into a terminal on trust. The path is quoted rather than
+ * backslash-escaped for the same reason: it is easier to read, and it survives
+ * being copied through anything that mangles backslashes.
+ */
+const COMMAND = 'xattr -dr com.apple.quarantine "/Applications/Universal Video Downloader.app"'
 const STORAGE_KEY = 'uvd:mac-notice-dismissed'
 
 /** Gatekeeper's "damaged app" message, and the one command that clears it. */
@@ -35,7 +45,14 @@ export default function MacNotice(): JSX.Element | null {
       <span className="label shrink-0 text-warn">macos</span>
       <div className="min-w-0 flex-1">
         <p className="text-[14px] font-medium text-ink">{t('mac.title')}</p>
-        <code className="mono selectable block truncate text-[12px] text-ink-2" title={COMMAND}>
+        {/* Why, before what. "Damaged" is a lie the OS tells about every
+            unsigned build, and someone who doesn't know that reasonably
+            assumes the download broke and fetches it again. */}
+        <p className="hint">{t('mac.why')}</p>
+        <code
+          className="mono selectable mt-1 block truncate text-[12px] text-ink-2"
+          title={COMMAND}
+        >
           {COMMAND}
         </code>
       </div>

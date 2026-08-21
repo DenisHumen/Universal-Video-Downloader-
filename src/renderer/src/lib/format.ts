@@ -25,14 +25,22 @@ export function formatDuration(seconds?: number): string {
   return `${m}:${pad(s)}`
 }
 
+/**
+ * How long is left, as a bare duration.
+ *
+ * The word "left" is not in here on purpose: it used to be, hard-coded in
+ * English, which meant a queue running in Russian said `1m 30s left`. Units
+ * are symbols and read the same either way; the sentence around them is the
+ * caller's job, and the caller has the dictionary.
+ */
 export function formatEta(seconds?: number): string {
   if (seconds == null || !Number.isFinite(seconds) || seconds <= 0) return ''
-  if (seconds < 60) return `${Math.round(seconds)}s left`
+  if (seconds < 60) return `${Math.round(seconds)}s`
   const m = Math.floor(seconds / 60)
   const s = Math.round(seconds % 60)
-  if (m < 60) return `${m}m ${s}s left`
+  if (m < 60) return `${m}m ${s}s`
   const h = Math.floor(m / 60)
-  return `${h}h ${m % 60}m left`
+  return `${h}h ${m % 60}m`
 }
 
 export function formatCount(n?: number): string {
