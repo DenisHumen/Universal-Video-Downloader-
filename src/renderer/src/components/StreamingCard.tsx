@@ -3,7 +3,7 @@ import { Loader2 } from 'lucide-react'
 import type { MediaInfo, QualityPreset } from '@shared/types'
 import Choice, { type ChoiceOption } from './Choice'
 import Thumbnail from './Thumbnail'
-import { initialQuality, QUALITY_HEIGHTS } from '../lib/quality'
+import { heightLabel, initialQuality } from '../lib/quality'
 import { toast } from '../lib/toast'
 import { queueDownload, queueDownloads } from '../lib/queue'
 import { useT } from '../i18n'
@@ -23,17 +23,39 @@ export default function StreamingCard({ info, onDone }: Props): JSX.Element {
   const settings = useStore((s) => s.settings)
   const s = info.streaming!
 
-  // Offer only the qualities this provider actually serves, plus automatic
-  // "best" — preselected so a too-high default can never break the download.
+  /*
+    Only the qualities this provider actually serves, plus automatic "best".
+
+    Any height the site lists, not just the members of the usual ladder: anime
+    sources routinely top out at 480p or offer 240p, and filtering those out
+    left the picker showing "best" and nothing else — which is the one case
+    where knowing the number matters most. The resolver takes a height and
+    picks the best stream at or below it, so every value here is one it can
+    honour.
+  */
   const heights = useMemo(() => {
-    const known = new Set<number>(QUALITY_HEIGHTS)
-    const hs = [...new Set(s.qualities.map((q) => parseInt(q, 10)).filter((h) => known.has(h)))]
-    return hs.sort((a, b) => b - a)
+    const parsed = s.qualities
+      .map((q) => parseInt(q, 10))
+      .filter((h) => Number.isFinite(h) && h >= 100 && h <= 4320)
+    return [...new Set(parsed)].sort((a, b) => b - a)
   }, [s.qualities])
   const qualityOptions: ChoiceOption[] = [
-    { value: 'best', label: t('common.best') },
-    ...heights.map((h) => ({ value: String(h), label: `${h}p` }))
+    // "Best" says which one it is, as it does everywhere else in the app.
+    {
+      value: 'best',
+      label: heights.length ? `${t('common.best')} · ${heightLabel(heights[0])}` : t('common.best')
+    },
+    ...heights.map((h) => ({ value: String(h), label: heightLabel(h) }))
   ]
+
+  /** The height this choice resolves to, carried into the queue row. */
+  const targetHeight = (q: QualityPreset): number | undefined => {
+    if (!heights.length) return undefined
+    if (q === 'best') return heights[0]
+    const want = Number(q)
+    if (!Number.isFinite(want)) return heights[0]
+    return heights.find((h) => h <= want) ?? heights[heights.length - 1]
+  }
 
   const [translatorId, setTranslatorId] = useState(s.defaultTranslator)
   const [season, setSeason] = useState(s.seasons[0]?.season ?? 1)
@@ -84,7 +106,8 @@ export default function StreamingCard({ info, onDone }: Props): JSX.Element {
             title: `${s.title} - S${pad2(Number(seasonStr))}E${pad2(ep)} (${translatorName})`,
             thumbnail: s.thumbnail,
             mode: 'video' as const,
-            quality
+            quality,
+            targetHeight: targetHeight(quality)
           }))
         )
       )
@@ -108,7 +131,8 @@ export default function StreamingCard({ info, onDone }: Props): JSX.Element {
         title: `${s.title}${translatorName ? ` (${translatorName})` : ''}`,
         thumbnail: s.thumbnail,
         mode: 'video',
-        quality
+        quality,
+        targetHeight: targetHeight(quality)
       })
     } finally {
       setBusy(false)
