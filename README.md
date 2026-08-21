@@ -192,6 +192,12 @@ with the app rather than being fetched, so it looks identical offline. One easin
 `cubic-bezier(0.2, 0, 0, 1)` — and three durations cover every transition, and nothing animates
 while idle.
 
+Two themes, one accent, and the light one is not a tint-inverted copy of the
+dark one — a light interface needs a canvas *darker* than the planes on it, or
+every block dissolves into the page.
+
+<img src="docs/screenshots/detected-day.png" width="880" alt="The same screen in the day theme" />
+
 The full specification lives in
 [`design-system/universal-video-downloader/MASTER.md`](design-system/universal-video-downloader/MASTER.md).
 
