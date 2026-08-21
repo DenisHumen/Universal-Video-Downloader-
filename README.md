@@ -236,7 +236,7 @@ Two extras worth knowing about:
 
 ```bash
 npm run preview          # the renderer alone, in a browser, against a mock IPC bridge
-npm run shots            # regenerate docs/screenshots from that preview
+npm run shots            # regenerate docs/screenshots (--theme=day|both for light)
 npm run make:icons       # rasterise the logo into app, tray and DMG artwork
 ```
 
