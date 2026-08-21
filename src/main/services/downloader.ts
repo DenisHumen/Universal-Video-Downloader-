@@ -674,28 +674,36 @@ async function runDownload(item: DownloadItem): Promise<void> {
     }
   }
 
-  child.stdout.on('data', onData)
-  child.stderr.on('data', (d) => {
-    const text = d.toString()
-    /*
-      Split on carriage returns too. ffmpeg — which the engine spawns for
-      trimmed sections and most live captures, with its console inherited —
-      overwrites a single status line rather than printing new ones, so its
-      entire output arrives as one `\r`-separated run that a newline split
-      never breaks apart.
-    */
-    for (const line of splitOutputLines(text)) {
-      if (!line.trim()) continue
-      const seconds = ffmpegProgressSeconds(line)
-      if (seconds != null) {
-        handleFfmpegProgress(seconds, item)
-        continue
-      }
-      parseFinalPath(line, item)
-      if (isFfmpegNoise(line)) continue
-      stderrTail = (stderrTail + line + '\n').slice(-4000)
-      appendLog(item, line + '\n')
+  const onErrorLine = (line: string): void => {
+    if (!line.trim()) return
+    const seconds = ffmpegProgressSeconds(line)
+    if (seconds != null) {
+      handleFfmpegProgress(seconds, item)
+      return
     }
+    parseFinalPath(line, item)
+    if (isFfmpegNoise(line)) return
+    stderrTail = (stderrTail + line + '\n').slice(-4000)
+    appendLog(item, line + '\n')
+  }
+
+  child.stdout.on('data', onData)
+  /*
+    Buffered, and split on carriage returns as well as newlines.
+
+    ffmpeg — which the engine spawns for trimmed sections and most live
+    captures, with its console inherited — overwrites a single status line
+    rather than printing new ones, so its whole output arrives as one
+    `\r`-separated run that a newline split never breaks apart. And a chunk
+    boundary falls wherever the pipe happens to flush, so without the buffer
+    the line naming the output file can be torn in half and never recognised.
+  */
+  let errBuffer = ''
+  child.stderr.on('data', (d) => {
+    errBuffer += d.toString()
+    const lines = splitOutputLines(errBuffer)
+    errBuffer = lines.pop() ?? ''
+    for (const line of lines) onErrorLine(line)
   })
 
   child.on('error', (err) => {
@@ -705,6 +713,15 @@ async function runDownload(item: DownloadItem): Promise<void> {
 
   child.on('close', (code) => {
     procs.delete(item.id)
+    /*
+      Whatever is still in the buffer. The last thing an engine writes before it
+      exits is very often the line that says why, and it has no separator after
+      it to push it out.
+    */
+    if (errBuffer) {
+      onErrorLine(errBuffer)
+      errBuffer = ''
+    }
     // If we deliberately stopped it, the state was already set.
     if (item.state === 'paused' || item.state === 'canceled') {
       emitUpdated(item)
