@@ -571,10 +571,20 @@ export default function HomeView(): JSX.Element {
                   onSelectionChange={setSelection}
                 />
 
+                {/*
+                  A live stream has no end, so it has no section to cut out of
+                  it and no percentage to report — it records until it is
+                  stopped. Offering a trim editor over a timeline that doesn't
+                  exist yet was an invitation to a download that fails.
+                */}
+                {info.isLive && (
+                  <p className="hint mt-4 border-t border-edge pt-4">{t('home.liveHint')}</p>
+                )}
+
                 {/* Trim before downloading: the engine fetches only this
                     section, so clipping a highlight out of a long stream costs
                     seconds instead of the whole file. */}
-                {selection.mode === 'video' && (
+                {selection.mode === 'video' && !info.isLive && (
                   <div className="mt-5 border-t border-edge pt-4">
                     <button
                       onClick={() => setTrimOpen((v) => !v)}

@@ -67,6 +67,8 @@ export const ru: Dictionary = {
   'home.clipboardUse': 'использовать',
   'home.addedToQueue': 'добавлено в очередь',
   'home.startFailed': 'не удалось запустить загрузку',
+  'home.liveHint':
+    'это прямой эфир — запись идёт с этого момента и до остановки, поэтому обрезать нечего и процент показать не из чего.',
 
   // ---- detection stages ----
   'detect.resolving': 'проверяю ссылку…',
