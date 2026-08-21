@@ -121,9 +121,12 @@ something goes wrong.
 - **Cut before you download.** Set a start and end on the video's timeline and the engine fetches
   *only that section* — clipping 30 seconds out of a two-hour stream costs 30 seconds of
   bandwidth, not the whole file.
-- **Trim what you already have.** Any finished download can be re-cut. The default is a
-  frame-accurate cut (re-encoded, so “remove the intro” actually removes the intro); a stream-copy
-  mode is one click away when speed matters more than precision.
+- **Trim what you already have.** Any finished download can be re-cut.
+- **Exact or fast, either way.** The default is a frame-accurate cut — re-encoded, so “remove the
+  intro” actually removes the intro. A stream copy is one click away when speed matters more:
+  near-instant, at the price of landing on the nearest keyframe. The choice applies to a trimmed
+  *download* as well as to a file already on disk, and on a long clip it is the difference between
+  seconds and minutes.
 - **Convert** to MP4, MKV, WebM, MOV or an animated GIF, extract audio as MP3, M4A, OPUS, FLAC,
   WAV or AAC, and downscale on the way. Conversions run in the same queue as downloads.
 
