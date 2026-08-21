@@ -73,7 +73,9 @@ dmg:
   window:
     width: 660
     height: 520
-  iconSize: 118
+  # Big enough to be the obvious thing to grab, small enough that the icons and
+  # their labels stay inside the band the artwork leaves clear for them.
+  iconSize: 100
   iconTextSize: 13
   contents:
     - x: 190
