@@ -2,7 +2,14 @@ import { useEffect, useRef, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { dialog, enter, overlay, staggerChild, staggerParent } from '../lib/motion'
 import { Check, Download, ExternalLink, Loader2, Search, SearchX, X } from 'lucide-react'
-import type { AppSettings, MediaInfo, SearchResult, SearchScope, SearchService } from '@shared/types'
+import type {
+  AppErrorCode,
+  AppSettings,
+  MediaInfo,
+  SearchResult,
+  SearchScope,
+  SearchService
+} from '@shared/types'
 import StreamingCard from '../components/StreamingCard'
 import Thumbnail from '../components/Thumbnail'
 import Choice from '../components/Choice'
@@ -11,6 +18,7 @@ import { formatCount, formatDuration } from '../lib/format'
 import { initialMode, initialQuality, maxHeightOf } from '../lib/quality'
 import { toast } from '../lib/toast'
 import { queueDownload } from '../lib/queue'
+import { errorText } from '../lib/errors'
 import { useT, type TranslateFn } from '../i18n'
 import { useStore } from '../store'
 
@@ -62,6 +70,7 @@ export default function SearchView({ settings, embedded = false }: Props): JSX.E
   const [service, setService] = useState<SearchScope>('all')
   const [status, setStatus] = useState<Status>('idle')
   const [error, setError] = useState('')
+  const [errorCode, setErrorCode] = useState<AppErrorCode | undefined>()
   const [results, setResults] = useState<SearchResult[] | null>(null)
   const [probes, setProbes] = useState<Record<string, QualityProbe>>({})
   const [added, setAdded] = useState<Set<string>>(new Set())
@@ -70,14 +79,31 @@ export default function SearchView({ settings, embedded = false }: Props): JSX.E
   const inputRef = useRef<HTMLInputElement>(null)
   // Bumped on every new search so stale probe results are discarded.
   const generation = useRef(0)
+  /*
+    Probes still running in the main process.
+
+    Discarding their *results* was never enough: each one is a yt-dlp process,
+    and switching service pill three times left three grids' worth of them
+    still extracting in the background — competing with the search the user is
+    now waiting on. Bumping the generation stops us listening; this stops them
+    working.
+  */
+  const probeRequests = useRef(new Set<string>())
+
+  const cancelProbes = (): void => {
+    for (const id of probeRequests.current) void window.api.cancelDetect(id)
+    probeRequests.current.clear()
+  }
 
   const search = async (value?: string, svc?: SearchScope): Promise<void> => {
     const q = (value ?? query).trim()
     const s = svc ?? service
     if (!q) return
     generation.current++
+    cancelProbes()
     setStatus('searching')
     setError('')
+    setErrorCode(undefined)
     setResults(null)
     setProbes({})
     setAdded(new Set())
@@ -89,6 +115,7 @@ export default function SearchView({ settings, embedded = false }: Props): JSX.E
       void probeQualities(res.results, generation.current)
     } else {
       setError(res.error || t('search.failed'))
+      setErrorCode(res.errorCode)
       setStatus('error')
     }
   }
@@ -102,8 +129,11 @@ export default function SearchView({ settings, embedded = false }: Props): JSX.E
         const item = queue.shift()!
         if (gen !== generation.current) return
         setProbes((p) => ({ ...p, [item.url]: { status: 'loading', maxHeight: 0 } }))
+        const requestId = `probe-${gen}-${item.url}`
+        probeRequests.current.add(requestId)
         try {
-          const res = await window.api.detect(item.url)
+          const res = await window.api.detect(item.url, requestId)
+          probeRequests.current.delete(requestId)
           if (gen !== generation.current) return
           const info = res.ok ? res.info : undefined
           setProbes((p) => ({
@@ -115,6 +145,7 @@ export default function SearchView({ settings, embedded = false }: Props): JSX.E
             }
           }))
         } catch {
+          probeRequests.current.delete(requestId)
           if (gen !== generation.current) return
           setProbes((p) => ({ ...p, [item.url]: { status: 'failed', maxHeight: 0 } }))
         }
@@ -145,6 +176,8 @@ export default function SearchView({ settings, embedded = false }: Props): JSX.E
     return () => {
       offIpc?.()
       window.removeEventListener('uvd:search-query', onLocalQuery)
+      // Leaving the screen ends the probes with it.
+      cancelProbes()
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
@@ -158,12 +191,17 @@ export default function SearchView({ settings, embedded = false }: Props): JSX.E
   const download = async (r: SearchResult): Promise<void> => {
     const probe = probes[r.url]
     const mode = r.service === 'soundcloud' ? 'audio' : initialMode(settings)
+    const quality = mode === 'audio' ? 'audio' : initialQuality(settings, probe?.maxHeight || 0)
     const ok = await queueDownload({
       url: r.url,
       title: r.title,
       thumbnail: r.thumbnail || probe?.thumbnail,
       mode,
-      quality: mode === 'audio' ? 'audio' : initialQuality(settings, probe?.maxHeight || 0)
+      quality,
+      // The probe already asked what this video offers, so the queue row can
+      // say which resolution "best" turned out to be instead of just "best".
+      targetHeight: quality === 'best' && probe?.maxHeight ? probe.maxHeight : undefined,
+      duration: r.duration
     })
     if (ok) setAdded((prev) => new Set(prev).add(r.url))
   }
@@ -175,7 +213,7 @@ export default function SearchView({ settings, embedded = false }: Props): JSX.E
     try {
       const res = await window.api.detect(r.pickerUrl)
       if (res.ok && res.info?.streaming) setPicker(res.info)
-      else toast(res.error || t('search.failed'), 'error')
+      else toast(errorText(t, { error: res.error, errorCode: res.errorCode }), 'error')
     } catch (err) {
       toast(err instanceof Error ? err.message : t('search.failed'), 'error')
     } finally {
@@ -271,8 +309,8 @@ export default function SearchView({ settings, embedded = false }: Props): JSX.E
               <p className="h2 flex items-center gap-2">
                 <span className="h-1.5 w-1.5 rounded-full bg-bad" /> {t('search.failed')}
               </p>
-              <p className="mono selectable mt-2 break-words text-[13px] leading-relaxed text-ink-2">
-                {error}
+              <p className="selectable mt-2 break-words text-[13px] leading-relaxed text-ink-2">
+                {errorText(t, { error, errorCode })}
               </p>
             </motion.div>
           )}

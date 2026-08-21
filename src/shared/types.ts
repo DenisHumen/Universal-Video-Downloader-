@@ -533,4 +533,5 @@ export interface SearchResponse {
   ok: boolean
   results?: SearchResult[]
   error?: string
+  errorCode?: AppErrorCode
 }

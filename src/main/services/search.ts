@@ -2,7 +2,7 @@ import { spawn } from 'child_process'
 import { ytdlpBinaryPath, ytdlpSpawnOptions, ensureYtdlp } from './ytdlp'
 import { killTree } from './process'
 import { getSettings } from './settings'
-import { humanizeYtdlpError } from './options'
+import { classifyYtdlpError } from './options'
 import { searchYummyani } from '../resolvers'
 import { SEARCH_ALL_SERVICES } from '@shared/types'
 import type { SearchResponse, SearchResult, SearchScope, SearchService } from '@shared/types'
@@ -70,7 +70,11 @@ function ytdlpSearch(target: string, service: SearchService, limit: number): Pro
     }
     const timeout = setTimeout(() => {
       killTree(child)
-      done({ ok: false, error: 'Search timed out. Check your connection and try again.' })
+      done({
+        ok: false,
+        error: 'Search timed out. Check your connection and try again.',
+        errorCode: 'timeout'
+      })
     }, 45_000)
 
     child.stdout.on('data', (d) => (stdout += d.toString()))
@@ -78,7 +82,10 @@ function ytdlpSearch(target: string, service: SearchService, limit: number): Pro
     child.on('error', (err) => done({ ok: false, error: err.message }))
     child.on('close', (code) => {
       if (code !== 0 || !stdout.trim()) {
-        done({ ok: false, error: humanizeYtdlpError(stderr.trim() || 'Search failed.', true) })
+        // `true` for cookies: a search is not the place to suggest configuring
+        // them, and the hint would be wrong as often as not.
+        const failure = classifyYtdlpError(stderr.trim() || 'Search failed.', true)
+        done({ ok: false, error: failure.message, errorCode: failure.code })
         return
       }
       try {
@@ -158,8 +165,12 @@ export async function searchVideos(
   const settled = await Promise.all(SEARCH_ALL_SERVICES.map((s) => searchOne(q, s, perService)))
   const successes = settled.filter((r) => r.ok && r.results?.length).map((r) => r.results!)
   if (!successes.length) {
-    const firstError = settled.find((r) => !r.ok)?.error
-    return { ok: false, error: firstError || 'No results on any service.' }
+    const firstFailure = settled.find((r) => !r.ok)
+    return {
+      ok: false,
+      error: firstFailure?.error || 'No results on any service.',
+      errorCode: firstFailure?.errorCode
+    }
   }
   return { ok: true, results: interleave(successes) }
 }
