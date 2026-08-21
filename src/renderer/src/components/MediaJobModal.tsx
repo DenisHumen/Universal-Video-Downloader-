@@ -167,7 +167,7 @@ export default function MediaJobModal({ item, mode, onClose }: Props): JSX.Eleme
                     onChange={(v) => setPrecise(v === 'precise')}
                     options={[
                       { value: 'precise', label: t('trim.precise') },
-                      { value: 'fast', label: 'fast' }
+                      { value: 'fast', label: t('trim.fast') }
                     ]}
                   />
                   <p className="hint mt-2">

@@ -258,7 +258,15 @@ function buildArgs(item: DownloadItem): string[] {
     const start = item.range!.start ?? 0
     const end = item.range!.end
     args.push('--download-sections', `*${start}-${end ?? 'inf'}`)
-    args.push('--force-keyframes-at-cuts')
+    /*
+      Forcing keyframes re-encodes the section so the cut lands exactly where
+      the user asked. That is the right default — "remove the intro" that leaves
+      two seconds of intro behind has not done the job — but it is also the
+      slowest part of a trimmed download by a wide margin, and it used to be
+      compulsory. A stream copy cuts on the nearest keyframe instead: near
+      instant, at the price of a second or two of slack.
+    */
+    if (item.precise !== false) args.push('--force-keyframes-at-cuts')
   }
 
   args.push(item.url)
@@ -847,6 +855,7 @@ export async function startDownload(request: DownloadRequest): Promise<DownloadI
     attempts: 0,
     kind: 'download',
     range: hasTrim(req.section) ? req.section : undefined,
+    precise: req.preciseSection ?? true,
     outputDir: req.outputDir || settings.downloadDir,
     createdAt: Date.now()
   }

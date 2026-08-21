@@ -318,6 +318,7 @@ export const en = {
   'trim.length': 'length',
   'trim.reset': 'whole video',
   'trim.precise': 'exact cut',
+  'trim.fast': 'fast cut',
   'trim.preciseHint': 're-encodes so the cut lands exactly here — slower, but no leftover intro',
   'trim.fastHint':
     'copies the stream — near-instant, but the clip can start seconds early and run longer than asked',

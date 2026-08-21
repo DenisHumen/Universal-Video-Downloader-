@@ -184,6 +184,13 @@ export interface DownloadRequest {
    */
   section?: TrimRange
   /**
+   * Re-encode the section so the cut lands exactly where it was asked for,
+   * rather than on the nearest keyframe. Slower — often much slower — so it is
+   * a choice rather than a rule. Defaults to true, which is what the app did
+   * before it was a choice at all.
+   */
+  preciseSection?: boolean
+  /**
    * How long the source is, when detection already knew. Used to turn ffmpeg's
    * output timestamp into a percentage for downloads the engine can only fetch
    * through ffmpeg (trimmed sections, some live and HLS streams).

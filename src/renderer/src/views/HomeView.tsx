@@ -40,6 +40,7 @@ import PlaylistCard from '../components/PlaylistCard'
 import StreamingCard from '../components/StreamingCard'
 import TrimEditor from '../components/TrimEditor'
 import CapabilitiesPanel from '../components/CapabilitiesPanel'
+import Choice from '../components/Choice'
 import Thumbnail from '../components/Thumbnail'
 
 type Status = 'idle' | 'detecting' | 'error'
@@ -82,6 +83,8 @@ export default function HomeView(): JSX.Element {
   const [batchText, setBatchText] = useState('')
   const [trimOpen, setTrimOpen] = useState(false)
   const [section, setSection] = useState<TrimRange>({ start: 0 })
+  /** Re-encode for an exact cut, or copy the stream and land on a keyframe. */
+  const [precise, setPrecise] = useState(true)
   /*
     Where this download lands. `DownloadRequest.outputDir` was always honoured
     by the main process but nothing ever set it, so every file in every project
@@ -170,6 +173,7 @@ export default function HomeView(): JSX.Element {
       })
       setTrimOpen(false)
       setSection({ start: 0 })
+      setPrecise(true)
       setStatus('idle')
     } else {
       setError(res.error || t('home.errorTitle'))
@@ -269,7 +273,8 @@ export default function HomeView(): JSX.Element {
         targetHeight: selection.targetHeight,
         duration: info.duration,
         outputDir: saveDir || undefined,
-        section: trimOpen && hasTrim(section) ? section : undefined
+        section: trimOpen && hasTrim(section) ? section : undefined,
+        preciseSection: precise
       })
     } finally {
       setStarting(false)
@@ -606,13 +611,35 @@ export default function HomeView(): JSX.Element {
                     <AnimatePresence initial={false}>
                       {trimOpen && (
                         <motion.div {...collapse} className="overflow-hidden">
-                          <div className="pt-4">
+                          <div className="space-y-4 pt-4">
                             <TrimEditor
                               duration={info.duration}
                               value={section}
                               onChange={setSection}
                               hint={t('trim.downloadHint')}
                             />
+                            {/*
+                              The same choice the trim editor for a finished file
+                              offers. A trimmed download always re-encoded, which
+                              is by far the slowest part of it — and for "just
+                              take the middle ten minutes" the extra precision
+                              buys nothing.
+                            */}
+                            <div>
+                              <p className="label mb-2">{t('trim.precise')}</p>
+                              <Choice
+                                label={t('trim.precise')}
+                                value={precise ? 'precise' : 'fast'}
+                                onChange={(v) => setPrecise(v === 'precise')}
+                                options={[
+                                  { value: 'precise', label: t('trim.precise') },
+                                  { value: 'fast', label: t('trim.fast') }
+                                ]}
+                              />
+                              <p className="hint mt-2">
+                                {precise ? t('trim.preciseHint') : t('trim.fastHint')}
+                              </p>
+                            </div>
                           </div>
                         </motion.div>
                       )}
