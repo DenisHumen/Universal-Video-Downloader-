@@ -9,6 +9,7 @@ import {
   buildConvertArgs,
   buildTrimArgs,
   classifyFfmpegError,
+  FfmpegMissingError,
   ffmpegLocation,
   probeMedia,
   rangeDuration,
@@ -579,6 +580,16 @@ async function runMediaJob(item: DownloadItem): Promise<void> {
       }
     })
   } catch (err) {
+    /*
+      A missing binary is not a post-processing failure, and the generic
+      classifier called it one because its message contains the word "ffmpeg".
+      It is the one error here the app diagnosed itself, so it keeps its own
+      name — and its own translation.
+    */
+    if (err instanceof FfmpegMissingError) {
+      failWith(item, err.code, err.message)
+      return
+    }
     fail(item, err instanceof Error ? err.message : String(err))
     return
   }
