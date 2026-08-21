@@ -4,6 +4,7 @@ import {
   ArrowLeft,
   ArrowRight,
   Check,
+  Copy,
   Crosshair,
   Download,
   ExternalLink,
@@ -19,6 +20,7 @@ import Toasts from './components/Toasts'
 import Logo from './components/Logo'
 import { enter } from './lib/motion'
 import { toast } from './lib/toast'
+import { formatBytes } from './lib/format'
 import { applyAppearance } from './lib/theme'
 import { useT } from './i18n'
 
@@ -47,6 +49,9 @@ export default function BrowserApp(): JSX.Element {
   const [editing, setEditing] = useState(false)
   const [queued, setQueued] = useState<Set<string>>(new Set())
   const [isMac, setIsMac] = useState(false)
+  // The main window tracks this; here the glyph was pinned to "maximize" for
+  // the life of the window, so a maximised browser still offered to maximise.
+  const [maximized, setMaximized] = useState(false)
   const stageRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -54,6 +59,7 @@ export default function BrowserApp(): JSX.Element {
       const [settings, info] = await Promise.all([window.api.getSettings(), window.api.getAppInfo()])
       applyAppearance(settings, info.locale)
       setIsMac(info.platform === 'darwin')
+      setMaximized(await window.api.isWindowMaximized())
     })()
     const offState = window.api.onBrowserState(setState)
     const offMedia = window.api.onBrowserMedia(setMedia)
@@ -204,10 +210,10 @@ export default function BrowserApp(): JSX.Element {
             </button>
             <button
               className="no-drag inline-flex h-8 w-9 cursor-pointer items-center justify-center text-ink-3 transition-colors duration-fast ease-ease hover:bg-sink hover:text-ink"
-              onClick={() => window.api.maximizeWindow()}
+              onClick={async () => setMaximized(await window.api.maximizeWindow())}
               aria-label="Maximize"
             >
-              <Square size={11} />
+              {maximized ? <Copy size={12} /> : <Square size={11} />}
             </button>
             <button
               className="no-drag inline-flex h-8 w-9 cursor-pointer items-center justify-center text-ink-3 transition-colors duration-fast ease-ease hover:bg-bad hover:text-white"
@@ -254,7 +260,9 @@ export default function BrowserApp(): JSX.Element {
                     {entry.label}
                   </p>
                   <p className="mono mt-1 text-[11px] uppercase tracking-[0.08em] text-ink-2">
-                    {entry.kind}
+                    {[entry.kind, entry.bytes ? formatBytes(entry.bytes) : null]
+                      .filter(Boolean)
+                      .join('  ·  ')}
                   </p>
                   <button
                     className={`mt-2.5 w-full py-2 ${

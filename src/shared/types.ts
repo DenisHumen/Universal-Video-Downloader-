@@ -447,6 +447,8 @@ export interface BrowserMedia {
   pageUrl: string
   pageTitle?: string
   thumbnail?: string
+  /** Bytes, when the response advertised a Content-Length. */
+  bytes?: number
   seenAt: number
 }
 

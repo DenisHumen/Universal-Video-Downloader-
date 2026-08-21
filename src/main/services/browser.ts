@@ -119,6 +119,9 @@ function rememberCandidate(candidate: MediaCandidate): void {
     score: candidate.score,
     pageUrl: wc?.getURL() ?? '',
     pageTitle: wc?.getTitle(),
+    // What the server said it was sending. On a page offering three MP4s, the
+    // size is the only thing in the panel that tells the film from the trailer.
+    bytes: candidate.bytes,
     seenAt: Date.now()
   })
   sendMedia()
