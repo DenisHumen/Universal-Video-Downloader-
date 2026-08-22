@@ -136,10 +136,15 @@ export const en = {
   'playlist.added': 'added {count} videos to the queue',
 
   // ---- streaming picker ----
-  'streaming.voiceover': 'voiceover · озвучка',
-  'streaming.season': 'season · сезон',
-  'streaming.episodes': 'episodes · серии',
-  'streaming.quality': 'quality · качество',
+  /*
+    Plain English. These carried a Russian gloss — "voiceover · озвучка" — from
+    before the app had a Russian locale, so the only person still seeing it was
+    the one reading the English one.
+  */
+  'streaming.voiceover': 'voiceover',
+  'streaming.season': 'season',
+  'streaming.episodes': 'episodes',
+  'streaming.quality': 'quality',
   'streaming.premium': 'premium',
   'streaming.premiumHint': 'requires Premium — cannot be downloaded',
   'streaming.series': 'series',
@@ -389,29 +394,29 @@ export const en = {
     main process sends a code; these are what it means.
   */
   'err.unavailable':
-    'This video is unavailable — it may have been removed, made private, or blocked in your region.',
-  'err.ageRestricted': 'This content is age-restricted.',
-  'err.rateLimited': 'The site is rate-limiting us. Wait a minute and retry, or set a proxy.',
-  'err.signIn': 'This video requires you to be signed in.',
-  'err.forbidden': 'The site refused the request.',
-  'err.geo': 'This video is not available in your region.',
-  'err.drm': 'This video is DRM-protected and cannot be downloaded.',
-  'err.diskFull': 'Your disk is full — free some space and try again.',
-  'err.permission': 'No permission to write to the download folder. Pick another one in settings.',
-  'err.postprocess': 'Post-processing failed — the video arrived but could not be merged or converted.',
-  'err.noFormats': 'Could not find a downloadable video at this link.',
-  'err.network': 'Network problem reaching the site. Check your connection or proxy.',
-  'err.timeout': 'The site took too long to answer. Check your connection or proxy.',
-  'err.canceled': 'Canceled.',
-  'err.sourceMissing': 'The source file is gone — it may have been moved or deleted.',
-  'err.noAudioTrack': 'This file has no audio track, so it can’t become an audio file.',
-  'err.damagedSource': 'The source file looks damaged or incomplete.',
-  'err.unknownEncoder': 'The bundled ffmpeg can’t encode this format. Pick another one.',
-  'err.ffmpegMissing': 'The bundled ffmpeg is missing — reinstall the app.',
-  'err.streamGone': 'The stream this link pointed at is no longer there.',
-  'err.corruptLink': 'This download link is corrupted — pick the video again.',
-  'err.emptyPage': 'No videos found on this page.',
-  'err.cookieHint': 'Try switching on browser cookies in settings → access.'
+    'this video is unavailable — it may have been removed, made private, or blocked in your region.',
+  'err.ageRestricted': 'this content is age-restricted.',
+  'err.rateLimited': 'the site is rate-limiting us. wait a minute and retry, or set a proxy.',
+  'err.signIn': 'this video requires you to be signed in.',
+  'err.forbidden': 'the site refused the request.',
+  'err.geo': 'this video is not available in your region.',
+  'err.drm': 'this video is DRM-protected and cannot be downloaded.',
+  'err.diskFull': 'your disk is full — free some space and try again.',
+  'err.permission': 'no permission to write to the download folder. pick another one in settings.',
+  'err.postprocess': 'post-processing failed — the video arrived but could not be merged or converted.',
+  'err.noFormats': 'could not find a downloadable video at this link.',
+  'err.network': 'network problem reaching the site. check your connection or proxy.',
+  'err.timeout': 'the site took too long to answer. check your connection or proxy.',
+  'err.canceled': 'canceled.',
+  'err.sourceMissing': 'the source file is gone — it may have been moved or deleted.',
+  'err.noAudioTrack': 'this file has no audio track, so it can’t become an audio file.',
+  'err.damagedSource': 'the source file looks damaged or incomplete.',
+  'err.unknownEncoder': 'the bundled ffmpeg can’t encode this format. pick another one.',
+  'err.ffmpegMissing': 'the bundled ffmpeg is missing — reinstall the app.',
+  'err.streamGone': 'the stream this link pointed at is no longer there.',
+  'err.corruptLink': 'this download link is corrupted — pick the video again.',
+  'err.emptyPage': 'no videos found on this page.',
+  'err.cookieHint': 'try switching on browser cookies in settings → access.'
 } as const
 
 export type TranslationKey = keyof typeof en
