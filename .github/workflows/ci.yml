@@ -31,17 +31,16 @@ jobs:
   # build, which is to say after a `v*` tag was already public and the failure
   # was most expensive to fix. `--dir` skips the installers and is quick.
   #
-  # Only the arm64 Mac runs here. The Intel one is in release.yml, on the
-  # macos-15-intel label, and stays out of the per-push matrix until a release
-  # has shown that label actually gets a runner — macos-13, which this used to
-  # ask for, was retired, so the job queued for ever and every CI run sat
-  # permanently in progress with the README badge along with it.
+  # Both Mac architectures, on macos-15-intel for x64 rather than the retired
+  # macos-13 — that label no longer resolves to a runner, so the job used to
+  # queue for ever, every run sat permanently in progress, and the Intel build
+  # was quietly coming off the arm64 runner instead. v3.15.0 confirmed the new
+  # label really is allocated.
   #
-  # macos-latest covers everything mac-specific about packaging: the DMG
-  # options, the entitlements, the background image. What genuinely differs by
-  # architecture is the bundled ffmpeg — and that is now checked inside each
-  # packed app by scripts/after-pack.mjs, on every platform, before an installer
-  # is built.
+  # Worth the extra job: the Intel Mac is exactly where a packaging bug hid for
+  # the entire life of the project, and scripts/after-pack.mjs — which reads the
+  # ffmpeg inside each packed app — only helps if something actually packs for
+  # that architecture.
   pack:
     name: Package (${{ matrix.label }})
     runs-on: ${{ matrix.os }}
@@ -61,6 +60,10 @@ jobs:
             args: --mac --arm64
             arch: arm64
             label: mac arm64
+          - os: macos-15-intel
+            args: --mac --x64
+            arch: x64
+            label: mac x64
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
