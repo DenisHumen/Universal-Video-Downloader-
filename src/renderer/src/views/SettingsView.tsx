@@ -212,8 +212,16 @@ export default function SettingsView(): JSX.Element {
   }
   const updateEngine = async (): Promise<void> => {
     setUpdatingEngine(true)
-    await window.api.updateYtdlp()
-    setUpdatingEngine(false)
+    try {
+      await window.api.updateYtdlp()
+      toast(t('settings.engineUpdated'), 'success')
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err)
+      // Main refuses to swap the binary out from under a running transfer.
+      toast(/engineBusy/.test(message) ? t('err.engineBusy') : t('settings.engineFailed'), 'error')
+    } finally {
+      setUpdatingEngine(false)
+    }
   }
   const resetAll = async (): Promise<void> => {
     await reset()

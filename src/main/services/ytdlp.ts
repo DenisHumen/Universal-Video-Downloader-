@@ -253,19 +253,59 @@ export function ensureYtdlp(): Promise<string> {
   return ensurePromise
 }
 
-/** Force update the engine to the latest release. */
-export async function updateYtdlp(): Promise<string | undefined> {
-  emit({ state: 'checking', message: 'Updating download engine…' })
-  // The self-update keeps the same path and is fast when up to date.
-  const { code } = await spawnYtdlp(['-U'])
-  if (code !== 0) {
-    // Fall back to a fresh download.
-    await downloadBinary()
+/** The engine is in use, so replacing it now would break a running download. */
+export class EngineBusyError extends Error {
+  readonly code = 'engineBusy'
+  constructor() {
+    super('Pause or finish your downloads first — updating replaces the file they run from.')
+    this.name = 'EngineBusyError'
   }
-  markRefreshed()
-  const version = await getVersion()
-  emit({ state: 'ready', version, message: 'Ready' })
-  return version
+}
+
+let updating: Promise<string | undefined> | null = null
+
+/**
+ * Force update the engine to the latest release.
+ *
+ * `refreshEngineIfDue` refuses to do this while the engine is in use, and
+ * documents why: `-U` replaces the very executable a running transfer was
+ * started from, which on Windows cannot be done at all while it is loaded. The
+ * button in Settings ran the same command with none of that care, so clicking
+ * it mid-download hit exactly the case the automatic path is written to avoid.
+ *
+ * Two clicks used to start two updates over one path, and a failure left the
+ * status stuck on "checking" with the spinner turning for the rest of the
+ * session — the caller had nothing to catch and nothing to show.
+ */
+export async function updateYtdlp(isBusy: () => boolean = () => false): Promise<string | undefined> {
+  if (isBusy()) throw new EngineBusyError()
+  if (updating) return updating
+
+  updating = (async () => {
+    emit({ state: 'checking', message: 'Updating download engine…' })
+    try {
+      // The self-update keeps the same path and is fast when up to date.
+      const { code } = await spawnYtdlp(['-U'])
+      if (code !== 0) {
+        // Fall back to a fresh download.
+        await downloadBinary()
+      }
+      markRefreshed()
+      const version = await getVersion()
+      emit({ state: 'ready', version, message: 'Ready' })
+      return version
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err)
+      emit({ state: 'error', message })
+      throw err
+    }
+  })()
+
+  try {
+    return await updating
+  } finally {
+    updating = null
+  }
 }
 
 const REFRESH_INTERVAL = 24 * 60 * 60 * 1000

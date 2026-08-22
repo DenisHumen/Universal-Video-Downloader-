@@ -1,5 +1,5 @@
 import { b64urlDecode, b64urlEncode } from '../http'
-import type { ResolvedUrl } from '../types'
+import type { ResolveOptions, ResolvedUrl } from '../types'
 
 /**
  * `uvd-direct://` — a stream the user picked by hand in the built-in browser.
@@ -38,7 +38,10 @@ export function parseDirectUrl(uvdUrl: string): DirectPayload | null {
   }
 }
 
-export async function resolveDirectUrl(uvdUrl: string): Promise<ResolvedUrl> {
+export async function resolveDirectUrl(
+  uvdUrl: string,
+  options: ResolveOptions = {}
+): Promise<ResolvedUrl> {
   const payload = parseDirectUrl(uvdUrl)
   if (!payload) throw new Error('This download link is corrupted — pick the video again.')
 
@@ -46,7 +49,7 @@ export async function resolveDirectUrl(uvdUrl: string): Promise<ResolvedUrl> {
   if (!fresh && payload.pageUrl) {
     // Lazily imported: the universal resolver pulls in the headless browser.
     const { resolveUniversal } = await import('./index')
-    const refreshed = await resolveUniversal(payload.pageUrl).catch(() => null)
+    const refreshed = await resolveUniversal(payload.pageUrl, options).catch(() => null)
     if (refreshed) {
       return {
         ...refreshed,

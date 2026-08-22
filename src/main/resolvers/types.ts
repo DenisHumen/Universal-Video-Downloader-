@@ -33,6 +33,20 @@ export interface ResolvedUrl {
   downloadUrl?: string
 }
 
+/**
+ * What the caller controls when a queued item is re-resolved.
+ *
+ * Both of these were simply missing. Re-resolution runs on every start and
+ * every retry, and it opened the headless browser whether or not the user had
+ * turned that fallback off in Settings, and kept it open after they cancelled.
+ */
+export interface ResolveOptions {
+  /** The user's "try the built-in browser" setting. */
+  allowBrowser?: boolean
+  /** Cancels the browser pass; the hidden window is torn down at once. */
+  signal?: AbortSignal
+}
+
 /** A hand-written resolver for one site (or family of mirror domains). */
 export interface SiteResolver {
   /** Stable id, also used as the extractor label when the site doesn't set one. */

@@ -4,9 +4,9 @@ import { yummyaniResolvers, resolveYummyaniItem, resolveYummyaniStream } from '.
 import { resolveSniffUrl, SNIFF_SCHEME } from './universal'
 import { DIRECT_SCHEME, resolveDirectUrl } from './universal/direct'
 import { normalizeUrl } from '@shared/urls'
-import type { ResolvedUrl, SiteResolver } from './types'
+import type { ResolveOptions, ResolvedUrl, SiteResolver } from './types'
 
-export type { ResolvedEntry, ResolvedUrl, SiteResolver } from './types'
+export type { ResolvedEntry, ResolveOptions, ResolvedUrl, SiteResolver } from './types'
 export { searchYummyani } from './sites/yummyani'
 export { resolveUniversal, sniffUrlFor, SNIFF_SCHEME } from './universal'
 export type { UniversalStage } from './universal'
@@ -28,7 +28,10 @@ const resolvers: SiteResolver[] = [
 ]
 
 /** Internal `uvd-*://` URLs the queue stores so streams can be re-resolved. */
-const internalSchemes: { prefix: string; resolve: (url: string) => Promise<ResolvedUrl> }[] = [
+const internalSchemes: {
+  prefix: string
+  resolve: (url: string, options?: ResolveOptions) => Promise<ResolvedUrl>
+}[] = [
   { prefix: 'uvd-rezka://', resolve: resolveRezkaStream },
   { prefix: 'uvd-yummy-item://', resolve: resolveYummyaniItem },
   { prefix: 'uvd-yummy://', resolve: resolveYummyaniStream },
@@ -47,11 +50,14 @@ export function isInternalUrl(input: string): boolean {
  * passes through untouched so the engine — and then the universal resolver —
  * can have a go at it.
  */
-export async function resolveUrl(input: string): Promise<ResolvedUrl> {
+export async function resolveUrl(
+  input: string,
+  options: ResolveOptions = {}
+): Promise<ResolvedUrl> {
   const raw = input.trim()
 
   for (const scheme of internalSchemes) {
-    if (raw.startsWith(scheme.prefix)) return scheme.resolve(raw)
+    if (raw.startsWith(scheme.prefix)) return scheme.resolve(raw, options)
   }
 
   // Callers normalise before queueing, but history written by an older build

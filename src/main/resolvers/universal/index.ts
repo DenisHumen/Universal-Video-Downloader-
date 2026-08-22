@@ -1,5 +1,5 @@
 import { b64urlDecode, b64urlEncode, hostOf } from '../http'
-import type { ResolvedUrl } from '../types'
+import type { ResolveOptions, ResolvedUrl } from '../types'
 import { best, type MediaCandidate } from './candidates'
 import { scrapeStatic } from './static'
 import { sniffPage } from './sniffer'
@@ -97,9 +97,12 @@ export async function resolveUniversal(
 }
 
 /** Re-resolve a queued `uvd-sniff://` item to a fresh stream URL. */
-export async function resolveSniffUrl(uvdUrl: string): Promise<ResolvedUrl> {
+export async function resolveSniffUrl(
+  uvdUrl: string,
+  options: ResolveOptions = {}
+): Promise<ResolvedUrl> {
   const pageUrl = pageUrlFromSniffUrl(uvdUrl)
-  const resolved = await resolveUniversal(pageUrl)
+  const resolved = await resolveUniversal(pageUrl, options)
   if (!resolved) {
     throw new Error('Could not find a video stream on this page any more.')
   }

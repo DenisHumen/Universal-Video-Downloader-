@@ -28,6 +28,7 @@ import {
   retryDownload,
   prioritizeDownload,
   kickQueue,
+  isEngineBusy,
   retryFailed,
   startDownload,
   startMediaJob
@@ -165,7 +166,7 @@ export function registerIpc({ getWindow, openSearchWindow, onSettingsChanged }: 
     }
     return getYtdlpStatus()
   })
-  ipcMain.handle(IPC.ytdlpUpdate, () => updateYtdlp())
+  ipcMain.handle(IPC.ytdlpUpdate, () => updateYtdlp(isEngineBusy))
 
   // ---- App updates ----
   ipcMain.handle(IPC.updateCheck, () => checkForUpdates())

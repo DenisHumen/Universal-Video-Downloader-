@@ -15,12 +15,12 @@ import { flushSettings, getSettings } from './services/settings'
 import { ensureYtdlp, refreshEngineIfDue } from './services/ytdlp'
 import { checkForUpdates, initUpdater } from './services/updater'
 import {
-  listDownloads,
   loadHistory,
   pauseAll,
   resumeAll,
   resumeInterrupted,
-  shutdownDownloads
+  shutdownDownloads,
+  isEngineBusy
 } from './services/downloader'
 import { startClipboardWatch, stopClipboardWatch } from './services/clipboard'
 import { currentLanguage, mt, type MainLanguage } from './services/locale'
@@ -439,13 +439,7 @@ if (!gotLock) {
       a stale engine is a real failure mode — but swapping the binary out from
       under a running transfer is a worse one.
     */
-    setTimeout(() => {
-      const busy = (): boolean =>
-        listDownloads().some((d) =>
-          ['downloading', 'processing', 'detecting'].includes(d.state)
-        )
-      void refreshEngineIfDue(busy)
-    }, 30_000)
+    setTimeout(() => void refreshEngineIfDue(isEngineBusy), 30_000)
 
     const initialLink = linkFromArgv(process.argv)
     if (initialLink) {

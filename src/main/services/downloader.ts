@@ -52,6 +52,19 @@ const items = new Map<string, DownloadItem>()
 const procs = new Map<string, ChildProcess>()
 const finalPaths = new Map<string, { path: string; priority: number }>()
 const retryTimers = new Map<string, NodeJS.Timeout>()
+/*
+  Resolving is the one phase of a download with no process behind it, so
+  cancel had nothing to kill. For a universal-resolved item that phase opens a
+  hidden browser window and drives the page, and it carried on doing so after
+  the user had stopped the download.
+*/
+const resolveAborts = new Map<string, AbortController>()
+
+/** Stop any in-flight link resolution for this item. */
+function abortResolve(id: string): void {
+  resolveAborts.get(id)?.abort()
+  resolveAborts.delete(id)
+}
 
 function historyFile(): string {
   return join(app.getPath('userData'), 'history.json')
@@ -738,8 +751,20 @@ async function runDownload(item: DownloadItem): Promise<void> {
   item.errorCode = undefined
   item.cookieHint = undefined
   emitUpdated(item)
+  const abort = new AbortController()
+  resolveAborts.set(item.id, abort)
   try {
-    const resolved = await resolveUrl(item.sourceUrl || item.url)
+    /*
+      `universalFallback` was read when the link was first detected and then
+      forgotten. Re-resolution happens on every start and every retry, and it
+      defaulted to allowing the headless browser — so turning the setting off
+      stopped the browser being used to find a video, but not to fetch it again
+      afterwards.
+    */
+    const resolved = await resolveUrl(item.sourceUrl || item.url, {
+      allowBrowser: getSettings().universalFallback,
+      signal: abort.signal
+    })
     item.url = resolved.url
     item.referer = resolved.referer
     item.headers = resolved.headers
@@ -752,6 +777,8 @@ async function runDownload(item: DownloadItem): Promise<void> {
   } catch (err) {
     fail(item, err instanceof Error ? err.message : String(err))
     return
+  } finally {
+    resolveAborts.delete(item.id)
   }
   // Paused/canceled/removed while we were resolving — don't start the engine.
   if (!items.has(item.id) || item.state !== 'detecting') {
@@ -988,6 +1015,16 @@ export async function startDownload(request: DownloadRequest): Promise<DownloadI
  * finished, because the limit is only read when the queue is next pumped and
  * no one pumped it on a settings change.
  */
+/**
+ * Whether anything is currently using the engine binary.
+ *
+ * Updating yt-dlp replaces the executable that running transfers were started
+ * from — on Windows it cannot even be overwritten while it is loaded.
+ */
+export function isEngineBusy(): boolean {
+  return activeCount() > 0
+}
+
 export function kickQueue(): void {
   processQueue()
 }
@@ -1047,6 +1084,7 @@ export function pauseDownload(id: string): void {
   if (!item) return
   if (item.state === 'completed') return
   clearRetry(id)
+  abortResolve(id)
   const proc = procs.get(id)
   item.state = 'paused'
   // A deliberate pause outranks anything the previous shutdown recorded.
@@ -1151,6 +1189,7 @@ export function cancelDownload(id: string): void {
   const item = items.get(id)
   if (!item) return
   clearRetry(id)
+  abortResolve(id)
   const proc = procs.get(id)
   item.state = 'canceled'
   resetProgress(item)
@@ -1178,6 +1217,7 @@ export function retryDownload(id: string): void {
   const item = items.get(id)
   if (!item) return
   clearRetry(id)
+  abortResolve(id)
   item.state = 'queued'
   item.error = undefined
   item.errorCode = undefined
@@ -1199,6 +1239,7 @@ export function retryDownload(id: string): void {
 
 export function removeDownload(id: string): void {
   clearRetry(id)
+  abortResolve(id)
   forgetProgress(id)
   const proc = procs.get(id)
   if (proc) killTree(proc)
