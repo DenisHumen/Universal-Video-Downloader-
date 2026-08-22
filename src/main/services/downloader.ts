@@ -660,7 +660,7 @@ async function runMediaJob(item: DownloadItem): Promise<void> {
     args =
       item.kind === 'trim'
         ? buildTrimArgs(source, item.filepath!, item.range ?? {}, item.precise ?? true, probe.hasVideo)
-        : buildConvertArgs(source, item.filepath!, item.convertTarget!)
+        : buildConvertArgs(source, item.filepath!, item.convertTarget!, probe)
   } catch (err) {
     fail(item, err instanceof Error ? err.message : String(err))
     return

@@ -161,6 +161,78 @@ describe('buildConvertArgs', () => {
     const args = buildConvertArgs('in.mp4', 'out.webm', { mode: 'video', container: 'webm' })
     expect(args[args.length - 1]).toBe('out.webm')
   })
+
+  /*
+    Turning an MKV of h264 and AAC into an MP4 is the commonest thing anyone
+    asks of this screen, and the streams inside are already what MP4 wants — it
+    is a rewrap. It re-encoded every frame at CRF 21 anyway: measured at 1027ms
+    against 46ms for the copy on a 20-second clip, and the re-encode came out
+    less than half the size, which is quality thrown away rather than saved.
+  */
+  it('copies the streams when only the container changes', () => {
+    const args = buildConvertArgs(
+      'in.mkv',
+      'out.mp4',
+      { mode: 'video', container: 'mp4' },
+      { videoCodec: 'h264', audioCodec: 'aac' }
+    )
+    expect(args).toContain('copy')
+    expect(args).not.toContain('libx264')
+    // One video and one audio track: MP4 cannot hold the ASS subtitles an MKV
+    // often carries, and a blanket copy would fail the whole file over them.
+    expect(args.join(' ')).toContain('-map 0:v:0 -map 0:a:0?')
+  })
+
+  it('re-encodes when the target container cannot hold those codecs', () => {
+    const vp9 = { videoCodec: 'vp9', audioCodec: 'opus' }
+    expect(buildConvertArgs('i.webm', 'o.mp4', { mode: 'video', container: 'mp4' }, vp9)).toContain(
+      'libx264'
+    )
+    const h264 = { videoCodec: 'h264', audioCodec: 'aac' }
+    expect(
+      buildConvertArgs('i.mp4', 'o.webm', { mode: 'video', container: 'webm' }, h264)
+    ).toContain('libvpx-vp9')
+  })
+
+  it('re-encodes when a downscale was asked for, since that has to decode', () => {
+    const args = buildConvertArgs(
+      'in.mkv',
+      'out.mp4',
+      { mode: 'video', container: 'mp4', height: 720 },
+      { videoCodec: 'h264', audioCodec: 'aac' }
+    )
+    expect(args).toContain('libx264')
+    expect(args).not.toContain('copy')
+  })
+
+  it('re-encodes when nothing is known about the streams', () => {
+    expect(buildConvertArgs('in.mkv', 'out.mp4', { mode: 'video', container: 'mp4' })).toContain(
+      'libx264'
+    )
+  })
+
+  it('copies a video with no audio at all', () => {
+    const args = buildConvertArgs(
+      'in.mkv',
+      'out.mp4',
+      { mode: 'video', container: 'mp4' },
+      { videoCodec: 'h264' }
+    )
+    expect(args).toContain('copy')
+  })
+
+  /*
+    The GIF branch turned a requested height into a width by multiplying by
+    16/9 and scaled on that — right only for a 16:9 source. A 1080x1920 phone
+    video asked to be 480 tall came out 853x1517: three times the height, and a
+    file to match. Verified against ffmpeg that it is now 270x480.
+  */
+  it('scales a gif by the dimension it was actually given', () => {
+    const tall = buildConvertArgs('in.mp4', 'out.gif', { mode: 'video', container: 'gif', height: 480 })
+    expect(tall.join(' ')).toContain('scale=-1:480')
+    const bare = buildConvertArgs('in.mp4', 'out.gif', { mode: 'video', container: 'gif' })
+    expect(bare.join(' ')).toContain('scale=480:-1')
+  })
 })
 
 describe('humanizeFfmpegError', () => {

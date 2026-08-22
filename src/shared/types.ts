@@ -173,10 +173,6 @@ export interface DownloadRequest {
   /** A quality preset, used when no explicit formatId is provided. */
   quality?: QualityPreset
   outputDir?: string
-  audioFormat?: string
-  embedThumbnail?: boolean
-  embedSubtitles?: boolean
-  embedMetadata?: boolean
   /**
    * Fetch only this section of the video. The engine downloads just the
    * requested range, so trimming a clip out of a two-hour stream costs

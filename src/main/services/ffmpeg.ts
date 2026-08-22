@@ -113,6 +113,9 @@ export interface MediaProbe {
   duration?: number
   hasVideo: boolean
   hasAudio: boolean
+  /** Codec names as ffmpeg reports them: `h264`, `aac`, `vp9`. */
+  videoCodec?: string
+  audioCodec?: string
 }
 
 /**
@@ -137,7 +140,11 @@ export function probeMedia(path: string): Promise<MediaProbe> {
       resolve({
         duration: seconds != null && Number.isFinite(seconds) ? seconds : undefined,
         hasVideo: /Stream #\d+:\d+.*: Video:/.test(stderr),
-        hasAudio: /Stream #\d+:\d+.*: Audio:/.test(stderr)
+        hasAudio: /Stream #\d+:\d+.*: Audio:/.test(stderr),
+        // Which codecs, not merely whether there are any: a conversion that
+        // only changes the container can copy these straight across.
+        videoCodec: /Stream #\d+:\d+.*: Video: (\w+)/.exec(stderr)?.[1],
+        audioCodec: /Stream #\d+:\d+.*: Audio: (\w+)/.exec(stderr)?.[1]
       })
     }
     const timer = setTimeout(() => {
@@ -344,8 +351,33 @@ const VIDEO_CODEC: Record<string, string[]> = {
   webm: ['-c:v', 'libvpx-vp9', '-crf', '32', '-b:v', '0', '-c:a', 'libopus', '-b:a', '128k']
 }
 
+/**
+ * Codecs each container can hold as they are, so a conversion that only
+ * changes the wrapper need not decode and re-encode a single frame.
+ *
+ * Converting an MKV of h264 and AAC to MP4 is the commonest thing anyone asks
+ * of this screen, and it is a rename with extra steps — the streams inside are
+ * already what MP4 wants. It was re-encoding every frame at CRF 21 regardless:
+ * minutes of work, a generation of quality thrown away, for a file that comes
+ * out worse than the copy would have been.
+ */
+const REMUXABLE: Record<string, { video: RegExp; audio: RegExp }> = {
+  mp4: { video: /^(h264|hevc|av1|mpeg4)$/, audio: /^(aac|mp3|ac3|eac3|alac)$/ },
+  mov: { video: /^(h264|hevc|prores|mpeg4)$/, audio: /^(aac|mp3|alac|pcm_\w+)$/ },
+  mkv: {
+    video: /^(h264|hevc|av1|vp8|vp9|mpeg4|theora)$/,
+    audio: /^(aac|mp3|ac3|eac3|opus|vorbis|flac|alac|dts|pcm_\w+)$/
+  },
+  webm: { video: /^(vp8|vp9|av1)$/, audio: /^(opus|vorbis)$/ }
+}
+
 /** Convert a file to another container/codec, optionally downscaling. */
-export function buildConvertArgs(input: string, output: string, target: ConvertTarget): string[] {
+export function buildConvertArgs(
+  input: string,
+  output: string,
+  target: ConvertTarget,
+  streams?: Pick<MediaProbe, 'videoCodec' | 'audioCodec'>
+): string[] {
   const args: string[] = ['-i', input]
 
   if (target.mode === 'audio') {
@@ -357,10 +389,17 @@ export function buildConvertArgs(input: string, output: string, target: ConvertT
   if (target.container === 'gif') {
     // A single-pass palette filter — far better looking than naive gif output.
     const fps = 12
-    const width = target.height ? Math.round((target.height * 16) / 9) : 480
+    /*
+      Scale by whichever dimension was actually asked for. This used to turn a
+      requested height into a width by multiplying by 16/9 and then scale on
+      that width — so it was only ever right for a 16:9 source. Ask for a 480p
+      GIF of a phone video and you got one 853 wide and about 1517 tall: three
+      times the height requested, and a file to match.
+    */
+    const scale = target.height ? `-1:${target.height}` : '480:-1'
     args.push(
       '-vf',
-      `fps=${fps},scale=${width}:-1:flags=lanczos,split[s0][s1];[s0]palettegen[p];[s1][p]paletteuse`,
+      `fps=${fps},scale=${scale}:flags=lanczos,split[s0][s1];[s0]palettegen[p];[s1][p]paletteuse`,
       '-loop',
       '0',
       output
@@ -368,8 +407,27 @@ export function buildConvertArgs(input: string, output: string, target: ConvertT
     return args
   }
 
+  const rules = REMUXABLE[target.container]
+  const canRemux =
+    // Downscaling has to decode; nothing else here does.
+    !target.height &&
+    !!rules &&
+    !!streams?.videoCodec &&
+    rules.video.test(streams.videoCodec) &&
+    (!streams.audioCodec || rules.audio.test(streams.audioCodec))
+
   if (target.height) args.push('-vf', `scale=-2:${target.height}`)
-  args.push(...(VIDEO_CODEC[target.container] ?? VIDEO_CODEC.mp4))
+  if (canRemux) {
+    /*
+      One video and one audio track, which is what ffmpeg's own default
+      selection would have picked. Naming them keeps subtitles and attachments
+      out: MP4 cannot hold the ASS subtitles an MKV often carries, and a plain
+      `-c copy` would fail on the whole file because of them.
+    */
+    args.push('-map', '0:v:0', '-map', '0:a:0?', '-c', 'copy')
+  } else {
+    args.push(...(VIDEO_CODEC[target.container] ?? VIDEO_CODEC.mp4))
+  }
   if (target.container === 'mp4' || target.container === 'mov') {
     args.push('-movflags', '+faststart')
   }
