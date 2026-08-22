@@ -56,6 +56,50 @@ describe('scoreUrl', () => {
   it('never treats a blob: URL as downloadable', () => {
     expect(isPlausible(candidate('blob:https://site.test/abcd.mp4'))).toBe(false)
   })
+
+  /*
+    Each junk word used to end in an optional separator, which is no boundary at
+    all, so the list matched anything merely starting with one of them. These are
+    ordinary videos that were being read as adverts and thumbnails — and at 45 or
+    55 off, they landed under the floor and were dropped rather than demoted, so
+    the page came back as "nothing found".
+  */
+  it('does not read a junk word out of the middle of an ordinary name', () => {
+    for (const url of [
+      'https://cdn.test/course/introduction.mp4',
+      'https://cdn.test/videos/cover-band-live.mp4',
+      'https://cdn.test/promotional-strategy.mp4',
+      'https://cdn.test/posterior-approach.mp4',
+      'https://cdn.test/app/logout.mp4',
+      'https://cdn.test/bannerman-interview.mp4'
+    ]) {
+      expect(scoreUrl(url).score, url).toBe(scoreUrl('https://cdn.test/video.mp4').score)
+    }
+  })
+
+  it('demotes a trailer to the floor but still offers it', () => {
+    // A page whose only video is the trailer is a page somebody opened wanting
+    // the trailer; a course's first lesson really is called intro.mp4.
+    for (const url of ['https://cdn.test/trailer.mp4', 'https://cdn.test/intro.mp4']) {
+      expect(isPlausible(candidate(url)), url).toBe(true)
+      expect(scoreUrl(url).score).toBeLessThan(scoreUrl('https://cdn.test/video.mp4').score)
+    }
+  })
+
+  it('does not let a soft penalty lift something already below the floor', () => {
+    expect(isPlausible(candidate('https://cdn.test/preview/seg-4.ts'))).toBe(false)
+  })
+
+  it('still drops the things that are certainly not the video', () => {
+    for (const url of [
+      'https://cdn.test/storyboard.mp4',
+      'https://cdn.test/thumbs/sprite.mp4',
+      'https://cdn.test/hls/thumbnails.mp4',
+      'https://ads.doubleclick.net/spot.mp4'
+    ]) {
+      expect(isPlausible(candidate(url)), url).toBe(false)
+    }
+  })
 })
 
 describe('rank', () => {

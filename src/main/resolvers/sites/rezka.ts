@@ -11,7 +11,23 @@ interface RezkaStream {
   url: string
 }
 
-function parseStreams(raw: string): RezkaStream[] {
+/**
+ * The height a HDRezka quality label stands for.
+ *
+ * These are free text from the site: `360p`, `1080p`, `1080p Ultra`, `4K`.
+ * Reading them with `parseInt` turned `4K` into 4, which sorted the best stream
+ * the site offers below its worst — so "best quality" picked 1080p and never
+ * once chose 4K, and asking for 480p could hand back the 4K stream because 4 is
+ * less than 480.
+ */
+export function labelHeight(label: string): number {
+  const k = /(\d+)\s*k\b/i.exec(label)
+  if (k) return { 2: 1440, 4: 2160, 8: 4320 }[Number(k[1])] ?? Number(k[1]) * 540
+  const p = /(\d{3,4})\s*p?/i.exec(label)
+  return p ? Number(p[1]) : 0
+}
+
+export function parseStreams(raw: string): RezkaStream[] {
   const out: RezkaStream[] = []
   const re = /\[([^\]]+)\]([^,]+?)(?=,\[|$)/g
   let m: RegExpExecArray | null
@@ -23,15 +39,15 @@ function parseStreams(raw: string): RezkaStream[] {
       .trim()
       .replace(/:hls:manifest\.m3u8$/i, '')
     if (!/^https?:\/\//.test(url)) continue
-    out.push({ quality: label, height: parseInt(label, 10) || 0, url })
+    out.push({ quality: label, height: labelHeight(label), url })
   }
   return out.sort((a, b) => a.height - b.height)
 }
 
-function pickQuality(streams: RezkaStream[], requested: string): RezkaStream | undefined {
+export function pickQuality(streams: RezkaStream[], requested: string): RezkaStream | undefined {
   if (!streams.length) return undefined
   if (requested === 'best' || requested === 'audio' || !requested) return streams[streams.length - 1]
-  const want = parseInt(requested, 10)
+  const want = labelHeight(requested)
   const atOrBelow = streams.filter((s) => s.height <= want)
   return atOrBelow.length ? atOrBelow[atOrBelow.length - 1] : streams[0]
 }

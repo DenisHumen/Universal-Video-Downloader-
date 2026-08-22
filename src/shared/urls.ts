@@ -184,13 +184,26 @@ const SINGLE_ITEM =
 export function looksLikeCollection(url: string): boolean {
   const normalized = normalizeUrl(url)
 
+  /*
+    A link straight to a media file is never a collection, whatever it is
+    called. The canonical name for an HLS manifest is `playlist.m3u8`, and
+    `/playlist` matched anywhere in the path — so pasting a stream URL spent a
+    whole flat-playlist probe against the engine, with its own two-minute
+    ceiling, before the real work could start.
+  */
+  if (/\.(m3u8|mpd|mp4|m4v|webm|mov|flv|mkv|mp3|m4a|aac|ogg|opus|flac|wav|ts)(\?|#|$)/i.test(normalized)) {
+    return false
+  }
+
   // A link to one specific video that merely happens to sit inside a playlist
   // (youtube.com/watch?v=…&list=…) is a single video — expanding it into the
   // whole playlist would be the opposite of what the user asked for.
   if (/[?&]v=[\w-]+/i.test(normalized)) return false
   if (SINGLE_ITEM.test(normalized) && !/[?&]list=/i.test(normalized)) return false
 
-  return /[?&]list=|\/playlist|\/playlists\/|\/channel\/|\/@[\w.-]+\/?$|\/user\/[\w.-]+\/?$|\/(c|channels)\/[\w.-]+\/?$|\/sets\/|\/album\/|\/videos\/?$|\/streams\/?$/i.test(
+  // `/playlists?` needs to end a path segment: bare `/playlist` also matched
+  // `playlist.m3u8`, `playlist_720.m3u8` and every other CDN variant of it.
+  return /[?&]list=|\/playlists?(?:[/?#]|$)|\/channel\/|\/@[\w.-]+\/?$|\/user\/[\w.-]+\/?$|\/(c|channels)\/[\w.-]+\/?$|\/sets\/|\/album\/|\/videos\/?$|\/streams\/?$/i.test(
     normalized
   )
 }

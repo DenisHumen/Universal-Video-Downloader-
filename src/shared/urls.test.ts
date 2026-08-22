@@ -130,6 +130,22 @@ describe('looksLikeCollection', () => {
     // `/c/` used to match anywhere in the path, which caught plain article URLs.
     expect(looksLikeCollection('https://example.com/c/news/story-42')).toBe(false)
   })
+
+  it('never treats a direct media link as a collection', () => {
+    // `playlist.m3u8` is what a CDN calls its manifest; `/playlist` matched it
+    // anywhere in the path, so a pasted stream URL bought a flat-playlist probe
+    // against the engine before anything useful happened.
+    expect(looksLikeCollection('https://cdn.test/hls/playlist.m3u8')).toBe(false)
+    expect(looksLikeCollection('https://cdn.test/hls/playlist_720p.m3u8?t=9')).toBe(false)
+    expect(looksLikeCollection('https://cdn.test/dash/playlist.mpd')).toBe(false)
+    expect(looksLikeCollection('https://cdn.test/album/track.mp3')).toBe(false)
+    expect(looksLikeCollection('https://cdn.test/videos/clip.mp4')).toBe(false)
+  })
+
+  it('still expands a real playlist page', () => {
+    expect(looksLikeCollection('https://site.test/playlist/rock-classics')).toBe(true)
+    expect(looksLikeCollection('https://site.test/playlists/42')).toBe(true)
+  })
 })
 
 describe('needsCookiesOften', () => {
