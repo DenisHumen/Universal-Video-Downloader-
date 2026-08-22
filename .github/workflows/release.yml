@@ -57,7 +57,11 @@ jobs:
             args: --arm64
             arch: arm64
             label: mac arm64
-          - os: macos-13
+          # macos-15-intel, not macos-13: that label was retired, so the job
+          # simply queued for ever without a runner ever being allocated — and
+          # nobody noticed, because the arm64 runner was quietly building the
+          # Intel image as well and filling the gap with a broken one.
+          - os: macos-15-intel
             platform: mac
             args: --x64
             arch: x64

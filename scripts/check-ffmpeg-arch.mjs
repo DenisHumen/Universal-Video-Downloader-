@@ -24,6 +24,7 @@
 import { openSync, readSync, closeSync } from 'fs'
 import { arch as hostArch } from 'os'
 import { createRequire } from 'module'
+import { pathToFileURL } from 'url'
 
 const require = createRequire(import.meta.url)
 
@@ -76,37 +77,58 @@ export function readArch(buf, readAt) {
   return { arches: [], format: 'unrecognised' }
 }
 
-const binary = require('ffmpeg-static')
-if (!binary) {
-  console.error('ffmpeg-static resolved to null — no binary for this platform/arch.')
-  process.exit(1)
+/** Read one binary off disk and say what it was built for. */
+export function archOf(path) {
+  const fd = openSync(path, 'r')
+  const readAt = (pos, len) => {
+    const b = Buffer.alloc(len)
+    readSync(fd, b, 0, len, pos)
+    return b
+  }
+  const head = readAt(0, 4096)
+  // Closed after readArch, not before: the PE branch follows a pointer out of
+  // the header and needs the descriptor to still be open.
+  const result = readArch(head, readAt)
+  closeSync(fd)
+  return result
 }
 
-const fd = openSync(binary, 'r')
-const readAt = (pos, len) => {
-  const b = Buffer.alloc(len)
-  readSync(fd, b, 0, len, pos)
-  return b
-}
-const head = readAt(0, 4096)
-// Closed after readArch, not before: the PE branch follows a pointer out of the
-// header and needs the descriptor to still be open.
-const { arches, format } = readArch(head, readAt)
-closeSync(fd)
-const ok = arches.includes(wanted)
+/** Print the comparison and exit non-zero when it does not hold. */
+export function reportArch(binary, wanted) {
+  const { arches, format } = archOf(binary)
+  console.log(`ffmpeg: ${binary}`)
+  console.log(`  format   ${format}`)
+  console.log(`  built for ${arches.join(', ') || 'unknown'}`)
+  console.log(`  packaging for ${wanted}`)
 
-console.log(`ffmpeg: ${binary}`)
-console.log(`  format   ${format}`)
-console.log(`  built for ${arches.join(', ') || 'unknown'}`)
-console.log(`  packaging for ${wanted}`)
-
-if (!ok) {
-  console.error(
-    `\n✗ This ffmpeg cannot run on ${wanted}.\n` +
-      `  ffmpeg-static downloads one binary for the machine that ran npm install.\n` +
-      `  Build each architecture on its own runner, or reinstall it first:\n` +
-      `      npm_config_arch=${wanted} npm rebuild ffmpeg-static\n`
-  )
-  process.exit(1)
+  if (!arches.includes(wanted)) {
+    console.error(
+      `\n✗ This ffmpeg cannot run on ${wanted}.\n` +
+        `  ffmpeg-static downloads one binary for the machine that ran npm install.\n` +
+        `  Build each architecture on its own runner, or reinstall it first:\n` +
+        `      npm_config_arch=${wanted} npm rebuild ffmpeg-static\n`
+    )
+    return false
+  }
+  console.log('\n✓ ffmpeg matches the target architecture')
+  return true
 }
-console.log('\n✓ ffmpeg matches the target architecture')
+
+/*
+  Run directly, this checks the copy in node_modules — which is what will be
+  packaged, but not proof of what *was*. scripts/after-pack.mjs checks the copy
+  actually inside the built app, which is the one that ships, and imports the
+  reader from here; without this guard that import would run the check too, and
+  a mismatch would exit the process in the middle of somebody else's build.
+*/
+const runDirectly =
+  process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href
+
+if (runDirectly) {
+  const binary = require('ffmpeg-static')
+  if (!binary) {
+    console.error('ffmpeg-static resolved to null — no binary for this platform/arch.')
+    process.exit(1)
+  }
+  if (!reportArch(binary, wanted)) process.exit(1)
+}

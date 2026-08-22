@@ -24,6 +24,9 @@ files:
   - '!{tsconfig.json,tsconfig.node.json,tsconfig.web.json,tailwind.config.js,postcss.config.js}'
 
 # ffmpeg-static ships a per-platform binary that must stay executable on disk.
+# Checks the ffmpeg inside each packed target, before its installer is built.
+afterPack: scripts/after-pack.mjs
+
 asarUnpack:
   - resources/**
   - '**/node_modules/ffmpeg-static/**'
@@ -51,15 +54,14 @@ mac:
   hardenedRuntime: true
   gatekeeperAssess: false
   notarize: false
+  # No `arch:` list here on purpose. With one, `electron-builder --mac --arm64`
+  # built the Intel image too — from the Apple silicon runner's node_modules,
+  # so it shipped an Apple silicon ffmpeg — and the Intel runner that should
+  # have built it was never even needed. The architecture comes from the command
+  # line now, one runner each, exactly as release.yml intends.
   target:
     - target: dmg
-      arch:
-        - arm64
-        - x64
     - target: zip
-      arch:
-        - arm64
-        - x64
   extendInfo:
     NSCameraUsageDescription: This app does not use the camera.
     NSMicrophoneUsageDescription: This app does not use the microphone.

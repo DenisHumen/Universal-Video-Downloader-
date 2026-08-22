@@ -31,16 +31,17 @@ jobs:
   # build, which is to say after a `v*` tag was already public and the failure
   # was most expensive to fix. `--dir` skips the installers and is quick.
   #
-  # Only the arm64 Mac runs here, not both architectures. macos-13 is scarce
-  # enough that the job sat queued for three quarters of an hour without ever
-  # starting, which leaves every CI run permanently in progress and the badge in
-  # the README with it — a check that never finishes is not a check. macos-latest
-  # covers everything mac-specific about packaging: the DMG options, the
-  # entitlements, the background image. The one thing that genuinely differs by
-  # architecture is the bundled ffmpeg, since `ffmpeg-static` downloads exactly
-  # one binary chosen from the host's own arch — and `check:ffmpeg` reads that
-  # binary's header on both Mac runners in release.yml, before anything is
-  # published.
+  # Only the arm64 Mac runs here. The Intel one is in release.yml, on the
+  # macos-15-intel label, and stays out of the per-push matrix until a release
+  # has shown that label actually gets a runner — macos-13, which this used to
+  # ask for, was retired, so the job queued for ever and every CI run sat
+  # permanently in progress with the README badge along with it.
+  #
+  # macos-latest covers everything mac-specific about packaging: the DMG
+  # options, the entitlements, the background image. What genuinely differs by
+  # architecture is the bundled ffmpeg — and that is now checked inside each
+  # packed app by scripts/after-pack.mjs, on every platform, before an installer
+  # is built.
   pack:
     name: Package (${{ matrix.label }})
     runs-on: ${{ matrix.os }}
