@@ -201,7 +201,8 @@ export default function SearchView({ settings, embedded = false }: Props): JSX.E
       // The probe already asked what this video offers, so the queue row can
       // say which resolution "best" turned out to be instead of just "best".
       targetHeight: quality === 'best' && probe?.maxHeight ? probe.maxHeight : undefined,
-      duration: r.duration
+      duration: r.duration,
+      extractor: r.service
     })
     if (ok) setAdded((prev) => new Set(prev).add(r.url))
   }

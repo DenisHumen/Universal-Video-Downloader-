@@ -110,6 +110,17 @@ export function listDownloads(): DownloadItem[] {
 }
 
 function emitUpdated(item: DownloadItem): void {
+  /*
+    Nothing to say about an item that is gone.
+
+    Removing a running download kills its process, but the kill is a signal —
+    the close handler still runs, still writes a terminal state, and still
+    emitted. The renderer treats an id it doesn't know as a new row, so the
+    entry the user had just deleted reappeared a second later as completed or
+    failed, and stayed until the next restart — by which point history on disk
+    and the list on screen disagreed.
+  */
+  if (!items.has(item.id)) return
   downloadEvents.emit('updated', { ...item })
   scheduleSave()
 }
@@ -156,9 +167,30 @@ function safeName(title: string): string {
     .slice(0, 150)
 }
 
+/** The site a download came from, for the per-site subfolder. */
+function siteFolder(item: DownloadItem): string {
+  /*
+    `extractor` is only ever set by a hand-written resolver, and there are three
+    of those. Every site the engine handles natively — which is to say YouTube,
+    Vimeo, TikTok, all of them — arrived with it undefined and went into a
+    single folder called `other`, so the setting that promises "a folder per
+    site" delivered one folder for the entire internet.
+
+    The detector knows the extractor and now sends it along; the host name is
+    the fallback for anything queued before that, and for links queued without
+    a detect step at all.
+  */
+  if (item.extractor) return safeName(item.extractor)
+  try {
+    return safeName(new URL(item.sourceUrl || item.url).hostname.replace(/^www\./, ''))
+  } catch {
+    return ''
+  }
+}
+
 function outputDirFor(item: DownloadItem, settings: AppSettings): string {
   if (!settings.createSubfolders) return item.outputDir
-  const folder = safeName(item.extractor || 'other') || 'other'
+  const folder = siteFolder(item) || 'other'
   const dir = join(item.outputDir, folder)
   try {
     if (!existsSync(dir)) mkdirSync(dir, { recursive: true })
@@ -298,6 +330,27 @@ function appendLog(item: DownloadItem, text: string): void {
 }
 
 function handleProgressLine(line: string, item: DownloadItem): void {
+  /*
+    Is this job still running?
+
+    Every other output handler asks first — the post-processing one, the ffmpeg
+    one, and the media-job callback, which spells out why: killing a process is
+    a signal, not an instant stop, and on Windows `killTree` shells out to
+    `taskkill`, which has not even started by the time pause returns. The engine
+    keeps printing, and whatever was already in the pipe arrives regardless.
+
+    This handler was the exception, and it *assigns* the state rather than
+    merely reading it — so one late line flipped a job the user had just paused
+    back to `downloading`. The close handler then saw a state it didn't
+    recognise as deliberate, took the exit code as a failure, and reported an
+    error; if the tail happened to mention a reset connection, the retry rule
+    matched and the app started the download the user had just cancelled.
+
+    Reading through the map rather than the reference also covers the item
+    having been removed outright while its process was still dying.
+  */
+  if (items.get(item.id)?.state !== 'downloading') return
+
   const payload = line.slice(PROGRESS_PREFIX.length)
   const [status, downloaded, total, totalEst, speed, eta, fragIndex, fragCount] = payload.split('\t')
   const totalBytes = num(total) ?? num(totalEst)
@@ -727,12 +780,24 @@ async function runDownload(item: DownloadItem): Promise<void> {
     for (const line of lines) onErrorLine(line)
   })
 
+  /*
+    Node emits `close` after `error` for a spawn that never started, so without
+    this both handlers ran: `fail` incremented the attempt counter twice,
+    burning both automatic retries on one failure, and the row was written
+    twice with two different messages.
+  */
+  let settled = false
+
   child.on('error', (err) => {
+    if (settled) return
+    settled = true
     procs.delete(item.id)
     fail(item, err.message)
   })
 
   child.on('close', (code) => {
+    if (settled) return
+    settled = true
     procs.delete(item.id)
     /*
       Whatever is still in either buffer, before anything reads what they said.
@@ -834,7 +899,6 @@ export async function startDownload(request: DownloadRequest): Promise<DownloadI
   const existing = findInFlight(req)
   if (existing) return { ...existing }
 
-  await ensureYtdlp()
   const settings = getSettings()
   const id = randomUUID()
   // Queue immediately; URL resolution (scraping custom sites for the real
@@ -850,6 +914,7 @@ export async function startDownload(request: DownloadRequest): Promise<DownloadI
     formatId: req.formatId,
     targetHeight: req.targetHeight,
     duration: req.duration,
+    extractor: req.extractor,
     state: 'queued',
     percent: 0,
     attempts: 0,
@@ -859,10 +924,33 @@ export async function startDownload(request: DownloadRequest): Promise<DownloadI
     outputDir: req.outputDir || settings.downloadDir,
     createdAt: Date.now()
   }
+  /*
+    Claim the slot before waiting on anything.
+
+    The duplicate check above used to sit in front of `await ensureYtdlp()`,
+    which on first launch downloads a ~30 MB binary. Nothing was in `items`
+    until that finished, so every click during the wait sailed past the check —
+    and dedupe.ts exists precisely because two entries for one URL become two
+    engines appending to one file with `--continue`, which corrupts it.
+  */
   items.set(id, item)
   emitUpdated(item)
+  // Failure here is reported by the engine strip, and by the row itself once
+  // it tries to run; the item stays queued rather than vanishing.
+  await ensureYtdlp().catch(() => undefined)
   processQueue()
   return item
+}
+
+/**
+ * Reconsider what should be running.
+ *
+ * Raising "simultaneous downloads" used to change nothing until something
+ * finished, because the limit is only read when the queue is next pumped and
+ * no one pumped it on a settings change.
+ */
+export function kickQueue(): void {
+  processQueue()
 }
 
 /** Queue a trim or convert job for a file that's already on disk. */
@@ -937,6 +1025,8 @@ export function resumeDownload(id: string): void {
   item.cookieHint = undefined
   item.attempts = 0
   item.interrupted = false
+  // A fresh run decides its own output path; see retryDownload.
+  finalPaths.delete(id)
   /*
     A resume re-runs the engine from the beginning, so the bar has to go with
     it. Without this the never-backwards rule pinned it at the figure the
@@ -962,17 +1052,53 @@ export function partialStem(name: string): string {
   return (dot > 0 ? file.slice(0, dot) : file).trim()
 }
 
+function escapeForRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}
+
+/**
+ * Which of `names` are leftovers of the file named `stem`.
+ *
+ * A prefix match is not good enough, and that has now bitten twice: the stem of
+ * "Lecture 1" is a prefix of "Lecture 10", so cancelling the first deleted the
+ * partial belonging to the second — a download still running. What yt-dlp
+ * actually writes beside an output file is `<name>.part` / `<name>.ytdl`, or,
+ * while fetching the streams it is about to merge, `<stem>.f137.mp4.part`.
+ * Those two shapes, exactly; everything else in the folder belongs to someone
+ * else.
+ */
+export function partialsFor(names: string[], stem: string): string[] {
+  if (stem.length < 3) return []
+  const perFormat = new RegExp(`^${escapeForRegExp(stem)}\\.f[\\w-]+\\.[\\w]+$`)
+  return names.filter((name) => {
+    if (!name.endsWith('.part') && !name.endsWith('.ytdl')) return false
+    const body = name.replace(/\.(part|ytdl)$/, '')
+    return body === stem || partialStem(body) === stem || perFormat.test(body)
+  })
+}
+
 function cleanupPartials(item: DownloadItem): void {
-  // Best-effort: remove leftover .part/.ytdl fragments for this item's output file.
-  const stem = partialStem(item.filepath || safeName(item.title))
-  // Too short to identify anything in particular: refuse rather than sweep the
-  // whole folder on the strength of one or two characters.
-  if (stem.length < 3) return
+  /*
+    Only ever the files this download itself wrote.
+
+    The output path is known once the engine has named it; when it isn't — a
+    cancel in the first second — nothing is removed. That is deliberate: a
+    leftover `.part` costs disk space that `--continue` reuses on the next
+    attempt, whereas guessing from the title risks deleting the progress of a
+    different download whose name merely starts the same way.
+
+    The directory comes from that path too. It used to come from
+    `item.outputDir`, which with per-site subfolders switched on is the parent
+    of where the file actually is — so that setting turned cleanup off entirely
+    and leaked partials forever.
+  */
+  const known = item.filepath || finalPaths.get(item.id)?.path
+  if (!known) return
+  const stem = partialStem(known)
+  const dir = dirname(known)
   try {
-    for (const f of readdirSync(item.outputDir)) {
-      if ((f.endsWith('.part') || f.endsWith('.ytdl')) && f.startsWith(stem)) {
-        rmSync(join(item.outputDir, f), { force: true })
-      }
+    for (const f of partialsFor(readdirSync(dir), stem)) {
+      rmSync(join(dir, f), { force: true })
     }
   } catch {
     /* ignore */
@@ -1017,6 +1143,14 @@ export function retryDownload(id: string): void {
   resetProgress(item)
   item.attempts = 0
   item.log = undefined
+  /*
+    Forget where the last attempt landed. `parseFinalPath` only overwrites when
+    the new line's priority is at least the old one's, so a high-priority path
+    from a previous attempt — a `[Merger]` line, say — survived a retry whose
+    best line was a plain `Destination:`. "Play" and "show in folder" then
+    pointed at the previous attempt's file, which usually no longer exists.
+  */
+  finalPaths.delete(id)
   emitUpdated(item)
   processQueue()
 }

@@ -272,6 +272,9 @@ export default function HomeView(): JSX.Element {
         // progress into a percentage rather than a spinner.
         targetHeight: selection.targetHeight,
         duration: info.duration,
+        // Names the per-site subfolder; without it every natively-supported
+        // site shares one called "other".
+        extractor: info.extractor,
         outputDir: saveDir || undefined,
         section: trimOpen && hasTrim(section) ? section : undefined,
         preciseSection: precise

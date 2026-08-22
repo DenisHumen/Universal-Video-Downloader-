@@ -27,6 +27,7 @@ import {
   resumeDownload,
   retryDownload,
   prioritizeDownload,
+  kickQueue,
   retryFailed,
   startDownload,
   startMediaJob
@@ -108,6 +109,10 @@ export function registerIpc({ getWindow, openSearchWindow, onSettingsChanged }: 
   ipcMain.handle(IPC.settingsSet, (_e, partial: Partial<AppSettings>) => {
     const next = setSettings(partial)
     onSettingsChanged(next)
+    // The concurrency limit is read when the queue is pumped, and nothing
+    // pumped it on a settings change — so raising it did nothing visible until
+    // something happened to finish.
+    kickQueue()
     return next
   })
   ipcMain.handle(IPC.settingsReset, () => {

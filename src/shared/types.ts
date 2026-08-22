@@ -197,6 +197,11 @@ export interface DownloadRequest {
    */
   duration?: number
   /**
+   * Which site this came from, as the engine names it. Used for the per-site
+   * subfolder — without it every natively-supported site shares one folder.
+   */
+  extractor?: string
+  /**
    * The video height this request will actually produce, when it can be worked
    * out up front. `best` is not a resolution — the queue row should be able to
    * say which one it resolved to.
