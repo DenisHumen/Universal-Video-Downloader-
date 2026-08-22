@@ -30,6 +30,21 @@ interface AppState {
   updateDismissed: boolean
   /** A link the user copied in another app, waiting to be accepted. */
   clipboardLink: string | null
+  /*
+    Work handed from one screen to another.
+
+    This used to travel as a `window` CustomEvent, dispatched immediately after
+    `setView`. React batches the state update, so the destination view had not
+    mounted yet and its listener did not exist — the event went nowhere. Typing
+    a title on the home screen and pressing search, which the subtitle
+    advertises, landed you on an empty Search screen with the text gone; and
+    "use it" on the clipboard strip, which is drawn on every screen, did
+    nothing at all unless you happened to already be on Home.
+
+    State survives the transition. The view reads it on mount and clears it.
+  */
+  pendingUrl: string | null
+  pendingQuery: string | null
   /** Live progress of the detector, so the UI can narrate the slow parts. */
   detect: DetectStatus | null
   shortcutsOpen: boolean
@@ -42,6 +57,12 @@ interface AppState {
   dismissUpdate: () => void
   dismissClipboardLink: () => void
   setShortcutsOpen: (open: boolean) => void
+  /** Go to Home and detect this link. */
+  requestDetect: (url: string) => void
+  /** Go to Search and run this query. */
+  requestSearch: (query: string) => void
+  takePendingUrl: () => string | null
+  takePendingQuery: () => string | null
 }
 
 type SetState = (partial: Partial<AppState>) => void
@@ -151,6 +172,8 @@ export const useStore = create<AppState>((set, get) => ({
   update: { state: 'idle' },
   updateDismissed: false,
   clipboardLink: null,
+  pendingUrl: null,
+  pendingQuery: null,
   detect: null,
   shortcutsOpen: false,
 
@@ -180,5 +203,18 @@ export const useStore = create<AppState>((set, get) => ({
 
   dismissUpdate: () => set({ updateDismissed: true }),
   dismissClipboardLink: () => set({ clipboardLink: null }),
-  setShortcutsOpen: (open) => set({ shortcutsOpen: open })
+  setShortcutsOpen: (open) => set({ shortcutsOpen: open }),
+
+  requestDetect: (url) => set({ pendingUrl: url, view: 'home' }),
+  requestSearch: (query) => set({ pendingQuery: query, view: 'search' }),
+  takePendingUrl: () => {
+    const url = get().pendingUrl
+    if (url) set({ pendingUrl: null })
+    return url
+  },
+  takePendingQuery: () => {
+    const query = get().pendingQuery
+    if (query) set({ pendingQuery: null })
+    return query
+  }
 }))

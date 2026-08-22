@@ -12,12 +12,14 @@ export default function ClipboardPrompt(): JSX.Element {
   const t = useT()
   const link = useStore((s) => s.clipboardLink)
   const dismiss = useStore((s) => s.dismissClipboardLink)
-  const setView = useStore((s) => s.setView)
+  const requestDetect = useStore((s) => s.requestDetect)
 
   const accept = (): void => {
     if (!link) return
-    window.dispatchEvent(new CustomEvent<string>('uvd:detect-url', { detail: link }))
-    setView('home')
+    // This strip is drawn on every screen; the home view is usually not mounted
+    // when it is clicked, which is why handing the link over as an event did
+    // nothing at all from the queue, search or settings.
+    requestDetect(link)
     dismiss()
   }
 

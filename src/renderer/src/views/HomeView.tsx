@@ -17,6 +17,7 @@ import {
 import {
   hasTrim,
   type AppErrorCode,
+  type DetectResult,
   type DetectStage,
   type MediaInfo,
   type TrimRange
@@ -68,6 +69,9 @@ export default function HomeView(): JSX.Element {
   const t = useT()
   const settings = useStore((s) => s.settings)
   const setView = useStore((s) => s.setView)
+  const requestSearch = useStore((s) => s.requestSearch)
+  const pendingUrl = useStore((s) => s.pendingUrl)
+  const takePendingUrl = useStore((s) => s.takePendingUrl)
   const saveSettings = useStore((s) => s.saveSettings)
   const detectStatus = useStore((s) => s.detect)
 
@@ -146,8 +150,7 @@ export default function HomeView(): JSX.Element {
     if (!target) return
     // Plain text (not a link) → search video services by title.
     if (!isProbablyUrl(target)) {
-      setView('search')
-      window.dispatchEvent(new CustomEvent<string>('uvd:search-query', { detail: target }))
+      requestSearch(target)
       return
     }
     const requestId = `${Date.now()}-${Math.random().toString(36).slice(2)}`
@@ -157,7 +160,11 @@ export default function HomeView(): JSX.Element {
     setErrorCode(undefined)
     setCookieHint(false)
     setInfo(null)
-    const res = await window.api.detect(target, requestId)
+    // Same reasoning as SearchView: the engine can refuse to install, and a
+    // rejected invoke would otherwise leave the card in its skeleton.
+    const res: DetectResult = await window.api.detect(target, requestId).catch(
+      (err: unknown) => ({ ok: false, error: err instanceof Error ? err.message : String(err) })
+    )
     if (requestRef.current !== requestId) return
     requestRef.current = null
     if (res.ok && res.info) {
@@ -220,27 +227,34 @@ export default function HomeView(): JSX.Element {
         void detect(text)
       }
     }
-    const onExternalUrl = (e: Event): void => {
-      const link = (e as CustomEvent<string>).detail
-      if (!link) return
-      setUrl(link)
-      void detect(link)
-    }
     const prevent = (e: DragEvent): void => e.preventDefault()
     window.addEventListener('paste', onPaste)
     window.addEventListener('keydown', onKey)
     window.addEventListener('drop', onDrop)
     window.addEventListener('dragover', prevent)
-    window.addEventListener('uvd:detect-url', onExternalUrl)
     return () => {
       window.removeEventListener('paste', onPaste)
       window.removeEventListener('keydown', onKey)
       window.removeEventListener('drop', onDrop)
       window.removeEventListener('dragover', prevent)
-      window.removeEventListener('uvd:detect-url', onExternalUrl)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  /*
+    A link handed to this screen from elsewhere — the clipboard strip, a link
+    the OS opened the app with, a second instance. It arrives as state rather
+    than an event precisely because the event was dispatched before this
+    component existed to hear it.
+  */
+  useEffect(() => {
+    if (!pendingUrl) return
+    const link = takePendingUrl()
+    if (!link) return
+    setUrl(link)
+    void detect(link)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pendingUrl])
 
   const chooseSaveDir = async (): Promise<void> => {
     const dir = await window.api.chooseDirectory()
@@ -276,7 +290,13 @@ export default function HomeView(): JSX.Element {
         // site shares one called "other".
         extractor: info.extractor,
         outputDir: saveDir || undefined,
-        section: trimOpen && hasTrim(section) ? section : undefined,
+        /*
+          Only when a video is what's being fetched. The trim editor is hidden
+          in audio mode but its state was kept, so switching to "audio only"
+          after setting a cut silently produced a 90-second clip of the track —
+          and relabelled the primary button "trim" with no trim UI on screen.
+        */
+        section: cutting ? section : undefined,
         preciseSection: precise
       })
     } finally {
@@ -320,6 +340,8 @@ export default function HomeView(): JSX.Element {
     setView('downloads')
   }
 
+  /** A cut is only real while a video is what we're fetching. */
+  const cutting = selection.mode === 'video' && trimOpen && hasTrim(section)
   const isSearchQuery = url.trim().length > 0 && !isProbablyUrl(url)
   const busy = status === 'detecting'
 
@@ -678,7 +700,7 @@ export default function HomeView(): JSX.Element {
                   disabled={starting}
                 >
                   {starting ? <Loader2 size={16} className="animate-spin" /> : null}
-                  {trimOpen && hasTrim(section) ? t('trim.apply') : t('common.download')}
+                  {cutting ? t('trim.apply') : t('common.download')}
                 </button>
               </div>
             </motion.div>

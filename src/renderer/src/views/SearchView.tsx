@@ -6,6 +6,7 @@ import type {
   AppErrorCode,
   AppSettings,
   MediaInfo,
+  SearchResponse,
   SearchResult,
   SearchScope,
   SearchService
@@ -66,6 +67,8 @@ function queryFromHash(): string {
 export default function SearchView({ settings, embedded = false }: Props): JSX.Element {
   const t = useT()
   const setView = useStore((s) => s.setView)
+  const pendingQuery = useStore((s) => s.pendingQuery)
+  const takePendingQuery = useStore((s) => s.takePendingQuery)
   const [query, setQuery] = useState(embedded ? '' : queryFromHash)
   const [service, setService] = useState<SearchScope>('all')
   const [status, setStatus] = useState<Status>('idle')
@@ -108,7 +111,18 @@ export default function SearchView({ settings, embedded = false }: Props): JSX.E
     setProbes({})
     setAdded(new Set())
     setPicker(null)
-    const res = await window.api.searchVideos(q, s, s === 'all' ? 6 : 12)
+    /*
+      `searchVideos` waits on the engine, and that rethrows when it can't be
+      installed — offline on first run, say. A rejected invoke skipped the
+      error branch entirely, so the screen sat in its loading skeleton forever
+      with the search button disabled: no result, no message, no way back.
+    */
+    const res: SearchResponse = await window.api
+      .searchVideos(q, s, s === 'all' ? 6 : 12)
+      .catch((err: unknown) => ({
+        ok: false,
+        error: err instanceof Error ? err.message : String(err)
+      }))
     if (res.ok && res.results) {
       setResults(res.results)
       setStatus('idle')
@@ -160,27 +174,35 @@ export default function SearchView({ settings, embedded = false }: Props): JSX.E
     if (query) void search(query)
     else inputRef.current?.focus({ preventScroll: true })
 
+    // The standalone search window is handed its query over IPC.
     const offIpc = embedded
       ? undefined
       : window.api.onSearchQuery((q) => {
           setQuery(q)
           void search(q)
         })
-    const onLocalQuery = (e: Event): void => {
-      const q = (e as CustomEvent<string>).detail
-      if (!q) return
-      setQuery(q)
-      void search(q)
-    }
-    window.addEventListener('uvd:search-query', onLocalQuery)
     return () => {
       offIpc?.()
-      window.removeEventListener('uvd:search-query', onLocalQuery)
       // Leaving the screen ends the probes with it.
       cancelProbes()
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  /*
+    A title typed on the home screen. It arrives as state rather than a DOM
+    event because the event was dispatched in the same tick as the view switch,
+    before this component had mounted to hear it — so the advertised "or type a
+    title to search" always landed here with the text gone.
+  */
+  useEffect(() => {
+    if (!pendingQuery) return
+    const q = takePendingQuery()
+    if (!q) return
+    setQuery(q)
+    void search(q)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pendingQuery])
 
   const changeService = (s: SearchScope): void => {
     setService(s)
@@ -406,6 +428,9 @@ export default function SearchView({ settings, embedded = false }: Props): JSX.E
 function marker(probe: QualityProbe | undefined, service: SearchService, t: TranslateFn): string | null {
   if (service === 'yummyani') return t('search.anime')
   if (service === 'soundcloud') return t('search.audio')
+  // Only some services are probed at all. Treating "never asked" as "asking"
+  // left a permanent "quality…" on every Bilibili and Niconico tile.
+  if (!PROBE_SERVICES.includes(service)) return null
   if (!probe || probe.status === 'loading') return t('search.qualityProbe')
   if (probe.status === 'done' && probe.maxHeight > 0) return `${probe.maxHeight}p`
   if (probe.status === 'done') return t('search.audio')
