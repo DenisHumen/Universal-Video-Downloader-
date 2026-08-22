@@ -55,7 +55,21 @@ const MEDIA_TYPE =
 
 const INTERESTING_HEADERS = ['Referer', 'Origin', 'Cookie', 'User-Agent', 'Authorization']
 
-export type CaptureSink = (candidate: MediaCandidate) => void
+/**
+ * A sink is told which webContents made the request.
+ *
+ * The hooks are installed on the session, and the hidden sniffer window and the
+ * visible in-app browser share one — deliberately, so a login made in the
+ * browser is available to the sniffer. But every candidate was fanned out to
+ * every subscriber with nothing saying whose request it was, so a video playing
+ * in the browser window fed straight into a sniff of an unrelated page. An HLS
+ * manifest scores 112, which is enough to end that sniff early and win the
+ * ranking, so the app would download the video the user happened to be watching
+ * instead of the one it was asked for.
+ *
+ * Undefined for requests that belong to no webContents at all.
+ */
+export type CaptureSink = (candidate: MediaCandidate, webContentsId?: number) => void
 
 interface Installation {
   sinks: Set<CaptureSink>
@@ -88,7 +102,7 @@ function install(ses: Session): Installation {
   const emit = (
     url: string,
     headers: Record<string, string>,
-    meta: { contentType?: string; bytes?: number } = {}
+    meta: { contentType?: string; bytes?: number; webContentsId?: number } = {}
   ): void => {
     const { kind, score } = scoreUrl(url, 12, meta.contentType)
     if (!score) return
@@ -102,7 +116,7 @@ function install(ses: Session): Installation {
     }
     for (const sink of state.sinks) {
       try {
-        sink(candidate)
+        sink(candidate, meta.webContentsId)
       } catch {
         /* a broken subscriber must not stop the others */
       }
@@ -117,7 +131,9 @@ function install(ses: Session): Installation {
     const headers = pickHeaders(details.requestHeaders)
     if (state.recentHeaders.size > 400) state.recentHeaders.clear()
     state.recentHeaders.set(details.url, headers)
-    if (MEDIA_EXT.test(details.url)) emit(details.url, headers)
+    if (MEDIA_EXT.test(details.url)) {
+      emit(details.url, headers, { webContentsId: details.webContentsId })
+    }
     callback({ requestHeaders: details.requestHeaders })
   })
 
@@ -139,7 +155,8 @@ function install(ses: Session): Installation {
       const length = Number(headerValue(details.responseHeaders, 'content-length'))
       emit(details.url, state.recentHeaders.get(details.url) ?? { 'User-Agent': UA }, {
         contentType,
-        bytes: Number.isFinite(length) && length > 0 ? length : undefined
+        bytes: Number.isFinite(length) && length > 0 ? length : undefined,
+        webContentsId: details.webContentsId
       })
     }
     callback({ responseHeaders: details.responseHeaders })

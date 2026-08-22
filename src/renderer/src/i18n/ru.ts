@@ -277,6 +277,7 @@ export const ru: Dictionary = {
   'update.ready': 'обновление {version} готово',
   'update.readyHint': 'приложение перезапустится, чтобы применить его',
   'update.action': 'обновить',
+  'update.failed': 'обновление не удалось установить',
   'update.restart': 'перезапустить',
   'update.getIt': 'скачать',
 

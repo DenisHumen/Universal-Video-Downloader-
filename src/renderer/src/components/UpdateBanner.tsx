@@ -19,9 +19,20 @@ export default function UpdateBanner(): JSX.Element {
   const dismissed = useStore((s) => s.updateDismissed)
   const dismiss = useStore((s) => s.dismissUpdate)
 
+  /*
+    'error' belongs here too. It was in neither this list nor the one in
+    Settings, and nothing raised a toast for it — so a download that failed
+    halfway (the network dropped, the asset 404ed, the checksum did not match)
+    simply made the strip fold itself away mid-progress. The message the main
+    process fills in was displayed nowhere at all, leaving the user with an
+    update that vanished and no idea why.
+  */
   const visible =
     !dismissed &&
-    (update.state === 'available' || update.state === 'downloading' || update.state === 'downloaded')
+    (update.state === 'available' ||
+      update.state === 'downloading' ||
+      update.state === 'downloaded' ||
+      update.state === 'error')
 
   // Builds that can't self-install (unsigned macOS, .deb/.rpm) send the user to
   // the releases page instead of pretending the app can restart into a new one.
@@ -71,6 +82,14 @@ export default function UpdateBanner(): JSX.Element {
                   <span className="mono ml-2 text-[12px] text-ink-2">{t('update.readyHint')}</span>
                 </p>
               )}
+              {update.state === 'error' && (
+                <p className="truncate text-[14px] font-medium text-bad" title={update.message}>
+                  {t('update.failed')}
+                  {update.message && (
+                    <span className="mono ml-2 text-[12px] text-ink-2">{update.message}</span>
+                  )}
+                </p>
+              )}
             </div>
 
             <div className="flex shrink-0 items-center gap-1.5">
@@ -83,6 +102,11 @@ export default function UpdateBanner(): JSX.Element {
               {update.state === 'downloaded' && (
                 <button className="btn-solid px-3 py-2" onClick={() => window.api.installUpdate()}>
                   <RefreshCw size={14} /> {t('update.restart')}
+                </button>
+              )}
+              {update.state === 'error' && (
+                <button className="btn px-3 py-2" onClick={() => window.api.checkForUpdates()}>
+                  <RefreshCw size={14} /> {t('common.retry')}
                 </button>
               )}
               <button className="btn-icon" onClick={dismiss} aria-label={t('common.close')}>

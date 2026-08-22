@@ -60,6 +60,20 @@ const retryTimers = new Map<string, NodeJS.Timeout>()
 */
 const resolveAborts = new Map<string, AbortController>()
 
+/*
+  Ids whose process we killed on purpose.
+
+  Killing is asynchronous everywhere, and on Windows `killTree` shells out to
+  taskkill, so `close` can arrive a good fraction of a second after the pause.
+  The handler decided whether a stop was deliberate by reading the item's state
+  at that moment — but the user can press resume in the meantime, which sets the
+  state to 'queued'. The late close then matched neither 'paused' nor 'canceled',
+  fell through to `fail()`, and turned a pause-then-resume into a failed
+  download complete with a "Download failed" notification. Pausing and resuming
+  everything from the toolbar did it to every running item at once.
+*/
+const deliberateStops = new Set<string>()
+
 /** Stop any in-flight link resolution for this item. */
 function abortResolve(id: string): void {
   resolveAborts.get(id)?.abort()
@@ -598,7 +612,7 @@ function activeCount(): number {
   return n
 }
 
-function processQueue(): void {
+function pump(): void {
   const settings = getSettings()
   const limit = Math.max(1, settings.concurrentDownloads || 1)
   if (activeCount() >= limit) return
@@ -613,6 +627,39 @@ function processQueue(): void {
     if (activeCount() >= limit) break
     if (item.kind && item.kind !== 'download') void runMediaJob(item)
     else void runDownload(item)
+  }
+}
+
+let pumping = false
+let pumpAgain = false
+
+/**
+ * Start whatever the queue can start, without ever running twice at once.
+ *
+ * `runMediaJob` can fail before its first await — a source file that has been
+ * moved or unplugged since it was queued — and failing an item ends in another
+ * `processQueue()`. That call used to run immediately, from inside the loop
+ * below, start the remaining items, and hand control back to a loop still
+ * walking a now-stale list. The outer iteration then started an item the nested
+ * call had already started: two ffmpeg processes writing one output path, with
+ * only the second registered in `procs`, so cancelling or quitting killed one
+ * of them and left the other running.
+ *
+ * Nested calls set a flag instead, and the loop repeats with a fresh snapshot.
+ */
+function processQueue(): void {
+  if (pumping) {
+    pumpAgain = true
+    return
+  }
+  pumping = true
+  try {
+    do {
+      pumpAgain = false
+      pump()
+    } while (pumpAgain)
+  } finally {
+    pumping = false
   }
 }
 
@@ -793,6 +840,19 @@ async function runDownload(item: DownloadItem): Promise<void> {
     // the trimmed and live paths, where the engine reports nothing else.
     if (!item.duration && resolved.duration) item.duration = resolved.duration
   } catch (err) {
+    /*
+      An abort arrives here as a rejection. Pause and cancel abort the resolve,
+      and for a `uvd-sniff://` item that means the sniffer returns nothing and
+      `resolveSniffUrl` throws "Could not find a video stream on this page any
+      more" — which `fail()` then wrote over the paused or cancelled state the
+      user had just asked for, with a "Download failed" notification to match.
+      Worse for a pause: the item was no longer 'paused', so nothing would ever
+      resume it again.
+    */
+    if (items.get(item.id)?.state !== 'detecting') {
+      processQueue()
+      return
+    }
     fail(item, err instanceof Error ? err.message : String(err))
     return
   } finally {
@@ -899,8 +959,10 @@ async function runDownload(item: DownloadItem): Promise<void> {
       onErrorLine(errBuffer)
       errBuffer = ''
     }
-    // If we deliberately stopped it, the state was already set.
-    if (item.state === 'paused' || item.state === 'canceled') {
+    // If we deliberately stopped it, the state was already set — or has since
+    // been changed again by a resume, which is equally not a failure.
+    const stoppedOnPurpose = deliberateStops.delete(item.id)
+    if (stoppedOnPurpose || item.state === 'paused' || item.state === 'canceled') {
       emitUpdated(item)
       processQueue()
       return
@@ -1108,7 +1170,10 @@ export function pauseDownload(id: string): void {
   // A deliberate pause outranks anything the previous shutdown recorded.
   item.interrupted = false
   clearPhase(item)
-  if (proc) killTree(proc)
+  if (proc) {
+    deliberateStops.add(id)
+    killTree(proc)
+  }
   emitUpdated(item)
   processQueue()
 }
@@ -1223,6 +1288,7 @@ export function cancelDownload(id: string): void {
       into recreating the files we just removed.
     */
     proc.once('close', () => cleanupPartials(item))
+    deliberateStops.add(id)
     killTree(proc)
   } else {
     cleanupPartials(item)
@@ -1260,7 +1326,10 @@ export function removeDownload(id: string): void {
   abortResolve(id)
   forgetProgress(id)
   const proc = procs.get(id)
-  if (proc) killTree(proc)
+  if (proc) {
+    deliberateStops.add(id)
+    killTree(proc)
+  }
   procs.delete(id)
   items.delete(id)
   finalPaths.delete(id)

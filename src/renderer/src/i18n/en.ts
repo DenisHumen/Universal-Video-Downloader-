@@ -284,6 +284,7 @@ export const en = {
   'update.ready': 'update {version} ready',
   'update.readyHint': 'the app will restart to apply it',
   'update.action': 'update',
+  'update.failed': 'the update could not be installed',
   'update.restart': 'restart',
   'update.getIt': 'get it',
 

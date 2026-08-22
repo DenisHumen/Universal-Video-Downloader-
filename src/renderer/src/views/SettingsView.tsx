@@ -530,9 +530,11 @@ export default function SettingsView(): JSX.Element {
               hint={
                 update.state === 'available'
                   ? t('settings.updateAvailable', { version: update.version ?? '' })
-                  : update.state === 'not-available'
-                    ? t('settings.upToDate')
-                    : `v${appInfo?.version ?? '—'}`
+                  : update.state === 'error'
+                    ? update.message || t('update.failed')
+                    : update.state === 'not-available'
+                      ? t('settings.upToDate')
+                      : `v${appInfo?.version ?? '—'}`
               }
             >
               <button className="btn-quiet" onClick={checkUpdates} disabled={checking}>

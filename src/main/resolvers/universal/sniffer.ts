@@ -174,7 +174,16 @@ async function sniffOnce(
     bonus over a bare variant path.
   */
   let graceTimer: NodeJS.Timeout | null = null
-  const detach = attachCapture(browsingSession(), (candidate) => {
+  /*
+    Set as soon as the window exists, below. Until then nothing is filtered,
+    because nothing of ours can have made a request yet — but the in-app browser
+    may well be playing something, and a manifest from it scores 112, which both
+    ends this sniff early and wins the ranking. That is how a sniff of one page
+    came back with the video the user was watching on another.
+  */
+  let ownWebContentsId: number | undefined
+  const detach = attachCapture(browsingSession(), (candidate, webContentsId) => {
+    if (webContentsId !== undefined && webContentsId !== ownWebContentsId) return
     found.push(candidate)
     if (candidate.score >= 100 && !graceTimer) {
       graceTimer = setTimeout(() => resolveEarly?.(), MANIFEST_GRACE_MS)
@@ -208,6 +217,7 @@ async function sniffOnce(
         autoplayPolicy: 'no-user-gesture-required'
       }
     })
+    ownWebContentsId = win.webContents.id
     win.webContents.setAudioMuted(true)
     win.webContents.setWindowOpenHandler(() => ({ action: 'deny' }))
 

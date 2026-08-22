@@ -97,7 +97,16 @@ function sendMedia(): void {
   win.webContents.send(IPC.evtBrowserMedia, list)
 }
 
-function rememberCandidate(candidate: MediaCandidate): void {
+function rememberCandidate(candidate: MediaCandidate, webContentsId?: number): void {
+  /*
+    Only what the page in this window asked for. The session is shared with the
+    hidden sniffer on purpose — it is how a login made here carries over — but
+    without this the panel also lists whatever a background sniff turned up, and
+    stamps it with this window's page URL and title.
+  */
+  const own = view?.webContents.id
+  if (own !== undefined && webContentsId !== undefined && webContentsId !== own) return
+
   if (!isPlausible(candidate)) return
   if (media.has(candidate.url)) return
   if (media.size >= MAX_MEDIA) {

@@ -118,6 +118,35 @@ function fetchJson(url: string): Promise<GhRelease> {
       res.on('data', (c: Buffer) => (data += c.toString()))
       res.on('end', () => {
         clearTimeout(timer)
+        /*
+          The status was never looked at, and GitHub answers a refusal with a
+          perfectly well-formed JSON body: 403 or 429 with
+          {"message": "API rate limit exceeded for <ip>"} once a shared address
+          has spent the 60 unauthenticated requests an hour, 404 with
+          {"message":"Not Found"} for a repo it cannot see. Both parsed, neither
+          has a tag_name, and the caller reads a missing tag as "nothing newer"
+          — so a check that never happened was reported to the user as "you are
+          up to date". On macOS and .deb/.rpm installs this is the only update
+          path there is, so those users could sit on an old build indefinitely
+          while the app told them they were current.
+        */
+        const status = res.statusCode ?? 0
+        if (status < 200 || status >= 300) {
+          let detail = ''
+          try {
+            detail = String((JSON.parse(data) as { message?: string }).message ?? '')
+          } catch {
+            /* not JSON; the status is enough */
+          }
+          reject(
+            new Error(
+              status === 403 || status === 429
+                ? 'GitHub is rate-limiting update checks from this network — try again in a few minutes.'
+                : `Update check failed (HTTP ${status})${detail ? `: ${detail}` : ''}`
+            )
+          )
+          return
+        }
         try {
           resolve(JSON.parse(data) as GhRelease)
         } catch (err) {
@@ -142,7 +171,13 @@ async function checkViaGitHub(): Promise<UpdateStatus> {
   try {
     const release = await fetchJson(RELEASES_API)
     const tag = (release.tag_name || release.name || '').trim()
-    if (!tag || release.draft) {
+    // A 200 with no tag is not "you are up to date", it is a reply we did not
+    // understand. Say so rather than inventing reassurance.
+    if (!tag) {
+      emit({ state: 'error', message: 'GitHub returned no release information.' })
+      return currentStatus
+    }
+    if (release.draft) {
       emit({ state: 'not-available', version: app.getVersion() })
       return currentStatus
     }
