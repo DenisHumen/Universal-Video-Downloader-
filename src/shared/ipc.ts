@@ -64,7 +64,9 @@ export const IPC = {
   evtBrowserState: 'event:browser-state',
   evtBrowserMedia: 'event:browser-media',
   evtClipboardLink: 'event:clipboard-link',
-  evtNavigate: 'event:navigate'
+  evtNavigate: 'event:navigate',
+  /** What main tried to hand the window before it was listening. */
+  takePending: 'app:take-pending'
 } as const
 
 export type IpcChannel = (typeof IPC)[keyof typeof IPC]

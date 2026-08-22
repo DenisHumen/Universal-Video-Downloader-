@@ -400,6 +400,7 @@ export function installMockApi(): void {
     },
     onDetectStatus: () => () => undefined,
     onClipboardLink: () => () => undefined,
+    takePending: async () => ({}),
     onNavigate: () => () => undefined
   }
   window.api = api

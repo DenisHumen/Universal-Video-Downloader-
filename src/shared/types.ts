@@ -138,6 +138,21 @@ export type DownloadState =
   | 'canceled'
 
 /** A section of a video, in seconds from its start. */
+/**
+ * What main wanted to tell the window while nothing was listening.
+ *
+ * IPC messages are not buffered: a link or a view handed to a webContents
+ * before the renderer has subscribed is dropped, and there is no second
+ * attempt. Main keeps them here instead and the window collects them once it
+ * is ready.
+ */
+export interface PendingDelivery {
+  /** A URL from the command line, a second launch, or the clipboard watcher. */
+  link?: string
+  /** A view the application menu asked for. */
+  view?: string
+}
+
 export interface TrimRange {
   start?: number
   /** Undefined means "to the end". */

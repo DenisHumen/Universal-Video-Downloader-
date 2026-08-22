@@ -35,6 +35,7 @@ import {
 } from './services/downloader'
 import { getSettings, resetSettings, setSettings } from './services/settings'
 import { ensureYtdlp, getYtdlpStatus, updateYtdlp, ytdlpEvents } from './services/ytdlp'
+import { takePending } from './index'
 import {
   checkForUpdates,
   downloadUpdate,
@@ -167,6 +168,9 @@ export function registerIpc({ getWindow, openSearchWindow, onSettingsChanged }: 
     return getYtdlpStatus()
   })
   ipcMain.handle(IPC.ytdlpUpdate, () => updateYtdlp(isEngineBusy))
+
+  // Whatever main tried to hand the window before it was listening.
+  ipcMain.handle(IPC.takePending, () => takePending())
 
   // ---- App updates ----
   ipcMain.handle(IPC.updateCheck, () => checkForUpdates())

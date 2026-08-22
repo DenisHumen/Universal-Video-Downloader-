@@ -1043,7 +1043,15 @@ export async function startDownload(request: DownloadRequest): Promise<DownloadI
   */
   const req: DownloadRequest = { ...request, url: normalizeUrl(request.url) }
   const existing = findInFlight(req)
-  if (existing) return { ...existing }
+  /*
+    Through `publicItem` like everything else that crosses the bridge. This
+    return value is an IPC reply — `ipcMain.handle(IPC.downloadStart, …)` — and
+    on the duplicate path it hands back the live queue entry, which by then
+    carries the headers the resolve captured. Every other route to the renderer
+    was stripped; this one was not, so queueing a URL a second time while the
+    first was still running delivered the site's Cookie straight to the window.
+  */
+  if (existing) return publicItem(existing)
 
   const settings = getSettings()
   const id = randomUUID()
@@ -1085,7 +1093,7 @@ export async function startDownload(request: DownloadRequest): Promise<DownloadI
   // it tries to run; the item stays queued rather than vanishing.
   await ensureYtdlp().catch(() => undefined)
   processQueue()
-  return item
+  return publicItem(item)
 }
 
 /**
@@ -1148,7 +1156,7 @@ export function startMediaJob(req: MediaJobRequest): DownloadItem {
   items.set(id, item)
   emitUpdated(item)
   processQueue()
-  return item
+  return publicItem(item)
 }
 
 function clearRetry(id: string): void {

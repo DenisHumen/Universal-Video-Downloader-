@@ -92,7 +92,14 @@ async function kodikGetM3u8(playerUrl: string, episode: number, requested: strin
     .sort((a, b) => a.h - b.h)
   if (!tiers.length) throw new Error('No streams returned by Kodik')
   const want = requested === 'best' || requested === 'audio' ? Infinity : parseInt(requested, 10) || Infinity
-  const chosen = tiers.filter((t) => t.h <= want).pop()?.q || tiers[tiers.length - 1].q
+  /*
+    Nothing at or below the request means every tier is above it — so take the
+    lowest, the closest thing to what was asked for. This used to take
+    `tiers[tiers.length - 1]`, the highest, which is the furthest: ask for 360p
+    on a title Kodik only carries in 720p and 1080p and you were handed the
+    1080p. The rezka resolver has always fallen back the other way.
+  */
+  const chosen = tiers.filter((t) => t.h <= want).pop()?.q || tiers[0].q
   return kodikDecode(links[chosen][0].src)
 }
 

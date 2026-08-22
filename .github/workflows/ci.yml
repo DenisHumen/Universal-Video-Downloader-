@@ -31,11 +31,16 @@ jobs:
   # build, which is to say after a `v*` tag was already public and the failure
   # was most expensive to fix. `--dir` skips the installers and is quick.
   #
-  # macOS is split by architecture because the runners are: `ffmpeg-static`
-  # downloads exactly one binary at install time, chosen from the host's own
-  # arch, so an arm64 build made on an Intel runner ships an Intel ffmpeg and
-  # post-processing fails on the machines it was built for. Same split as
-  # release.yml, and `check:ffmpeg` reads the binary's own header to prove it.
+  # Only the arm64 Mac runs here, not both architectures. macos-13 is scarce
+  # enough that the job sat queued for three quarters of an hour without ever
+  # starting, which leaves every CI run permanently in progress and the badge in
+  # the README with it — a check that never finishes is not a check. macos-latest
+  # covers everything mac-specific about packaging: the DMG options, the
+  # entitlements, the background image. The one thing that genuinely differs by
+  # architecture is the bundled ffmpeg, since `ffmpeg-static` downloads exactly
+  # one binary chosen from the host's own arch — and `check:ffmpeg` reads that
+  # binary's header on both Mac runners in release.yml, before anything is
+  # published.
   pack:
     name: Package (${{ matrix.label }})
     runs-on: ${{ matrix.os }}
@@ -55,10 +60,6 @@ jobs:
             args: --mac --arm64
             arch: arm64
             label: mac arm64
-          - os: macos-13
-            args: --mac --x64
-            arch: x64
-            label: mac x64
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4

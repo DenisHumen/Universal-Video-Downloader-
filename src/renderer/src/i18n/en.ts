@@ -234,6 +234,8 @@ export const en = {
   'settings.restrictFilenames': 'restrict filenames',
   'settings.restrictFilenamesHint': 'ascii-only, no spaces',
   'settings.filenameTemplate': 'filename template',
+  'settings.filenameTemplateUnsafe':
+    'a template has to stay inside the download folder - no leading slash, no drive letter, no ..',
   'settings.filenameTemplateHint': 'yt-dlp output template',
 
   'settings.universal': 'universal detection',

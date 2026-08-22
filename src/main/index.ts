@@ -24,7 +24,7 @@ import {
 } from './services/downloader'
 import { startClipboardWatch, stopClipboardWatch } from './services/clipboard'
 import { currentLanguage, mt, type MainLanguage } from './services/locale'
-import type { AppSettings } from '@shared/types'
+import type { AppSettings, PendingDelivery } from '@shared/types'
 
 const isMac = process.platform === 'darwin'
 let mainWindow: BrowserWindow | null = null
@@ -151,7 +151,48 @@ function createWindow(): void {
 
   mainWindow.on('closed', () => {
     mainWindow = null
+    // The next window has to ask for what it missed; this one cannot receive.
+    rendererReady = false
   })
+}
+
+/*
+  Messages the window was not ready for.
+
+  IPC does not buffer. `showMainWindow()` creates the window and returns while
+  the document is still loading, and even once it has loaded the renderer only
+  subscribes at the end of its init, after three IPC round-trips. Everything
+  sent in between was dropped on the floor with no second attempt: a link on the
+  command line ("open with") was lost every single time, the menu's Settings and
+  Search items opened a window showing Home, a second launch carrying a URL did
+  nothing, and a link copied while no window was open was swallowed for good —
+  the clipboard watcher had already recorded it as seen, so copying it again did
+  nothing either.
+
+  Anything undeliverable is parked here and collected by the window when it is
+  ready. `rendererReady` is set by that collection, so it is the renderer
+  itself saying so rather than main guessing from a load event.
+*/
+const pending: PendingDelivery = {}
+let rendererReady = false
+
+/** Hand something to the window, or hold it until there is one listening. */
+function deliver(channel: string, slot: 'link' | 'view', value: string): void {
+  const wc = mainWindow?.webContents
+  if (rendererReady && wc && !wc.isDestroyed()) {
+    wc.send(channel, value)
+    return
+  }
+  pending[slot] = value
+}
+
+/** Everything main tried to say while nothing was listening. Clears it. */
+export function takePending(): PendingDelivery {
+  rendererReady = true
+  const out: PendingDelivery = { ...pending }
+  delete pending.link
+  delete pending.view
+  return out
 }
 
 function showMainWindow(): void {
@@ -188,7 +229,7 @@ export function openSearchWindow(query: string): void {
 function buildMenu(): void {
   const navigate = (view: string) => (): void => {
     showMainWindow()
-    mainWindow?.webContents.send(IPC.evtNavigate, view)
+    deliver(IPC.evtNavigate, 'view', view)
   }
 
   const template: MenuItemConstructorOptions[] = [
@@ -361,11 +402,7 @@ function applySettings(settings: AppSettings): void {
   else destroyTray()
 
   if (settings.clipboardWatch) {
-    startClipboardWatch((url) => {
-      if (mainWindow && !mainWindow.isDestroyed()) {
-        mainWindow.webContents.send(IPC.evtClipboardLink, url)
-      }
-    })
+    startClipboardWatch((url) => deliver(IPC.evtClipboardLink, 'link', url))
   } else {
     stopClipboardWatch()
   }
@@ -383,9 +420,7 @@ if (!gotLock) {
   app.on('second-instance', (_event, argv) => {
     showMainWindow()
     const link = linkFromArgv(argv)
-    if (link && mainWindow && !mainWindow.isDestroyed()) {
-      mainWindow.webContents.send(IPC.evtClipboardLink, link)
-    }
+    if (link) deliver(IPC.evtClipboardLink, 'link', link)
   })
 
   app.whenReady().then(() => {
@@ -442,11 +477,7 @@ if (!gotLock) {
     setTimeout(() => void refreshEngineIfDue(isEngineBusy), 30_000)
 
     const initialLink = linkFromArgv(process.argv)
-    if (initialLink) {
-      mainWindow?.webContents.once('did-finish-load', () => {
-        mainWindow?.webContents.send(IPC.evtClipboardLink, initialLink)
-      })
-    }
+    if (initialLink) pending.link = initialLink
 
     app.on('activate', () => {
       if (BrowserWindow.getAllWindows().length === 0) createWindow()

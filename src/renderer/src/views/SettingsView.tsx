@@ -23,6 +23,7 @@ import { toast } from '../lib/toast'
 import Choice from '../components/Choice'
 import TabStrip from '../components/TabStrip'
 import ConfirmDialog from '../components/ConfirmDialog'
+import { isSafeTemplate } from '@shared/filename'
 
 type SectionId =
   | 'appearance'
@@ -156,6 +157,59 @@ function TextField({
       className={className}
       spellCheck={false}
     />
+  )
+}
+
+/**
+ * The filename template, which is the one setting that can be refused.
+ *
+ * Every other field here saves on each keystroke, which is fine when nothing
+ * can reject the value. This one is checked before it is written, and a
+ * rejected template is replaced with the default — so typing the first
+ * character of an absolute path, a lone slash or the drive letter, wiped
+ * everything already typed and put the default in its place, mid-word, with no
+ * explanation. The user was most of the way through a valid template and
+ * watched it disappear.
+ *
+ * So: a draft that is only committed when it is safe, and a line saying why
+ * when it is not.
+ */
+function TemplateField({
+  value,
+  onCommit
+}: {
+  value: string
+  onCommit: (v: string) => void
+}): JSX.Element {
+  const t = useT()
+  const labelledBy = useContext(RowLabelId)
+  const [draft, setDraft] = useState(value)
+
+  // Follow the store when it changes underneath us — a reset, most obviously.
+  useEffect(() => setDraft(value), [value])
+
+  const safe = isSafeTemplate(draft)
+
+  return (
+    <>
+      <input
+        value={draft}
+        onChange={(e) => {
+          const next = e.target.value
+          setDraft(next)
+          if (isSafeTemplate(next)) onCommit(next)
+        }}
+        onBlur={() => {
+          if (isSafeTemplate(draft)) onCommit(draft)
+          else setDraft(value)
+        }}
+        aria-labelledby={labelledBy}
+        aria-invalid={!safe}
+        className="field mono text-[13px]"
+        spellCheck={false}
+      />
+      {!safe && <p className="hint mt-1.5 text-bad">{t('settings.filenameTemplateUnsafe')}</p>}
+    </>
   )
 }
 
@@ -452,9 +506,9 @@ export default function SettingsView(): JSX.Element {
               <Switch value={settings.restrictFilenames} onChange={(v) => set('restrictFilenames', v)} />
             </Row>
             <Row label={t('settings.filenameTemplate')} hint={t('settings.filenameTemplateHint')} stack>
-              <TextField
+              <TemplateField
                 value={settings.filenameTemplate}
-                onChange={(v) => set('filenameTemplate', v)}
+                onCommit={(v) => set('filenameTemplate', v)}
               />
             </Row>
           </Group>

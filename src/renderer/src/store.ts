@@ -158,6 +158,23 @@ async function runInit(set: SetState, get: GetState): Promise<void> {
     if (isViewId(view)) set({ view })
   })
 
+  /*
+    Collect anything main tried to hand us before this point. IPC does not
+    buffer, and every subscription above is registered only after three awaited
+    round-trips — so a link from the command line, from a second launch, or from
+    the clipboard watcher while no window was open, and a view the application
+    menu asked for, all arrived at a renderer that was not listening yet and
+    were simply dropped. This is also what tells main the window is ready.
+  */
+  const missed = await window.api.takePending()
+  if (missed.view && isViewId(missed.view)) set({ view: missed.view })
+  if (missed.link) {
+    const link = normalizeUrl(missed.link)
+    if (!get().downloads.some((d) => normalizeUrl(d.sourceUrl || d.url) === link)) {
+      set({ clipboardLink: missed.link })
+    }
+  }
+
   // Make sure the engine is ready.
   void window.api.ensureYtdlp().then((s) => set({ ytdlp: s }))
 }

@@ -2,6 +2,9 @@ import { app } from 'electron'
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { LEGACY_THEMES, THEMES, type AppSettings, type ThemeId } from '@shared/types'
+import { isSafeTemplate } from '@shared/filename'
+
+export { isSafeTemplate }
 
 const SETTINGS_FILE = (): string => join(app.getPath('userData'), 'settings.json')
 
@@ -68,25 +71,6 @@ export function migrate(raw: Record<string, unknown>): Partial<AppSettings> {
   return next
 }
 
-/**
- * Whether a filename template stays inside the download folder.
- *
- * The template is joined onto the chosen directory and handed to the engine as
- * `-o`, and `join` resolves `..` — so `../../../../Startup/%(title)s.%(ext)s`
- * writes wherever it likes, and an absolute template discards the directory
- * altogether. Nothing validated it. On its own that is a foot-gun rather than
- * an attack, since only the user can type it; it stops being only a foot-gun
- * the moment anything else can write settings.json.
- *
- * A template may still contain slashes — putting downloads in per-uploader
- * subfolders is a real thing people do — it just may not climb out.
- */
-export function isSafeTemplate(template: string): boolean {
-  const value = template.trim()
-  if (!value) return true
-  if (/^([a-zA-Z]:|\\|\/)/.test(value)) return false
-  return !value.split(/[\\/]+/).includes('..')
-}
 
 let cache: AppSettings | null = null
 

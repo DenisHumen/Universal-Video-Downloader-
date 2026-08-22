@@ -227,6 +227,8 @@ export const ru: Dictionary = {
   'settings.restrictFilenames': 'упрощать имена файлов',
   'settings.restrictFilenamesHint': 'только ascii, без пробелов',
   'settings.filenameTemplate': 'шаблон имени файла',
+  'settings.filenameTemplateUnsafe':
+    'шаблон должен оставаться внутри папки загрузок - без слэша в начале, без буквы диска, без ..',
   'settings.filenameTemplateHint': 'шаблон вывода yt-dlp',
 
   'settings.universal': 'универсальное определение',
