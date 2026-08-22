@@ -300,10 +300,15 @@ src/
 │       ├── detector.ts        # the engine → scrape → browser cascade
 │       ├── downloader.ts      # queue: downloads, trims and conversions
 │       ├── progress.ts        # one bar across download + post-processing
+│       ├── throttle.ts        # how often a running job is allowed to speak
+│       ├── schedule.ts        # what the queue starts next
+│       ├── dedupe.ts          # refusing a second entry for the same file
+│       ├── resume.ts          # which downloads a restart should pick back up
 │       ├── ffmpeg.ts          # bundled ffmpeg: trim, convert, probe
 │       ├── ffmpeg-output.ts   # reading ffmpeg's console chatter for progress
 │       ├── browser.ts         # the built-in browser window
 │       ├── search.ts          # title search across services
+│       ├── clipboard.ts       # the optional clipboard watcher
 │       ├── updater.ts         # auto-update (+ manual fallback)
 │       ├── locale.ts          # the strings the OS draws, not React
 │       ├── options.ts         # engine flags & error classification
