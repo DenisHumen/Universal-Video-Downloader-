@@ -269,6 +269,9 @@ export const en = {
   'settings.viewOnGithub': 'view on github',
   'settings.reset': 'reset all settings',
   'settings.resetDone': 'settings restored to defaults',
+  'settings.resetConfirm': 'reset every setting?',
+  'settings.resetConfirmBody':
+    'your download folder, cookies, proxy and every other choice on this page go back to how they started. downloads already finished are not touched.',
 
   // ---- update banner ----
   'update.available': 'version {version} is available',

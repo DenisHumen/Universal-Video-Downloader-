@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { extractFromHtml } from './static'
+import { extractFromHtml, refererFor, scrapeStatic } from './static'
 
 const BASE = 'https://site.test/watch/42'
 
@@ -114,5 +114,63 @@ describe('extractFromHtml', () => {
   it('never returns a relative or javascript: URL', () => {
     const html = `<video src="javascript:void(0)"></video><div data-src="/relative/clip.mp4"></div>`
     for (const url of urls(html)) expect(url).toMatch(/^https?:\/\//)
+  })
+})
+
+/*
+  Embedded players check the Referer to see which site is framing them, and
+  refuse anything they do not recognise. Every fetch used to send the Referer of
+  the host being fetched — so a player asked "who is embedding you?" was told
+  "you are", which is the exact shape a hotlink check turns away. The page came
+  back a 403 or an error, the scrape found nothing, and the app reported that
+  the page had no video on it.
+*/
+describe('scrapeStatic referer', () => {
+  const PAGE = 'https://site.test/watch/42'
+  const FRAME = 'https://player.cdn.test/embed/abc'
+
+  /** Records what each URL was asked for with. */
+  function recorder(pages: Record<string, string>): {
+    fetcher: (url: string, headers: Record<string, string>) => Promise<string>
+    seen: Map<string, Record<string, string>>
+  } {
+    const seen = new Map<string, Record<string, string>>()
+    return {
+      seen,
+      fetcher: async (url, headers) => {
+        seen.set(url, headers)
+        return pages[url] ?? ''
+      }
+    }
+  }
+
+  it('sends the embedding page as the referer for an iframe', async () => {
+    const { fetcher, seen } = recorder({
+      [PAGE]: `<iframe src="${FRAME}"></iframe>`,
+      [FRAME]: '<video src="https://cdn.test/film.mp4"></video>'
+    })
+    await scrapeStatic(PAGE, fetcher)
+
+    expect(seen.get(FRAME)?.Referer).toBe(PAGE)
+  })
+
+  it('still sends the site root for the page the user actually gave us', async () => {
+    const { fetcher, seen } = recorder({ [PAGE]: '<html></html>' })
+    await scrapeStatic(PAGE, fetcher)
+
+    expect(seen.get(PAGE)?.Referer).toBe('https://site.test/')
+  })
+
+})
+
+describe('refererFor', () => {
+  it('prefers the page that pointed at the URL', () => {
+    expect(refererFor('https://player.cdn.test/embed/1', 'https://site.test/watch/42')).toBe(
+      'https://site.test/watch/42'
+    )
+  })
+
+  it('falls back to the site root of the URL itself when there is no parent', () => {
+    expect(refererFor('https://site.test/watch/42')).toBe('https://site.test/')
   })
 })

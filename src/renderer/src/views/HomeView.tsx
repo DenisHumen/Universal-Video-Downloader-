@@ -370,6 +370,7 @@ export default function HomeView(): JSX.Element {
             onChange={(e) => setUrl(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && detect()}
             placeholder={t('home.placeholder')}
+            aria-label={t('home.placeholder')}
             className="no-drag min-w-0 flex-1 bg-transparent px-2.5 py-2 text-[16px] text-ink outline-none placeholder:text-ink-3"
             spellCheck={false}
             autoComplete="off"
@@ -421,6 +422,7 @@ export default function HomeView(): JSX.Element {
                 value={batchText}
                 onChange={(e) => setBatchText(e.target.value)}
                 rows={5}
+                aria-label={t('home.batchHint')}
                 spellCheck={false}
                 className="field mono resize-none bg-canvas text-[13px]"
                 placeholder={'https://…\nhttps://…'}

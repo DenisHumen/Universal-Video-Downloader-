@@ -257,10 +257,35 @@ export function extractFromHtml(html: string, base: string): StaticScrape {
   return meta
 }
 
-async function scrapeOne(url: string, depth: number): Promise<StaticScrape> {
+/** Fetches a page. Injectable so the header threading below can be tested. */
+export type Fetcher = (url: string, headers: Record<string, string>) => Promise<string>
+
+const defaultFetcher: Fetcher = (url, headers) => fetchText(url, headers, { timeout: 15_000 })
+
+/**
+ * The Referer to send when fetching `url`.
+ *
+ * An embedded player is fetched with the page that embedded it, because that
+ * is what a browser sends and what the player checks. This used to send the
+ * iframe's own host for every request, including the nested ones — so a player
+ * on its own domain, embedded in the site the user is actually on, saw a
+ * Referer pointing at itself. That is precisely the shape a hotlink check
+ * rejects, and the reply is a 403 or an error page with no video in it: the
+ * scrape found nothing and the app said the page had no video on it.
+ */
+export function refererFor(url: string, parent?: string): string {
+  return parent ?? `https://${hostOf(url)}/`
+}
+
+async function scrapeOne(
+  url: string,
+  depth: number,
+  parent?: string,
+  fetcher: Fetcher = defaultFetcher
+): Promise<StaticScrape> {
   let html: string
   try {
-    html = await fetchText(url, { Referer: `https://${hostOf(url)}/` }, { timeout: 15_000 })
+    html = await fetcher(url, { Referer: refererFor(url, parent) })
   } catch {
     return { candidates: [] }
   }
@@ -272,7 +297,7 @@ async function scrapeOne(url: string, depth: number): Promise<StaticScrape> {
   if (depth > 0 && !out.some((c) => c.score >= 80)) {
     const frames = readIframes(text, url).slice(0, 3)
     for (const frame of frames) {
-      const nested = await scrapeOne(frame, depth - 1)
+      const nested = await scrapeOne(frame, depth - 1, url, fetcher)
       out.push(...nested.candidates)
       meta.title = meta.title || nested.title
       meta.thumbnail = meta.thumbnail || nested.thumbnail
@@ -286,6 +311,6 @@ async function scrapeOne(url: string, depth: number): Promise<StaticScrape> {
 }
 
 /** Scrape a page (and one level of player iframes) for downloadable media. */
-export function scrapeStatic(url: string): Promise<StaticScrape> {
-  return scrapeOne(url, 1)
+export function scrapeStatic(url: string, fetcher?: Fetcher): Promise<StaticScrape> {
+  return scrapeOne(url, 1, undefined, fetcher)
 }

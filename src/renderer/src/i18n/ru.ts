@@ -262,6 +262,9 @@ export const ru: Dictionary = {
   'settings.viewOnGithub': 'открыть на github',
   'settings.reset': 'сбросить все настройки',
   'settings.resetDone': 'настройки сброшены',
+  'settings.resetConfirm': 'сбросить все настройки?',
+  'settings.resetConfirmBody':
+    'папка загрузок, куки, прокси и любой другой выбор на этой странице вернутся к исходным. уже скачанные файлы это не затронет.',
 
   // ---- update banner ----
   'update.available': 'доступна версия {version}',

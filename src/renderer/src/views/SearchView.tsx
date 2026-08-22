@@ -264,6 +264,7 @@ export default function SearchView({ settings, embedded = false }: Props): JSX.E
             onChange={(e) => setQuery(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && search()}
             placeholder={t('search.placeholder')}
+            aria-label={t('search.placeholder')}
             className="no-drag min-w-0 flex-1 bg-transparent px-1.5 py-2 text-[16px] text-ink outline-none placeholder:text-ink-3"
             spellCheck={false}
             autoComplete="off"

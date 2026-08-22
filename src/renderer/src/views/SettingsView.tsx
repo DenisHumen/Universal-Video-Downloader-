@@ -1,4 +1,12 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react'
+import {
+  createContext,
+  useContext,
+  useEffect,
+  useId,
+  useRef,
+  useState,
+  type ReactNode
+} from 'react'
 import { Folder, Github, Loader2, RefreshCw, RotateCcw } from 'lucide-react'
 import {
   SUPPORTED_COOKIE_BROWSERS,
@@ -14,6 +22,7 @@ import { LANGUAGES, useT, type TranslationKey } from '../i18n'
 import { toast } from '../lib/toast'
 import Choice from '../components/Choice'
 import TabStrip from '../components/TabStrip'
+import ConfirmDialog from '../components/ConfirmDialog'
 
 type SectionId =
   | 'appearance'
@@ -79,6 +88,16 @@ function Group({
  * meant a list of settings had two different silhouettes for no reason the user
  * could see. Wide controls simply wrap under the label.
  */
+/**
+ * The id of the row's label, so the control beside it can point at one.
+ *
+ * Every switch on this screen was unnamed: a screen reader read out fourteen
+ * "switch, on" in a row with no way to tell which setting any of them was.
+ * Passing it down means the row that already draws the text is the one that
+ * names the control, and no call site has to repeat the string.
+ */
+const RowLabelId = createContext<string | undefined>(undefined)
+
 function Row({
   label,
   hint,
@@ -90,6 +109,7 @@ function Row({
   children: ReactNode
   stack?: boolean
 }): JSX.Element {
+  const labelId = useId()
   return (
     <div
       className={`flex gap-x-6 gap-y-3 border-b border-edge py-4 ${
@@ -97,11 +117,45 @@ function Row({
       }`}
     >
       <div className="min-w-0 max-w-md">
-        <p className="text-[14px] text-ink">{label}</p>
+        <p className="text-[14px] text-ink" id={labelId}>
+          {label}
+        </p>
         {hint && <p className="hint mt-1">{hint}</p>}
       </div>
-      <div className={stack ? '' : 'shrink-0'}>{children}</div>
+      <div className={stack ? '' : 'shrink-0'}>
+        <RowLabelId.Provider value={labelId}>{children}</RowLabelId.Provider>
+      </div>
     </div>
+  )
+}
+
+/**
+ * A free-text setting, named by the row it sits in.
+ *
+ * A placeholder is not a name: it vanishes the moment anything is typed, and a
+ * screen reader reaching these four announced an unlabelled edit box.
+ */
+function TextField({
+  value,
+  onChange,
+  placeholder,
+  className = 'field mono text-[13px]'
+}: {
+  value: string
+  onChange: (v: string) => void
+  placeholder?: string
+  className?: string
+}): JSX.Element {
+  const labelledBy = useContext(RowLabelId)
+  return (
+    <input
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      placeholder={placeholder}
+      aria-labelledby={labelledBy}
+      className={className}
+      spellCheck={false}
+    />
   )
 }
 
@@ -111,11 +165,13 @@ function Row({
  * binary control has nothing to be springy about.
  */
 function Switch({ value, onChange }: { value: boolean; onChange: (v: boolean) => void }): JSX.Element {
+  const labelledBy = useContext(RowLabelId)
   return (
     <button
       onClick={() => onChange(!value)}
       role="switch"
       aria-checked={value}
+      aria-labelledby={labelledBy}
       /* 44x24 is the right *look* for a switch and a small target to hit, so
          a pseudo-element extends the clickable area to 44x40 without changing
          a pixel of what's drawn. */
@@ -153,6 +209,7 @@ export default function SettingsView(): JSX.Element {
   const [active, setActive] = useState<SectionId>('appearance')
   const [checking, setChecking] = useState(false)
   const [updatingEngine, setUpdatingEngine] = useState(false)
+  const [confirmReset, setConfirmReset] = useState(false)
   const scrollRef = useRef<HTMLDivElement>(null)
 
   // Mark the index against whatever is nearest the top of the viewport. The
@@ -223,7 +280,13 @@ export default function SettingsView(): JSX.Element {
       setUpdatingEngine(false)
     }
   }
+  /*
+    This throws away the download folder, the cookies file, the proxy and every
+    other choice the user has ever made here, and it used to happen on one
+    click of a button sitting in the middle of a list of ordinary toggles.
+  */
   const resetAll = async (): Promise<void> => {
+    setConfirmReset(false)
     await reset()
     toast(t('settings.resetDone'), 'success')
   }
@@ -332,12 +395,11 @@ export default function SettingsView(): JSX.Element {
               <Switch value={settings.resumeOnLaunch} onChange={(v) => set('resumeOnLaunch', v)} />
             </Row>
             <Row label={t('settings.speedLimit')} hint={t('settings.speedLimitHint')}>
-              <input
+              <TextField
                 value={settings.speedLimit}
-                onChange={(e) => set('speedLimit', e.target.value)}
+                onChange={(v) => set('speedLimit', v)}
                 placeholder="2M"
                 className="field mono w-36 text-[13px]"
-                spellCheck={false}
               />
             </Row>
             <Row label={t('settings.playlistLimit')} hint={t('settings.playlistLimitHint')} stack>
@@ -367,12 +429,11 @@ export default function SettingsView(): JSX.Element {
               <Switch value={settings.writeSubtitles} onChange={(v) => set('writeSubtitles', v)} />
             </Row>
             <Row label={t('settings.subtitleLanguages')} hint={t('settings.subtitleLanguagesHint')}>
-              <input
+              <TextField
                 value={settings.subtitleLanguages}
-                onChange={(e) => set('subtitleLanguages', e.target.value)}
+                onChange={(v) => set('subtitleLanguages', v)}
                 placeholder="en,ru"
                 className="field mono w-44 text-[13px]"
-                spellCheck={false}
               />
             </Row>
             <Row label={t('settings.sponsorBlock')} hint={t('settings.sponsorBlockHint')}>
@@ -382,11 +443,9 @@ export default function SettingsView(): JSX.Element {
               <Switch value={settings.restrictFilenames} onChange={(v) => set('restrictFilenames', v)} />
             </Row>
             <Row label={t('settings.filenameTemplate')} hint={t('settings.filenameTemplateHint')} stack>
-              <input
+              <TextField
                 value={settings.filenameTemplate}
-                onChange={(e) => set('filenameTemplate', e.target.value)}
-                className="field mono text-[13px]"
-                spellCheck={false}
+                onChange={(v) => set('filenameTemplate', v)}
               />
             </Row>
           </Group>
@@ -428,12 +487,10 @@ export default function SettingsView(): JSX.Element {
 
           <Group id="network" title={t('settings.section.network')}>
             <Row label={t('settings.proxy')} stack>
-              <input
+              <TextField
                 value={settings.proxy}
-                onChange={(e) => set('proxy', e.target.value)}
+                onChange={(v) => set('proxy', v)}
                 placeholder={t('settings.proxyPlaceholder')}
-                className="field mono text-[13px]"
-                spellCheck={false}
               />
             </Row>
           </Group>
@@ -449,7 +506,7 @@ export default function SettingsView(): JSX.Element {
               <Switch value={settings.trayEnabled} onChange={(v) => set('trayEnabled', v)} />
             </Row>
             <Row label={t('settings.reset')}>
-              <button className="btn-danger" onClick={resetAll}>
+              <button className="btn-danger" onClick={() => setConfirmReset(true)}>
                 <RotateCcw size={14} /> {t('settings.reset')}
               </button>
             </Row>
@@ -514,6 +571,16 @@ export default function SettingsView(): JSX.Element {
           </Group>
         </div>
       </div>
+
+      {confirmReset && (
+        <ConfirmDialog
+          title={t('settings.resetConfirm')}
+          body={t('settings.resetConfirmBody')}
+          confirmLabel={t('settings.reset')}
+          onConfirm={resetAll}
+          onCancel={() => setConfirmReset(false)}
+        />
+      )}
     </div>
   )
 }
