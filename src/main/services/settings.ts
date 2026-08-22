@@ -5,6 +5,9 @@ import { LEGACY_THEMES, THEMES, type AppSettings, type ThemeId } from '@shared/t
 
 const SETTINGS_FILE = (): string => join(app.getPath('userData'), 'settings.json')
 
+/** Kept out of `defaults()` so `migrate` stays free of Electron, and testable. */
+const DEFAULT_TEMPLATE = '%(title)s [%(id)s].%(ext)s'
+
 function defaults(): AppSettings {
   return {
     downloadDir: app.getPath('downloads'),
@@ -20,7 +23,7 @@ function defaults(): AppSettings {
     subtitleLanguages: 'en,ru',
     sponsorBlock: false,
     restrictFilenames: false,
-    filenameTemplate: '%(title)s [%(id)s].%(ext)s',
+    filenameTemplate: DEFAULT_TEMPLATE,
     createSubfolders: false,
     speedLimit: '',
     playlistLimit: 500,
@@ -46,7 +49,7 @@ function defaults(): AppSettings {
  * Map it onto the nearest survivor rather than resetting to the default — a
  * user who chose `daylight` wants a light window, not a dark one.
  */
-function migrate(raw: Record<string, unknown>): Partial<AppSettings> {
+export function migrate(raw: Record<string, unknown>): Partial<AppSettings> {
   const next = { ...raw } as Partial<AppSettings> & { accent?: unknown }
   if (raw.theme !== undefined && !THEMES.includes(raw.theme as ThemeId)) {
     next.theme = LEGACY_THEMES[String(raw.theme)] ?? 'night'
@@ -58,7 +61,30 @@ function migrate(raw: Record<string, unknown>): Partial<AppSettings> {
   if (typeof next.playlistLimit === 'number') {
     next.playlistLimit = Math.min(5000, Math.max(10, Math.round(next.playlistLimit)))
   }
+  if (typeof next.filenameTemplate === 'string' && !isSafeTemplate(next.filenameTemplate)) {
+    next.filenameTemplate = DEFAULT_TEMPLATE
+  }
   return next
+}
+
+/**
+ * Whether a filename template stays inside the download folder.
+ *
+ * The template is joined onto the chosen directory and handed to the engine as
+ * `-o`, and `join` resolves `..` — so `../../../../Startup/%(title)s.%(ext)s`
+ * writes wherever it likes, and an absolute template discards the directory
+ * altogether. Nothing validated it. On its own that is a foot-gun rather than
+ * an attack, since only the user can type it; it stops being only a foot-gun
+ * the moment anything else can write settings.json.
+ *
+ * A template may still contain slashes — putting downloads in per-uploader
+ * subfolders is a real thing people do — it just may not climb out.
+ */
+export function isSafeTemplate(template: string): boolean {
+  const value = template.trim()
+  if (!value) return true
+  if (/^([a-zA-Z]:|\\|\/)/.test(value)) return false
+  return !value.split(/[\\/]+/).includes('..')
 }
 
 let cache: AppSettings | null = null
@@ -74,7 +100,13 @@ export function getSettings(): AppSettings {
       cache = defaults()
       persist(cache)
     }
-  } catch {
+  } catch (err) {
+    /*
+      Reaching here throws away every setting the user has ever changed — the
+      download folder, the cookies, the proxy — and it runs on the first launch
+      after every update, for every existing user. Silently was not good enough.
+    */
+    console.error('Could not read settings; falling back to defaults', err)
     cache = defaults()
   }
   return cache!

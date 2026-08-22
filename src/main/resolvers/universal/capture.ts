@@ -15,8 +15,34 @@ import { scoreUrl, type MediaCandidate } from './candidates'
 /** The session used by both the hidden sniffer and the in-app browser. */
 export const BROWSING_PARTITION = 'persist:uvd-browser'
 
+let hardened = false
+
+/**
+ * The session both the visible browser and the hidden sniffer load pages into.
+ *
+ * Hardened on first use. Electron grants **every** permission a page asks for
+ * when no handler is installed, and this session is where arbitrary,
+ * unexamined websites run — including in a window the user cannot see, opened
+ * automatically when a link needs the universal fallback, with autoplay policy
+ * relaxed and a synthetic user gesture behind the probe script. A page loaded
+ * that way could ask for the camera, the microphone or the location and simply
+ * be given them.
+ *
+ * Nothing this app does needs any of them: it watches network requests and
+ * reads the DOM. Fullscreen is the one thing a video player legitimately wants
+ * in the visible browser, so that is the only one allowed through.
+ */
 export function browsingSession(): Session {
-  return session.fromPartition(BROWSING_PARTITION)
+  const ses = session.fromPartition(BROWSING_PARTITION)
+  if (!hardened) {
+    hardened = true
+    ses.setPermissionRequestHandler((_wc, permission, callback) =>
+      callback(permission === 'fullscreen')
+    )
+    ses.setPermissionCheckHandler((_wc, permission) => permission === 'fullscreen')
+    ses.setDevicePermissionHandler(() => false)
+  }
+  return ses
 }
 
 /** Requests that only add noise (and slow the page down). */

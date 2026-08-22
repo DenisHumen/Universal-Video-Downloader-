@@ -98,15 +98,37 @@ export function flushHistory(): void {
     if (!existsSync(dir)) mkdirSync(dir, { recursive: true })
     const target = historyFile()
     const tmp = `${target}.tmp`
-    writeFileSync(tmp, JSON.stringify([...items.values()], null, 2), 'utf-8')
+    writeFileSync(tmp, JSON.stringify([...items.values()].map(publicItem), null, 2), 'utf-8')
     renameSync(tmp, target)
   } catch (err) {
     console.error('Failed to save history', err)
   }
 }
 
+/**
+ * An item as anyone outside this module is allowed to see it.
+ *
+ * The captured headers stay behind. When the built-in browser or the sniffer
+ * catches a stream, it keeps whatever the page sent with it — including
+ * `Cookie` and `Authorization`, because that is often the only reason the CDN
+ * will serve the file. Those are live session credentials for whatever site
+ * the user was signed into, and every item was being written verbatim into
+ * history.json and broadcast to the renderer on each update.
+ *
+ * Nothing outside needs them: the download re-resolves its source URL on every
+ * start, so the headers are rebuilt fresh each time anyway. They live in memory
+ * for exactly as long as the process does.
+ */
+function publicItem(item: DownloadItem): DownloadItem {
+  if (!item.headers) return { ...item }
+  const { headers: _headers, ...rest } = item
+  return rest
+}
+
 export function listDownloads(): DownloadItem[] {
-  return [...items.values()].sort((a, b) => b.createdAt - a.createdAt)
+  return [...items.values()]
+    .sort((a, b) => b.createdAt - a.createdAt)
+    .map(publicItem)
 }
 
 function emitUpdated(item: DownloadItem): void {
@@ -121,7 +143,7 @@ function emitUpdated(item: DownloadItem): void {
     and the list on screen disagreed.
   */
   if (!items.has(item.id)) return
-  downloadEvents.emit('updated', { ...item })
+  downloadEvents.emit('updated', publicItem(item))
   scheduleSave()
 }
 

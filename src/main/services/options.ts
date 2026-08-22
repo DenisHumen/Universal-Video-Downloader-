@@ -25,7 +25,15 @@ export function headerArgs(headers?: Record<string, string>): string[] {
     if (!value) continue
     // Referer has its own flag; the others would break the engine's own logic.
     if (/^(referer|range|accept-encoding|host|content-length)$/i.test(key)) continue
-    args.push('--add-header', `${key}:${value}`)
+    /*
+      These values are captured off a page we did not write. A carriage return
+      or newline inside one would end the header and begin another as far as
+      the engine is concerned, which is header injection by any other name.
+      Neither belongs in a header value regardless.
+    */
+    const clean = value.replace(/[\r\n]+/g, ' ').trim()
+    if (!clean) continue
+    args.push('--add-header', `${key}:${clean}`)
   }
   return args
 }

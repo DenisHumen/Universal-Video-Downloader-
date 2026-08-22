@@ -204,7 +204,15 @@ export function openBrowserWindow(initialUrl?: string): void {
       preload: sitePreload(),
       contextIsolation: true,
       nodeIntegration: false,
-      sandbox: false,
+      /*
+        This is the one view in the app that renders arbitrary websites, and it
+        was the one with the OS sandbox turned off — while the hidden sniffer,
+        which does the same job unattended, had it on. Context isolation keeps
+        a page away from the bridge either way; the sandbox is what keeps a
+        renderer bug from becoming unconstrained code execution. The site
+        preload uses nothing but `ipcRenderer`, which works sandboxed.
+      */
+      sandbox: true,
       // The user is driving; let them play things without fighting the policy.
       autoplayPolicy: 'no-user-gesture-required'
     }
@@ -336,6 +344,18 @@ export function registerBrowserIpc(): void {
     picking = false
     sendState()
     if (!result || result.kind === 'none' || !result.src) return
+    /*
+      The URL came from an attribute on the page. `absolute()` in the site
+      preload only requires that `new URL()` parses it, so `file:`, `data:` and
+      `blob:` all survive — and the link and iframe branches below navigate
+      straight to it. A page could cover itself with an anchor pointing at a
+      local file and wait for the user to reach for pick mode, which is exactly
+      what they do when detection has already failed them.
+
+      Media candidates take the same test later, via `isPlausible`; the two
+      navigating branches had none.
+    */
+    if (!/^https?:\/\//i.test(result.src)) return
     if (result.kind === 'link') {
       // The user pointed at a thumbnail — open that page and keep watching.
       void view?.webContents.loadURL(result.src, { userAgent: UA })
