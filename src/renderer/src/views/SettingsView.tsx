@@ -439,6 +439,15 @@ export default function SettingsView(): JSX.Element {
             <Row label={t('settings.sponsorBlock')} hint={t('settings.sponsorBlockHint')}>
               <Switch value={settings.sponsorBlock} onChange={(v) => set('sponsorBlock', v)} />
             </Row>
+            <Row
+              label={t('settings.preferCompatible')}
+              hint={t('settings.preferCompatibleHint')}
+            >
+              <Switch
+                value={settings.preferCompatible}
+                onChange={(v) => set('preferCompatible', v)}
+              />
+            </Row>
             <Row label={t('settings.restrictFilenames')} hint={t('settings.restrictFilenamesHint')}>
               <Switch value={settings.restrictFilenames} onChange={(v) => set('restrictFilenames', v)} />
             </Row>

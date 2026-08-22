@@ -23,6 +23,7 @@ function defaults(): AppSettings {
     subtitleLanguages: 'en,ru',
     sponsorBlock: false,
     restrictFilenames: false,
+    preferCompatible: true,
     filenameTemplate: DEFAULT_TEMPLATE,
     createSubfolders: false,
     speedLimit: '',

@@ -356,6 +356,13 @@ export interface AppSettings {
   /** Strip sponsor/intro segments from YouTube videos via SponsorBlock. */
   sponsorBlock: boolean
   restrictFilenames: boolean
+  /**
+   * Prefer H.264 video and AAC audio when the site offers a choice.
+   *
+   * Resolution still wins: this only decides between two formats of the same
+   * size, so a 4K video that exists only as VP9 or AV1 still comes down as 4K.
+   */
+  preferCompatible: boolean
   filenameTemplate: string
   /** Put each download in a subfolder named after the site. */
   createSubfolders: boolean

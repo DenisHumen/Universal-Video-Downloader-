@@ -29,6 +29,7 @@ function settings(overrides: Partial<AppSettings> = {}): AppSettings {
     clipboardWatch: false,
     trayEnabled: false,
     universalFallback: true,
+    preferCompatible: true,
     proxy: '',
     cookiesFromBrowser: '',
     cookiesFile: '',

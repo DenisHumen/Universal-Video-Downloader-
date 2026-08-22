@@ -228,6 +228,9 @@ export const en = {
   'settings.subtitleLanguagesHint': 'comma-separated codes, or "all"',
   'settings.sponsorBlock': 'skip sponsor segments',
   'settings.sponsorBlockHint': 'removes sponsor, self-promo and interaction segments (YouTube)',
+  'settings.preferCompatible': 'play-anywhere formats',
+  'settings.preferCompatibleHint':
+    'prefer H.264 and AAC, which every player and television understands. resolution is unaffected — a 4K video that only exists as VP9 still comes down as 4K.',
   'settings.restrictFilenames': 'restrict filenames',
   'settings.restrictFilenamesHint': 'ascii-only, no spaces',
   'settings.filenameTemplate': 'filename template',

@@ -221,6 +221,9 @@ export const ru: Dictionary = {
   'settings.subtitleLanguagesHint': 'коды через запятую или «all»',
   'settings.sponsorBlock': 'вырезать рекламные вставки',
   'settings.sponsorBlockHint': 'убирает спонсорские и саморекламные фрагменты (YouTube)',
+  'settings.preferCompatible': 'форматы, которые играют везде',
+  'settings.preferCompatibleHint':
+    'предпочитать H.264 и AAC — их понимает любой плеер и телевизор. на разрешение не влияет: видео в 4K, которое есть только в VP9, всё равно скачается в 4K.',
   'settings.restrictFilenames': 'упрощать имена файлов',
   'settings.restrictFilenamesHint': 'только ascii, без пробелов',
   'settings.filenameTemplate': 'шаблон имени файла',

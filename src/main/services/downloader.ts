@@ -302,6 +302,24 @@ function buildArgs(item: DownloadItem): string[] {
       args.push('-f', qualityFormat(item.quality))
     }
     args.push('--merge-output-format', 'mp4')
+    /*
+      Prefer the codecs everything can play.
+
+      YouTube and most large sites serve the same video twice: once as VP9 or
+      AV1, once as H.264. The first is smaller for the same quality and is what
+      the engine picks unprompted — and it is also what QuickTime, Windows
+      Media Player and a great many televisions refuse to open. The file
+      downloads perfectly and then will not play, which from the user's side is
+      indistinguishable from a broken download.
+
+      `res` comes first on purpose. yt-dlp's own mp4 preset sorts by codec
+      before resolution, which would quietly cap a 4K download at 1080p,
+      because above 1080p there usually is no H.264 to be had. Sorting by
+      resolution first means the codec only decides between two formats of the
+      same size: you keep every pixel the site offers and get the playable one
+      wherever there is a choice.
+    */
+    if (settings.preferCompatible) args.push('-S', 'res,vcodec:h264,acodec:aac')
   }
 
   if (settings.embedMetadata) args.push('--embed-metadata')

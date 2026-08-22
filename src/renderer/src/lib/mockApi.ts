@@ -42,6 +42,7 @@ const settings: AppSettings = {
   clipboardWatch: false,
   trayEnabled: false,
   universalFallback: true,
+  preferCompatible: true,
   proxy: '',
   cookiesFromBrowser: '',
   cookiesFile: ''

@@ -31,7 +31,18 @@ function unescapeMarkup(html: string): string {
     .replace(/&amp;/g, '&')
 }
 
-const MEDIA_RE = /https?:\/\/[^\s"'`<>\\)(]+?\.(?:m3u8|mpd|mp4|m4v|webm|mov|flv)(?:\?[^\s"'`<>\\)(]*)?/gi
+/*
+  Bare media URLs sitting in a script blob or an attribute none of the patterns
+  above knows about.
+
+  The audio extensions were missing here while the browser sniffer matched them
+  and the scorer ranked them deliberately — so a page whose only media is a
+  podcast, a mix or a lecture recording, written as a plain URL rather than an
+  <audio> tag, slipped past the cheap pass and had to wait for the hidden
+  browser, or came back as nothing at all when that fallback is switched off.
+*/
+const MEDIA_RE =
+  /https?:\/\/[^\s"'`<>\\)(]+?\.(?:m3u8|mpd|mp4|m4v|webm|mov|flv|mp3|m4a|flac|aac|ogg|oga|opus|wav)(?:\?[^\s"'`<>\\)(]*)?/gi
 
 function add(
   out: MediaCandidate[],

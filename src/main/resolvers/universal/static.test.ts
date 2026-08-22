@@ -115,6 +115,24 @@ describe('extractFromHtml', () => {
     const html = `<video src="javascript:void(0)"></video><div data-src="/relative/clip.mp4"></div>`
     for (const url of urls(html)) expect(url).toMatch(/^https?:\/\//)
   })
+
+  /*
+    The raw scan matched video extensions only, while the browser sniffer
+    matched audio and the scorer ranked it on purpose — so a page whose one
+    piece of media is a podcast written as a plain URL fell through the cheap
+    pass entirely.
+  */
+  it('finds a bare audio URL in a script blob', () => {
+    const html = `<script>var cfg = {"file":"https://cdn.test/episode-42.mp3"}</script>`
+    expect(urls(html)).toContain('https://cdn.test/episode-42.mp3')
+  })
+
+  it('finds the other audio containers too', () => {
+    for (const ext of ['m4a', 'flac', 'opus', 'ogg', 'wav', 'aac']) {
+      const html = `<script>src = "https://cdn.test/track.${ext}"</script>`
+      expect(urls(html), ext).toContain(`https://cdn.test/track.${ext}`)
+    }
+  })
 })
 
 /*
