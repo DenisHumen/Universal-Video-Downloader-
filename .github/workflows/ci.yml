@@ -8,8 +8,9 @@ on:
   workflow_dispatch:
 
 jobs:
+  # The cheap gate: everything that is platform-independent, once.
   check:
-    name: Typecheck, test & build
+    name: Typecheck, test & contrast
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -18,14 +19,57 @@ jobs:
           node-version: 20
           cache: npm
       - run: npm ci
-      # The bundled ffmpeg must be able to run on the machine it ships to.
-      - run: npm run check:ffmpeg
       - run: npm run typecheck
       - run: npm test
       - run: npm run check:contrast
+
+  # Packaging, on every platform that ships.
+  #
+  # This used to run on ubuntu alone, so anything that only breaks on macOS or
+  # Windows — a DMG option, an entitlement, an NSIS setting, a path assumption,
+  # or an Electron upgrade moving something — first showed up in the release
+  # build, which is to say after a `v*` tag was already public and the failure
+  # was most expensive to fix. `--dir` skips the installers and is quick.
+  #
+  # macOS is split by architecture because the runners are: `ffmpeg-static`
+  # downloads exactly one binary at install time, chosen from the host's own
+  # arch, so an arm64 build made on an Intel runner ships an Intel ffmpeg and
+  # post-processing fails on the machines it was built for. Same split as
+  # release.yml, and `check:ffmpeg` reads the binary's own header to prove it.
+  pack:
+    name: Package (${{ matrix.label }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            args: --linux
+            arch: x64
+            label: linux x64
+          - os: windows-latest
+            args: --win
+            arch: x64
+            label: windows x64
+          - os: macos-latest
+            args: --mac --arm64
+            arch: arm64
+            label: mac arm64
+          - os: macos-13
+            args: --mac --x64
+            arch: x64
+            label: mac x64
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      # The bundled ffmpeg must be able to run on the machine it ships to.
+      - name: Check the bundled ffmpeg matches this architecture
+        run: node scripts/check-ffmpeg-arch.mjs --arch=${{ matrix.arch }}
       - run: npm run build
-      # Exercise the packaging config here rather than discovering its mistakes
-      # at tag time, when they are most expensive. `--dir` skips the installers.
-      - run: npx --no-install electron-builder --dir
+      - run: npx --no-install electron-builder --dir ${{ matrix.args }}
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: false
