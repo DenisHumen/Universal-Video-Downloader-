@@ -10,6 +10,14 @@ files:
   - '!src/*'
   - '!scripts/*'
   - '!assets/*'
+  # `output` is resolved before this list is applied, so electron-builder only
+  # excludes the *current* version's directory — every previous release left
+  # under release/ was being packed into app.asar. At 350 MB a piece.
+  - '!release{,/**/*}'
+  - '!docs{,/**/*}'
+  - '!design-system{,/**/*}'
+  - '!.claude{,/**/*}'
+  - '!{vitest.config.ts,vite.preview.config.ts}'
   - '!electron.vite.config.{js,ts,mjs,cjs}'
   - '!{.eslintignore,.eslintrc.cjs,.prettierignore,.prettierrc.yaml,dev-app-update.yml,CHANGELOG.md,README.md}'
   - '!{.env,.env.*,.npmrc,pnpm-lock.yaml,package-lock.json}'

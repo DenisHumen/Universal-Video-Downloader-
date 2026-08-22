@@ -18,7 +18,14 @@ jobs:
           node-version: 20
           cache: npm
       - run: npm ci
+      # The bundled ffmpeg must be able to run on the machine it ships to.
+      - run: npm run check:ffmpeg
       - run: npm run typecheck
       - run: npm test
       - run: npm run check:contrast
       - run: npm run build
+      # Exercise the packaging config here rather than discovering its mistakes
+      # at tag time, when they are most expensive. `--dir` skips the installers.
+      - run: npx --no-install electron-builder --dir
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: false

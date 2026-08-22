@@ -14,19 +14,64 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  # A tag that doesn't match package.json publishes artifacts under the old
+  # version number, together with a latest.yml advertising it — so every
+  # installed copy compares the version it already has against itself and
+  # decides it is up to date. The release exists and nobody ever receives it.
+  verify:
+    name: Tag matches package.json
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Compare
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          tag="${GITHUB_REF_NAME#v}"
+          pkg="$(node -p "require('./package.json').version")"
+          echo "tag=$tag package.json=$pkg"
+          if [ "$tag" != "$pkg" ]; then
+            echo "::error::Tag $GITHUB_REF_NAME does not match package.json version $pkg."
+            exit 1
+          fi
+
   build:
-    name: Build (${{ matrix.platform }})
+    name: Build (${{ matrix.label }})
+    needs: verify
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
         include:
+          # Each architecture is built on its own machine.
+          #
+          # `ffmpeg-static` downloads exactly one binary at install time, for
+          # the architecture that ran npm — and electron-builder then copies
+          # that same node_modules into every target it was asked for. Building
+          # `--mac` (arm64 *and* x64) on one Apple Silicon runner therefore put
+          # an Apple Silicon ffmpeg inside the Intel disk image, where it fails
+          # with "Bad CPU type" on every merge, trim and convert. That is most
+          # downloads, since the default format is separate video and audio
+          # streams that have to be merged.
           - os: macos-latest
             platform: mac
+            args: --arm64
+            arch: arm64
+            label: mac arm64
+          - os: macos-13
+            platform: mac
+            args: --x64
+            arch: x64
+            label: mac x64
           - os: ubuntu-latest
             platform: linux
+            args: --x64
+            arch: x64
+            label: linux x64
           - os: windows-latest
             platform: win
+            args: --x64
+            arch: x64
+            label: windows x64
 
     steps:
       - name: Checkout
@@ -47,14 +92,23 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      # The guard for the bug described above: read the binary's own header and
+      # refuse to package it for a machine it cannot run on.
+      - name: Check the bundled ffmpeg matches this architecture
+        run: node scripts/check-ffmpeg-arch.mjs --arch=${{ matrix.arch }}
+
       - name: Typecheck & test
         run: npm run typecheck && npm test
+
+      # CI gates the palette on every push; a release must clear the same bar.
+      - name: Contrast gate
+        run: npm run check:contrast
 
       - name: Build renderer & main
         run: npm run build
 
-      - name: Build & publish (${{ matrix.platform }})
-        run: npx --no-install electron-builder --${{ matrix.platform }} --publish always
+      - name: Build & publish (${{ matrix.label }})
+        run: npx --no-install electron-builder --${{ matrix.platform }} ${{ matrix.args }} --publish always
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
