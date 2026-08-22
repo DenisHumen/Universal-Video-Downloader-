@@ -67,6 +67,62 @@ describe('buildTrimArgs', () => {
     const args = buildTrimArgs('in.mp4', 'out.mp4', { start: 1, end: 2 }, true)
     expect(args[args.length - 1]).toBe('out.mp4')
   })
+
+  /*
+    A trim writes beside its source and keeps its extension, so the encoders
+    have to be ones that container will accept. Handing the MP3 muxer an AAC
+    stream, or the WebM muxer h264, fails before the first frame — which is
+    every audio download and every VP9 download, on the default setting.
+  */
+  it('copies rather than re-encodes a lossy audio file, whatever the toggle says', () => {
+    for (const ext of ['mp3', 'm4a', 'opus', 'wav', 'ogg']) {
+      const args = buildTrimArgs(`in.${ext}`, `out.${ext}`, { start: 5, end: 15 }, true)
+      expect(args).toContain('copy')
+      expect(args).not.toContain('libx264')
+      expect(args).not.toContain('aac')
+    }
+  })
+
+  /*
+    A copied FLAC keeps the source's STREAMINFO, so the cut reports the original
+    length and a start time in the middle of it — verified by decoding the
+    result and comparing. Re-encoding is free: FLAC is lossless.
+  */
+  it('re-encodes flac, whose header a copy would leave lying', () => {
+    for (const precise of [true, false]) {
+      const args = buildTrimArgs('in.flac', 'out.flac', { start: 5, end: 15 }, precise)
+      expect(args).toContain('flac')
+      expect(args.join(' ')).toContain('-c:a flac')
+    }
+  })
+
+  it('copies when the source has no video, whatever the container is called', () => {
+    const args = buildTrimArgs('in.mp4', 'out.mp4', { start: 5 }, true, false)
+    expect(args).toContain('copy')
+    expect(args).not.toContain('libx264')
+  })
+
+  it('re-encodes webm to vp9 and opus, which is all webm accepts', () => {
+    const args = buildTrimArgs('in.webm', 'out.webm', { start: 5, end: 15 }, true)
+    expect(args).toContain('libvpx-vp9')
+    expect(args).toContain('libopus')
+    expect(args).not.toContain('libx264')
+    expect(args).not.toContain('aac')
+  })
+
+  it('still re-encodes a real video cut to h264', () => {
+    for (const ext of ['mp4', 'mkv', 'mov']) {
+      const args = buildTrimArgs(`in.${ext}`, `out.${ext}`, { start: 5, end: 15 }, true)
+      expect(args).toContain('libx264')
+      expect(args).toContain('aac')
+    }
+  })
+
+  it('keeps +faststart to the mov family that understands it', () => {
+    expect(buildTrimArgs('i.mp4', 'o.mp4', { start: 1 }, true)).toContain('+faststart')
+    expect(buildTrimArgs('i.webm', 'o.webm', { start: 1 }, true)).not.toContain('+faststart')
+    expect(buildTrimArgs('i.mkv', 'o.mkv', { start: 1 }, true)).not.toContain('+faststart')
+  })
 })
 
 describe('buildConvertArgs', () => {

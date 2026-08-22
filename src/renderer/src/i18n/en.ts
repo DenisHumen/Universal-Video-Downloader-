@@ -327,6 +327,7 @@ export const en = {
   'trim.preciseHint': 're-encodes so the cut lands exactly here — slower, but no leftover intro',
   'trim.fastHint':
     'copies the stream — near-instant, but the clip can start seconds early and run longer than asked',
+  'trim.audioExact': 'audio is cut exactly, without re-encoding — nothing to choose here',
   'trim.downloadHint': 'only the selected part is downloaded',
   'trim.invalid': 'the end must come after the start',
   'trim.apply': 'trim',

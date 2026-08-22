@@ -611,6 +611,23 @@ async function runMediaJob(item: DownloadItem): Promise<void> {
   emitUpdated(item)
 
   const probe = await probeMedia(source)
+  /*
+    Probing spawns ffmpeg and waits for it, and the item is reachable the whole
+    time — the row is on screen showing "processing" with a working cancel
+    button. Cancel finds no process to kill, because none has been spawned yet,
+    so it just marks the item and returns; this function then carried on and
+    started the encode anyway. Cancel followed by retry was worse: retry queues
+    the item again, the queue calls this function a second time while the first
+    call is still inside the probe, and both go on to spawn an ffmpeg writing
+    the same output path. The second registration overwrites the first in
+    `procs`, so one of them is left running untracked and unkillable.
+  */
+  const stateAfterProbe = items.get(item.id)?.state
+  if (stateAfterProbe !== 'processing') {
+    processQueue()
+    return
+  }
+
   // Catch the impossible ask up front rather than letting ffmpeg fail obscurely.
   if (item.kind === 'convert' && item.convertTarget?.mode === 'audio' && !probe.hasAudio) {
     failWith(
@@ -629,7 +646,7 @@ async function runMediaJob(item: DownloadItem): Promise<void> {
   try {
     args =
       item.kind === 'trim'
-        ? buildTrimArgs(source, item.filepath!, item.range ?? {}, item.precise ?? true)
+        ? buildTrimArgs(source, item.filepath!, item.range ?? {}, item.precise ?? true, probe.hasVideo)
         : buildConvertArgs(source, item.filepath!, item.convertTarget!)
   } catch (err) {
     fail(item, err instanceof Error ? err.message : String(err))
@@ -983,7 +1000,10 @@ export function startMediaJob(req: MediaJobRequest): DownloadItem {
     ? (req.sourcePath.split('.').pop() || 'mp4').toLowerCase()
     : (req.target?.container ?? 'mp4')
   const suffix = isTrim ? ' (clip)' : ` (${container})`
-  const filepath = uniqueOutputPath(req.sourcePath, suffix, container)
+  const spokenFor = new Set(
+    [...items.values()].flatMap((other) => (other.filepath ? [other.filepath.toLowerCase()] : []))
+  )
+  const filepath = uniqueOutputPath(req.sourcePath, suffix, container, spokenFor)
 
   const label = isTrim
     ? `${toTimestamp(req.range?.start ?? 0)} → ${req.range?.end != null ? toTimestamp(req.range.end) : '∞'}`

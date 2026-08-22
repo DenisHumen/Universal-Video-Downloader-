@@ -159,21 +159,25 @@ export default function MediaJobModal({ item, mode, onClose }: Props): JSX.Eleme
                 ) : (
                   <TrimEditor duration={duration} value={range} onChange={setRange} />
                 )}
-                <div>
-                  <p className="label mb-2">{t('trim.precise')}</p>
-                  <Choice
-                    label={t('trim.precise')}
-                    value={precise ? 'precise' : 'fast'}
-                    onChange={(v) => setPrecise(v === 'precise')}
-                    options={[
-                      { value: 'precise', label: t('trim.precise') },
-                      { value: 'fast', label: t('trim.fast') }
-                    ]}
-                  />
-                  <p className="hint mt-2">
-                    {precise ? t('trim.preciseHint') : t('trim.fastHint')}
-                  </p>
-                </div>
+                {hasVideo ? (
+                  <div>
+                    <p className="label mb-2">{t('trim.precise')}</p>
+                    <Choice
+                      label={t('trim.precise')}
+                      value={precise ? 'precise' : 'fast'}
+                      onChange={(v) => setPrecise(v === 'precise')}
+                      options={[
+                        { value: 'precise', label: t('trim.precise') },
+                        { value: 'fast', label: t('trim.fast') }
+                      ]}
+                    />
+                    <p className="hint mt-2">
+                      {precise ? t('trim.preciseHint') : t('trim.fastHint')}
+                    </p>
+                  </div>
+                ) : (
+                  !probing && <p className="hint">{t('trim.audioExact')}</p>
+                )}
               </>
             ) : (
               <>

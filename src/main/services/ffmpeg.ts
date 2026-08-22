@@ -232,6 +232,52 @@ export function rangeDuration(range: TrimRange, sourceDuration?: number): number
   const length = end - start
   return length > 0 ? length : undefined
 }
+/**
+ * Containers that hold audio and nothing else. A trim keeps the source's
+ * extension, so this doubles as the list of extensions a music download from
+ * this app arrives with — and every one of them was previously handed an h264
+ * video encoder and an AAC audio encoder.
+ */
+const AUDIO_ONLY_CONTAINERS = new Set(['mp3', 'm4a', 'aac', 'opus', 'ogg', 'oga', 'flac', 'wav'])
+
+/** Only the MOV family understands `+faststart`; elsewhere it is a warning. */
+const FASTSTART_CONTAINERS = new Set(['mp4', 'm4v', 'mov', 'm4a'])
+
+/**
+ * What each container will actually accept from a re-encode.
+ *
+ * WebM takes VP9 and Opus, and nothing this app might otherwise reach for.
+ * libvpx's own default is slower than real time; `good`/`cpu-used 4` halves
+ * that for no visible difference at this CRF.
+ */
+const TRIM_VIDEO: Record<string, string[]> = {
+  webm: ['-c:v', 'libvpx-vp9', '-crf', '32', '-b:v', '0', '-deadline', 'good', '-cpu-used', '4']
+}
+const TRIM_VIDEO_DEFAULT = ['-c:v', 'libx264', '-preset', 'veryfast', '-crf', '20']
+
+const TRIM_AUDIO: Record<string, string[]> = {
+  webm: ['-c:a', 'libopus', '-b:a', '160k']
+}
+const TRIM_AUDIO_DEFAULT = ['-c:a', 'aac', '-b:a', '192k']
+
+/**
+ * Audio containers whose header carries a total length that a stream copy does
+ * not rewrite.
+ *
+ * FLAC's STREAMINFO keeps the source's sample count, so a copied cut holds ten
+ * seconds of audio behind a header claiming thirty, with a start time pointing
+ * into the middle of the original. Players show the wrong length and a seek bar
+ * that runs off the end of the sound. Re-encoding costs nothing here — FLAC is
+ * lossless, so the output is the same audio, sample for sample — and it is worth
+ * doing on the fast path too, because a file that misreports itself is not a
+ * faster answer, just a wrong one.
+ *
+ * Checked the others the same way, by decoding the result and comparing it with
+ * the header: mp3, m4a, opus and wav all copy honestly.
+ */
+const TRIM_AUDIO_RECODE: Record<string, string[]> = {
+  flac: ['-c:v', 'copy', '-c:a', 'flac']
+}
 
 /**
  * Cut `[start, end]` out of a file.
@@ -240,12 +286,25 @@ export function rangeDuration(range: TrimRange, sourceDuration?: number): number
  * Stream copy is far faster but can only cut on keyframes, which for "remove
  * the intro" typically leaves a second or two of the intro behind — so precise
  * is the default and the fast path is opt-in.
+ *
+ * The encoders have to match the container, which is the source's own: a trim
+ * writes `song (clip).mp3` beside `song.mp3`. Asking the MP3 muxer to accept an
+ * AAC stream, or the WebM muxer to accept h264, fails before the first frame is
+ * written — "Could not write header" — leaving an empty file and a generic
+ * post-processing error. Every audio download and every VP9 video download hit
+ * that, which is most of them, and precise is the default.
+ *
+ * Audio takes the copy path whatever the toggle says, and that is the honest
+ * answer rather than a shortcut: an audio frame is tens of milliseconds, so a
+ * copy is already accurate to well past anything a person can hear, and
+ * re-encoding a lossy file to trim it would throw away quality to gain nothing.
  */
 export function buildTrimArgs(
   input: string,
   output: string,
   range: TrimRange,
-  precise: boolean
+  precise: boolean,
+  hasVideo = true
 ): string[] {
   const args: string[] = []
   if (range.start && range.start > 0) args.push('-ss', toTimestamp(range.start))
@@ -253,24 +312,19 @@ export function buildTrimArgs(
   const duration = rangeDuration(range)
   if (duration != null) args.push('-t', toTimestamp(duration))
 
-  if (precise) {
-    // Re-encode video for a frame-accurate cut; audio is copied when it can be.
-    args.push(
-      '-c:v',
-      'libx264',
-      '-preset',
-      'veryfast',
-      '-crf',
-      '20',
-      '-c:a',
-      'aac',
-      '-b:a',
-      '192k'
-    )
+  const container = extname(output).slice(1).toLowerCase()
+  const audioOnly = !hasVideo || AUDIO_ONLY_CONTAINERS.has(container)
+
+  if (!precise || audioOnly) {
+    args.push(...(TRIM_AUDIO_RECODE[container] ?? ['-c', 'copy']))
   } else {
-    args.push('-c', 'copy')
+    args.push(...(TRIM_VIDEO[container] ?? TRIM_VIDEO_DEFAULT))
+    args.push(...(TRIM_AUDIO[container] ?? TRIM_AUDIO_DEFAULT))
   }
-  args.push('-avoid_negative_ts', 'make_zero', '-movflags', '+faststart', output)
+
+  args.push('-avoid_negative_ts', 'make_zero')
+  if (FASTSTART_CONTAINERS.has(container)) args.push('-movflags', '+faststart')
+  args.push(output)
   return args
 }
 
@@ -327,13 +381,29 @@ export function buildConvertArgs(input: string, output: string, target: ConvertT
  * A destination path next to the source that doesn't collide with an existing
  * file — `clip.mp4`, then `clip (2).mp4`, and so on.
  */
-export function uniqueOutputPath(sourcePath: string, suffix: string, container: string): string {
+export function uniqueOutputPath(
+  sourcePath: string,
+  suffix: string,
+  container: string,
+  taken: ReadonlySet<string> = new Set()
+): string {
   const dir = dirname(sourcePath)
   const ext = extname(sourcePath)
   const base = sourcePath.slice(dir.length + 1, sourcePath.length - ext.length)
+  /*
+    `taken` is what the queue has already promised to other jobs. On disk a name
+    is free until something writes it, and nothing writes until the job runs —
+    so queueing two trims of the same file handed both the same output path and
+    the second silently overwrote the first. At the concurrency limit they do
+    not even take turns: two ffmpegs write the one file at once.
+
+    Matched case-insensitively, because on Windows a difference in case is not
+    a different file.
+  */
+  const claimed = (p: string): boolean => existsSync(p) || taken.has(p.toLowerCase())
   let candidate = join(dir, `${base}${suffix}.${container}`)
   let n = 2
-  while (existsSync(candidate)) {
+  while (claimed(candidate)) {
     candidate = join(dir, `${base}${suffix} (${n}).${container}`)
     n++
   }
