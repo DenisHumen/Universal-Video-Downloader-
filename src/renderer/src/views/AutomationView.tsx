@@ -365,7 +365,6 @@ export default function AutomationView(): JSX.Element {
       {editing && selected && (
         <StepEditor
           step={editing}
-          targets={settings?.smbTargets ?? []}
           onSave={saveStep}
           onRemove={removeStep}
           onClose={() => setEditing(null)}

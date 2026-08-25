@@ -21,8 +21,8 @@ import { useStore } from '../store'
 import { LANGUAGES, useT, type TranslationKey } from '../i18n'
 import { toast } from '../lib/toast'
 import Choice from '../components/Choice'
-import TabStrip from '../components/TabStrip'
 import ConfirmDialog from '../components/ConfirmDialog'
+import AutomationSettings from '../components/AutomationSettings'
 import { isSafeTemplate } from '@shared/filename'
 
 type SectionId =
@@ -30,6 +30,7 @@ type SectionId =
   | 'downloads'
   | 'processing'
   | 'detection'
+  | 'automation'
   | 'access'
   | 'network'
   | 'system'
@@ -41,6 +42,7 @@ const SECTIONS: { id: SectionId; label: TranslationKey }[] = [
   { id: 'downloads', label: 'settings.section.downloads' },
   { id: 'processing', label: 'settings.section.processing' },
   { id: 'detection', label: 'settings.section.detection' },
+  { id: 'automation', label: 'settings.section.automation' },
   { id: 'access', label: 'settings.section.access' },
   { id: 'network', label: 'settings.section.network' },
   { id: 'system', label: 'settings.section.system' },
@@ -346,9 +348,24 @@ export default function SettingsView(): JSX.Element {
   }
 
   return (
-    <div className="flex h-full flex-col">
-      <div className="mx-auto w-full max-w-[720px] shrink-0 px-6 pt-10">
-        <h1 className="h1">{t('settings.title')}</h1>
+    <div className="flex h-full min-h-0">
+      {/*
+        A rail down the side, not a strip across the top.
+
+        The strip was a row of tabs that scrolled, and it worked while there
+        were five of them. There are now more than fit any sensible window, so
+        most of the list was permanently off-screen behind an arrow - which is
+        the one affordance you cannot use without first noticing it. Down the
+        side every section is visible at once and the list can keep growing.
+      */}
+      <aside className="flex w-[190px] shrink-0 flex-col border-r border-edge">
+        <h1 className="h1 shrink-0 px-4 pb-3 pt-8">{t('settings.title')}</h1>
+        <nav
+          role="tablist"
+          aria-orientation="vertical"
+          aria-label={t('settings.title')}
+          className="min-h-0 flex-1 overflow-y-auto px-2 pb-6"
+        >
         {/*
           An underline strip, not a pill row.
           The index was styled with `.choice` at first, which is the app's
@@ -356,23 +373,24 @@ export default function SettingsView(): JSX.Element {
           radio groups it scrolls to, and nothing said which one changed a
           setting and which one just moved the page.
         */}
-        <TabStrip label={t('settings.title')} className="mt-4 border-b border-edge">
           {SECTIONS.map((s) => (
             <button
               key={s.id}
               onClick={() => jump(s.id)}
               role="tab"
               aria-selected={active === s.id}
-              className={`tab -mb-px shrink-0 ${active === s.id ? 'tab-on' : ''}`}
+              className={`w-full rounded px-2.5 py-1.5 text-left text-[13px] transition-colors ${
+                active === s.id ? 'bg-raise text-ink' : 'text-ink-2 hover:bg-raise/60'
+              }`}
             >
               {t(s.label)}
             </button>
           ))}
-        </TabStrip>
-      </div>
+        </nav>
+      </aside>
 
       <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto">
-        <div className="mx-auto w-full max-w-[720px] px-6 pb-24">
+        <div className="mx-auto w-full max-w-[720px] px-6 pb-24 pt-8">
           <Group id="appearance" title={t('settings.section.appearance')}>
             <Row label={t('settings.language')}>
               <Choice
@@ -516,6 +534,30 @@ export default function SettingsView(): JSX.Element {
           <Group id="detection" title={t('settings.section.detection')}>
             <Row label={t('settings.universal')} hint={t('settings.universalHint')}>
               <Switch value={settings.universalFallback} onChange={(v) => set('universalFallback', v)} />
+            </Row>
+          </Group>
+
+          <Group id="automation" title={t('settings.section.automation')}>
+            <AutomationSettings />
+            <Row label={t('settings.background')} hint={t('settings.backgroundHint')}>
+              <Switch
+                value={settings.automationEnabled}
+                onChange={(v) => set('automationEnabled', v)}
+              />
+            </Row>
+            <Row label={t('settings.autostart')} hint={t('settings.autostartHint')}>
+              <Switch value={settings.autostart} onChange={(v) => set('autostart', v)} />
+            </Row>
+            <Row label={t('settings.logVerbose')} hint={t('settings.logVerboseHint')}>
+              <Switch value={settings.logVerbose} onChange={(v) => set('logVerbose', v)} />
+            </Row>
+            <Row label={t('settings.logRow')}>
+              <button
+                className="btn-quiet"
+                onClick={async () => window.api.showInFolder(await window.api.getLogPath())}
+              >
+                {t('settings.openLog')}
+              </button>
             </Row>
           </Group>
 
