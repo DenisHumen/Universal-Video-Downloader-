@@ -6,7 +6,7 @@ import { useT } from '../i18n'
 import { useStore } from '../store'
 import { toast } from '../lib/toast'
 import { STEP_LABEL } from '../lib/automationLabels'
-import { emptyTarget, ShareForm, TelegramForm, useSecretState } from './AutomationForms'
+import { emptyTarget, pathOf, ShareForm, TelegramForm, useSecretState } from './AutomationForms'
 import {
   remoteDirFor,
   renameFor,
@@ -128,7 +128,7 @@ export default function StepEditor({
       if (step.kind === 'upload') {
         const target: SmbTarget = {
           ...draft,
-          name: draft.name.trim() || `${draft.host}/${draft.share}`
+          name: draft.name.trim() || pathOf(draft)
         }
         await saveSettings({ smbTargets: [...targets.filter((x) => x.id !== target.id), target] })
         if (password) await window.api.autoSetSecret('smb', target.id, password)

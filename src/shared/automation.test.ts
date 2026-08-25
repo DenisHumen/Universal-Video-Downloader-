@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import {
   applyReplacements,
+  formatSmbPath,
   episodeKey,
   fillTemplate,
+  parseSmbPath,
   newEpisodes,
   remoteDirFor,
   renameFor,
@@ -190,5 +192,57 @@ describe('newEpisodes', () => {
 describe('episodeKey', () => {
   it('tells seasons apart', () => {
     expect(episodeKey({ season: 1, episode: 12 })).not.toBe(episodeKey({ season: 11, episode: 2 }))
+  })
+})
+
+/**
+ * Reading the location people actually write.
+ *
+ * The share box was first offered on its own, and the first thing it received
+ * was a whole path - which the server answers with "there is no share by that
+ * name", because a share really is only the first segment. Every spelling below
+ * is one somebody has reasonably typed, and all of them mean the same place.
+ */
+describe('parseSmbPath', () => {
+  const path = '\\\\192.168.1.10\\shared\\torrents\\downloads'
+  const messy = '\\\\192.168.1.10\\\\shared\\torrents\\downloads\\'
+
+  it('splits a UNC path into server, share and folder', () => {
+    expect(parseSmbPath(path)).toEqual({
+      host: '192.168.1.10',
+      share: 'shared',
+      folder: 'torrents/downloads'
+    })
+  })
+
+  it('reads every other spelling of the same place the same way', () => {
+    const expected = { host: '192.168.1.10', share: 'shared', folder: 'torrents/downloads' }
+    expect(parseSmbPath('//192.168.1.10/shared/torrents/downloads')).toEqual(expected)
+    expect(parseSmbPath('smb://192.168.1.10/shared/torrents/downloads')).toEqual(expected)
+    expect(parseSmbPath('192.168.1.10/shared/torrents/downloads')).toEqual(expected)
+    expect(parseSmbPath(messy)).toEqual(expected)
+    expect(parseSmbPath('  ' + path + '  ')).toEqual(expected)
+  })
+
+  it('keeps the share to one segment however deep the path goes', () => {
+    // This is the whole point: the second segment is the share, and everything
+    // past it is a folder the upload creates rather than part of the name.
+    expect(parseSmbPath(path).share).toBe('shared')
+    expect(parseSmbPath('\\\\192.168.1.10\\shared')).toEqual({ host: '192.168.1.10', share: 'shared', folder: '' })
+  })
+
+  it('reports missing parts as empty rather than guessing', () => {
+    expect(parseSmbPath('')).toEqual({ host: '', share: '', folder: '' })
+    expect(parseSmbPath('192.168.1.10')).toEqual({ host: '192.168.1.10', share: '', folder: '' })
+    // A path with no server names a share nowhere, so the first segment is read
+    // as the host regardless. An obviously wrong server in the readout under the
+    // box is easier to spot and correct than a silently invented one.
+    expect(parseSmbPath('\\shared\\torrents\\downloads\\').host).toBe('shared')
+  })
+
+  it('writes a location back the way it came in', () => {
+    expect(formatSmbPath(parseSmbPath(path))).toBe(path)
+    expect(formatSmbPath(parseSmbPath(messy))).toBe(path)
+    expect(formatSmbPath({ host: '', share: '', folder: '' })).toBe('')
   })
 })

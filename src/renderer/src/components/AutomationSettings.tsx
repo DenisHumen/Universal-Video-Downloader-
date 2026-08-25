@@ -3,7 +3,7 @@ import { Loader2, Plus, Trash2 } from 'lucide-react'
 import { useT } from '../i18n'
 import { useStore } from '../store'
 import { toast } from '../lib/toast'
-import { emptyTarget, ShareForm, TelegramForm, useSecretState } from './AutomationForms'
+import { emptyTarget, pathOf, ShareForm, TelegramForm, useSecretState } from './AutomationForms'
 import type { SmbTarget } from '@shared/automation'
 
 /**
@@ -48,7 +48,7 @@ export default function AutomationSettings(): JSX.Element {
     try {
       const target: SmbTarget = {
         ...draft,
-        name: draft.name.trim() || `${draft.host}/${draft.share}`
+        name: draft.name.trim() || pathOf(draft)
       }
       await saveSettings({ smbTargets: [...targets.filter((x) => x.id !== target.id), target] })
       if (password) await window.api.autoSetSecret('smb', target.id, password)
@@ -105,7 +105,7 @@ export default function AutomationSettings(): JSX.Element {
                 >
                   <span className="block text-[13px] text-ink">{target.name}</span>
                   <span className="mono block text-[11px] text-ink-2">
-                    {target.host}/{target.share}
+                    {pathOf(target)}
                     {secrets.smb[target.id] ? '' : ` · ${t('auto.sharePassword')}?`}
                   </span>
                 </button>

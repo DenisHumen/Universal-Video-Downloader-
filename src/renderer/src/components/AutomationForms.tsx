@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { Check, Loader2 } from 'lucide-react'
 import { useT } from '../i18n'
 import { toast } from '../lib/toast'
-import type { SmbTarget } from '@shared/automation'
+import { formatSmbPath, parseSmbPath, type SmbTarget } from '@shared/automation'
 
 /**
  * The two things the automation needs credentials for.
@@ -18,11 +18,15 @@ import type { SmbTarget } from '@shared/automation'
  * and part of a step's setup in another.
  */
 
+/** What a location looks like, so the box explains its own format. */
+const PLACEHOLDER = '\\\\192.168.1.10\\shared\\video\\series'
+
 export const emptyTarget = (): SmbTarget => ({
   id: crypto.randomUUID(),
   name: '',
   host: '',
   share: '',
+  path: '',
   domain: '',
   username: ''
 })
@@ -85,6 +89,10 @@ function Field({
   )
 }
 
+/** The three parts of a location, as one string in the form people write it. */
+export const pathOf = (target: SmbTarget): string =>
+  formatSmbPath({ host: target.host, share: target.share, folder: target.path ?? '' })
+
 export function ShareForm({
   target,
   onTarget,
@@ -100,6 +108,40 @@ export function ShareForm({
 }): JSX.Element {
   const t = useT()
   const [testing, setTesting] = useState(false)
+
+  /*
+    One box for the whole path.
+
+    The first version asked for the server and the share separately, and got a
+    whole path typed into the share box - which the server rejects outright,
+    because a share name is only ever the first segment. That was the form's
+    fault, not the typist's: nobody holds a network location in their head as
+    three fields. They hold the one line they would paste into an address bar.
+
+    So take that line and do the splitting here. The text is kept as typed
+    rather than reformatted on every keystroke, because a field that rewrites
+    itself under the cursor is impossible to edit; what the app made of it is
+    shown underneath instead, so the split is visible rather than magic.
+  */
+  const [text, setText] = useState(() => pathOf(target))
+  useEffect(() => {
+    setText(pathOf(target))
+    // Keyed on the id: this resyncs when the parent swaps which share is open,
+    // not when the user is midway through typing into it.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [target.id])
+
+  const setPath = (value: string): void => {
+    setText(value)
+    const location = parseSmbPath(value)
+    onTarget({
+      ...target,
+      host: location.host,
+      share: location.share,
+      path: location.folder
+    })
+  }
+
   const ready = Boolean(target.host && target.share && target.username)
 
   const test = async (): Promise<void> => {
@@ -116,19 +158,24 @@ export function ShareForm({
   return (
     <div className="space-y-3">
       <Field
-        label={t('auto.shareHost')}
-        value={target.host}
-        onChange={(v) => onTarget({ ...target, host: v })}
-        placeholder="192.168.1.10"
-        hint={t('auto.shareHostHint')}
+        label={t('auto.sharePath')}
+        value={text}
+        onChange={setPath}
+        placeholder={PLACEHOLDER}
+        hint={t('auto.sharePathHint')}
       />
-      <Field
-        label={t('auto.shareName2')}
-        value={target.share}
-        onChange={(v) => onTarget({ ...target, share: v })}
-        placeholder="shared"
-        hint={t('auto.shareNameHint')}
-      />
+
+      {(target.host || target.share) && (
+        <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-0.5 text-[11px]">
+          <dt className="text-ink-2">{t('auto.shareHost')}</dt>
+          <dd className="mono truncate text-ink">{target.host || '—'}</dd>
+          <dt className="text-ink-2">{t('auto.shareName2')}</dt>
+          <dd className="mono truncate text-ink">{target.share || '—'}</dd>
+          <dt className="text-ink-2">{t('auto.shareFolder')}</dt>
+          <dd className="mono truncate text-ink">{target.path || t('auto.shareRoot')}</dd>
+        </dl>
+      )}
+
       <Field
         label={t('auto.shareUser')}
         value={target.username}
@@ -146,7 +193,7 @@ export function ShareForm({
         label={t('auto.shareLabel')}
         value={target.name}
         onChange={(v) => onTarget({ ...target, name: v })}
-        placeholder={target.host ? `${target.host}/${target.share}` : ''}
+        placeholder={pathOf(target)}
         hint={t('auto.shareLabelHint')}
       />
       <button className="btn" onClick={() => void test()} disabled={testing || !ready}>
@@ -156,6 +203,7 @@ export function ShareForm({
     </div>
   )
 }
+
 
 export function TelegramForm({
   token,

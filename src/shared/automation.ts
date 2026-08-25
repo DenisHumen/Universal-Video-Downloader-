@@ -61,6 +61,15 @@ export interface SmbTarget {
   name: string
   host: string
   share: string
+  /**
+   * The folder inside the share that everything is filed under.
+   *
+   * A share name alone is rarely where anyone actually wants their files. The
+   * location people have in mind is the whole path they would type into an
+   * address bar, and this is the part of it past the share name. Empty means
+   * the root of the share.
+   */
+  path: string
   domain: string
   username: string
 }
@@ -338,4 +347,49 @@ export function migrateWatches(raw: unknown): StoredWatches {
   }
 
   return { watches, runs }
+}
+
+// ---------------------------------------------------------------------------
+// Where a share lives
+// ---------------------------------------------------------------------------
+
+export interface SmbLocation {
+  host: string
+  share: string
+  /** Anything after the share name, which is a folder inside it. */
+  folder: string
+}
+
+/**
+ * Split the thing people actually write into the three parts SMB needs.
+ *
+ * Nobody thinks of a network location as a server plus a share plus a path.
+ * They think of it as one string, the way it appears in the address bar, and
+ * they will paste that string into whichever box looks most like it. The first
+ * version of the form asked for the parts separately and got a whole path typed
+ * into the share box - which the server rejects with "no share by that name",
+ * because a share name really is only the first segment and everything after it
+ * is a folder.
+ *
+ * Accepts every spelling of the same location: UNC, forward slashes, an smb://
+ * URL, or a bare host/share, with any number of separators anywhere.
+ */
+export function parseSmbPath(input: string): SmbLocation {
+  const backslash = String.fromCharCode(92)
+  let text = String(input || '').trim().split(backslash).join('/')
+  text = text.replace(/^smb:/i, '')
+  while (text.startsWith('/')) text = text.slice(1)
+  const parts = text.split('/').filter(Boolean)
+  return {
+    host: parts[0] ?? '',
+    share: parts[1] ?? '',
+    folder: parts.slice(2).join('/')
+  }
+}
+
+/** Write a location back out the way the user is used to seeing it. */
+export function formatSmbPath(location: SmbLocation): string {
+  const backslash = String.fromCharCode(92)
+  const parts = [location.host, location.share, ...location.folder.split('/')].filter(Boolean)
+  return parts.length ? backslash + backslash + parts.join(backslash) : ''
 }

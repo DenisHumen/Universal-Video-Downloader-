@@ -133,7 +133,12 @@ export async function uploadFile(
   const total = statSync(localPath).size
   const { client, tree } = await connect(target, password)
   const started = Date.now()
-  const dir = remoteDir.split(/[\\/]+/).filter(Boolean).join(SEP)
+  // Everything is filed under the folder the share was set up with.
+  const dir = [target.path ?? '', remoteDir]
+    .join('/')
+    .split(/[\\/]+/)
+    .filter(Boolean)
+    .join(SEP)
   const finalPath = dir ? dir + SEP + remoteName : remoteName
   const tempPath = `${finalPath}.uvd-part`
 
@@ -191,9 +196,21 @@ export async function uploadFile(
 /** Check a target works, for the "test this" button in settings. */
 export async function testTarget(target: SmbTarget, password: string): Promise<string> {
   const { client, tree } = await connect(target, password)
+  const folder = (target.path ?? '').split(/[\\/]+/).filter(Boolean).join(SEP)
   try {
-    const entries = await tree.readDirectory('')
-    return `Connected. ${entries.length} item(s) in the share.`
+    /*
+      Report on the folder the files will really land in, not on the share.
+      A share that answers while the folder under it is missing is a test that
+      passes and an upload that fails, which is the worst of both. A folder that
+      is merely not there yet is no failure though - the upload creates every
+      level it needs - so it is worth saying so rather than refusing.
+    */
+    if (folder && !(await tree.exists(folder))) {
+      return `Connected. ${folder.split(SEP).join('/')} does not exist yet, and will be created.`
+    }
+    const entries = await tree.readDirectory(folder)
+    const where = folder ? folder.split(SEP).join('/') : target.share
+    return `Connected. ${entries.length} item(s) in ${where}.`
   } catch (err) {
     throw wrap(err, target.host)
   } finally {
