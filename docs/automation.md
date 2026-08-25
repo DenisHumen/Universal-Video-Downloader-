@@ -4,9 +4,9 @@ The plan for the automation feature, written before the code so the code has
 something to answer to. Work proceeds stage by stage down this file; each stage
 names what has to be true before it counts as done.
 
-Status of this document: **stages 1–8 planned. Sections 9 and 11 (SMB and
-Telegram) are still marked `PENDING RESEARCH`; they are needed by stages 5 and
-6, so stages 1–4 are not blocked on them.**
+Status of this document: **complete — every section settled, and the SMB and
+Telegram choices were verified against the real share and the published limits
+rather than chosen from a search result. Ready to build from.**
 
 ---
 
@@ -247,12 +247,73 @@ A run is a small state machine over its steps. Rules:
 - A run that fails is retried on the next check, not in a tight loop.
 - Everything is logged (§10).
 
-## 9. `PENDING RESEARCH` — SMB
+## 9. SMB
 
-The library choice, with a version and a justification, plus the shape of the
-upload: streaming rather than buffering (a 10 GB file cannot be read into
-memory), remote directory creation, and distinguishing an authentication failure
-from an unreachable host so the user is told which.
+**`node-smb2@1.3.5`.** Tested against the real share before being chosen, not
+picked from a search result.
+
+### Why that one
+
+Queried the npm registry directly for every candidate. Three are dead: `smb2`
+last published 2018, `@marsaud/smb2` 2021, `v9u-smb2` 2022. Two are alive and
+are the same codebase — `@awo00/smb2` (May 2025) and `node-smb2` (October 2025),
+whose README still tells you to install the other one. `node-smb2` is the more
+recent, ships TypeScript declarations, and needs no native build, which keeps
+electron-builder out of it.
+
+The cost is honest: eight packages arrive where the app had two, and one of them
+is `moment-timezone`, which is large and superseded. That is the price of the
+decision to authenticate ourselves rather than write to a path the user has
+mounted.
+
+### The one thing that makes it work
+
+```js
+await client.authenticate({ domain: '', username, password, forceNtlmVersion: 'v2' })
+```
+
+Without `forceNtlmVersion: 'v2'` it does not work at all. Left to negotiate, the
+library chooses **NTLMv1** — it announces this on stdout — and a modern server
+refuses, returning `STATUS_LOGON_FAILURE` for a perfectly correct password.
+Verified all three ways against the live share: `v2` authenticates, `v1` fails,
+and auto-negotiation fails. Three different `domain` values made no difference.
+
+This is also why the error message has to be worded carefully. A wrong password
+and a refused authentication method produce the **same** status code, so an app
+that let the library negotiate would tell users their password was wrong when it
+was not. Forcing v2 is what makes "wrong username or password" an honest thing
+to say.
+
+### The upload, verified
+
+`tree.createFileWriteStream(path)` returns a real `Writable`, so an episode is
+piped from disk to the share without being read into memory. Measured: 200 MB in
+9.1 seconds, about 22 MB/s, with resident memory *falling* over the transfer.
+The rest of what the module needs is there — `createDirectory`, `exists`,
+`renameFile`, `removeFile`, `removeDirectory`, `readDirectory`,
+`createFileReadStream` — and all of it was exercised end to end against the
+share: directory created, file streamed up, renamed in place, removed, directory
+removed.
+
+Upload to a temporary name and rename on success, so a share never briefly holds
+a half-written episode under its final name.
+
+### Two quirks that cost time if you do not know them
+
+- **`readDirectory` prefixes every filename with `./`.** The entry for
+  `episode.mkv` comes back as `./episode.mkv`. A "did it land?" check comparing
+  bare names silently fails while the upload was in fact fine — which is exactly
+  what happened during this testing. Strip the prefix.
+- **Failures are thrown as raw protocol `Response` objects, not `Error`s.** No
+  `message`, no `code`; the reason is a numeric status on `.header.status`,
+  sometimes a BigInt. Everything from this library has to be caught and wrapped
+  before it reaches the rest of the app, mapping at least `0xC000006D`
+  (logon failure), `0xC00000CC` (no such share) and `0xC0000022` (access denied)
+  onto sentences a person can act on. An unreachable host is distinguishable —
+  it surfaces as `connect_timeout` rather than a status — which is what §8 needs.
+
+It also writes to stdout unconditionally during authentication. That line must
+not be allowed to land in the app's own log as if the app had written it.
 
 ## 10. Logging
 
@@ -341,10 +402,71 @@ second line cannot be forged, truncates, and rate-limits.
 spend its 10 MB on progress percentages. A setting flips it to DEBUG when a bug
 report is being prepared.
 
-## 11. `PENDING RESEARCH` — Telegram
+## 11. Telegram
 
-Exact request shape using Electron's `net`, HTML vs MarkdownV2 escaping, cover
-art via `sendPhoto`, size and rate limits, and which errors to report distinctly.
+A plain HTTPS POST to `api.telegram.org/bot<token>/<method>` through Electron's
+own `net`, the same way `resolvers/http.ts` already talks to sites. No webhook —
+that is only for *receiving* updates, and this bot only speaks. No client
+library.
+
+### The notification cannot carry the episode
+
+A bot may send files **up to 50 MB**. An episode is several hundred megabytes to
+a couple of gigabytes, so the file is never the message. The notification says
+what arrived and where it was put; the file is on the share, which is the whole
+point of the upload step.
+
+### Shape
+
+`sendPhoto` with the series cover and a caption, falling back to `sendMessage`
+when there is no cover or the text would not fit. The limits differ and both
+matter: **1024 characters for a caption, 4096 for a message**, so the composer
+has to know which one it is aiming at and truncate the title rather than have
+Telegram reject the whole thing.
+
+Suggested caption, which fits comfortably:
+
+```
+🎬 <b>Tabakoshka</b> — S01E09
+<i>Озвучка РуАниме / DEEP · 720p</i>
+
+Uploaded to <code>shared/test/Tabakoshka</code>
+1.24 GB · 4 min 12 s
+```
+
+### HTML, not MarkdownV2
+
+`parse_mode: "HTML"` needs three characters escaped — `&`, `<`, `>` — and
+nothing else. MarkdownV2 needs roughly eighteen, including `.`, `-`, `!`, `(`
+and `)`, every one of which turns up in ordinary series titles. A single
+unescaped character makes Telegram reject the entire message, so the format with
+three rules is the one that keeps working on titles nobody anticipated.
+
+Escaping is applied to each interpolated value — title, dub name, path — never
+to the assembled string, or the tags would be escaped too.
+
+### Failures
+
+Telegram answers with `{ "ok": false, "error_code": …, "description": … }` and a
+matching HTTP status, so unlike the SMB library the reason arrives in a readable
+form. Worth distinguishing for the user: a bad token, a chat id the bot has
+never been spoken to, and a bot the user has blocked all mean different things
+and have different fixes.
+
+Sending happens one message at a time with a small gap. Telegram documents
+roughly one message per second to a single chat; a check that finds four new
+episodes at once would otherwise be a burst.
+
+### Setup, in the settings screen
+
+The token comes from BotFather and the chat id from the user writing to their
+own bot once. Both are secrets under §5, and the token is worth calling out
+twice: it sits in the **URL path**, not in a header or a query parameter, so the
+redaction rule in §10 has to match it there — a rule written for query
+parameters would miss every single request.
+
+A "send a test message" button, because the first thing anyone wants to know is
+whether they pasted the right thing.
 
 ## 12. UI
 
