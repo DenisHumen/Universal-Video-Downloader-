@@ -8,6 +8,7 @@ import EngineNotice from './components/EngineNotice'
 import HomeView from './views/HomeView'
 import DownloadsView from './views/DownloadsView'
 import SettingsView from './views/SettingsView'
+import AutomationView from './views/AutomationView'
 import SearchView from './views/SearchView'
 import Logo from './components/Logo'
 import MacNotice from './components/MacNotice'
@@ -78,6 +79,7 @@ export default function App(): JSX.Element {
             {view === 'home' && <HomeView />}
             {view === 'search' && <SearchView settings={settings} embedded />}
             {view === 'downloads' && <DownloadsView />}
+            {view === 'automation' && <AutomationView />}
             {view === 'settings' && <SettingsView />}
           </motion.div>
         ) : (

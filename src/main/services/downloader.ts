@@ -74,6 +74,23 @@ const resolveAborts = new Map<string, AbortController>()
 */
 const deliberateStops = new Set<string>()
 
+/*
+  What we told the engine to name each file, so the result can be found again.
+
+  The engine writes its progress to a pipe in the console's own code page, not
+  UTF-8 - measured here as cp1251 for a Cyrillic title, and neither
+  PYTHONIOENCODING nor PYTHONUTF8 changes it. The app reads those lines as UTF-8,
+  so every non-Latin character in the destination path came back as U+FFFD. The
+  file downloaded perfectly and then could not be found, which surfaced as "the
+  download finished but the file is not where it should be" - after fetching the
+  whole thing. Most of a Russian-language library would hit that.
+
+  Rather than guess at a code page that varies by machine, the app compares
+  against the name it chose itself: `readdirSync` hands back real strings, and
+  the only thing the engine decides is the extension.
+*/
+const expectedNames = new Map<string, { dir: string; stem: string }>()
+
 /** Stop any in-flight link resolution for this item. */
 function abortResolve(id: string): void {
   resolveAborts.get(id)?.abort()
@@ -281,7 +298,9 @@ function buildArgs(item: DownloadItem): string[] {
   // Output template. For custom-resolved streams (e.g. a scraped .m3u8) the
   // engine's own title is meaningless, so we bake in the title we scraped.
   if ((item.referer || item.headers) && item.title) {
-    args.push('-o', join(dir, `${safeName(item.title) || 'video'}.%(ext)s`))
+    const stem = safeName(item.title) || 'video'
+    expectedNames.set(item.id, { dir, stem })
+    args.push('-o', join(dir, `${stem}.%(ext)s`))
   } else {
     const template = settings.filenameTemplate || '%(title)s [%(id)s].%(ext)s'
     args.push('-o', join(dir, template))
@@ -389,6 +408,26 @@ function parseFinalPath(line: string, item: DownloadItem): void {
         finalPaths.set(item.id, { path: m[1].trim(), priority })
       }
     }
+  }
+}
+
+/**
+ * Find the finished file by the name we asked for, when the engine's own
+ * report of it came back unreadable. See `expectedNames`.
+ */
+function findByExpectedName(id: string): string | undefined {
+  const expected = expectedNames.get(id)
+  if (!expected) return undefined
+  try {
+    const match = readdirSync(expected.dir)
+      .filter((name) => name.startsWith(expected.stem + '.'))
+      // A leftover `.part` or `.ytdl` is not the finished file.
+      .filter((name) => !/[.](part|ytdl|temp)$/i.test(name))
+      .sort()
+      .pop()
+    return match ? join(expected.dir, match) : undefined
+  } catch {
+    return undefined
   }
 }
 
@@ -976,7 +1015,12 @@ async function runDownload(item: DownloadItem): Promise<void> {
       item.finishedAt = Date.now()
       const fp = finalPaths.get(item.id)
       if (fp) item.filepath = fp.path
+      if (!item.filepath || !existsSync(item.filepath)) {
+        const recovered = findByExpectedName(item.id)
+        if (recovered) item.filepath = recovered
+      }
       finalPaths.delete(item.id)
+      expectedNames.delete(item.id)
       emitUpdated(item)
       processQueue()
       return

@@ -36,6 +36,7 @@ import {
 import { getSettings, resetSettings, setSettings } from './services/settings'
 import { ensureYtdlp, getYtdlpStatus, updateYtdlp, ytdlpEvents } from './services/ytdlp'
 import { takePending } from './index'
+import { registerAutomationIpc } from './automation-ipc'
 import {
   checkForUpdates,
   downloadUpdate,
@@ -171,6 +172,8 @@ export function registerIpc({ getWindow, openSearchWindow, onSettingsChanged }: 
 
   // Whatever main tried to hand the window before it was listening.
   ipcMain.handle(IPC.takePending, () => takePending())
+
+  registerAutomationIpc()
 
   // ---- App updates ----
   ipcMain.handle(IPC.updateCheck, () => checkForUpdates())

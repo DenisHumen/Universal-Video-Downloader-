@@ -406,6 +406,27 @@ export function installMockApi(): void {
     onDetectStatus: () => () => undefined,
     onClipboardLink: () => () => undefined,
     takePending: async () => ({}),
+    autoDescribe: async (url: string) => ({
+      url,
+      title: 'A series',
+      thumbnail: undefined,
+      provider: 'yummyani',
+      defaultTranslator: 'a',
+      qualities: ['360p', '480p', '720p'],
+      translators: [{ id: 'a', name: 'A dub', episodes: 8 }]
+    }),
+    autoList: async () => [],
+    autoRuns: async () => [],
+    autoAdd: async (w) => ({ ...w, id: 'mock', createdAt: Date.now() }),
+    autoUpdate: async () => undefined,
+    autoRemove: async () => undefined,
+    autoCheckNow: async () => undefined,
+    autoTestSmb: async () => 'Connected.',
+    autoTestTelegram: async () => 'Connected.',
+    autoSetSecret: async () => undefined,
+    autoSecretState: async () => ({ telegram: false, smb: {}, persists: true }),
+    getLogPath: async () => 'C:/mock/uvd.log',
+    onAutomationChanged: () => () => undefined,
     onNavigate: () => () => undefined
   }
   window.api = api

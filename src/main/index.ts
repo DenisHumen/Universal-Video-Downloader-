@@ -8,12 +8,16 @@ import {
   Tray,
   type MenuItemConstructorOptions
 } from 'electron'
+import { existsSync, mkdirSync, rmSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { IPC } from '@shared/ipc'
 import { registerIpc } from './ipc'
 import { flushSettings, getSettings } from './services/settings'
 import { ensureYtdlp, refreshEngineIfDue } from './services/ytdlp'
 import { checkForUpdates, initUpdater } from './services/updater'
+import { flushLog, initLog, log } from './services/log'
+import { flushWatches } from './services/automation/store'
+import { startWatcher } from './services/automation/watcher'
 import {
   loadHistory,
   pauseAll,
@@ -193,6 +197,47 @@ export function takePending(): PendingDelivery {
   delete pending.link
   delete pending.view
   return out
+}
+
+/**
+ * Start with the system, or stop doing so.
+ *
+ * Only meaningful in a packaged build - in development the executable is
+ * Electron itself, and registering that would launch a bare Electron at every
+ * login. Linux is not handled by Electron at all: `setLoginItemSettings` is an
+ * empty function there, so the desktop entry is written by hand.
+ */
+function applyAutostart(enabled: boolean): void {
+  if (!app.isPackaged) return
+  try {
+    if (process.platform === 'linux') {
+      const dir = join(app.getPath('home'), '.config', 'autostart')
+      const file = join(dir, 'universal-video-downloader.desktop')
+      if (enabled) {
+        mkdirSync(dir, { recursive: true })
+        writeFileSync(
+          file,
+          [
+            '[Desktop Entry]',
+            'Type=Application',
+            'Name=Universal Video Downloader',
+            `Exec=${process.execPath}`,
+            'X-GNOME-Autostart-enabled=true',
+            ''
+          ].join(String.fromCharCode(10)),
+          'utf-8'
+        )
+      } else if (existsSync(file)) {
+        rmSync(file, { force: true })
+      }
+      return
+    }
+    app.setLoginItemSettings({ openAtLogin: enabled, openAsHidden: true })
+  } catch (err) {
+    log.warn('app', 'Could not change the start-with-system setting', {
+      why: err instanceof Error ? err.message : String(err)
+    })
+  }
 }
 
 function showMainWindow(): void {
@@ -424,6 +469,13 @@ if (!gotLock) {
   })
 
   app.whenReady().then(() => {
+    /*
+      First, so everything after it can be explained afterwards.
+      `getPath('logs')` creates its directory as a side effect, which is why
+      this cannot happen at module load.
+    */
+    initLog(getSettings().logVerbose ? 'debug' : 'info')
+
     if (process.platform === 'win32') {
       app.setAppUserModelId('com.denishumen.universalvideodownloader')
     }
@@ -476,6 +528,9 @@ if (!gotLock) {
     */
     setTimeout(() => void refreshEngineIfDue(isEngineBusy), 30_000)
 
+    if (getSettings().automationEnabled) startWatcher()
+    applyAutostart(getSettings().autostart)
+
     const initialLink = linkFromArgv(process.argv)
     if (initialLink) pending.link = initialLink
 
@@ -492,10 +547,19 @@ if (!gotLock) {
     // rewrite the file per keystroke; a change made just before quitting is
     // still a change the user made.
     flushSettings()
+    flushWatches()
+    flushLog()
     shutdownDownloads()
   })
 
   app.on('window-all-closed', () => {
-    if (!isMac && !getSettings().trayEnabled) app.quit()
+    /*
+      Closing the window must not end the process while the app is meant to be
+      watching. `trayEnabled` alone was the old condition, which meant somebody
+      who turned automation on and closed the window silently stopped every
+      schedule they had set up.
+    */
+    const settings = getSettings()
+    if (!isMac && !settings.trayEnabled && !settings.automationEnabled) app.quit()
   })
 }

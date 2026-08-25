@@ -69,8 +69,22 @@ interface Rule {
 }
 
 const RULES: Rule[] = [
+  /*
+    First on purpose. A tool that is missing or has failed says so unambiguously,
+    while several of the rules below are guesses from vaguer wording - and one of
+    them used to win this race. `not found` in the "unavailable" rule matched
+    "ffmpeg not found", so every post-processing failure was reported to the user
+    as "this video may have been removed, or blocked in your region - try
+    enabling cookies": a wrong diagnosis, a wrong remedy, and a file that had in
+    fact downloaded perfectly.
+  */
   {
-    re: /\b410\b|http error 404|\bgone\b|\b404\b|has been removed|video.*deleted|not found/,
+    re: /ffmpeg|ffprobe|postprocessing|conversion failed/,
+    code: 'postprocess',
+    message: 'Post-processing failed - the video downloaded but could not be merged or converted.'
+  },
+  {
+    re: /\b410\b|http error 404|\bgone\b|\b404\b|has been removed|video.*deleted|video.*not found|no such video/,
     code: 'unavailable',
     message:
       'This video is unavailable — it may have been removed, made private, or the site is blocking access from your region.',
@@ -119,11 +133,6 @@ const RULES: Rule[] = [
     re: /permission denied|eacces|eperm/,
     code: 'permission',
     message: 'No permission to write to the download folder. Pick another one in Settings.'
-  },
-  {
-    re: /ffmpeg|postprocessing|conversion failed/,
-    code: 'postprocess',
-    message: 'Post-processing failed — the video downloaded but could not be merged or converted.'
   },
   {
     re: /unsupported url|no video formats|unable to extract|nothing to download/,

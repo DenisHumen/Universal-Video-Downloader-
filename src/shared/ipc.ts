@@ -66,7 +66,22 @@ export const IPC = {
   evtClipboardLink: 'event:clipboard-link',
   evtNavigate: 'event:navigate',
   /** What main tried to hand the window before it was listening. */
-  takePending: 'app:take-pending'
+  takePending: 'app:take-pending',
+
+  // ---- Automation ----
+  autoDescribe: 'auto:describe',
+  autoList: 'auto:list',
+  autoAdd: 'auto:add',
+  autoUpdate: 'auto:update',
+  autoRemove: 'auto:remove',
+  autoRuns: 'auto:runs',
+  autoCheckNow: 'auto:check-now',
+  autoTestSmb: 'auto:test-smb',
+  autoTestTelegram: 'auto:test-telegram',
+  autoSetSecret: 'auto:set-secret',
+  autoSecretState: 'auto:secret-state',
+  logPath: 'app:log-path',
+  evtAutoChanged: 'event:automation-changed'
 } as const
 
 export type IpcChannel = (typeof IPC)[keyof typeof IPC]

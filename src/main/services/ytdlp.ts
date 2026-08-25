@@ -73,6 +73,20 @@ export function ytdlpSpawnOptions(): {
   detached?: boolean
 } {
   const env: NodeJS.ProcessEnv = { ...process.env }
+  /*
+    Make the engine speak UTF-8 on its pipes.
+
+    Without this it writes to stdout in the console's own code page, and this
+    app reads that as UTF-8 - so every non-Latin character in a title came back
+    as replacement characters. That is not cosmetic: the destination path is
+    parsed out of those lines, so a download named in Cyrillic finished
+    perfectly on disk and the app then could not find it, reporting that the
+    file "is not where it should be". Most of a Russian-language library would
+    hit this, and the failure only appears after the whole file has been
+    fetched.
+  */
+  env.PYTHONIOENCODING = 'utf-8'
+  env.PYTHONUTF8 = '1'
   if (process.platform === 'win32') {
     const tmp = engineTmpDir()
     env.TMP = tmp

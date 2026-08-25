@@ -6,6 +6,7 @@ import {
   Keyboard,
   ListVideo,
   Minus,
+  Radar,
   Search,
   Settings as SettingsIcon,
   Square,
@@ -37,7 +38,8 @@ const ITEMS: NavItem[] = [
   { id: 'home', label: 'nav.home', icon: <Download size={15} />, hint: '1' },
   { id: 'search', label: 'nav.search', icon: <Search size={15} />, hint: '2' },
   { id: 'downloads', label: 'nav.queue', icon: <ListVideo size={15} />, hint: '3' },
-  { id: 'settings', label: 'nav.settings', icon: <SettingsIcon size={15} />, hint: '4' }
+  { id: 'automation', label: 'nav.automation', icon: <Radar size={15} />, hint: '4' },
+  { id: 'settings', label: 'nav.settings', icon: <SettingsIcon size={15} />, hint: '5' }
 ]
 
 const ACTIVE_STATES = ['downloading', 'processing', 'queued', 'paused', 'detecting']

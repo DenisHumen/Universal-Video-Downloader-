@@ -1,6 +1,13 @@
 import { describe, expect, it } from 'vitest'
 import type { AppSettings } from '@shared/types'
-import { accessArgs, hasCookies, headerArgs, humanizeYtdlpError, isTransientError } from './options'
+import {
+  accessArgs,
+  classifyYtdlpError,
+  hasCookies,
+  headerArgs,
+  humanizeYtdlpError,
+  isTransientError
+} from './options'
 
 function settings(overrides: Partial<AppSettings> = {}): AppSettings {
   return {
@@ -140,5 +147,31 @@ describe('isTransientError', () => {
     expect(isTransientError('Video has been removed')).toBe(false)
     expect(isTransientError('No space left on device')).toBe(false)
     expect(isTransientError('Unsupported URL: https://example.com')).toBe(false)
+  })
+})
+
+describe('classifyYtdlpError', () => {
+  /*
+    A missing ffmpeg says "ffmpeg not found", and the rule for a removed video
+    matched a bare "not found" and came first - so every post-processing failure
+    was reported as "this video may have been removed, or blocked in your
+    region, try enabling cookies". Wrong diagnosis, wrong remedy, and the file
+    had in fact downloaded perfectly.
+  */
+  it('blames the tool when the tool is what failed', () => {
+    const out = classifyYtdlpError(
+      'ERROR: Postprocessing: ffmpeg not found. Please install or provide the path',
+      false
+    )
+    expect(out.code).toBe('postprocess')
+    expect(out.cookieHint).toBe(false)
+    expect(out.message).not.toMatch(/region|removed/i)
+  })
+
+  it('still recognises a video that really is gone', () => {
+    expect(classifyYtdlpError('ERROR: Video not found on this server', false).code).toBe(
+      'unavailable'
+    )
+    expect(classifyYtdlpError('ERROR: HTTP Error 404: Not Found', false).code).toBe('unavailable')
   })
 })

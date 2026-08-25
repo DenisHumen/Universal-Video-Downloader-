@@ -11,9 +11,9 @@ import { normalizeUrl } from '@shared/urls'
 import type { AppInfo } from '../../preload/index'
 import { applyAppearance } from './lib/theme'
 
-export type ViewId = 'home' | 'search' | 'downloads' | 'settings'
+export type ViewId = 'home' | 'search' | 'downloads' | 'automation' | 'settings'
 
-const VIEWS: ViewId[] = ['home', 'search', 'downloads', 'settings']
+const VIEWS: ViewId[] = ['home', 'search', 'downloads', 'automation', 'settings']
 
 export function isViewId(value: string): value is ViewId {
   return (VIEWS as string[]).includes(value)

@@ -1,3 +1,5 @@
+import type { Run, SmbTarget, Watch } from '@shared/automation'
+import type { SeriesOffer } from '../main/automation-ipc'
 import { contextBridge, ipcRenderer } from 'electron'
 import { IPC } from '@shared/ipc'
 import type {
@@ -107,6 +109,32 @@ const api = {
   ensureYtdlp: (): Promise<YtDlpStatus> => ipcRenderer.invoke(IPC.ytdlpEnsure),
   updateYtdlp: (): Promise<string | undefined> => ipcRenderer.invoke(IPC.ytdlpUpdate),
   takePending: (): Promise<PendingDelivery> => ipcRenderer.invoke(IPC.takePending),
+
+  // ---- Automation ----
+  autoDescribe: (url: string): Promise<SeriesOffer> => ipcRenderer.invoke(IPC.autoDescribe, url),
+  autoList: (): Promise<Watch[]> => ipcRenderer.invoke(IPC.autoList),
+  autoRuns: (watchId: string): Promise<Run[]> => ipcRenderer.invoke(IPC.autoRuns, watchId),
+  autoAdd: (watch: Omit<Watch, 'id' | 'createdAt'>): Promise<Watch> =>
+    ipcRenderer.invoke(IPC.autoAdd, watch),
+  autoUpdate: (id: string, patch: Partial<Watch>): Promise<Watch | undefined> =>
+    ipcRenderer.invoke(IPC.autoUpdate, id, patch),
+  autoRemove: (id: string): Promise<void> => ipcRenderer.invoke(IPC.autoRemove, id),
+  autoCheckNow: (id: string): Promise<void> => ipcRenderer.invoke(IPC.autoCheckNow, id),
+  autoTestSmb: (target: SmbTarget, password: string): Promise<string> =>
+    ipcRenderer.invoke(IPC.autoTestSmb, target, password),
+  autoTestTelegram: (token: string, chatId: string): Promise<string> =>
+    ipcRenderer.invoke(IPC.autoTestTelegram, token, chatId),
+  /** One way. There is no channel that reads a secret back. */
+  autoSetSecret: (kind: 'smb' | 'telegram', id: string, value: string): Promise<void> =>
+    ipcRenderer.invoke(IPC.autoSetSecret, kind, id, value),
+  autoSecretState: (): Promise<{ telegram: boolean; smb: Record<string, boolean>; persists: boolean }> =>
+    ipcRenderer.invoke(IPC.autoSecretState),
+  getLogPath: (): Promise<string> => ipcRenderer.invoke(IPC.logPath),
+  onAutomationChanged: (cb: () => void): (() => void) => {
+    const handler = (): void => cb()
+    ipcRenderer.on(IPC.evtAutoChanged, handler)
+    return () => ipcRenderer.removeListener(IPC.evtAutoChanged, handler)
+  },
 
   // App updates
   checkForUpdates: (): Promise<UpdateStatus> => ipcRenderer.invoke(IPC.updateCheck),
