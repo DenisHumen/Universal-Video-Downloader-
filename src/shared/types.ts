@@ -1,3 +1,4 @@
+import type { SmbTarget } from './automation'
 // Shared types used by the main process, preload bridge and renderer.
 
 export type DownloadMode = 'video' | 'audio'
@@ -378,6 +379,16 @@ export interface AppSettings {
    * size, so a 4K video that exists only as VP9 or AV1 still comes down as 4K.
    */
   preferCompatible: boolean
+  /** Keep checking and downloading with the window closed. Implies the tray. */
+  automationEnabled: boolean
+  /** Start with the system, so a schedule survives a reboot. */
+  autostart: boolean
+  /** Shares the upload step can send to. Passwords live in the secret store. */
+  smbTargets: SmbTarget[]
+  /** Where notifications go. The bot token lives in the secret store. */
+  telegramChatId: string
+  /** Turn the log up when a bug report is being prepared. */
+  logVerbose: boolean
   filenameTemplate: string
   /** Put each download in a subfolder named after the site. */
   createSubfolders: boolean

@@ -43,6 +43,11 @@ const settings: AppSettings = {
   trayEnabled: false,
   universalFallback: true,
   preferCompatible: true,
+  automationEnabled: false,
+  autostart: false,
+  smbTargets: [],
+  telegramChatId: '',
+  logVerbose: false,
   proxy: '',
   cookiesFromBrowser: '',
   cookiesFile: ''
