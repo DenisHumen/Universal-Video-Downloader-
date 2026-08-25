@@ -1,0 +1,194 @@
+import { describe, expect, it } from 'vitest'
+import {
+  applyReplacements,
+  episodeKey,
+  fillTemplate,
+  newEpisodes,
+  remoteDirFor,
+  renameFor,
+  safeSegment,
+  type RenameStep
+} from './automation'
+
+const AT = new Date(2026, 7, 25)
+
+const step = (over: Partial<RenameStep> = {}): RenameStep => ({
+  id: 'r',
+  kind: 'rename',
+  enabled: true,
+  template: '{title} - S{season2}E{episode2}',
+  replacements: [],
+  ...over
+})
+
+describe('applyReplacements', () => {
+  it('renames a series into whatever the user files it under', () => {
+    // The sites this watches answer in Russian; a library organised in English
+    // is the whole reason this module exists.
+    expect(applyReplacements('Табакошка', [{ from: 'Табакошка', to: 'Tabakoshka' }])).toBe(
+      'Tabakoshka'
+    )
+  })
+
+  it('replaces every occurrence, not just the first', () => {
+    expect(applyReplacements('a b a b', [{ from: 'a', to: 'x' }])).toBe('x b x b')
+  })
+
+  it('applies rules in the order they are listed', () => {
+    const rules = [
+      { from: 'one', to: 'two' },
+      { from: 'two', to: 'three' }
+    ]
+    expect(applyReplacements('one', rules)).toBe('three')
+  })
+
+  it('takes the text literally rather than as a pattern', () => {
+    // Somebody naming a TV show should not have to know what `(` means.
+    expect(applyReplacements('Show (2025)', [{ from: '(2025)', to: '' }])).toBe('Show ')
+    expect(applyReplacements('a.b', [{ from: '.', to: '-' }])).toBe('a-b')
+  })
+
+  it('ignores a rule with nothing to find', () => {
+    expect(applyReplacements('Show', [{ from: '', to: 'X' }])).toBe('Show')
+  })
+})
+
+describe('fillTemplate', () => {
+  const values = { title: 'Show', season: 1, episode: 9, quality: '720p', ext: 'mkv' }
+
+  it('fills the tokens', () => {
+    expect(fillTemplate('{title} S{season}E{episode} {quality}.{ext}', values, AT)).toBe(
+      'Show S1E9 720p.mkv'
+    )
+  })
+
+  it('pads the two-digit forms', () => {
+    expect(fillTemplate('S{season2}E{episode2}', values, AT)).toBe('S01E09')
+  })
+
+  it('does not pad past two digits', () => {
+    expect(fillTemplate('E{episode2}', { ...values, episode: 128 }, AT)).toBe('E128')
+  })
+
+  it('leaves an unknown token visible instead of silently dropping it', () => {
+    // A typo should look like a typo, not produce "Show - S01E" and a mystery.
+    expect(fillTemplate('{title} {epsiode}', values, AT)).toBe('Show {epsiode}')
+  })
+
+  it('takes the date from the clock it is given', () => {
+    expect(fillTemplate('{year} {date}', values, AT)).toBe('2026 2026-08-25')
+  })
+})
+
+describe('safeSegment', () => {
+  it('removes what no filesystem will take', () => {
+    expect(safeSegment('a<b>c:d"e/f\\g|h?i*j')).toBe('a b c d e f g h i j')
+  })
+
+  it('keeps hyphens, because that is what people put in their templates', () => {
+    expect(safeSegment('Show - S01E09')).toBe('Show - S01E09')
+  })
+
+  it('trims the dots and spaces Windows refuses at the end of a name', () => {
+    expect(safeSegment('  Show.  ')).toBe('Show')
+  })
+
+  it('keeps a title readable rather than truncating mid-word forever', () => {
+    expect(safeSegment('x'.repeat(400)).length).toBe(180)
+  })
+})
+
+describe('renameFor', () => {
+  const values = { title: 'Табакошка', season: 1, episode: 9, quality: '720p', ext: 'mkv' }
+
+  it('builds the filename people actually want', () => {
+    const s = step({ replacements: [{ from: 'Табакошка', to: 'Tabakoshka' }] })
+    expect(renameFor(s, values, AT)).toBe('Tabakoshka - S01E09.mkv')
+  })
+
+  it('keeps the extension it was given, however it was written', () => {
+    expect(renameFor(step(), { ...values, ext: '.mp4' }, AT)).toMatch(/[.]mp4$/)
+  })
+
+  it('never produces a nameless file', () => {
+    expect(renameFor(step({ template: '///' }), values, AT)).toBe('episode.mkv')
+  })
+
+  it('cannot be made to escape its directory by a hostile title', () => {
+    const out = renameFor(step({ template: '{title}' }), { ...values, title: '../../etc/passwd' }, AT)
+    expect(out).not.toContain('/')
+    expect(out).not.toContain('..')
+  })
+})
+
+describe('remoteDirFor', () => {
+  const values = { title: 'Tabakoshka', season: 1, episode: 9 }
+
+  it('keeps slashes as directory levels, which is the point of the field', () => {
+    expect(remoteDirFor('anime/{title}/season {season}', values, [], AT)).toBe(
+      'anime/Tabakoshka/season 1'
+    )
+  })
+
+  it('does not let a title invent a level of its own', () => {
+    expect(remoteDirFor('{title}', { ...values, title: 'a/b' }, [], AT)).toBe('a b')
+  })
+
+  it('drops empty levels rather than producing a doubled slash', () => {
+    expect(remoteDirFor('a//{title}', values, [], AT)).toBe('a/Tabakoshka')
+  })
+
+  it('runs the replacements first, so one set of rules serves both', () => {
+    expect(remoteDirFor('{title}', { ...values, title: 'Табакошка' }, [
+      { from: 'Табакошка', to: 'Tabakoshka' }
+    ], AT)).toBe('Tabakoshka')
+  })
+})
+
+describe('newEpisodes', () => {
+  const ep = (season: number, episode: number): { season: number; episode: number } => ({
+    season,
+    episode
+  })
+
+  it('finds what has appeared since last time', () => {
+    const seen = [ep(1, 1), ep(1, 2)]
+    expect(newEpisodes(seen, [ep(1, 1), ep(1, 2), ep(1, 3)])).toEqual([ep(1, 3)])
+  })
+
+  it('has nothing to do when nothing has changed', () => {
+    expect(newEpisodes([ep(1, 1)], [ep(1, 1)])).toEqual([])
+  })
+
+  /*
+    The reason `seen` is a set of pairs and not the highest episode number:
+    sites really do add an episode behind one already published, and a
+    high-water mark would never look back.
+  */
+  it('notices an episode inserted behind ones already handled', () => {
+    const seen = [ep(1, 1), ep(1, 3)]
+    expect(newEpisodes(seen, [ep(1, 1), ep(1, 2), ep(1, 3)])).toEqual([ep(1, 2)])
+  })
+
+  it('treats the same number in another season as another episode', () => {
+    expect(newEpisodes([ep(1, 1)], [ep(1, 1), ep(2, 1)])).toEqual([ep(2, 1)])
+  })
+
+  it('returns them in the order they should be downloaded', () => {
+    expect(newEpisodes([], [ep(2, 1), ep(1, 5), ep(1, 2)])).toEqual([
+      ep(1, 2),
+      ep(1, 5),
+      ep(2, 1)
+    ])
+  })
+
+  it('is not upset by an episode disappearing from the site', () => {
+    expect(newEpisodes([ep(1, 1), ep(1, 2)], [ep(1, 1)])).toEqual([])
+  })
+})
+
+describe('episodeKey', () => {
+  it('tells seasons apart', () => {
+    expect(episodeKey({ season: 1, episode: 12 })).not.toBe(episodeKey({ season: 11, episode: 2 }))
+  })
+})
