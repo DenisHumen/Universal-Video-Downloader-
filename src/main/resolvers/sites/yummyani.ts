@@ -184,11 +184,55 @@ async function streamingFromId(animeId: string, webUrl: string): Promise<Resolve
   }
 }
 
+/**
+ * Every number on the page that might be this title's id, likeliest first.
+ *
+ * The page carries two, and they are not always the same number. The
+ * `short_link` meta tag is the site's own short numbering, and the id block on
+ * the rating widget is what api.yani.tv answers to. Across a sample of a dozen
+ * titles the two agreed on eleven and disagreed on one - an older season, where
+ * the short link pointed at a number the API has never heard of. Reading the
+ * short link first therefore worked for most of the catalogue and failed
+ * silently on the back half of it, with nothing to show for it but "HTTP 404".
+ *
+ * Ordered rather than chosen, because a page that changes shape should degrade
+ * into trying the next number rather than into not working.
+ */
+export function animeIdCandidates(page: string): string[] {
+  const out: string[] = []
+  const add = (value?: string): void => {
+    if (value && !out.includes(value)) out.push(value)
+  }
+  add(pick(/class="rating-info"[^>]*data-id="(\d+)"/, page))
+  add(pick(/data-id="(\d+)"[^>]*class="rating-info"/, page))
+  add(pick(/data-id="(\d+)"/, page))
+  add(pick(/yani\.tv\/a(\d+)/, page))
+  return out
+}
+
+/** A 404 means the number was not an anime id, not that the title is gone. */
+function looksLikeAWrongId(err: unknown): boolean {
+  return /\b404\b/.test(err instanceof Error ? err.message : String(err))
+}
+
 async function resolvePage(url: string): Promise<ResolvedUrl> {
   const page = await fetchText(url, { Referer: REFERER })
-  const animeId = pick(/yani\.tv\/a(\d+)/, page) || pick(/data-id="(\d+)"/, page)
-  if (!animeId) return { url }
-  return streamingFromId(animeId, url)
+  const candidates = animeIdCandidates(page)
+  if (!candidates.length) return { url }
+
+  let last: unknown
+  for (const animeId of candidates) {
+    try {
+      return await streamingFromId(animeId, url)
+    } catch (err) {
+      last = err
+      // Anything else is a real answer about the right title - a season with no
+      // streams yet, a network failure - and asking a different number about it
+      // would only turn a clear message into a confusing one.
+      if (!looksLikeAWrongId(err)) throw err
+    }
+  }
+  throw last
 }
 
 /** Internal scheme built from a search result: uvd-yummy-item://<animeId> */
