@@ -2,7 +2,12 @@ import { useCallback, useEffect, useState } from 'react'
 import { Check, Loader2 } from 'lucide-react'
 import { useT } from '../i18n'
 import { toast } from '../lib/toast'
-import { formatSmbPath, parseSmbPath, type SmbTarget } from '@shared/automation'
+import {
+  formatSmbPath,
+  normaliseSmbTarget,
+  parseSmbPath,
+  type SmbTarget
+} from '@shared/automation'
 
 /**
  * The two things the automation needs credentials for.
@@ -89,9 +94,17 @@ function Field({
   )
 }
 
-/** The three parts of a location, as one string in the form people write it. */
-export const pathOf = (target: SmbTarget): string =>
-  formatSmbPath({ host: target.host, share: target.share, folder: target.path ?? '' })
+/**
+ * The three parts of a location, as one string in the form people write it.
+ *
+ * Repairs as it formats, so a share saved by an older version reads correctly
+ * everywhere it is shown - in the list, in the box, and in the name it suggests
+ * - rather than only once its settings have been written again.
+ */
+export const pathOf = (target: SmbTarget): string => {
+  const { host, share, path } = normaliseSmbTarget(target)
+  return formatSmbPath({ host, share, folder: path })
+}
 
 export function ShareForm({
   target,
@@ -125,7 +138,17 @@ export function ShareForm({
   */
   const [text, setText] = useState(() => pathOf(target))
   useEffect(() => {
-    setText(pathOf(target))
+    /*
+      A share saved before this box existed holds the whole path in its share
+      field, and would be read back as a share named 'shared/torrents/downloads'
+      sitting at the root. Repair it on the way in, so the readout below is the
+      truth immediately rather than after the next restart.
+    */
+    const repaired = normaliseSmbTarget(target)
+    if (repaired.share !== target.share || repaired.path !== (target.path ?? '')) {
+      onTarget(repaired)
+    }
+    setText(pathOf(repaired))
     // Keyed on the id: this resyncs when the parent swaps which share is open,
     // not when the user is midway through typing into it.
     // eslint-disable-next-line react-hooks/exhaustive-deps

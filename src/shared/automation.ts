@@ -393,3 +393,70 @@ export function formatSmbPath(location: SmbLocation): string {
   const parts = [location.host, location.share, ...location.folder.split('/')].filter(Boolean)
   return parts.length ? backslash + backslash + parts.join(backslash) : ''
 }
+
+/**
+ * Repair a target whose share carries a path.
+ *
+ * Before the path box existed, the form asked for the share on its own, and
+ * what it kept receiving was the whole path - which the server rejects outright,
+ * because a share name is only ever the first segment. Fixing the form was not
+ * enough: those targets are already sitting in people's settings, and a stored
+ * share of "shared/torrents/downloads" goes on failing with the same message
+ * however good the box that replaced it is.
+ *
+ * So the split is applied on every settings read and write, and again before
+ * connecting. A target repaired once stays repaired, and one that somehow
+ * escapes repair still connects.
+ */
+/**
+ * Was this name written by the old default, rather than chosen?
+ *
+ * Compared by meaning rather than character by character: the label was
+ * generated at whatever moment the share was saved, so a stray leading or
+ * trailing separator added later leaves the two spelled differently while still
+ * plainly being the same thing. An exact comparison misses every real case.
+ */
+function looksGenerated(name: string, host: string, share: string): boolean {
+  const backslash = String.fromCharCode(92)
+  const squash = (value: string): string =>
+    value.split(backslash).join('/').split('/').filter(Boolean).join('/').toLowerCase()
+  return squash(name) === squash(`${host}/${share}`)
+}
+
+export function normaliseSmbTarget<T extends SmbTarget>(target: T): T {
+  const backslash = String.fromCharCode(92)
+  let host = (target.host || '').trim()
+  const share = (target.share || '').split(backslash).join('/')
+  const parts = [share, target.path || '']
+    .join('/')
+    .split(backslash)
+    .join('/')
+    .split('/')
+    .filter(Boolean)
+
+  if (parts.length > 1 && parts[0].toLowerCase() === host.toLowerCase()) {
+    // A whole UNC path typed into the share box names the server twice.
+    parts.shift()
+  } else if (!host && share.startsWith('//') && parts.length > 1) {
+    // ...or names it only there, if the server box was left empty.
+    host = parts.shift() as string
+  }
+
+  const repaired = { ...target, host, share: parts[0] ?? '', path: parts.slice(1).join('/') }
+
+  /*
+    An older version labelled a share `server/share` by default, which for these
+    targets reads as the mangled value it is repairing. Relabel only when the
+    name is exactly that generated form - a name somebody chose is theirs, and
+    rewriting it would be a worse fault than an ugly default.
+  */
+  if (looksGenerated(target.name, target.host, target.share)) {
+    repaired.name = formatSmbPath({
+      host: repaired.host,
+      share: repaired.share,
+      folder: repaired.path
+    })
+  }
+
+  return repaired
+}

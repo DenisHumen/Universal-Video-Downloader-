@@ -1,7 +1,7 @@
 import { createReadStream, statSync } from 'fs'
 import { pipeline } from 'stream/promises'
 import { log } from '../log'
-import type { SmbTarget } from '@shared/automation'
+import { normaliseSmbTarget, type SmbTarget } from '@shared/automation'
 
 /**
  * Putting a finished episode on a share.
@@ -70,7 +70,10 @@ function wrap(err: unknown, host: string): SmbError {
   return new SmbError(message || 'The share could not be reached.', 'unknown')
 }
 
-async function connect(target: SmbTarget, password: string): Promise<{ client: Client; tree: Client }> {
+async function connect(input: SmbTarget, password: string): Promise<{ client: Client; tree: Client }> {
+  // Defence in depth: a share field still carrying a whole path is split here
+  // too, so a target that escaped the settings migration reaches the right share.
+  const target = normaliseSmbTarget(input)
   const SMB2 = (await import('node-smb2')).default as any
   const client = new SMB2.Client(target.host, { connectTimeout: 10_000, requestTimeout: 120_000 })
   try {
@@ -123,13 +126,14 @@ export interface UploadResult {
  * else might pick up.
  */
 export async function uploadFile(
-  target: SmbTarget,
+  input: SmbTarget,
   password: string,
   localPath: string,
   remoteDir: string,
   remoteName: string,
   onProgress?: (bytes: number, total: number) => void
 ): Promise<UploadResult> {
+  const target = normaliseSmbTarget(input)
   const total = statSync(localPath).size
   const { client, tree } = await connect(target, password)
   const started = Date.now()
@@ -194,7 +198,8 @@ export async function uploadFile(
 }
 
 /** Check a target works, for the "test this" button in settings. */
-export async function testTarget(target: SmbTarget, password: string): Promise<string> {
+export async function testTarget(input: SmbTarget, password: string): Promise<string> {
+  const target = normaliseSmbTarget(input)
   const { client, tree } = await connect(target, password)
   const folder = (target.path ?? '').split(/[\\/]+/).filter(Boolean).join(SEP)
   try {

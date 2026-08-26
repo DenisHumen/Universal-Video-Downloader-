@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   applyReplacements,
   formatSmbPath,
+  normaliseSmbTarget,
   episodeKey,
   fillTemplate,
   parseSmbPath,
@@ -244,5 +245,105 @@ describe('parseSmbPath', () => {
     expect(formatSmbPath(parseSmbPath(path))).toBe(path)
     expect(formatSmbPath(parseSmbPath(messy))).toBe(path)
     expect(formatSmbPath({ host: '', share: '', folder: '' })).toBe('')
+  })
+})
+
+/**
+ * Repairing shares that were saved before the path box existed.
+ *
+ * This is the case that was actually reported: a share stored as
+ * "shared/torrents/downloads" at the root of nothing, which the server answers
+ * with "there is no share by that name" no matter how good the form in front
+ * of it has become.
+ */
+describe('normaliseSmbTarget', () => {
+  const base = {
+    id: 'x',
+    name: 'the one from the bug report',
+    host: '192.168.1.10',
+    share: '',
+    path: '',
+    domain: '',
+    username: 'someone'
+  }
+
+  it('splits a share that swallowed the rest of the path', () => {
+    const fixed = normaliseSmbTarget({ ...base, share: '\\shared\\torrents\\downloads\\' })
+    expect(fixed.share).toBe('shared')
+    expect(fixed.path).toBe('torrents/downloads')
+    expect(fixed.host).toBe('192.168.1.10')
+  })
+
+  it('does not name the server twice when the share held a whole UNC path', () => {
+    const fixed = normaliseSmbTarget({ ...base, share: '\\\\192.168.1.10\\shared\\torrents\\downloads' })
+    expect(fixed).toMatchObject({ host: '192.168.1.10', share: 'shared', path: 'torrents/downloads' })
+  })
+
+  it('takes the server from the share when the server box was left empty', () => {
+    const fixed = normaliseSmbTarget({ ...base, host: '', share: '\\\\192.168.1.10\\shared\\torrents\\downloads' })
+    expect(fixed).toMatchObject({ host: '192.168.1.10', share: 'shared', path: 'torrents/downloads' })
+  })
+
+  it('leaves a target that was already right alone', () => {
+    const good = { ...base, share: 'shared', path: 'torrents/downloads' }
+    expect(normaliseSmbTarget(good)).toEqual(good)
+  })
+
+  it('gives a path rather than undefined for a target saved before the field existed', () => {
+    // Written out in full, without the field at all - which is how an older
+    // settings file really holds it, and what the app reads back.
+    const old = {
+      id: 'x',
+      name: 'saved before the field existed',
+      host: '192.168.1.10',
+      share: 'shared',
+      domain: '',
+      username: 'someone'
+    } as unknown as typeof base
+    expect(normaliseSmbTarget(old).path).toBe('')
+  })
+
+  it('repairs the same target to the same thing however often it runs', () => {
+    // It runs on every settings read and write, so drifting would compound.
+    const once = normaliseSmbTarget({ ...base, share: '\\shared\\torrents\\downloads\\' })
+    expect(normaliseSmbTarget(once)).toEqual(once)
+    expect(normaliseSmbTarget(normaliseSmbTarget(once))).toEqual(once)
+  })
+
+  it('relabels a share still wearing the old generated name', () => {
+    const share = '\\shared\\torrents\\downloads\\'
+    const generated = { ...base, share, name: `192.168.1.10/${share}` }
+    expect(normaliseSmbTarget(generated).name).toBe(formatSmbPath({
+      host: '192.168.1.10',
+      share: 'shared',
+      folder: 'torrents/downloads'
+    }))
+  })
+
+  it('relabels even when the generated name and the share drifted apart', () => {
+    // What the bug report actually held: a label generated before a stray
+    // separator was added to the share, so the two no longer match exactly.
+    const drifted = {
+      ...base,
+      share: '\\shared\\torrents\\downloads\\',
+      name: '192.168.1.10/shared\\torrents\\downloads'
+    }
+    expect(normaliseSmbTarget(drifted).name).toBe(formatSmbPath({
+      host: '192.168.1.10',
+      share: 'shared',
+      folder: 'torrents/downloads'
+    }))
+  })
+
+  it('never rewrites a name somebody chose', () => {
+    const chosen = { ...base, share: 'shared', name: 'the NAS in the cupboard' }
+    expect(normaliseSmbTarget(chosen).name).toBe('the NAS in the cupboard')
+  })
+
+  it('keeps the name and credentials it was given', () => {
+    const fixed = normaliseSmbTarget({ ...base, share: '\\shared\\torrents\\downloads\\' })
+    expect(fixed.name).toBe('the one from the bug report')
+    expect(fixed.username).toBe('someone')
+    expect(fixed.id).toBe('x')
   })
 })

@@ -3,6 +3,7 @@ import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from '
 import { join } from 'path'
 import { LEGACY_THEMES, THEMES, type AppSettings, type ThemeId } from '@shared/types'
 import { isSafeTemplate } from '@shared/filename'
+import { normaliseSmbTarget } from '@shared/automation'
 
 export { isSafeTemplate }
 
@@ -69,6 +70,15 @@ export function migrate(raw: Record<string, unknown>): Partial<AppSettings> {
   }
   if (typeof next.playlistLimit === 'number') {
     next.playlistLimit = Math.min(5000, Math.max(10, Math.round(next.playlistLimit)))
+  }
+  /*
+    Shares saved before the path box existed hold the whole path in the share
+    field, which no server will accept. Repairing them here means it happens on
+    the read that follows the update, without the user being asked to go and
+    retype something they already typed correctly once.
+  */
+  if (Array.isArray(next.smbTargets)) {
+    next.smbTargets = next.smbTargets.map(normaliseSmbTarget)
   }
   if (typeof next.filenameTemplate === 'string' && !isSafeTemplate(next.filenameTemplate)) {
     next.filenameTemplate = DEFAULT_TEMPLATE

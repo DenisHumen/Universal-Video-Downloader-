@@ -74,3 +74,49 @@ describe('isSafeTemplate', () => {
     expect(isSafeTemplate('season..2/%(title)s.%(ext)s')).toBe(true)
   })
 })
+
+/*
+  A share saved before the path box existed keeps the whole path in its share
+  field, which no server accepts. It was reported from a real settings file, so
+  the repair has to happen on the read, not only in the form.
+*/
+describe('migrate, for shares saved by an older version', () => {
+  const stored = {
+    id: 'x',
+    name: 'downloads',
+    host: '192.168.1.10',
+    share: '\\shared\\torrents\\downloads\\',
+    domain: '',
+    username: 'someone'
+  }
+
+  it('splits the path back out of the share field on read', () => {
+    const [fixed] = migrate({ smbTargets: [stored] }).smbTargets ?? []
+    expect(fixed).toMatchObject({ host: '192.168.1.10', share: 'shared', path: 'torrents/downloads' })
+  })
+
+  it('keeps the id, so the password already stored against it still applies', () => {
+    const [fixed] = migrate({ smbTargets: [stored] }).smbTargets ?? []
+    expect(fixed.id).toBe('x')
+    expect(fixed.name).toBe('downloads')
+  })
+
+  it('relabels a share still wearing the old generated name', () => {
+    // The renderer draws this straight from the store, so the repair has to
+    // reach it here - the settings read is the only thing between the file and
+    // the list the user is looking at.
+    const generated = { ...stored, name: '192.168.1.10/shared\\torrents\\downloads' }
+    const [fixed] = migrate({ smbTargets: [generated] }).smbTargets ?? []
+    expect(fixed.name).toBe('\\\\192.168.1.10\\shared\\torrents\\downloads')
+  })
+
+  it('leaves a name the user chose alone', () => {
+    const [fixed] = migrate({ smbTargets: [stored] }).smbTargets ?? []
+    expect(fixed.name).toBe('downloads')
+  })
+
+  it('leaves settings without any shares untouched', () => {
+    expect(migrate({ theme: 'day' }).smbTargets).toBeUndefined()
+    expect(migrate({ smbTargets: [] }).smbTargets).toEqual([])
+  })
+})
