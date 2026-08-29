@@ -312,6 +312,25 @@ function usable(raw: unknown): raw is Watch {
  * whole list because one entry gained a field would be a genuinely bad
  * afternoon. Bad entries are dropped one at a time; the rest survives.
  */
+/** Where an upload files its episodes when nobody has said otherwise. */
+export const DEFAULT_REMOTE_PATH = '{title}'
+
+/**
+ * The default this replaced.
+ *
+ * It filed every episode inside a `season 1` folder, which is a level of
+ * nesting nobody asked for and most series never need - one folder per title,
+ * with the episodes in it, is what people actually want to browse. Chains saved
+ * with the old default are moved onto the new one; a path somebody typed
+ * themselves is theirs and is left exactly as written.
+ */
+const LEGACY_REMOTE_PATH = '{title}/season {season}'
+
+function withoutTheSeasonFolder(step: PipelineStep): PipelineStep {
+  if (step.kind !== 'upload' || step.remotePath !== LEGACY_REMOTE_PATH) return step
+  return { ...step, remotePath: DEFAULT_REMOTE_PATH }
+}
+
 export function migrateWatches(raw: unknown): StoredWatches {
   const source = (raw ?? {}) as Partial<StoredWatches>
   const watches: Watch[] = []
@@ -333,7 +352,9 @@ export function migrateWatches(raw: unknown): StoredWatches {
           : 360,
       nextCheckAt: Number(candidate.nextCheckAt) || 0,
       seen: Array.isArray(candidate.seen) ? candidate.seen : [],
-      steps: candidate.steps.filter((step) => step && typeof step.kind === 'string'),
+      steps: candidate.steps
+        .filter((step) => step && typeof step.kind === 'string')
+        .map(withoutTheSeasonFolder),
       createdAt: Number(candidate.createdAt) || 0
     })
   }

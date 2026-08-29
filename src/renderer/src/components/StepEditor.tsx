@@ -8,6 +8,7 @@ import { toast } from '../lib/toast'
 import { STEP_LABEL } from '../lib/automationLabels'
 import { emptyTarget, pathOf, ShareForm, TelegramForm, useSecretState } from './AutomationForms'
 import {
+  DEFAULT_REMOTE_PATH,
   remoteDirFor,
   renameFor,
   type PipelineStep,
@@ -47,7 +48,7 @@ const blank = (kind: StepKind): PipelineStep => {
       kind,
       enabled: true,
       targetId: '',
-      remotePath: '{title}/season {season}',
+      remotePath: DEFAULT_REMOTE_PATH,
       createDirs: true,
       deleteLocalAfter: false
     }

@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest'
-import { MAX_RUNS, migrateWatches, type Run, type Watch } from './automation'
+import {
+  DEFAULT_REMOTE_PATH,
+  MAX_RUNS,
+  migrateWatches,
+  type PipelineStep,
+  type Run,
+  type Watch
+} from './automation'
 
 /*
   This runs against every user's file on the first launch after an update. A
@@ -126,5 +133,54 @@ describe('migrateWatches', () => {
     expect(out.runs.w1).toHaveLength(MAX_RUNS)
     // The ones kept are the recent ones.
     expect(out.runs.w1[out.runs.w1.length - 1].id).toBe(`r${MAX_RUNS + 39}`)
+  })
+})
+
+/*
+  The first default filed every episode inside a `season 1` folder — a level of
+  nesting nobody asked for, and one most series never need. Chains built with it
+  are already saved, so changing the default alone would leave every existing
+  watch still making the folder.
+*/
+describe('migrateWatches, for the season folder that nobody wanted', () => {
+  const upload = (remotePath: string): PipelineStep => ({
+    id: 'u',
+    kind: 'upload',
+    enabled: true,
+    targetId: 't',
+    remotePath,
+    createDirs: true,
+    deleteLocalAfter: false
+  })
+
+  const stepsOf = (step: PipelineStep): PipelineStep[] =>
+    migrateWatches({ watches: [watch({ steps: [step] })] }).watches[0].steps
+
+  it('moves a chain off the old default', () => {
+    const [migrated] = stepsOf(upload('{title}/season {season}'))
+    expect(migrated.kind === 'upload' && migrated.remotePath).toBe(DEFAULT_REMOTE_PATH)
+  })
+
+  it('files episodes straight into a folder named after the series', () => {
+    expect(DEFAULT_REMOTE_PATH).toBe('{title}')
+  })
+
+  it('leaves a path somebody typed themselves exactly as written', () => {
+    // Including one that still wants seasons — that is a choice, not the default.
+    for (const chosen of ['anime/{title}', '{title}/season {season2}', 'seasons/{season}']) {
+      const [migrated] = stepsOf(upload(chosen))
+      expect(migrated.kind === 'upload' && migrated.remotePath).toBe(chosen)
+    }
+  })
+
+  it('does not touch the other kinds of step', () => {
+    const rename: PipelineStep = {
+      id: 'r',
+      kind: 'rename',
+      enabled: true,
+      template: '{title} - S{season2}E{episode2}',
+      replacements: []
+    }
+    expect(stepsOf(rename)[0]).toEqual(rename)
   })
 })
