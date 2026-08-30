@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { animeIdCandidates } from './yummyani'
+import { animeIdCandidates, kodikTarget } from './yummyani'
 
 /*
   A yummyani page carries two numbers that both look like the title's id, and
@@ -61,5 +61,47 @@ describe('animeIdCandidates', () => {
   it('never repeats a number, so no id is asked about twice', () => {
     const candidates = animeIdCandidates(page({ rating: '26429', short: '26429', noise: ['26429'] }))
     expect(candidates).toEqual(['26429'])
+  })
+})
+
+/*
+  A film is not a one-episode series. Its player has no episode list at all,
+  and Kodik answers a film asked about as an episode with HTTP 500 — so the
+  only thing the app could report was "episode not found" about a page that
+  has no episodes to find.
+*/
+describe('kodikTarget', () => {
+  const options = [1, 2, 3]
+    .map((n) => `<option value="${n}" data-id="90${n}" data-hash="aaa${n}">ep ${n}</option>`)
+    .join('')
+
+  it('reads a film straight out of its address', () => {
+    const target = kodikTarget('https://kodikplayer.com/video/114576/aeb5c92b/720p', '', 1)
+    expect(target).toEqual({ id: '114576', hash: 'aeb5c92b', type: 'video' })
+  })
+
+  it('asks about a film as a film, whatever episode number it was given', () => {
+    // A film arrives as episode 1 of 1, and that number means nothing to Kodik.
+    expect(kodikTarget('https://kodikplayer.com/video/114576/aeb5c92b/720p', options, 7)?.type).toBe(
+      'video'
+    )
+  })
+
+  it('still finds an episode by the value on its option', () => {
+    expect(kodikTarget('https://kodikplayer.com/season/120921/7abe07/720p', options, 2)).toEqual({
+      id: '902',
+      hash: 'aaa2',
+      type: 'seria'
+    })
+  })
+
+  it('falls back to position when no option carries that value', () => {
+    expect(kodikTarget('https://kodikplayer.com/season/120921/7abe07/720p', options, 3)?.id).toBe(
+      '903'
+    )
+  })
+
+  it('gives nothing when the player holds neither, so the caller can say so', () => {
+    expect(kodikTarget('https://kodikplayer.com/season/120921/7abe07/720p', '', 1)).toBeUndefined()
   })
 })

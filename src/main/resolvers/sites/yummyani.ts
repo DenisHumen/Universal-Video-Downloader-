@@ -39,6 +39,46 @@ interface KodikLinks {
   [quality: string]: { src: string; type?: string }[]
 }
 
+export interface KodikTarget {
+  id: string
+  hash: string
+  /** What Kodik calls this: a film is asked about differently from an episode. */
+  type: 'video' | 'seria'
+}
+
+/**
+ * Work out which thing to ask Kodik for, and how to ask.
+ *
+ * A series player carries an <option> per episode, each with the id and hash
+ * for that episode, and is asked about with type=seria. A film has no episode
+ * list at all - the player is /video/<id>/<hash> and those two values in the
+ * address are the whole answer - and asking about it as an episode is answered
+ * with HTTP 500. Reading only the option list therefore worked for every series
+ * and failed on every film, with nothing to show for it but "episode not found"
+ * on a page that has no episodes to find.
+ */
+export function kodikTarget(
+  playerUrl: string,
+  html: string,
+  episode: number
+): KodikTarget | undefined {
+  const film = playerUrl.match(/\/video\/(\d+)\/([a-f0-9]+)/)
+  if (film) return { id: film[1], hash: film[2], type: 'video' }
+
+  for (const opt of html.match(/<option[^>]*>/g) || []) {
+    const id = pick(/data-id="(\d+)"/, opt)
+    const hash = pick(/data-hash="([a-f0-9]+)"/, opt)
+    if (id && hash && Number(pick(/value="(\d+)"/, opt)) === episode) {
+      return { id, hash, type: 'seria' }
+    }
+  }
+
+  // Some players number their options from something other than one.
+  const seq = [...html.matchAll(/data-id="(\d+)"\s+data-hash="([a-f0-9]+)"/g)]
+  const fallback = seq[episode - 1]
+  return fallback ? { id: fallback[1], hash: fallback[2], type: 'seria' } : undefined
+}
+
 async function kodikGetM3u8(playerUrl: string, episode: number, requested: string): Promise<string> {
   const url = playerUrl.startsWith('//') ? 'https:' + playerUrl : playerUrl
   const html = await fetchText(url, { Referer: REFERER })
@@ -46,28 +86,8 @@ async function kodikGetM3u8(playerUrl: string, episode: number, requested: strin
   if (!upRaw) throw new Error('Kodik player params not found')
   const up = JSON.parse(upRaw) as Record<string, string>
 
-  // Episode <option> elements carry data-id (episodeID) and data-hash (episodeHash).
-  let id = ''
-  let hash = ''
-  for (const opt of html.match(/<option[^>]*>/g) || []) {
-    const oid = pick(/data-id="(\d+)"/, opt)
-    const oh = pick(/data-hash="([a-f0-9]+)"/, opt)
-    const v = pick(/value="(\d+)"/, opt)
-    if (oid && oh && Number(v) === episode) {
-      id = oid
-      hash = oh
-      break
-    }
-  }
-  if (!id) {
-    const seq = [...html.matchAll(/data-id="(\d+)"\s+data-hash="([a-f0-9]+)"/g)]
-    const fallback = seq[episode - 1]
-    if (fallback) {
-      id = fallback[1]
-      hash = fallback[2]
-    }
-  }
-  if (!id || !hash) throw new Error('Episode not found in the Kodik player')
+  const target = kodikTarget(url, html, episode)
+  if (!target) throw new Error('Episode not found in the Kodik player')
 
   const body = new URLSearchParams({
     d: up.d,
@@ -78,9 +98,9 @@ async function kodikGetM3u8(playerUrl: string, episode: number, requested: strin
     ref_sign: up.ref_sign,
     bad_user: 'false',
     cdn_is_working: 'true',
-    type: 'seria',
-    hash,
-    id
+    type: target.type,
+    hash: target.hash,
+    id: target.id
   })
   const raw = await netPost('https://kodikplayer.com/ftor', body.toString(), {
     Referer: 'https://kodikplayer.com/'
