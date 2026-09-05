@@ -5,11 +5,12 @@ const VIEW_BY_DIGIT: Record<string, ViewId> = {
   '1': 'home',
   '2': 'search',
   '3': 'downloads',
-  '4': 'settings'
+  '4': 'automation',
+  '5': 'settings'
 }
 
 /**
- * Global keyboard shortcuts. ⌘/Ctrl+1…4 switch views, ⌘/Ctrl+, opens settings,
+ * Global keyboard shortcuts. ⌘/Ctrl+1…5 switch views, ⌘/Ctrl+, opens settings,
  * ⌘/Ctrl+/ shows the shortcut list, Esc closes whatever is open.
  */
 export function useShortcuts(): void {

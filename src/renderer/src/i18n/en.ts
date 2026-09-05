@@ -302,12 +302,16 @@ export const en = {
   'shortcuts.queue': 'open the queue',
   'shortcuts.search': 'search by title',
   'shortcuts.settings': 'settings',
+  'shortcuts.watch': 'watched series',
   'shortcuts.paste': 'paste a link and detect',
   'shortcuts.help': 'this list',
   'shortcuts.escape': 'clear / close',
 
   // ---- capabilities panel ----
   'cap.title': 'what this does',
+  'cap.watch.title': 'follow a series',
+  'cap.watch.body':
+    'Paste a link to a series once. Every new episode is downloaded as it appears, and can be renamed, sent to a share and announced in Telegram.',
   'cap.link.title': 'paste any link',
   'cap.link.body':
     '1800+ sites natively, and for the rest the app reads the page — or watches it in a hidden browser — to find the stream itself.',

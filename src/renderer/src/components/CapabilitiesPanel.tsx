@@ -1,4 +1,13 @@
-import { ArrowUpRight, FileVideo, Globe, Link2, ListVideo, Scissors, Search } from 'lucide-react'
+import {
+  ArrowUpRight,
+  FileVideo,
+  Globe,
+  Link2,
+  ListVideo,
+  Radar,
+  Scissors,
+  Search
+} from 'lucide-react'
 import { useStore } from '../store'
 import { useT, type TranslationKey } from '../i18n'
 
@@ -12,9 +21,9 @@ interface Capability {
 /**
  * The home screen's idle state: what this app can do, as a ruled list.
  *
- * Previously six bordered cards in a grid — six competing rectangles under an
+ * Previously bordered cards in a grid — a row of competing rectangles under an
  * input that was already the point of the screen. A ruled list carries the same
- * six facts with one hairline each, reads top-to-bottom like the reference
+ * facts with one hairline each, reads top-to-bottom like the reference
  * material it is, and the mono index gives the eye somewhere to land without
  * spending an icon on every row.
  */
@@ -38,6 +47,12 @@ export default function CapabilitiesPanel(): JSX.Element {
       action: () => setView('downloads')
     },
     { icon: <ListVideo size={16} />, title: 'cap.channel.title', body: 'cap.channel.body' },
+    {
+      icon: <Radar size={16} />,
+      title: 'cap.watch.title',
+      body: 'cap.watch.body',
+      action: () => setView('automation')
+    },
     {
       icon: <Globe size={16} />,
       title: 'cap.browser.title',

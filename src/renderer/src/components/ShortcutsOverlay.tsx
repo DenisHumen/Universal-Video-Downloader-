@@ -8,7 +8,8 @@ const ROWS: { keys: string[]; label: TranslationKey }[] = [
   { keys: ['mod', '1'], label: 'shortcuts.newDownload' },
   { keys: ['mod', '2'], label: 'shortcuts.search' },
   { keys: ['mod', '3'], label: 'shortcuts.queue' },
-  { keys: ['mod', '4'], label: 'shortcuts.settings' },
+  { keys: ['mod', '4'], label: 'shortcuts.watch' },
+  { keys: ['mod', '5'], label: 'shortcuts.settings' },
   { keys: ['mod', 'V'], label: 'shortcuts.paste' },
   { keys: ['mod', '/'], label: 'shortcuts.help' },
   { keys: ['Esc'], label: 'shortcuts.escape' }
