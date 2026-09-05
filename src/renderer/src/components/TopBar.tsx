@@ -66,6 +66,7 @@ export default function TopBar(): JSX.Element {
   */
   const active = useStore((s) => s.downloads.filter((d) => ACTIVE_STATES.includes(d.state)).length)
   const openShortcuts = useStore((s) => s.setShortcutsOpen)
+  const alerts = useStore((s) => s.watchAlerts)
   const isMac = appInfo?.platform === 'darwin'
   const [maximized, setMaximized] = useState(false)
 
@@ -110,6 +111,14 @@ export default function TopBar(): JSX.Element {
               >
                 {item.icon}
                 {t(item.label)}
+                {item.id === 'automation' && alerts > 0 && (
+                  <span
+                    className="h-1.5 w-1.5 rounded-full bg-bad"
+                    role="img"
+                    aria-label={t('auto.failingCount', { n: String(alerts) })}
+                    title={t('auto.failingCount', { n: String(alerts) })}
+                  />
+                )}
                 {item.id === 'downloads' && active > 0 && (
                   <span
                     className={`mono rounded-full px-1.5 py-0.5 text-[11px] font-semibold leading-none ${

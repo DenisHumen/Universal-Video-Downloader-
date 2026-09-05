@@ -50,3 +50,28 @@ export function errorText(t: TranslateFn, failure: FailureLike): string {
   if (!base) return t('error.title')
   return failure.cookieHint ? `${base} ${t('err.cookieHint')}` : base
 }
+
+/**
+ * What to show when something *threw*, rather than reported a code.
+ *
+ * An error that crosses the IPC bridge arrives wearing Electron's wrapper -
+ * `Error invoking remote method 'auto:test-smb': SmbError: There is no share
+ * by that name on the server.` - and the careful sentence written in main is
+ * buried behind a channel name and a class name that mean nothing to anyone
+ * reading a toast. This takes the machinery off and leaves the sentence; the
+ * message itself is kept verbatim, so whatever main went to the trouble of
+ * saying still reaches the screen.
+ */
+export function describeError(err: unknown): string {
+  let text = (err instanceof Error ? err.message : String(err ?? '')).trim()
+
+  // Electron: "Error invoking remote method '<channel>': <the actual error>"
+  const wrapped = text.match(/^Error invoking remote method '[^']*':\s*(.*)$/s)
+  if (wrapped) text = wrapped[1].trim()
+
+  // A thrown class announcing itself: "SmbError: ...", "TypeError: ...".
+  const classed = text.match(/^[A-Z][A-Za-z0-9]*Error:\s+(.*)$/s)
+  if (classed) text = classed[1].trim()
+
+  return text || 'Something went wrong.'
+}

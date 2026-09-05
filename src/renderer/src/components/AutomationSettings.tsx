@@ -3,6 +3,7 @@ import { Loader2, Plus, Trash2 } from 'lucide-react'
 import { useT } from '../i18n'
 import { useStore } from '../store'
 import { toast } from '../lib/toast'
+import { describeError } from '../lib/errors'
 import { emptyTarget, pathOf, ShareForm, TelegramForm, useSecretState } from './AutomationForms'
 import type { SmbTarget } from '@shared/automation'
 
@@ -55,7 +56,7 @@ export default function AutomationSettings(): JSX.Element {
       secrets.refresh()
       setEditing(null)
     } catch (err) {
-      toast(err instanceof Error ? err.message : String(err), 'error')
+      toast(describeError(err), 'error')
     } finally {
       setSaving(false)
     }

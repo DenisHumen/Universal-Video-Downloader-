@@ -1,11 +1,13 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { Film, Loader2, X } from 'lucide-react'
 import { dialog, overlay } from '../lib/motion'
 import { useT } from '../i18n'
 import { toast } from '../lib/toast'
+import { describeError } from '../lib/errors'
 import Thumbnail from './Thumbnail'
 import type { SeriesOffer } from '../../../main/automation-ipc'
+import type { WatchIntent } from '../store'
 
 /**
  * Adding a series to watch.
@@ -17,34 +19,54 @@ import type { SeriesOffer } from '../../../main/automation-ipc'
  * for exactly that reason.
  */
 export default function AddWatchDialog({
+  initial,
   onClose,
   onAdded
 }: {
+  /** A series the home screen already resolved: looked up at once, dub and quality kept. */
+  initial?: WatchIntent
   onClose: () => void
   onAdded: (id: string) => void
 }): JSX.Element {
   const t = useT()
-  const [url, setUrl] = useState('')
+  const [url, setUrl] = useState(initial?.url ?? '')
   const [looking, setLooking] = useState(false)
   const [offer, setOffer] = useState<SeriesOffer | null>(null)
   const [translatorId, setTranslatorId] = useState('')
   const [quality, setQuality] = useState('720p')
   const [saving, setSaving] = useState(false)
 
-  const look = async (): Promise<void> => {
-    if (!url.trim()) return
+  const look = async (keep?: WatchIntent): Promise<void> => {
+    const target = (keep?.url ?? url).trim()
+    if (!target) return
     setLooking(true)
     try {
-      const found = await window.api.autoDescribe(url.trim())
+      const found = await window.api.autoDescribe(target)
       setOffer(found)
-      setTranslatorId(found.defaultTranslator)
-      setQuality(found.qualities[found.qualities.length - 1] ?? 'best')
+      /*
+        What was chosen on the home screen is honoured when it exists here,
+        and quietly replaced when it does not - a dub this listing lacks, or
+        "best", which is a preference rather than a height.
+      */
+      const dub = found.translators.some((x) => x.id === keep?.translatorId)
+        ? (keep?.translatorId as string)
+        : found.defaultTranslator
+      const wanted = keep?.quality && keep.quality !== 'best' ? parseInt(keep.quality, 10) : NaN
+      const height = found.qualities.find((q) => parseInt(q, 10) === wanted)
+      setTranslatorId(dub)
+      setQuality(height ?? found.qualities[found.qualities.length - 1] ?? 'best')
     } catch (err) {
-      toast(err instanceof Error ? err.message : String(err), 'error')
+      toast(describeError(err), 'error')
     } finally {
       setLooking(false)
     }
   }
+
+  useEffect(() => {
+    if (initial?.url) void look(initial)
+    // Once, for the series that was handed over; typing is handled by the button.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   const add = async (): Promise<void> => {
     if (!offer) return
@@ -73,7 +95,7 @@ export default function AddWatchDialog({
       })
       onAdded(created.id)
     } catch (err) {
-      toast(err instanceof Error ? err.message : String(err), 'error')
+      toast(describeError(err), 'error')
       setSaving(false)
     }
   }

@@ -5,6 +5,7 @@ import { dialog, overlay } from '../lib/motion'
 import { useT } from '../i18n'
 import { useStore } from '../store'
 import { toast } from '../lib/toast'
+import { describeError } from '../lib/errors'
 import { STEP_LABEL } from '../lib/automationLabels'
 import { emptyTarget, pathOf, ShareForm, TelegramForm, useSecretState } from './AutomationForms'
 import {
@@ -144,7 +145,7 @@ export default function StepEditor({
       }
       onSave(step)
     } catch (err) {
-      toast(err instanceof Error ? err.message : String(err), 'error')
+      toast(describeError(err), 'error')
       setSaving(false)
     }
   }

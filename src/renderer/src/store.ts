@@ -13,6 +13,12 @@ import { applyAppearance } from './lib/theme'
 
 export type ViewId = 'home' | 'search' | 'downloads' | 'automation' | 'settings'
 
+export interface WatchIntent {
+  url: string
+  translatorId?: string
+  quality?: string
+}
+
 const VIEWS: ViewId[] = ['home', 'search', 'downloads', 'automation', 'settings']
 
 export function isViewId(value: string): value is ViewId {
@@ -45,6 +51,13 @@ interface AppState {
   */
   pendingUrl: string | null
   pendingQuery: string | null
+  /**
+   * A series the home screen asked to follow, carried across to the watch
+   * screen the same way a link is carried to Home: state, read on mount.
+   */
+  pendingWatch: WatchIntent | null
+  /** Watched series whose last check failed - shown as a mark on the tab. */
+  watchAlerts: number
   /** Live progress of the detector, so the UI can narrate the slow parts. */
   detect: DetectStatus | null
   shortcutsOpen: boolean
@@ -61,6 +74,10 @@ interface AppState {
   requestDetect: (url: string) => void
   /** Go to Search and run this query. */
   requestSearch: (query: string) => void
+  /** Go to the watch screen and offer this series, dub and quality preselected. */
+  requestWatch: (intent: WatchIntent) => void
+  takePendingWatch: () => WatchIntent | null
+  refreshWatchAlerts: () => Promise<void>
   takePendingUrl: () => string | null
   takePendingQuery: () => string | null
 }
@@ -154,6 +171,13 @@ async function runInit(set: SetState, get: GetState): Promise<void> {
     if (get().downloads.some((d) => normalizeUrl(d.sourceUrl || d.url) === link)) return
     set({ clipboardLink: url })
   })
+  /*
+    A watch that fails at four in the morning must be visible from every
+    screen, not only from the one nobody is looking at. The count is what
+    the tab draws; the list itself stays with the screen that shows it.
+  */
+  window.api.onAutomationChanged(() => void get().refreshWatchAlerts())
+  void get().refreshWatchAlerts()
   window.api.onNavigate((view) => {
     if (isViewId(view)) set({ view })
   })
@@ -191,6 +215,8 @@ export const useStore = create<AppState>((set, get) => ({
   clipboardLink: null,
   pendingUrl: null,
   pendingQuery: null,
+  pendingWatch: null,
+  watchAlerts: 0,
   detect: null,
   shortcutsOpen: false,
 
@@ -228,6 +254,16 @@ export const useStore = create<AppState>((set, get) => ({
     const url = get().pendingUrl
     if (url) set({ pendingUrl: null })
     return url
+  },
+  requestWatch: (intent) => set({ pendingWatch: intent, view: 'automation' }),
+  takePendingWatch: () => {
+    const intent = get().pendingWatch
+    if (intent) set({ pendingWatch: null })
+    return intent
+  },
+  refreshWatchAlerts: async () => {
+    const watches = await window.api.autoList()
+    set({ watchAlerts: watches.filter((w) => w.enabled && Boolean(w.lastError)).length })
   },
   takePendingQuery: () => {
     const query = get().pendingQuery

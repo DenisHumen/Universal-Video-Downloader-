@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { Check, Loader2 } from 'lucide-react'
 import { useT } from '../i18n'
 import { toast } from '../lib/toast'
+import { describeError } from '../lib/errors'
 import {
   formatSmbPath,
   normaliseSmbTarget,
@@ -172,7 +173,7 @@ export function ShareForm({
     try {
       toast(await window.api.autoTestSmb(target, password), 'success')
     } catch (err) {
-      toast(err instanceof Error ? err.message : String(err), 'error')
+      toast(describeError(err), 'error')
     } finally {
       setTesting(false)
     }
@@ -249,7 +250,7 @@ export function TelegramForm({
     try {
       toast(await window.api.autoTestTelegram(token, chatId), 'success')
     } catch (err) {
-      toast(err instanceof Error ? err.message : String(err), 'error')
+      toast(describeError(err), 'error')
     } finally {
       setTesting(false)
     }

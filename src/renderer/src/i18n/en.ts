@@ -150,6 +150,7 @@ export const en = {
   'streaming.series': 'series',
   'streaming.seriesSeasons': 'series · {count} seasons',
   'streaming.movie': 'movie',
+  'streaming.follow': 'follow new episodes',
   'streaming.selectEpisode': 'select at least one episode',
 
   // ---- format selector ----
@@ -435,6 +436,10 @@ export const en = {
   'auto.title': 'watching',
   'auto.add': 'add',
   'auto.empty': 'nothing is being watched yet',
+  'auto.emptyHint':
+    'paste a link to a series and each new episode is downloaded as it appears - then renamed, sent to a share and announced, if you ask',
+  'auto.failingCount': '{n} watched series failing',
+  'auto.notifyTo': 'Telegram - chat {id}',
   'auto.pickOne': 'pick a series on the left',
   'auto.failing': 'last check failed',
   'auto.paused': 'paused',
@@ -442,7 +447,11 @@ export const en = {
   'auto.in': 'in',
   'auto.ago': 'ago',
   'auto.nextCheck': 'next check',
-  'auto.everyN': 'every {n} min',
+  'auto.everyN': 'every {span}',
+  'auto.everyDay': 'every day',
+  'time.min': 'min',
+  'time.h': 'h',
+  'time.d': 'd',
   'auto.interval': 'how often to check',
   'auto.pause': 'pause',
   'auto.resume': 'resume',

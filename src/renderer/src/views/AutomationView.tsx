@@ -3,11 +3,13 @@ import { motion } from 'framer-motion'
 import {
   Check,
   Clock,
+  Download,
   Film,
   FolderUp,
   Loader2,
   Pencil,
   Plus,
+  Radar,
   RefreshCw,
   Send,
   Trash2,
@@ -15,9 +17,12 @@ import {
 } from 'lucide-react'
 import { enter } from '../lib/motion'
 import { useStore } from '../store'
-import { useT } from '../i18n'
+import { useT, type TranslateFn } from '../i18n'
 import { toast } from '../lib/toast'
 import Thumbnail from '../components/Thumbnail'
+import EmptyState from '../components/EmptyState'
+import { span, type SpanUnit } from '../lib/span'
+import type { WatchIntent } from '../store'
 import ConfirmDialog from '../components/ConfirmDialog'
 import AddWatchDialog from '../components/AddWatchDialog'
 import StepEditor from '../components/StepEditor'
@@ -33,7 +38,7 @@ import type { PipelineStep, Run, StepKind, Watch } from '@shared/automation'
  */
 
 const STEP_ICON: Record<StepKind, JSX.Element> = {
-  download: <FolderUp size={15} />,
+  download: <Download size={15} />,
   rename: <Pencil size={15} />,
   upload: <FolderUp size={15} />,
   notify: <Send size={15} />
@@ -42,13 +47,34 @@ const STEP_ICON: Record<StepKind, JSX.Element> = {
 /** Steps a watch can gain, in the order they would run. */
 const ADDABLE: StepKind[] = ['rename', 'upload', 'notify']
 
-function relative(at: number | undefined, words: { soon: string; ahead: string; past: string }): string {
+/*
+  Units are looked up, never written: the first version said "in 2 h" in a
+  Russian interface, which is the kind of seam that makes translated software
+  feel translated. Spelled out as literals so the dictionary check can see them.
+*/
+const UNIT: Record<SpanUnit, 'time.min' | 'time.h' | 'time.d'> = {
+  min: 'time.min',
+  h: 'time.h',
+  d: 'time.d'
+}
+
+function spanText(minutes: number, t: TranslateFn): string {
+  const { n, unit } = span(minutes)
+  return `${n} ${t(UNIT[unit])}`
+}
+
+/** "every 6 h", "every day" - the interval as a person would say it. */
+function every(minutes: number, t: TranslateFn): string {
+  return minutes === 1440 ? t('auto.everyDay') : t('auto.everyN', { span: spanText(minutes, t) })
+}
+
+function relative(at: number | undefined, t: TranslateFn): string {
   if (!at) return ''
   const delta = at - Date.now()
   const mins = Math.round(Math.abs(delta) / 60_000)
-  if (mins < 1) return words.soon
-  const text = mins < 60 ? `${mins} min` : `${Math.round(mins / 60)} h`
-  return delta > 0 ? `${words.ahead} ${text}` : `${text} ${words.past}`
+  if (mins < 1) return t('auto.soon')
+  const text = spanText(mins, t)
+  return delta > 0 ? `${t('auto.in')} ${text}` : `${text} ${t('auto.ago')}`
 }
 
 export default function AutomationView(): JSX.Element {
@@ -56,16 +82,19 @@ export default function AutomationView(): JSX.Element {
   const [watches, setWatches] = useState<Watch[]>([])
   const [runs, setRuns] = useState<Run[]>([])
   const [selectedId, setSelectedId] = useState<string | null>(null)
-  const [adding, setAdding] = useState(false)
+  /** `true` from the add button; an intent when the home screen sent a series over. */
+  const [adding, setAdding] = useState<boolean | WatchIntent>(false)
   const [editing, setEditing] = useState<PipelineStep | StepKind | null>(null)
   const [confirmRemove, setConfirmRemove] = useState(false)
   const [checking, setChecking] = useState(false)
   const settings = useStore((s) => s.settings)
-  const words = {
-    soon: t('auto.soon'),
-    ahead: t('auto.in'),
-    past: t('auto.ago')
-  }
+  const takePendingWatch = useStore((s) => s.takePendingWatch)
+
+  // A series handed over from the home screen opens the dialog already filled in.
+  useEffect(() => {
+    const intent = takePendingWatch()
+    if (intent) setAdding(intent)
+  }, [takePendingWatch])
 
   const selected = useMemo(
     () => watches.find((w) => w.id === selectedId) ?? null,
@@ -145,10 +174,9 @@ export default function AutomationView(): JSX.Element {
         </div>
 
         <div className="min-h-0 flex-1 overflow-y-auto">
-          {watches.length === 0 ? (
-            <p className="hint px-3 py-6 text-center">{t('auto.empty')}</p>
-          ) : (
-            watches.map((w) => (
+          {watches.length === 0
+            ? null
+            : watches.map((w) => (
               <button
                 key={w.id}
                 onClick={() => setSelectedId(w.id)}
@@ -168,7 +196,7 @@ export default function AutomationView(): JSX.Element {
                     {w.enabled
                       ? w.lastError
                         ? t('auto.failing')
-                        : relative(w.nextCheckAt, words)
+                        : relative(w.nextCheckAt, t)
                       : t('auto.paused')}
                   </span>
                 </span>
@@ -177,8 +205,7 @@ export default function AutomationView(): JSX.Element {
                   <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-bad" />
                 )}
               </button>
-            ))
-          )}
+            ))}
         </div>
       </aside>
 
@@ -190,7 +217,18 @@ export default function AutomationView(): JSX.Element {
         transition={enter}
         className="min-h-0 flex-1 overflow-y-auto"
       >
-        {!selected ? (
+        {watches.length === 0 ? (
+          <EmptyState
+            icon={<Radar size={22} />}
+            title={t('auto.empty')}
+            hint={t('auto.emptyHint')}
+            action={
+              <button className="btn-solid" onClick={() => setAdding(true)}>
+                <Plus size={14} /> {t('auto.add')}
+              </button>
+            }
+          />
+        ) : !selected ? (
           <div className="flex h-full items-center justify-center">
             <p className="hint">{t('auto.pickOne')}</p>
           </div>
@@ -211,10 +249,10 @@ export default function AutomationView(): JSX.Element {
                 <p className="mono mt-1 text-[12px] text-ink-2">
                   <Clock size={11} className="mr-1 inline" />
                   {selected.enabled
-                    ? `${t('auto.nextCheck')} ${relative(selected.nextCheckAt, words)}`
+                    ? `${t('auto.nextCheck')} ${relative(selected.nextCheckAt, t)}`
                     : t('auto.paused')}
                   {' · '}
-                  {t('auto.everyN', { n: String(selected.intervalMinutes) })}
+                  {every(selected.intervalMinutes, t)}
                 </p>
                 {selected.lastError && (
                   <p className="hint mt-1 text-bad">{selected.lastError}</p>
@@ -242,7 +280,7 @@ export default function AutomationView(): JSX.Element {
               >
                 {[15, 30, 60, 180, 360, 720, 1440].map((n) => (
                   <option key={n} value={n}>
-                    {t('auto.everyN', { n: String(n) })}
+                    {every(n, t)}
                   </option>
                 ))}
               </select>
@@ -276,6 +314,9 @@ export default function AutomationView(): JSX.Element {
                       <span className="mono block truncate text-[11px] text-ink-2">
                         {step.kind === 'rename' && step.template}
                         {step.kind === 'upload' && step.remotePath}
+                        {step.kind === 'notify' &&
+                          settings?.telegramChatId &&
+                          t('auto.notifyTo', { id: settings.telegramChatId })}
                       </span>
                     </span>
                     {step.enabled ? (
@@ -322,7 +363,7 @@ export default function AutomationView(): JSX.Element {
                         {t(RUN_LABEL[run.state])}
                       </span>
                       <span className="mono ml-auto text-[11px] text-ink-3">
-                        {relative(run.startedAt, words)}
+                        {relative(run.startedAt, t)}
                       </span>
                     </div>
                     <div className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5">
@@ -353,6 +394,7 @@ export default function AutomationView(): JSX.Element {
 
       {adding && (
         <AddWatchDialog
+          initial={typeof adding === 'object' ? adding : undefined}
           onClose={() => setAdding(false)}
           onAdded={async (id) => {
             setAdding(false)

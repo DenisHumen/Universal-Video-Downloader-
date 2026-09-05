@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { Loader2 } from 'lucide-react'
+import { Loader2, Radar } from 'lucide-react'
 import type { MediaInfo, QualityPreset } from '@shared/types'
 import Choice, { type ChoiceOption } from './Choice'
 import Thumbnail from './Thumbnail'
@@ -20,6 +20,7 @@ const pad2 = (n: number): string => String(n).padStart(2, '0')
 export default function StreamingCard({ info, onDone }: Props): JSX.Element {
   const t = useT()
   const setView = useStore((s) => s.setView)
+  const requestWatch = useStore((s) => s.requestWatch)
   const settings = useStore((s) => s.settings)
   const s = info.streaming!
 
@@ -261,6 +262,17 @@ export default function StreamingCard({ info, onDone }: Props): JSX.Element {
             <button className="btn-solid w-full py-3.5 text-[14px]" onClick={queueSeries} disabled={busy}>
               {busy ? <Loader2 size={16} className="animate-spin" /> : null}
               {t('playlist.selected', { count: totalSelected })}
+            </button>
+
+            {/*
+              The series is already resolved and the dub already chosen. Following
+              it from here means not finding the link again on another screen.
+            */}
+            <button
+              className="btn-quiet w-full"
+              onClick={() => requestWatch({ url: info.webpageUrl, translatorId, quality })}
+            >
+              <Radar size={14} /> {t('streaming.follow')}
             </button>
           </>
         ) : (

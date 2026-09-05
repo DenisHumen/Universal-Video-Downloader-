@@ -143,6 +143,7 @@ export const ru: Dictionary = {
   'streaming.series': 'сериал',
   'streaming.seriesSeasons': 'сериал · сезонов: {count}',
   'streaming.movie': 'фильм',
+  'streaming.follow': 'следить за новыми сериями',
   'streaming.selectEpisode': 'выберите хотя бы одну серию',
 
   // ---- format selector ----
@@ -422,6 +423,10 @@ export const ru: Dictionary = {
   'auto.title': 'слежение',
   'auto.add': 'добавить',
   'auto.empty': 'пока ни за чем не следим',
+  'auto.emptyHint':
+    'вставьте ссылку на сериал - каждая новая серия скачается сама, как только выйдет, а по желанию переименуется, уедет на шару и придёт уведомлением',
+  'auto.failingCount': 'не удаётся проверить: {n}',
+  'auto.notifyTo': 'Telegram - чат {id}',
   'auto.pickOne': 'выберите сериал слева',
   'auto.failing': 'последняя проверка не удалась',
   'auto.paused': 'на паузе',
@@ -429,7 +434,11 @@ export const ru: Dictionary = {
   'auto.in': 'через',
   'auto.ago': 'назад',
   'auto.nextCheck': 'следующая проверка',
-  'auto.everyN': 'каждые {n} мин',
+  'auto.everyN': 'каждые {span}',
+  'auto.everyDay': 'раз в день',
+  'time.min': 'мин',
+  'time.h': 'ч',
+  'time.d': 'д',
   'auto.interval': 'как часто проверять',
   'auto.pause': 'пауза',
   'auto.resume': 'продолжить',

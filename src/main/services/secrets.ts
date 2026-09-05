@@ -133,7 +133,14 @@ export function deleteSecret(key: string): void {
 
 /** What the renderer is allowed to know: whether it is set, never what it is. */
 export function hasSecret(key: string): boolean {
-  return volatile.has(key) || Boolean(load()[key])
+  /*
+    "Stored" has to mean "and it reads back". The key that sealed a value lives
+    in a file Chromium flushes on a clean quit, so an app killed between saving
+    a password and its first normal exit keeps a blob it can no longer open.
+    Answering true for that blob draws a filled-in password field over an empty
+    one, and nobody retypes what the screen says is already there.
+  */
+  return volatile.has(key) || getSecret(key) !== undefined
 }
 
 /** True when secrets survive a restart on this machine. */
