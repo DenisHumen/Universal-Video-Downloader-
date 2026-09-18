@@ -1,4 +1,5 @@
 import { resolveUrl } from '../../resolvers'
+import { NotReleasedError } from '../../resolvers/upcoming'
 import { log } from '../log'
 import { episodeKey, newEpisodes, type EpisodeRef, type Watch } from '@shared/automation'
 import type { StreamingInfo } from '@shared/types'
@@ -23,6 +24,8 @@ export interface SeriesDescription {
   qualities: string[]
   /** Episodes for each translator, which is what a watch actually compares. */
   episodesFor: (translatorId: string) => EpisodeRef[]
+  /** Set when nothing is out yet: there are no dubs to offer, only a date. */
+  upcoming?: { releaseAt?: number }
 }
 
 function flatten(seasons: { season: number; episodes: number[] }[]): EpisodeRef[] {
@@ -50,7 +53,31 @@ export function episodesForTranslator(info: StreamingInfo, translatorId: string)
 
 /** Look at a page and describe what could be watched there. */
 export async function describeSeries(url: string): Promise<SeriesDescription> {
-  const resolved = await resolveUrl(url)
+  let resolved
+  try {
+    resolved = await resolveUrl(url)
+  } catch (err) {
+    /*
+      Not out yet is a perfectly good thing to follow - arguably the best one,
+      since it is the release nobody wants to keep checking for by hand. There
+      are no dubs to list, so none is offered; the watch picks one when there is
+      something to pick from.
+    */
+    if (err instanceof NotReleasedError) {
+      return {
+        url,
+        title: err.title,
+        thumbnail: err.thumbnail,
+        provider: 'yummyani',
+        translators: [],
+        defaultTranslator: '',
+        qualities: ['360p', '480p', '720p'],
+        episodesFor: () => [],
+        upcoming: { releaseAt: err.releaseAt }
+      }
+    }
+    throw err
+  }
   const info = resolved.streaming
   if (!info) {
     throw new Error('That page is not a series this app can follow.')
@@ -78,6 +105,10 @@ export interface CheckResult {
   title: string
   thumbnail?: string
   translatorName?: string
+  /** Still not out. `releaseAt` is the site's current guess, which moves. */
+  notOut?: { releaseAt?: number }
+  /** A watch that was waiting has something to follow now: the dub it should take. */
+  adopt?: { translatorId: string; translatorName?: string }
 }
 
 /**
@@ -92,10 +123,50 @@ export interface CheckResult {
  * distinguishes them.
  */
 export async function checkWatch(watch: Watch): Promise<CheckResult> {
-  const resolved = await resolveUrl(watch.url)
+  let resolved
+  try {
+    resolved = await resolveUrl(watch.url)
+  } catch (err) {
+    // "Not yet" is an answer, not a failure: nothing to back off from.
+    if (err instanceof NotReleasedError) {
+      return {
+        fresh: [],
+        available: [],
+        title: err.title,
+        thumbnail: err.thumbnail,
+        notOut: { releaseAt: err.releaseAt }
+      }
+    }
+    throw err
+  }
   const info = resolved.streaming
   if (!info) {
     throw new Error('The page no longer looks like a series.')
+  }
+
+  /*
+    A watch added before release has no dub, because there was none to choose.
+    Now there is: take the one the resolver opens on, which is the fullest, and
+    treat everything it has as new - nothing was out when this watch was made,
+    so nothing can already have been seen.
+  */
+  if (watch.pending) {
+    const translatorId = info.defaultTranslator
+    const available = episodesForTranslator(info, translatorId)
+    const translatorName = info.translators.find((t) => t.id === translatorId)?.name
+    log.info('watcher', 'A title this watch was waiting for is out', {
+      id: watch.id.slice(0, 8),
+      series: info.title,
+      episodes: available.length
+    })
+    return {
+      fresh: available,
+      available,
+      title: info.title,
+      thumbnail: info.thumbnail,
+      translatorName,
+      adopt: { translatorId, translatorName }
+    }
   }
 
   const available = episodesForTranslator(info, watch.translatorId)

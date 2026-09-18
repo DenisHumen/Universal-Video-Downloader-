@@ -17,17 +17,24 @@ import {
 } from 'lucide-react'
 import { enter } from '../lib/motion'
 import { useStore } from '../store'
-import { useT, type TranslateFn } from '../i18n'
+import { resolveLanguage, useT, type TranslateFn } from '../i18n'
 import { toast } from '../lib/toast'
 import Thumbnail from '../components/Thumbnail'
 import EmptyState from '../components/EmptyState'
 import { span, type SpanUnit } from '../lib/span'
+import { releaseDate, releaseText } from '../lib/release'
 import type { WatchIntent } from '../store'
 import ConfirmDialog from '../components/ConfirmDialog'
 import AddWatchDialog from '../components/AddWatchDialog'
 import StepEditor from '../components/StepEditor'
 import { RUN_LABEL, STEP_LABEL } from '../lib/automationLabels'
-import type { PipelineStep, Run, StepKind, Watch } from '@shared/automation'
+import {
+  upcomingDelayMinutes,
+  type PipelineStep,
+  type Run,
+  type StepKind,
+  type Watch
+} from '@shared/automation'
 
 /**
  * Watching series, and what happens when one produces an episode.
@@ -89,6 +96,9 @@ export default function AutomationView(): JSX.Element {
   const [checking, setChecking] = useState(false)
   const settings = useStore((s) => s.settings)
   const takePendingWatch = useStore((s) => s.takePendingWatch)
+  const locale = useStore((s) =>
+    resolveLanguage(s.settings?.language ?? 'auto', s.appInfo?.locale ?? 'en')
+  )
 
   // A series handed over from the home screen opens the dialog already filled in.
   useEffect(() => {
@@ -196,7 +206,9 @@ export default function AutomationView(): JSX.Element {
                     {w.enabled
                       ? w.lastError
                         ? t('auto.failing')
-                        : relative(w.nextCheckAt, t)
+                        : w.pending
+                          ? releaseText(w.releaseAt, t)
+                          : relative(w.nextCheckAt, t)
                       : t('auto.paused')}
                   </span>
                 </span>
@@ -246,13 +258,29 @@ export default function AutomationView(): JSX.Element {
                 <p className="hint mt-1 truncate">
                   {[selected.translatorName, selected.quality].filter(Boolean).join(' · ')}
                 </p>
+                {selected.pending && (
+                  <p className="mt-1 text-[13px] text-ink">
+                    {releaseText(selected.releaseAt, t)}
+                    {selected.releaseAt
+                      ? ` · ${t('auto.releaseOn', {
+                          date: releaseDate(selected.releaseAt, locale)
+                        })}`
+                      : ''}
+                  </p>
+                )}
                 <p className="mono mt-1 text-[12px] text-ink-2">
                   <Clock size={11} className="mr-1 inline" />
                   {selected.enabled
                     ? `${t('auto.nextCheck')} ${relative(selected.nextCheckAt, t)}`
                     : t('auto.paused')}
                   {' · '}
-                  {every(selected.intervalMinutes, t)}
+                  {/* While it is waiting, the pace is the waiting pace - say that one. */}
+                  {every(
+                    selected.pending
+                      ? upcomingDelayMinutes(selected.releaseAt, selected.intervalMinutes, Date.now())
+                      : selected.intervalMinutes,
+                    t
+                  )}
                 </p>
                 {selected.lastError && (
                   <p className="hint mt-1 text-bad">{selected.lastError}</p>

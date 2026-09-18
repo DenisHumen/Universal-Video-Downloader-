@@ -453,6 +453,12 @@ export const en = {
   'auto.nextCheck': 'next check',
   'auto.everyN': 'every {span}',
   'auto.everyDay': 'every day',
+  'auto.releaseIn': 'out in {span}',
+  'auto.releaseAny': 'expected any day now',
+  'auto.releaseUnknown': 'not out yet',
+  'auto.releaseOn': 'expected {date}',
+  'auto.upcomingNote':
+    'nothing is out yet, so there is no translation to choose. the date is looked at once a day, because announcements move; once episodes appear, the fullest translation is picked and every new episode is handled as usual.',
   'time.min': 'min',
   'time.h': 'h',
   'time.d': 'd',

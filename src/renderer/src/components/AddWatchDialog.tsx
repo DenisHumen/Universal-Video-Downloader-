@@ -1,10 +1,12 @@
 import { useEffect, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
-import { Film, Loader2, X } from 'lucide-react'
+import { CalendarClock, Film, Loader2, X } from 'lucide-react'
 import { dialog, overlay } from '../lib/motion'
-import { useT } from '../i18n'
+import { resolveLanguage, useT } from '../i18n'
 import { toast } from '../lib/toast'
 import { describeError } from '../lib/errors'
+import { releaseDate, releaseText } from '../lib/release'
+import { useStore } from '../store'
 import Thumbnail from './Thumbnail'
 import type { SeriesOffer } from '../../../main/automation-ipc'
 import type { WatchIntent } from '../store'
@@ -29,6 +31,9 @@ export default function AddWatchDialog({
   onAdded: (id: string) => void
 }): JSX.Element {
   const t = useT()
+  const locale = useStore((s) =>
+    resolveLanguage(s.settings?.language ?? 'auto', s.appInfo?.locale ?? 'en')
+  )
   const [url, setUrl] = useState(initial?.url ?? '')
   const [looking, setLooking] = useState(false)
   const [offer, setOffer] = useState<SeriesOffer | null>(null)
@@ -77,8 +82,14 @@ export default function AddWatchDialog({
         title: offer.title,
         thumbnail: offer.thumbnail,
         provider: offer.provider,
-        translatorId,
+        /*
+          Nothing is out, so there is no dub to choose. The watch is stored
+          without one and adopts the fullest dub the moment episodes appear.
+        */
+        translatorId: offer.upcoming ? '' : translatorId,
         translatorName: offer.translators.find((x) => x.id === translatorId)?.name,
+        pending: Boolean(offer.upcoming) || undefined,
+        releaseAt: offer.upcoming?.releaseAt,
         quality,
         enabled: true,
         intervalMinutes: 360,
@@ -156,12 +167,30 @@ export default function AddWatchDialog({
                   <div className="min-w-0">
                     <p className="text-[14px] text-ink">{offer.title}</p>
                     <p className="hint mt-1">
-                      {t('auto.dubCount', { n: String(offer.translators.length) })}
+                      {offer.upcoming
+                        ? releaseText(offer.upcoming.releaseAt, t)
+                        : t('auto.dubCount', { n: String(offer.translators.length) })}
                     </p>
                   </div>
                 </div>
 
-                <div>
+                {offer.upcoming && (
+                  <div className="well flex gap-3 p-3">
+                    <CalendarClock size={16} className="mt-0.5 shrink-0 text-ink-2" />
+                    <div className="min-w-0">
+                      {offer.upcoming.releaseAt && (
+                        <p className="text-[13px] text-ink">
+                          {t('auto.releaseOn', {
+                            date: releaseDate(offer.upcoming.releaseAt, locale)
+                          })}
+                        </p>
+                      )}
+                      <p className="hint mt-1">{t('auto.upcomingNote')}</p>
+                    </div>
+                  </div>
+                )}
+
+                <div hidden={Boolean(offer.upcoming)}>
                   <p className="label mb-2">{t('auto.dub')}</p>
                   <select
                     className="field w-full text-[13px]"

@@ -210,6 +210,10 @@ declare global {
   }
 }
 
+import type { Watch } from '@shared/automation'
+
+const mockWatches: Watch[] = []
+
 export function installMockApi(): void {
   const browserState: BrowserState = {
     url: '',
@@ -406,20 +410,48 @@ export function installMockApi(): void {
     onDetectStatus: () => () => undefined,
     onClipboardLink: () => () => undefined,
     takePending: async () => ({}),
-    autoDescribe: async (url: string) => ({
-      url,
-      title: 'A series',
-      thumbnail: undefined,
-      provider: 'yummyani',
-      defaultTranslator: 'a',
-      qualities: ['360p', '480p', '720p'],
-      translators: [{ id: 'a', name: 'A dub', episodes: 8 }]
-    }),
-    autoList: async () => [],
+    /*
+      A link with "upcoming" in it is a title that is not out yet, so the
+      waiting state can be looked at without waiting for a real one.
+    */
+    autoDescribe: async (url: string) =>
+      /upcoming/i.test(url)
+        ? {
+            url,
+            title: 'A film that is not out yet',
+            thumbnail: undefined,
+            provider: 'yummyani',
+            defaultTranslator: '',
+            qualities: ['360p', '480p', '720p'],
+            translators: [],
+            upcoming: { releaseAt: Date.now() + 35 * 86_400_000 }
+          }
+        : {
+            url,
+            title: 'A series',
+            thumbnail: undefined,
+            provider: 'yummyani',
+            defaultTranslator: 'a',
+            qualities: ['360p', '480p', '720p'],
+            translators: [{ id: 'a', name: 'A dub', episodes: 8 }]
+          },
+    // Kept in memory, so the watch screen can be seen with something on it.
+    autoList: async () => [...mockWatches],
     autoRuns: async () => [],
-    autoAdd: async (w) => ({ ...w, id: 'mock', createdAt: Date.now() }),
-    autoUpdate: async () => undefined,
-    autoRemove: async () => undefined,
+    autoAdd: async (w) => {
+      const created = { ...w, id: crypto.randomUUID(), createdAt: Date.now() }
+      mockWatches.push(created)
+      return created
+    },
+    autoUpdate: async (id, changes) => {
+      const i = mockWatches.findIndex((x) => x.id === id)
+      if (i >= 0) mockWatches[i] = { ...mockWatches[i], ...changes }
+      return mockWatches[i]
+    },
+    autoRemove: async (id) => {
+      const i = mockWatches.findIndex((x) => x.id === id)
+      if (i >= 0) mockWatches.splice(i, 1)
+    },
     autoCheckNow: async () => undefined,
     autoTestSmb: async () => 'Connected.',
     autoTestTelegram: async () => 'Connected.',

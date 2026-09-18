@@ -1,5 +1,6 @@
 import { b64urlDecode, b64urlEncode, fetchText, netPost, pick } from '../http'
 import type { ResolvedUrl, SiteResolver } from '../types'
+import { NotReleasedError, releaseAtFrom } from '../upcoming'
 import type { SearchResult, StreamingInfo, StreamSeason, StreamTranslator } from '@shared/types'
 
 export const YUMMY_DOMAIN = /^https?:\/\/(?:[a-z0-9-]+\.)*yummyani\.me\/catalog\/item\//i
@@ -221,7 +222,12 @@ export function fullestDub(
 async function streamingFromId(animeId: string, webUrl: string): Promise<ResolvedUrl> {
   const meta = (
     JSON.parse(await fetchText(`https://api.yani.tv/anime/${animeId}`, { Referer: REFERER })) as {
-      response: { title?: string; poster?: YaniPoster }
+      response: {
+        title?: string
+        poster?: YaniPoster
+        anime_status?: { alias?: string }
+        episodes?: { aired?: number; next_date?: number }
+      }
     }
   ).response
   const thumbnail = normalizeYaniPoster(meta.poster)
@@ -232,7 +238,24 @@ async function streamingFromId(animeId: string, webUrl: string): Promise<Resolve
   ).response
 
   const dubs = groupKodikDubs(videos)
-  if (!dubs.length) throw new Error('No playable Kodik streams found for this title.')
+  if (!dubs.length) {
+    /*
+      Nothing to play is two different situations. A title the site has only
+      announced will have streams later, and says roughly when; anything else
+      with no streams is simply not downloadable. Only the first is worth
+      waiting for, so only the first is reported as "not yet".
+    */
+    const announced =
+      meta.anime_status?.alias === 'announcement' || (meta.episodes?.aired ?? 1) === 0
+    if (announced) {
+      throw new NotReleasedError({
+        title: meta.title || 'Anime',
+        thumbnail,
+        releaseAt: releaseAtFrom(meta.episodes?.next_date)
+      })
+    }
+    throw new Error('No playable Kodik streams found for this title.')
+  }
 
   const translators: StreamTranslator[] = []
   const episodesByTranslator: Record<string, StreamSeason[]> = {}

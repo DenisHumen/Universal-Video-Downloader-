@@ -36,6 +36,8 @@ export interface SeriesOffer {
   qualities: string[]
   /** Each dub with the number of episodes *it* has, which is what a watch follows. */
   translators: { id: string; name: string; premium?: boolean; episodes: number }[]
+  /** Nothing is out yet. There are no dubs to list, only the date the site expects. */
+  upcoming?: { releaseAt?: number }
 }
 
 function broadcast(): void {
@@ -54,7 +56,8 @@ export function registerAutomationIpc(): void {
       provider: d.provider,
       defaultTranslator: d.defaultTranslator,
       qualities: d.qualities,
-      translators: d.translators.map((t) => ({ ...t, episodes: d.episodesFor(t.id).length }))
+      translators: d.translators.map((t) => ({ ...t, episodes: d.episodesFor(t.id).length })),
+      upcoming: d.upcoming
     }
   })
 

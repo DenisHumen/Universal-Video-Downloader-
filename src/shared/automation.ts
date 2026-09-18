@@ -109,6 +109,16 @@ export interface Watch {
   seen: EpisodeRef[]
   steps: PipelineStep[]
   createdAt: number
+  /**
+   * Added before anything was released.
+   *
+   * There is no dub to choose yet, so none is stored: the first check that
+   * finds episodes adopts the fullest dub on offer and clears this, after which
+   * the watch is an ordinary one.
+   */
+  pending?: boolean
+  /** When the site expects the release, in milliseconds. Absent when it does not say. */
+  releaseAt?: number
 }
 
 export interface RunStep {
@@ -480,4 +490,36 @@ export function normaliseSmbTarget<T extends SmbTarget>(target: T): T {
   }
 
   return repaired
+}
+
+// ---------------------------------------------------------------------------
+// Waiting for something that is not out yet
+// ---------------------------------------------------------------------------
+
+const DAY_MINUTES = 24 * 60
+
+/**
+ * How long to leave it before looking again at a title that is not out.
+ *
+ * Weeks away, asking every few hours is noise - but the date on an announcement
+ * moves, in both directions, so it is looked at once a day to keep the countdown
+ * honest. Inside the last day, and for as long as the date has passed without
+ * anything appearing, it is checked at the watch's own pace: release dates are
+ * approximate, and "due yesterday" is exactly when checking often pays off. With
+ * no date at all there is nothing to count down to, so it is the daily look.
+ */
+export function upcomingDelayMinutes(
+  releaseAt: number | undefined,
+  intervalMinutes: number,
+  now: number
+): number {
+  if (!releaseAt) return DAY_MINUTES
+  const minutesLeft = (releaseAt - now) / 60_000
+  if (minutesLeft > DAY_MINUTES) return DAY_MINUTES
+  return Math.max(15, intervalMinutes)
+}
+
+/** Whole days until a release, rounded up - "in 3 d" until the last day begins. */
+export function daysUntil(releaseAt: number, now: number): number {
+  return Math.max(0, Math.ceil((releaseAt - now) / 86_400_000))
 }

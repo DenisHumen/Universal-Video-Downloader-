@@ -3,7 +3,7 @@ import { log } from '../log'
 import { checkWatch } from './detect'
 import { markHandled, runEpisode } from './pipeline'
 import { getWatch, listWatches, updateWatch } from './store'
-import type { Watch } from '@shared/automation'
+import { upcomingDelayMinutes, type Watch } from '@shared/automation'
 
 /**
  * Deciding when to look, and looking.
@@ -58,6 +58,31 @@ async function checkOne(watch: Watch): Promise<void> {
   running++
   try {
     const result = await checkWatch(watch)
+
+    if (result.notOut) {
+      const releaseAt = result.notOut.releaseAt
+      const wait = upcomingDelayMinutes(releaseAt, watch.intervalMinutes, Date.now())
+      updateWatch(watch.id, {
+        title: result.title || watch.title,
+        thumbnail: result.thumbnail ?? watch.thumbnail,
+        releaseAt,
+        lastCheckedAt: Date.now(),
+        lastError: undefined,
+        failures: 0,
+        nextCheckAt: Date.now() + wait * 60_000 + jitter()
+      })
+      return
+    }
+
+    // Out at last: from here on this is an ordinary watch on the dub it adopted.
+    if (result.adopt) {
+      updateWatch(watch.id, {
+        translatorId: result.adopt.translatorId,
+        translatorName: result.adopt.translatorName,
+        pending: false,
+        releaseAt: undefined
+      })
+    }
 
     // The site is the authority on the title and poster; a series gets renamed.
     updateWatch(watch.id, {

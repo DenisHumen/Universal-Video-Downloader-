@@ -440,6 +440,12 @@ export const ru: Dictionary = {
   'auto.nextCheck': 'следующая проверка',
   'auto.everyN': 'каждые {span}',
   'auto.everyDay': 'раз в день',
+  'auto.releaseIn': 'выйдет через {span}',
+  'auto.releaseAny': 'ждём со дня на день',
+  'auto.releaseUnknown': 'ещё не вышло',
+  'auto.releaseOn': 'ожидается {date}',
+  'auto.upcomingNote':
+    'пока ничего не вышло, поэтому выбирать озвучку не из чего. дата сверяется раз в сутки - у анонсов она плавает; как только появятся серии, возьмётся самая полная озвучка, и дальше всё пойдёт как обычно.',
   'time.min': 'мин',
   'time.h': 'ч',
   'time.d': 'д',
