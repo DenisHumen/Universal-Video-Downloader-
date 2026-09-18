@@ -144,6 +144,48 @@ function normalizeYaniPoster(poster: YaniPoster): string | undefined {
   return u
 }
 
+export interface KodikDub {
+  /** The season player this dub plays from - which is also what identifies it. */
+  base: string
+  name: string
+  episodes: number[]
+}
+
+/**
+ * One entry per player, not one per label.
+ *
+ * A dub is identified here by the address of its Kodik player, because that
+ * address is all the downloader needs and it survives in saved watches. The
+ * site sometimes files two labels against the same player - a fifteen-episode
+ * translation and a stray one-episode record under another studio name. Keyed
+ * by label, both claimed the same id and the later one overwrote the earlier
+ * episode list, so a complete dub was shown, and followed, as having one
+ * episode. The same player is the same stream: the episodes are pooled, and the
+ * label with the most records behind it names the result.
+ */
+export function groupKodikDubs(
+  videos: { number: string | number; iframe_url: string; data: { player: string; dubbing: string } }[]
+): KodikDub[] {
+  const byBase = new Map<string, { labels: Map<string, number>; episodes: Set<number> }>()
+  for (const v of videos) {
+    if (v.data.player !== 'Плеер Kodik') continue
+    const episode = Number(v.number)
+    if (!Number.isFinite(episode)) continue
+    const base = v.iframe_url.split('?')[0]
+    const entry = byBase.get(base) ?? { labels: new Map(), episodes: new Set() }
+    const label = v.data.dubbing || 'Kodik'
+    entry.labels.set(label, (entry.labels.get(label) ?? 0) + 1)
+    entry.episodes.add(episode)
+    byBase.set(base, entry)
+  }
+  return [...byBase].map(([base, entry]) => ({
+    base,
+    // Map keeps insertion order, so a tie goes to the label the site listed first.
+    name: [...entry.labels].reduce((best, next) => (next[1] > best[1] ? next : best))[0],
+    episodes: [...entry.episodes].sort((x, y) => x - y)
+  }))
+}
+
 function episodeCount(seasons: StreamSeason[] | undefined): number {
   return (seasons ?? []).reduce((n, s) => n + s.episodes.length, 0)
 }
@@ -189,23 +231,15 @@ async function streamingFromId(animeId: string, webUrl: string): Promise<Resolve
     }
   ).response
 
-  // Group Kodik entries by dubbing — each dubbing maps to one season player URL.
-  const byDub = new Map<string, { base: string; episodes: Set<number> }>()
-  for (const v of videos) {
-    if (v.data.player !== 'Плеер Kodik') continue
-    const base = v.iframe_url.split('?')[0]
-    const dub = v.data.dubbing || 'Kodik'
-    if (!byDub.has(dub)) byDub.set(dub, { base, episodes: new Set() })
-    byDub.get(dub)!.episodes.add(Number(v.number))
-  }
-  if (!byDub.size) throw new Error('No playable Kodik streams found for this title.')
+  const dubs = groupKodikDubs(videos)
+  if (!dubs.length) throw new Error('No playable Kodik streams found for this title.')
 
   const translators: StreamTranslator[] = []
   const episodesByTranslator: Record<string, StreamSeason[]> = {}
-  for (const [dub, info] of byDub) {
-    const tid = b64urlEncode(info.base)
-    translators.push({ id: tid, name: dub })
-    episodesByTranslator[tid] = [{ season: 1, episodes: [...info.episodes].sort((a, b) => a - b) }]
+  for (const dub of dubs) {
+    const tid = b64urlEncode(dub.base)
+    translators.push({ id: tid, name: dub.name })
+    episodesByTranslator[tid] = [{ season: 1, episodes: dub.episodes }]
   }
   const defaultTranslator = fullestDub(translators, episodesByTranslator)
 

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { animeIdCandidates, fullestDub, kodikTarget } from './yummyani'
+import { animeIdCandidates, fullestDub, groupKodikDubs, kodikTarget } from './yummyani'
 
 /*
   A yummyani page carries two numbers that both look like the title's id, and
@@ -132,5 +132,48 @@ describe('fullestDub', () => {
   it('counts across seasons, and survives a dub with no list at all', () => {
     const split = { a: [...eps(3), { season: 2, episodes: [1, 2, 3, 4] }], b: eps(5) }
     expect(fullestDub([{ id: 'b' }, { id: 'a' }, { id: 'ghost' }], split)).toBe('a')
+  })
+})
+
+/*
+  The site filed a one-episode record under another studio name against the
+  same player as a complete fifteen-episode dub. Both claimed the same id, the
+  later one won, and the complete dub was shown as having one episode.
+*/
+describe('groupKodikDubs', () => {
+  const KODIK = 'Плеер Kodik'
+  const video = (dubbing: string, number: number, base: string, player = KODIK) => ({
+    number: String(number),
+    iframe_url: `${base}?translations=false`,
+    data: { player, dubbing }
+  })
+  const full = Array.from({ length: 15 }, (_, i) => video('DEEP', i + 1, '//kodikplayer.com/season/1/aa/720p'))
+  const stray = video('SHIZA', 1, '//kodikplayer.com/season/1/aa/720p')
+
+  it('pools two labels that play from the same player, instead of letting the last one win', () => {
+    const dubs = groupKodikDubs([...full, stray])
+    expect(dubs).toHaveLength(1)
+    expect(dubs[0].episodes).toHaveLength(15)
+  })
+
+  it('names the result after the label with the most records behind it', () => {
+    expect(groupKodikDubs([...full, stray])[0].name).toBe('DEEP')
+    expect(groupKodikDubs([stray, ...full])[0].name).toBe('DEEP')
+  })
+
+  it('keeps dubs on different players apart', () => {
+    const other = video('AniDUB', 1, '//kodikplayer.com/season/2/bb/720p')
+    expect(groupKodikDubs([...full, other]).map((d) => d.name)).toEqual(['DEEP', 'AniDUB'])
+  })
+
+  it('ignores players it cannot download from', () => {
+    const alloha = video('Dubbed', 1, '//alloha.yani.tv/x', 'Плеер Alloha')
+    expect(groupKodikDubs([alloha])).toEqual([])
+  })
+
+  it('lists each episode once, in order, whatever order and however often it arrived', () => {
+    const base = '//kodikplayer.com/season/3/cc/720p'
+    const dubs = groupKodikDubs([video('A', 3, base), video('A', 1, base), video('A', 3, base)])
+    expect(dubs[0].episodes).toEqual([1, 3])
   })
 })
