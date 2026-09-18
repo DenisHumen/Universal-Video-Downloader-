@@ -144,6 +144,33 @@ function normalizeYaniPoster(poster: YaniPoster): string | undefined {
   return u
 }
 
+function episodeCount(seasons: StreamSeason[] | undefined): number {
+  return (seasons ?? []).reduce((n, s) => n + s.episodes.length, 0)
+}
+
+/**
+ * The dub to open a title on: the one carrying the most episodes.
+ *
+ * The API lists dubs in no useful order, and the first one is sometimes a
+ * single uploaded episode sitting in front of eight complete translations.
+ * Opening on it made a fifteen-episode series look like a film - the home card
+ * drew the film picker, and following it was refused as "a single video" -
+ * because whether a title is a series was read off that one dub. A tie keeps
+ * the order the site gave, so the choice does not move between visits.
+ */
+export function fullestDub(
+  translators: { id: string }[],
+  episodesByTranslator: Record<string, StreamSeason[]>
+): string {
+  let best = translators[0].id
+  for (const t of translators) {
+    if (episodeCount(episodesByTranslator[t.id]) > episodeCount(episodesByTranslator[best])) {
+      best = t.id
+    }
+  }
+  return best
+}
+
 /**
  * Build the full streaming picker (dubbings → episodes → qualities) for an
  * anime from its numeric yani.tv id. Shared by the page resolver and the
@@ -180,7 +207,7 @@ async function streamingFromId(animeId: string, webUrl: string): Promise<Resolve
     translators.push({ id: tid, name: dub })
     episodesByTranslator[tid] = [{ season: 1, episodes: [...info.episodes].sort((a, b) => a - b) }]
   }
-  const defaultTranslator = translators[0].id
+  const defaultTranslator = fullestDub(translators, episodesByTranslator)
 
   const streaming: StreamingInfo = {
     provider: 'yummyani',
@@ -188,7 +215,7 @@ async function streamingFromId(animeId: string, webUrl: string): Promise<Resolve
     id: animeId,
     title: meta.title || 'Anime',
     thumbnail,
-    isSeries: episodesByTranslator[defaultTranslator][0].episodes.length > 1,
+    isSeries: episodeCount(episodesByTranslator[defaultTranslator]) > 1,
     translators,
     defaultTranslator,
     seasons: episodesByTranslator[defaultTranslator],

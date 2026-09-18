@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { animeIdCandidates, kodikTarget } from './yummyani'
+import { animeIdCandidates, fullestDub, kodikTarget } from './yummyani'
 
 /*
   A yummyani page carries two numbers that both look like the title's id, and
@@ -103,5 +103,34 @@ describe('kodikTarget', () => {
 
   it('gives nothing when the player holds neither, so the caller can say so', () => {
     expect(kodikTarget('https://kodikplayer.com/season/120921/7abe07/720p', '', 1)).toBeUndefined()
+  })
+})
+
+/*
+  A fifteen-episode series opened as a film, because the first dub the API
+  happened to list held one episode and everything was read off that one.
+*/
+describe('fullestDub', () => {
+  const eps = (n: number): { season: number; episodes: number[] }[] => [
+    { season: 1, episodes: Array.from({ length: n }, (_, i) => i + 1) }
+  ]
+  const dubs = [{ id: 'stub' }, { id: 'full' }, { id: 'also-full' }, { id: 'partial' }]
+  const byDub = { stub: eps(1), full: eps(15), 'also-full': eps(15), partial: eps(5) }
+
+  it('opens on the dub with the most episodes, not the first one listed', () => {
+    expect(fullestDub(dubs, byDub)).toBe('full')
+  })
+
+  it('keeps the order the site gave when two dubs tie', () => {
+    expect(fullestDub([dubs[2], dubs[1]], byDub)).toBe('also-full')
+  })
+
+  it('still answers for a film, where every dub has one', () => {
+    expect(fullestDub([{ id: 'a' }, { id: 'b' }], { a: eps(1), b: eps(1) })).toBe('a')
+  })
+
+  it('counts across seasons, and survives a dub with no list at all', () => {
+    const split = { a: [...eps(3), { season: 2, episodes: [1, 2, 3, 4] }], b: eps(5) }
+    expect(fullestDub([{ id: 'b' }, { id: 'a' }, { id: 'ghost' }], split)).toBe('a')
   })
 })
