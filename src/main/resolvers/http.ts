@@ -1,4 +1,5 @@
 import { net } from 'electron'
+import { describeNetError } from './neterror'
 
 /** A recent desktop Chrome UA — many sites gate on this. */
 export const UA =
@@ -67,9 +68,9 @@ function request(
         chunks.push(chunk)
       })
       response.on('end', () => finish(() => resolve(Buffer.concat(chunks).toString('utf-8'))))
-      response.on('error', (err: Error) => finish(() => reject(err)))
+      response.on('error', (err: Error) => finish(() => reject(describeNetError(err, url))))
     })
-    req.on('error', (err) => finish(() => reject(err)))
+    req.on('error', (err) => finish(() => reject(describeNetError(err, url))))
     if (body) req.write(body)
     req.end()
   })
@@ -143,9 +144,9 @@ export function fetchBinary(
       response.on('end', () =>
         finish(() => resolve({ body: Buffer.concat(chunks), contentType: contentType.split(';')[0] }))
       )
-      response.on('error', (err: Error) => finish(() => reject(err)))
+      response.on('error', (err: Error) => finish(() => reject(describeNetError(err, url))))
     })
-    req.on('error', (err) => finish(() => reject(err)))
+    req.on('error', (err) => finish(() => reject(describeNetError(err, url))))
     req.end()
   })
 }

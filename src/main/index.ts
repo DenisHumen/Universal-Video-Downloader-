@@ -13,6 +13,7 @@ import { join } from 'path'
 import { IPC } from '@shared/ipc'
 import { registerIpc } from './ipc'
 import { flushSettings, getSettings } from './services/settings'
+import { applyProxy } from './services/proxy'
 import { ensureYtdlp, refreshEngineIfDue } from './services/ytdlp'
 import { checkForUpdates, initUpdater } from './services/updater'
 import { flushLog, initLog, log } from './services/log'
@@ -429,6 +430,8 @@ function destroyTray(): void {
 }
 
 function applySettings(settings: AppSettings): void {
+  // The app's own requests follow the proxy too, not only the engine's.
+  void applyProxy(settings)
   /*
     The application menu and the tray menu are built once from a dictionary, so
     switching the interface language left both of them in the old one until the
@@ -475,6 +478,9 @@ if (!gotLock) {
       this cannot happen at module load.
     */
     initLog(getSettings().logVerbose ? 'debug' : 'info')
+
+    // Before any request is made: the proxy the user set applies to our own too.
+    void applyProxy(getSettings())
 
     if (process.platform === 'win32') {
       app.setAppUserModelId('com.denishumen.universalvideodownloader')
