@@ -152,7 +152,27 @@ const RULES: Rule[] = [
   }
 ]
 
+/**
+ * ffmpeg finished having written nothing.
+ *
+ * When a section download starts somewhere ffmpeg cannot read from, it exits
+ * cleanly with an empty file; yt-dlp calls that a finished download, and the
+ * failure only surfaces at the next step, as a post-processing error about the
+ * empty file. Reading the last line alone, that became "the video downloaded
+ * but could not be merged" - the one thing that certainly had not happened.
+ */
+const WROTE_NOTHING = /size=\s*0ki?b\s+time=n\/a|video:0ki?b audio:0ki?b/
+
 export function classifyYtdlpError(raw: string, cookiesEnabled: boolean): ClassifiedError {
+  if (WROTE_NOTHING.test(raw.toLowerCase())) {
+    return {
+      code: 'cutFailed',
+      message:
+        'Nothing was recorded from the point you chose to start at, so there was nothing to process. ' +
+        'Try downloading it without cutting, then trim the file.',
+      cookieHint: false
+    }
+  }
   const line =
     raw
       .split('\n')

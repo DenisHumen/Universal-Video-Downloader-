@@ -25,6 +25,7 @@
     "test:watch": "vitest",
     "check:contrast": "node scripts/check-contrast.mjs",
     "check:ffmpeg": "node scripts/check-ffmpeg-arch.mjs",
+    "fetch:ffmpeg": "node scripts/fetch-ffmpeg.mjs",
     "shots": "electron scripts/capture-screenshots.mjs",
     "make:icons": "node scripts/generate-icons.mjs",
     "pack": "npm run build && electron-builder --dir",

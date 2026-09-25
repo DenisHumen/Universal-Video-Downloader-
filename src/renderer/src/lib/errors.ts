@@ -34,7 +34,8 @@ const KEYS: Record<AppErrorCode, TranslationKey> = {
   ffmpegMissing: 'err.ffmpegMissing',
   streamGone: 'err.streamGone',
   corruptLink: 'err.corruptLink',
-  emptyPage: 'err.emptyPage'
+  emptyPage: 'err.emptyPage',
+  cutFailed: 'err.cutFailed'
 }
 
 export interface FailureLike {

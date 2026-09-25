@@ -127,6 +127,7 @@ export type AppErrorCode =
   | 'streamGone'
   | 'corruptLink'
   | 'emptyPage'
+  | 'cutFailed'
 
 export type DownloadState =
   | 'queued'

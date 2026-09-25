@@ -175,3 +175,41 @@ describe('classifyYtdlpError', () => {
     expect(classifyYtdlpError('ERROR: HTTP Error 404: Not Found', false).code).toBe('unavailable')
   })
 })
+
+/*
+  A trimmed Twitch VOD failed with "post-processing failed - the video
+  downloaded but could not be merged". It had not downloaded: ffmpeg wrote
+  nothing, yt-dlp called the empty file finished, and the metadata step choked
+  on it. The last line blamed the wrong step; the lines above it said so.
+*/
+describe('classifyYtdlpError, when ffmpeg wrote nothing', () => {
+  const log = [
+    '[info] v2881778152: Downloading 1 time ranges: 17077.0-inf',
+    '[download] Destination: C:/Users/x/Downloads/vod [v2881778152].mp4',
+    '[NULL @ 00000199d5e52c40] Invalid NAL unit size (1919161869 > 101).',
+    '[NULL @ 00000199d5e52c40] missing picture in access unit with size 105',
+    'size=       0kB time=N/A bitrate=N/A speed=N/A    ',
+    '[Metadata] Adding metadata to "C:/Users/x/Downloads/vod [v2881778152].mp4"',
+    'ERROR: Postprocessing: Error opening output files: Invalid argument'
+  ].join('\n')
+
+  it('says nothing was recorded, not that it downloaded and failed to merge', () => {
+    const out = classifyYtdlpError(log, false)
+    expect(out.code).toBe('cutFailed')
+    expect(out.message).not.toMatch(/downloaded but/i)
+  })
+
+  it('recognises the summary line newer ffmpeg prints instead', () => {
+    const summary =
+      '[out#0/mp4 @ 0000017533aef140] video:0kB audio:0kB subtitle:0kB other streams:0kB global headers:0kB muxing overhead: unknown\n' +
+      'ERROR: Postprocessing: Error opening output files: Invalid argument'
+    expect(classifyYtdlpError(summary, false).code).toBe('cutFailed')
+  })
+
+  it('leaves a real post-processing failure where it was', () => {
+    const real =
+      'size=   20480kB time=00:01:05.00 bitrate=2580.1kbits/s speed=12x\n' +
+      'ERROR: Postprocessing: Conversion failed!'
+    expect(classifyYtdlpError(real, false).code).toBe('postprocess')
+  })
+})
