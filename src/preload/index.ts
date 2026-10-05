@@ -11,6 +11,7 @@ import type {
   DownloadItem,
   DownloadProgress,
   DownloadRequest,
+  EngineUpdateResult,
   MediaJobRequest,
   MediaProbe,
   PendingDelivery,
@@ -107,7 +108,7 @@ const api = {
 
   // Engine
   ensureYtdlp: (): Promise<YtDlpStatus> => ipcRenderer.invoke(IPC.ytdlpEnsure),
-  updateYtdlp: (): Promise<string | undefined> => ipcRenderer.invoke(IPC.ytdlpUpdate),
+  updateYtdlp: (): Promise<EngineUpdateResult> => ipcRenderer.invoke(IPC.ytdlpUpdate),
   takePending: (): Promise<PendingDelivery> => ipcRenderer.invoke(IPC.takePending),
 
   // ---- Automation ----

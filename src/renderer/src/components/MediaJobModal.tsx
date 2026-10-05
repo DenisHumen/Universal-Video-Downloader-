@@ -12,6 +12,7 @@ import {
 } from '@shared/types'
 import { useT } from '../i18n'
 import { toast } from '../lib/toast'
+import { describeError } from '../lib/errors'
 import { useStore } from '../store'
 import TrimEditor from './TrimEditor'
 import Choice from './Choice'
@@ -108,7 +109,7 @@ export default function MediaJobModal({ item, mode, onClose }: Props): JSX.Eleme
         })
       }
     } catch (err) {
-      toast(err instanceof Error ? err.message : t('home.startFailed'), 'error')
+      toast(describeError(err, t('home.startFailed')), 'error')
       setBusy(false)
       return
     }

@@ -1,6 +1,7 @@
 import type { DownloadRequest } from '@shared/types'
 import { useStore } from '../store'
 import { toast } from './toast'
+import { describeError } from './errors'
 import { t } from '../i18n'
 
 export interface QueueResult {
@@ -41,7 +42,7 @@ async function queue(requests: DownloadRequest[]): Promise<QueueResult> {
       }
     } catch (err) {
       result.failed++
-      toast(err instanceof Error ? err.message : t('home.startFailed'), 'error')
+      toast(describeError(err, t('home.startFailed')), 'error')
     }
   }
   return result

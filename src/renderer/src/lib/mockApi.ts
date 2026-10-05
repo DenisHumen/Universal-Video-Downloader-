@@ -377,7 +377,7 @@ export function installMockApi(): void {
     },
     readClipboard: async () => '',
     ensureYtdlp: async () => appInfo.ytdlp,
-    updateYtdlp: async () => 'mock',
+    updateYtdlp: async () => ({ ok: true, version: 'mock' }),
     checkForUpdates: async () => appInfo.update,
     downloadUpdate: async () => undefined,
     installUpdate: async () => undefined,

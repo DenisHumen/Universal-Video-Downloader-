@@ -5,6 +5,7 @@ import type {
   DetectStage,
   DownloadItem,
   DownloadRequest,
+  EngineUpdateResult,
   MediaJobRequest,
   SearchScope
 } from '@shared/types'
@@ -34,7 +35,14 @@ import {
   startMediaJob
 } from './services/downloader'
 import { getSettings, resetSettings, setSettings } from './services/settings'
-import { ensureYtdlp, getYtdlpStatus, updateYtdlp, ytdlpEvents } from './services/ytdlp'
+import {
+  EngineBusyError,
+  engineUnavailable,
+  ensureYtdlp,
+  getYtdlpStatus,
+  updateYtdlp,
+  ytdlpEvents
+} from './services/ytdlp'
 import { takePending } from './index'
 import { registerAutomationIpc } from './automation-ipc'
 import {
@@ -65,7 +73,8 @@ export function registerIpc({ getWindow, openSearchWindow, onSettingsChanged }: 
 
   // ---- Media detection & search ----
   ipcMain.handle(IPC.detect, async (event, url: string, requestId?: string) => {
-    await ensureYtdlp()
+    const engineFailure = await engineUnavailable()
+    if (engineFailure) return engineFailure
     const controller = new AbortController()
     if (requestId) detections.set(requestId, controller)
     const report = (stage: DetectStage): void => {
@@ -168,7 +177,21 @@ export function registerIpc({ getWindow, openSearchWindow, onSettingsChanged }: 
     }
     return getYtdlpStatus()
   })
-  ipcMain.handle(IPC.ytdlpUpdate, () => updateYtdlp(isEngineBusy))
+  /*
+    Settings used to tell a refusal apart by matching /engineBusy/ against the
+    rejection's message. Electron sends only "Error invoking remote method
+    'ytdlp:update': EngineBusyError: Pause or finish…" across, and that never
+    contains the word in that case - so the advice to pause first was never
+    shown, only "update failed". A refusal is an answer, so it returns as one.
+  */
+  ipcMain.handle(IPC.ytdlpUpdate, async (): Promise<EngineUpdateResult> => {
+    try {
+      return { ok: true, version: await updateYtdlp(isEngineBusy) }
+    } catch (err) {
+      if (err instanceof EngineBusyError) return { ok: false, code: 'engineBusy' }
+      return { ok: false, error: err instanceof Error ? err.message : String(err) }
+    }
+  })
 
   // Whatever main tried to hand the window before it was listening.
   ipcMain.handle(IPC.takePending, () => takePending())

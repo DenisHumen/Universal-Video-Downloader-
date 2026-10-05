@@ -50,6 +50,22 @@ export function formatCount(n?: number): string {
   return String(n)
 }
 
+/**
+ * A saved file's path as folder and file name, so a row can shorten the
+ * folder and keep the name.
+ *
+ * One truncated line used to cut from the end, and a long title plus
+ * ` [id].mp4` pushed the file name — the part anyone is looking for — off the
+ * row, leaving `…\youtube\Some Extremely Long Video Title…`. Either separator
+ * counts, because the renderer has no `node:path` and the same queue shows
+ * Windows paths and POSIX ones. The folder keeps its trailing separator, so the
+ * two halves put back together are exactly the path.
+ */
+export function splitPath(path: string): { dir: string; base: string } {
+  const i = Math.max(path.lastIndexOf('/'), path.lastIndexOf('\\'))
+  return { dir: path.slice(0, i + 1), base: path.slice(i + 1) }
+}
+
 export function isProbablyUrl(text: string): boolean {
   const t = text.trim()
   if (!t) return false

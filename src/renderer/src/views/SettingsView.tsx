@@ -326,12 +326,12 @@ export default function SettingsView(): JSX.Element {
   const updateEngine = async (): Promise<void> => {
     setUpdatingEngine(true)
     try {
-      await window.api.updateYtdlp()
-      toast(t('settings.engineUpdated'), 'success')
-    } catch (err) {
-      const message = err instanceof Error ? err.message : String(err)
+      const res = await window.api.updateYtdlp()
+      if (res.ok) toast(t('settings.engineUpdated'), 'success')
       // Main refuses to swap the binary out from under a running transfer.
-      toast(/engineBusy/.test(message) ? t('err.engineBusy') : t('settings.engineFailed'), 'error')
+      else toast(res.code === 'engineBusy' ? t('err.engineBusy') : t('settings.engineFailed'), 'error')
+    } catch {
+      toast(t('settings.engineFailed'), 'error')
     } finally {
       setUpdatingEngine(false)
     }

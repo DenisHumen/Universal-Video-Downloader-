@@ -19,7 +19,7 @@ import { formatCount, formatDuration } from '../lib/format'
 import { initialMode, initialQuality, maxHeightOf } from '../lib/quality'
 import { toast } from '../lib/toast'
 import { queueDownload } from '../lib/queue'
-import { errorText } from '../lib/errors'
+import { describeError, errorText } from '../lib/errors'
 import { useT, type TranslateFn } from '../i18n'
 import { useStore } from '../store'
 
@@ -112,17 +112,16 @@ export default function SearchView({ settings, embedded = false }: Props): JSX.E
     setAdded(new Set())
     setPicker(null)
     /*
-      `searchVideos` waits on the engine, and that rethrows when it can't be
-      installed — offline on first run, say. A rejected invoke skipped the
-      error branch entirely, so the screen sat in its loading skeleton forever
-      with the search button disabled: no result, no message, no way back.
+      `searchVideos` waits on the engine, and that used to rethrow when it
+      couldn't be installed — offline on first run, say. A rejected invoke
+      skipped the error branch entirely, so the screen sat in its loading
+      skeleton forever with the search button disabled: no result, no message,
+      no way back. Main now answers that case with a code; this catch stays for
+      whatever else might still reject.
     */
     const res: SearchResponse = await window.api
       .searchVideos(q, s, s === 'all' ? 6 : 12)
-      .catch((err: unknown) => ({
-        ok: false,
-        error: err instanceof Error ? err.message : String(err)
-      }))
+      .catch((err: unknown) => ({ ok: false, error: describeError(err) }))
     if (res.ok && res.results) {
       setResults(res.results)
       setStatus('idle')
@@ -238,7 +237,7 @@ export default function SearchView({ settings, embedded = false }: Props): JSX.E
       if (res.ok && res.info?.streaming) setPicker(res.info)
       else toast(errorText(t, { error: res.error, errorCode: res.errorCode }), 'error')
     } catch (err) {
-      toast(err instanceof Error ? err.message : t('search.failed'), 'error')
+      toast(describeError(err, t('search.failed')), 'error')
     } finally {
       setPickerBusy(null)
     }

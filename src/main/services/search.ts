@@ -1,5 +1,5 @@
 import { spawn } from 'child_process'
-import { ytdlpBinaryPath, ytdlpSpawnOptions, ensureYtdlp } from './ytdlp'
+import { ytdlpBinaryPath, ytdlpSpawnOptions, engineUnavailable } from './ytdlp'
 import { killTree } from './process'
 import { getSettings } from './settings'
 import { classifyYtdlpError } from './options'
@@ -156,7 +156,8 @@ export async function searchVideos(
 ): Promise<SearchResponse> {
   const q = query.trim()
   if (!q) return { ok: false, error: 'Empty search query.' }
-  await ensureYtdlp()
+  const engineFailure = await engineUnavailable()
+  if (engineFailure) return engineFailure
 
   if (scope !== 'all') return searchOne(q, scope, limit)
 

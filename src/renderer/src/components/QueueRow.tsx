@@ -17,8 +17,8 @@ import {
   X
 } from 'lucide-react'
 import type { DownloadItem } from '@shared/types'
-import { formatBytes, formatEta, formatSpeed } from '../lib/format'
-import { errorText } from '../lib/errors'
+import { formatBytes, formatEta, formatSpeed, splitPath } from '../lib/format'
+import { errorReport, errorText } from '../lib/errors'
 import { useT, type TranslationKey } from '../i18n'
 import { toast } from '../lib/toast'
 import MediaJobModal, { type JobMode } from './MediaJobModal'
@@ -144,9 +144,11 @@ function QueueRow({ item, index }: Props): JSX.Element {
     }
   }
 
+  const savedAt = splitPath(item.filepath ?? '')
+
   const copyError = async (): Promise<void> => {
     try {
-      await navigator.clipboard.writeText(item.error || item.log || '')
+      await navigator.clipboard.writeText(errorReport(t, item))
       toast(t('common.copied'), 'success')
     } catch {
       /* clipboard unavailable */
@@ -388,14 +390,24 @@ function QueueRow({ item, index }: Props): JSX.Element {
       {/* Outcome: the path it landed at, or why it didn't. */}
       {(item.state === 'completed' || item.state === 'error') && (
         <div className="pb-3 pl-[124px] pr-1">
-          <p
-            className={`selectable truncate text-[12px] ${
-              item.state === 'error' ? 'text-bad' : 'mono text-ink-3'
-            }`}
-            title={item.state === 'error' ? errorText(t, item) : item.filepath}
-          >
-            {item.state === 'error' ? errorText(t, item) : item.filepath}
-          </p>
+          {/*
+            Each translated failure says what happened and then what to do,
+            and one truncated line kept only the first half. A path gives up
+            its folder before its file name, which is the part people look for.
+          */}
+          {item.state === 'error' ? (
+            <p
+              className="selectable line-clamp-3 break-words text-[12px] text-bad"
+              title={errorText(t, item)}
+            >
+              {errorText(t, item)}
+            </p>
+          ) : (
+            <p className="selectable mono flex min-w-0 text-[12px]" title={item.filepath}>
+              <span className="min-w-0 shrink truncate text-ink-3">{savedAt.dir}</span>
+              <span className="max-w-full shrink-0 truncate text-ink-2">{savedAt.base}</span>
+            </p>
+          )}
           {item.log && (
             <>
               <button

@@ -24,7 +24,7 @@ import {
 } from '@shared/types'
 import { needsCookiesOften } from '@shared/urls'
 import { useStore } from '../store'
-import { errorText } from '../lib/errors'
+import { describeError, errorText } from '../lib/errors'
 import { formatCount, formatDuration, isProbablyUrl } from '../lib/format'
 import {
   availableHeights,
@@ -160,10 +160,11 @@ export default function HomeView(): JSX.Element {
     setErrorCode(undefined)
     setCookieHint(false)
     setInfo(null)
-    // Same reasoning as SearchView: the engine can refuse to install, and a
-    // rejected invoke would otherwise leave the card in its skeleton.
+    // Same reasoning as SearchView: main reports an engine that won't install
+    // as a coded result, but any other rejected invoke would otherwise leave
+    // the card in its skeleton.
     const res: DetectResult = await window.api.detect(target, requestId).catch(
-      (err: unknown) => ({ ok: false, error: err instanceof Error ? err.message : String(err) })
+      (err: unknown) => ({ ok: false, error: describeError(err) })
     )
     if (requestRef.current !== requestId) return
     requestRef.current = null
