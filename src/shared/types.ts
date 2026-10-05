@@ -312,6 +312,16 @@ export interface DownloadItem {
   downloadedBytes?: number
   totalBytes?: number
   filepath?: string
+  /**
+   * The name a custom-resolved stream is saved under, chosen on its first run
+   * and kept, so a resume finds its own partial. See naming.ts.
+   */
+  outputStem?: string
+  /**
+   * ` (2)` and so on, when the name the template gave this entry turned out
+   * to belong to a different download's file. See naming.ts.
+   */
+  copySuffix?: string
   outputDir: string
   error?: string
   /** Machine-readable reason, so the UI can say it in the user's language. */

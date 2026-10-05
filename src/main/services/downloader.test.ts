@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import { join } from 'path'
 import type { AppSettings, DownloadItem } from '@shared/types'
-import { buildArgs, pickFinishedFile, safeName } from './downloader'
+import { buildArgs, pickFinishedFile, safeName, siteFolder } from './downloader'
+import { sniffUrlFor } from '../resolvers/universal'
+import { directUrlFor } from '../resolvers/universal/direct'
 
 function settings(overrides: Partial<AppSettings> = {}): AppSettings {
   return {
@@ -100,6 +102,73 @@ describe('buildArgs', () => {
   it('uses the filename template when the engine names the file', () => {
     const args = buildArgs(item(), settings(), '/downloads')
     expect(args[args.indexOf('-o') + 1]).toBe(join('/downloads', '%(title)s [%(id)s].%(ext)s'))
+  })
+
+  const output = (args: string[]): string => args[args.indexOf('-o') + 1]
+
+  it('names a trimmed download after its section, so the full video is not "already downloaded"', () => {
+    // Same template for clip and full video: the engine handed back the clip, exit 0.
+    const clip = item({ range: { start: 5, end: 9 } })
+    expect(output(buildArgs(clip, settings(), '/downloads'))).toBe(
+      join('/downloads', '%(title)s [%(id)s] [0m05s-0m09s].%(ext)s')
+    )
+    expect(output(buildArgs(item({ range: { start: 5 } }), settings(), '/downloads'))).toBe(
+      join('/downloads', '%(title)s [%(id)s] [0m05s-end].%(ext)s')
+    )
+  })
+
+  it('puts a copy number after the section, just before the extension', () => {
+    const copy = item({ range: { start: 5 }, copySuffix: ' (2)' })
+    const nested = settings({ filenameTemplate: '%(uploader)s/%(title)s.%(ext)s' })
+    expect(output(buildArgs(copy, nested, '/d'))).toBe(
+      join('/d', '%(uploader)s/%(title)s [0m05s-end] (2).%(ext)s')
+    )
+  })
+
+  const scraped = { referer: 'https://site.test/', title: 'Episode 1' }
+
+  it('gives a trimmed custom-resolved stream its section too', () => {
+    const clip = item({ ...scraped, range: { start: 65, end: 125 } })
+    expect(output(buildArgs(clip, settings(), '/downloads'))).toBe(
+      join('/downloads', 'Episode 1 [1m05s-2m05s].%(ext)s')
+    )
+  })
+
+  it('keeps the name a custom-resolved stream settled on', () => {
+    // A resume has to write into the partial the first run started.
+    const resumed = item({ ...scraped, outputStem: 'Episode 1 (2)' })
+    expect(output(buildArgs(resumed, settings(), '/downloads'))).toBe(
+      join('/downloads', 'Episode 1 (2).%(ext)s')
+    )
+  })
+})
+
+describe('siteFolder', () => {
+  it('files a sniffed page under its site, not "Universal"', () => {
+    // Every universally detected site shared one folder named after the fallback.
+    const sourceUrl = sniffUrlFor('https://www.ok.ru/video/1')
+    expect(siteFolder({ url: 'https://cdn.test/x.m3u8', sourceUrl, extractor: 'Universal' })).toBe('ok.ru')
+  })
+
+  it('files a stream picked in the built-in browser under the page it came from', () => {
+    const picked = directUrlFor({ url: 'https://cdn.test/a.mp4', pageUrl: 'https://kino.example/w/7' })
+    expect(siteFolder({ url: picked, sourceUrl: picked })).toBe('kino.example')
+    const noPage = directUrlFor({ url: 'https://cdn.test/a.mp4', referer: 'https://www.tube.example/' })
+    expect(siteFolder({ url: noPage, sourceUrl: noPage })).toBe('tube.example')
+  })
+
+  it("files the engine's generic extractor under the host", () => {
+    const generic = { url: 'https://videos.example.org/a.mp4', extractor: 'Generic' }
+    expect(siteFolder(generic)).toBe('videos.example.org')
+  })
+
+  it('keeps a real extractor name', () => {
+    const native = { url: 'https://www.youtube.com/watch?v=abc', extractor: 'Youtube' }
+    expect(siteFolder(native)).toBe('Youtube')
+  })
+
+  it('falls back to nothing, and so to "other", for a link it cannot read', () => {
+    expect(siteFolder({ url: 'not a url', extractor: 'generic' })).toBe('')
   })
 })
 

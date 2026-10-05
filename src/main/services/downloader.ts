@@ -2,7 +2,7 @@ import { app } from 'electron'
 import { EventEmitter } from 'events'
 import { spawn, ChildProcess, type ChildProcessWithoutNullStreams } from 'child_process'
 import { existsSync, mkdirSync, readFileSync, writeFileSync, readdirSync, rmSync, renameSync, statSync } from 'fs'
-import { dirname, join } from 'path'
+import { basename, dirname, join } from 'path'
 import { randomUUID } from 'crypto'
 import { ytdlpBinaryPath, ensureYtdlp, ytdlpSpawnOptions } from './ytdlp'
 import {
@@ -19,7 +19,15 @@ import {
 } from './ffmpeg'
 import { getSettings } from './settings'
 import { accessArgs, classifyYtdlpError, hasCookies, headerArgs, isTransientError } from './options'
-import { isSameDownload } from './dedupe'
+import { IN_FLIGHT_STATES, isSameDownload } from './dedupe'
+import {
+  freeCopySuffix,
+  pickOutputStem,
+  samePath,
+  sectionSuffix,
+  shouldTakeOwnName,
+  withNameSuffix
+} from './naming'
 import { killTree } from './process'
 import { markInterrupted, shouldResume } from './resume'
 import { pendingOrder } from './schedule'
@@ -28,6 +36,8 @@ import { ffmpegProgressSeconds, isFfmpegNoise, splitOutputLines } from './ffmpeg
 import { lineReader } from './engine-output'
 import { markOf, shouldEmitProgress, type ProgressMark } from './throttle'
 import { resolveUrl } from '../resolvers'
+import { pageUrlFromSniffUrl, SNIFF_SCHEME } from '../resolvers/universal'
+import { DIRECT_SCHEME, parseDirectUrl } from '../resolvers/universal/direct'
 import { isAbsoluteUrl, normalizeUrl } from '@shared/urls'
 import { hasTrim } from '@shared/types'
 import type {
@@ -88,6 +98,14 @@ const deliberateStops = new Set<string>()
   thing the engine decides is the extension.
 */
 const expectedNames = new Map<string, { dir: string; stem: string }>()
+
+/*
+  The file the engine skipped because one of that name already existed, per
+  running item. Exit 0 then only means "nothing to do"; whether that file is
+  the one this entry asked for is decided when the process closes - see
+  `shouldTakeOwnName`.
+*/
+const alreadyOnDisk = new Map<string, string>()
 
 /** Stop any in-flight link resolution for this item. */
 function abortResolve(id: string): void {
@@ -238,8 +256,30 @@ export function safeName(title: string): string {
     .slice(0, 150)
 }
 
+/*
+  Extractor names that say how a video was found rather than where it lives:
+  the universal fallback, the engine's generic extractor, a pick from the
+  built-in browser. Filed under those, every site without a resolver of its own
+  - the long tail a folder per site is most useful for - shared one folder.
+*/
+const NOT_A_SITE = /^(universal|generic|browser)$/i
+
+/**
+ * The page a queued link stands for. A sniff or a browser pick is queued under
+ * an app-internal scheme whose host means nothing; the page it came from is
+ * inside.
+ */
+function pageUrlOf(src: string): string {
+  if (src.startsWith(SNIFF_SCHEME)) return pageUrlFromSniffUrl(src)
+  if (src.startsWith(DIRECT_SCHEME)) {
+    const payload = parseDirectUrl(src)
+    return payload?.pageUrl || payload?.referer || payload?.url || ''
+  }
+  return src
+}
+
 /** The site a download came from, for the per-site subfolder. */
-function siteFolder(item: DownloadItem): string {
+export function siteFolder(item: Pick<DownloadItem, 'extractor' | 'sourceUrl' | 'url'>): string {
   /*
     `extractor` is only ever set by a hand-written resolver, and there are three
     of those. Every site the engine handles natively — which is to say YouTube,
@@ -248,21 +288,26 @@ function siteFolder(item: DownloadItem): string {
     site" delivered one folder for the entire internet.
 
     The detector knows the extractor and now sends it along; the host name is
-    the fallback for anything queued before that, and for links queued without
-    a detect step at all.
+    the fallback for anything queued before that, for links queued without a
+    detect step at all, and for the labels in NOT_A_SITE.
   */
-  if (item.extractor) return safeName(item.extractor)
+  if (item.extractor && !NOT_A_SITE.test(item.extractor)) return safeName(item.extractor)
   try {
-    return safeName(new URL(item.sourceUrl || item.url).hostname.replace(/^www\./, ''))
+    return safeName(new URL(pageUrlOf(item.sourceUrl || item.url)).hostname.replace(/^www\./, ''))
   } catch {
     return ''
   }
 }
 
+/** Where this item's file goes, without touching the disk. */
+function plannedDir(item: DownloadItem, settings: AppSettings): string {
+  if (!settings.createSubfolders) return item.outputDir
+  return join(item.outputDir, siteFolder(item) || 'other')
+}
+
 function outputDirFor(item: DownloadItem, settings: AppSettings): string {
   if (!settings.createSubfolders) return item.outputDir
-  const folder = siteFolder(item) || 'other'
-  const dir = join(item.outputDir, folder)
+  const dir = plannedDir(item, settings)
   try {
     if (!existsSync(dir)) mkdirSync(dir, { recursive: true })
   } catch {
@@ -272,13 +317,63 @@ function outputDirFor(item: DownloadItem, settings: AppSettings): string {
 }
 
 /**
- * The name the app gives a custom-resolved stream (e.g. a scraped .m3u8),
- * whose title according to the engine is meaningless. Undefined when the
- * engine's own filename template decides.
+ * The title the app names a custom-resolved stream after (e.g. a scraped
+ * .m3u8), whose title according to the engine is meaningless. Undefined when
+ * the engine's own filename template decides.
  */
 function chosenStem(item: DownloadItem): string | undefined {
   if (!(item.referer || item.headers) || !item.title) return undefined
   return safeName(item.title) || 'video'
+}
+
+/**
+ * Settle the name a custom-resolved stream is saved under, for this run and
+ * every later one. See `pickOutputStem` for the rules; this gathers what they
+ * need - the folder's contents, and what the rest of the queue has claimed in
+ * it.
+ */
+function settleOutputStem(item: DownloadItem, dir: string, settings: AppSettings): string | undefined {
+  const base = chosenStem(item)
+  if (!base) return undefined
+  let names: string[] = []
+  try {
+    names = readdirSync(dir)
+  } catch {
+    /* not there yet: nothing in it can collide */
+  }
+  const held = new Set<string>()
+  const finished = new Set<string>()
+  for (const other of items.values()) {
+    if (other.id === item.id) continue
+    if (other.outputStem && IN_FLIGHT_STATES.includes(other.state)) {
+      const otherDir = expectedNames.get(other.id)?.dir ?? plannedDir(other, settings)
+      if (samePath(otherDir, dir)) held.add(other.outputStem.toLowerCase())
+    }
+    if (other.filepath && samePath(dirname(other.filepath), dir)) {
+      finished.add(basename(other.filepath).toLowerCase())
+    }
+  }
+  /*
+    An entry that ran before this naming existed has no stem on record, and
+    whatever partial it left is named after the bare title. Keeping that name is
+    what lets an upgrade resume it; `log` is how to tell it from a new entry,
+    which has never produced any output.
+  */
+  const ranBefore = !item.outputStem && item.log != null
+  const legacy = ranBefore && partialsFor(names, base).length ? base : undefined
+  const stem = pickOutputStem({
+    wanted: base + sectionSuffix(item.range),
+    current: item.outputStem,
+    legacy,
+    held,
+    finished,
+    names
+  })
+  if (stem !== item.outputStem) {
+    item.outputStem = stem
+    scheduleSave()
+  }
+  return stem
 }
 
 /**
@@ -326,13 +421,20 @@ export function buildArgs(
   if (settings.restrictFilenames) args.push('--restrict-filenames')
   if (settings.speedLimit.trim()) args.push('--limit-rate', settings.speedLimit.trim())
 
-  // Output template. For custom-resolved streams we bake in the title we scraped.
-  const stem = chosenStem(item)
-  if (stem) {
+  /*
+    Output template. For custom-resolved streams we bake in the title we
+    scraped, under the stem `settleOutputStem` made unique. Either way a
+    trimmed download carries its section in the name - see naming.ts for what
+    sharing one name used to cost.
+  */
+  const base = chosenStem(item)
+  if (base) {
+    const stem = item.outputStem ?? base + sectionSuffix(item.range)
     args.push('-o', join(dir, `${stem}.%(ext)s`))
   } else {
     const template = settings.filenameTemplate || '%(title)s [%(id)s].%(ext)s'
-    args.push('-o', join(dir, template))
+    const suffix = sectionSuffix(item.range) + (item.copySuffix ?? '')
+    args.push('-o', join(dir, withNameSuffix(template, suffix)))
   }
 
   // Progress as machine-readable lines
@@ -426,12 +528,14 @@ export function buildArgs(
   return args
 }
 
+const ALREADY_DOWNLOADED = /\[download\]\s*(.+?) has already been downloaded/
+
 function parseFinalPath(line: string, item: DownloadItem): void {
   const candidates: { re: RegExp; priority: number }[] = [
     { re: /\[Merger\] Merging formats into "(.+?)"/, priority: 6 },
     { re: /\[ExtractAudio\] Destination:\s*(.+?)\s*$/, priority: 6 },
     { re: /\[SponsorBlock\].*?to "(.+?)"/, priority: 5 },
-    { re: /\[download\]\s*(.+?) has already been downloaded/, priority: 4 },
+    { re: ALREADY_DOWNLOADED, priority: 4 },
     { re: /\[Metadata\] .*?to "(.+?)"/, priority: 3 },
     { re: /\[download\] Destination:\s*(.+?)\s*$/, priority: 2 }
   ]
@@ -442,6 +546,7 @@ function parseFinalPath(line: string, item: DownloadItem): void {
       if (!current || priority >= current.priority) {
         finalPaths.set(item.id, { path: m[1].trim(), priority })
       }
+      if (re === ALREADY_DOWNLOADED) alreadyOnDisk.set(item.id, m[1].trim())
     }
   }
 }
@@ -984,8 +1089,9 @@ async function runDownload(item: DownloadItem): Promise<void> {
   try {
     const settings = getSettings()
     const dir = outputDirFor(item, settings)
-    const stem = chosenStem(item)
+    const stem = settleOutputStem(item, dir, settings)
     expectedNames.delete(item.id)
+    alreadyOnDisk.delete(item.id)
     if (stem) expectedNames.set(item.id, { dir, stem })
     const args = buildArgs(item, settings, dir, ffmpegLocation())
     child = spawn(ytdlpBinaryPath(), args, ytdlpSpawnOptions())
@@ -1066,12 +1172,18 @@ async function runDownload(item: DownloadItem): Promise<void> {
     */
     stdout.flush()
     stderr.flush()
+    const existing = alreadyOnDisk.get(item.id)
+    alreadyOnDisk.delete(item.id)
     // If we deliberately stopped it, the state was already set — or has since
     // been changed again by a resume, which is equally not a failure.
     const stoppedOnPurpose = deliberateStops.delete(item.id)
     if (stoppedOnPurpose || item.state === 'paused' || item.state === 'canceled') {
       emitUpdated(item)
       processQueue()
+      return
+    }
+    if (code === 0 && existing && shouldTakeOwnName(item, existing, [...items.values()])) {
+      retryUnderOwnName(item, existing)
       return
     }
     if (code === 0) {
@@ -1095,6 +1207,34 @@ async function runDownload(item: DownloadItem): Promise<void> {
     }
     fail(item, stderrTail || `yt-dlp exited with code ${code}`)
   })
+}
+
+/**
+ * The engine "finished" by pointing at a file another download made. Run again
+ * under the same name with ` (2)` - or the first number nothing in that folder
+ * has - on the end, which the template puts just before the extension.
+ *
+ * Not a failure and not an automatic retry: no attempt is spent, and the
+ * suffix is kept on the item, so a pause or a resume after this goes on
+ * writing the copy rather than finding the other file again.
+ */
+function retryUnderOwnName(item: DownloadItem, existing: string): void {
+  let names: string[] = []
+  try {
+    names = readdirSync(dirname(existing))
+  } catch {
+    /* gone already: any number is free */
+  }
+  item.copySuffix = freeCopySuffix(partialStem(existing), names)
+  appendLog(item, `${basename(existing)} belongs to another download; fetching this as its own copy\n`)
+  item.state = 'queued'
+  item.speed = undefined
+  item.eta = undefined
+  resetProgress(item)
+  finalPaths.delete(item.id)
+  expectedNames.delete(item.id)
+  emitUpdated(item)
+  processQueue()
 }
 
 /** Mark a failure, retrying transient ones automatically with a short backoff. */
@@ -1456,6 +1596,7 @@ export function removeDownload(id: string): void {
   procs.delete(id)
   items.delete(id)
   finalPaths.delete(id)
+  alreadyOnDisk.delete(id)
   scheduleSave()
   downloadEvents.emit('removed', id)
 }
