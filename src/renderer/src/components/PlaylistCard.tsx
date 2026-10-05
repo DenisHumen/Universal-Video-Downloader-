@@ -2,6 +2,8 @@ import { useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { Check, Loader2 } from 'lucide-react'
 import type { DownloadMode, MediaInfo, PlaylistEntry, QualityPreset } from '@shared/types'
 import Choice from './Choice'
+import SaveLocation from './SaveLocation'
+import { placeEntries } from '../lib/playlist'
 import { initialMode, initialQuality } from '../lib/quality'
 import { queueDownloads } from '../lib/queue'
 import { useT } from '../i18n'
@@ -10,6 +12,9 @@ import { useStore } from '../store'
 interface Props {
   info: MediaInfo
   onDone: () => void
+  /** Home's save folder for the job on screen; '' is the one in Settings. */
+  saveDir: string
+  onSaveDirChange: (dir: string) => void
 }
 
 /** Fixed, so a spacer can stand in exactly for the rows that aren't rendered. */
@@ -20,10 +25,19 @@ const VIEWPORT_HEIGHT = 224
 const OVERSCAN = 6
 
 /** A channel or playlist: pick a format once, then choose what to take. */
-export default function PlaylistCard({ info, onDone }: Props): JSX.Element {
+export default function PlaylistCard({ info, onDone, saveDir, onSaveDirChange }: Props): JSX.Element {
   const t = useT()
   const setView = useStore((s) => s.setView)
   const settings = useStore((s) => s.settings)
+  const saveSettings = useStore((s) => s.saveSettings)
+  /*
+    How the files are laid out: numbered, and in a folder of their own. Both on
+    by default - a course or a season that lands in the download root, unsorted
+    and mixed in with everything else, is the thing being fixed - and both
+    remembered, so someone who turns one off does not have to every time.
+  */
+  const numbered = settings?.playlistNumbering ?? true
+  const folder = settings?.playlistFolder ?? true
   const [mode, setMode] = useState<DownloadMode>(initialMode(settings))
   const [quality, setQuality] = useState<QualityPreset>(initialQuality(settings))
   const [busy, setBusy] = useState(false)
@@ -88,12 +102,21 @@ export default function PlaylistCard({ info, onDone }: Props): JSX.Element {
     let ok = false
     try {
       ok = await queueDownloads(
-        list.map((e) => ({
+        placeEntries(info, list, { folder, numbered }).map(({ entry: e, playlist }) => ({
           url: e.url,
           title: e.title,
           thumbnail: e.thumbnail,
           mode,
-          quality: mode === 'audio' ? 'audio' : quality
+          quality: mode === 'audio' ? 'audio' : quality,
+          /*
+            Names the per-site subfolder, as it does for a single video. The
+            entry's, not `info.extractor`: that is the list's, `YoutubeTab`
+            for a channel. Entries from a site resolver have none and get the
+            resolver's when they start.
+          */
+          extractor: e.extractor,
+          outputDir: saveDir || undefined,
+          playlist
         }))
       )
     } finally {
@@ -244,6 +267,27 @@ export default function PlaylistCard({ info, onDone }: Props): JSX.Element {
           </div>
         </div>
 
+        <div className="space-y-1 border-t border-edge pt-4">
+          <LayoutOption
+            on={numbered}
+            onChange={(v) => void saveSettings({ playlistNumbering: v })}
+            label={t('playlist.numbering')}
+            hint={t('playlist.numberingHint')}
+          />
+          <LayoutOption
+            on={folder}
+            onChange={(v) => void saveSettings({ playlistFolder: v })}
+            label={t('playlist.folder')}
+            hint={t('playlist.folderHint', { name: info.title })}
+          />
+        </div>
+
+        <SaveLocation
+          value={saveDir}
+          onChange={onSaveDirChange}
+          defaultDir={settings?.downloadDir ?? ''}
+        />
+
         <div className="flex gap-2">
           {chosen.length > 0 && (
             <button className="btn-solid flex-1 py-3" onClick={() => run(chosen)} disabled={busy}>
@@ -262,5 +306,39 @@ export default function PlaylistCard({ info, onDone }: Props): JSX.Element {
         </div>
       </div>
     </div>
+  )
+}
+
+/** A yes/no about how the files land, drawn like the entries' own check boxes above it. */
+function LayoutOption({
+  on,
+  onChange,
+  label,
+  hint
+}: {
+  on: boolean
+  onChange: (on: boolean) => void
+  label: string
+  hint: string
+}): JSX.Element {
+  return (
+    <button
+      role="checkbox"
+      aria-checked={on}
+      onClick={() => onChange(!on)}
+      className="flex w-full items-start gap-3 rounded-1 px-1 py-1.5 text-left outline-offset-2 transition-colors duration-fast ease-ease hover:bg-sink focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
+    >
+      <span
+        className={`mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-[4px] border transition-colors duration-fast ease-ease ${
+          on ? 'border-accent bg-accent text-accent-fg' : 'border-edge-strong'
+        }`}
+      >
+        {on && <Check size={11} strokeWidth={3} />}
+      </span>
+      <span className="min-w-0">
+        <span className="block text-[13px] text-ink">{label}</span>
+        <span className="hint mt-0.5 block break-words">{hint}</span>
+      </span>
+    </button>
   )
 }

@@ -30,6 +30,8 @@ function settings(overrides: Partial<AppSettings> = {}): AppSettings {
     createSubfolders: false,
     speedLimit: '',
     playlistLimit: 500,
+    playlistNumbering: true,
+    playlistFolder: true,
     autoUpdate: true,
     resumeOnLaunch: true,
     theme: 'night',

@@ -79,6 +79,12 @@ export default function SearchView({ settings, embedded = false }: Props): JSX.E
   const [added, setAdded] = useState<Set<string>>(new Set())
   const [picker, setPicker] = useState<MediaInfo | null>(null)
   const [pickerBusy, setPickerBusy] = useState<string | null>(null)
+  /*
+    The series picker shows a save folder and sends it, as it does on Home.
+    Its own, and started afresh for each series opened: the plain results
+    above queue to the Settings folder, and say nothing to the contrary.
+  */
+  const [pickerDir, setPickerDir] = useState('')
   const inputRef = useRef<HTMLInputElement>(null)
   // Bumped on every new search so stale probe results are discarded.
   const generation = useRef(0)
@@ -234,8 +240,10 @@ export default function SearchView({ settings, embedded = false }: Props): JSX.E
     setPickerBusy(r.url)
     try {
       const res = await window.api.detect(r.pickerUrl)
-      if (res.ok && res.info?.streaming) setPicker(res.info)
-      else toast(errorText(t, { error: res.error, errorCode: res.errorCode }), 'error')
+      if (res.ok && res.info?.streaming) {
+        setPickerDir('')
+        setPicker(res.info)
+      } else toast(errorText(t, { error: res.error, errorCode: res.errorCode }), 'error')
     } catch (err) {
       toast(describeError(err, t('search.failed')), 'error')
     } finally {
@@ -415,6 +423,8 @@ export default function SearchView({ settings, embedded = false }: Props): JSX.E
                   setPicker(null)
                   if (embedded) setView('downloads')
                 }}
+                saveDir={pickerDir}
+                onSaveDirChange={setPickerDir}
               />
             </motion.div>
           </motion.div>

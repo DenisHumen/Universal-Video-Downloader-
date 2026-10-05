@@ -54,6 +54,8 @@ interface RawInfo {
   url?: string
   extractor_key?: string
   extractor?: string
+  /** On a flat-playlist entry: the extractor that will handle it. */
+  ie_key?: string
   is_live?: boolean
   view_count?: number
   formats?: RawFormat[]
@@ -453,7 +455,21 @@ export function playlistEntries(raw: RawInfo[]): PlaylistEntry[] {
   return raw.flatMap((e) => {
     const url = e.webpage_url || e.url
     if (!url || !isAbsoluteUrl(url)) return []
-    return [{ url, title: e.title || 'Untitled', thumbnail: pickThumbnail(e) }]
+    return [
+      {
+        url,
+        title: e.title || 'Untitled',
+        thumbnail: pickThumbnail(e),
+        /*
+          The entry's own extractor, not the list's. A channel or playlist is
+          `YoutubeTab`, its videos are `Youtube` - the name a single video
+          detects with - so the list's would put playlist downloads in a
+          per-site folder of their own, beside the one the same site's videos
+          already go to.
+        */
+        extractor: e.ie_key || e.extractor_key
+      }
+    ]
   })
 }
 

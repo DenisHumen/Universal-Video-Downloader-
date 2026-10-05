@@ -135,6 +135,10 @@ export const ru: Dictionary = {
   'playlist.range': 'номера',
   'playlist.selectRange': 'выбрать диапазон',
   'playlist.added': 'добавлено видео: {count}',
+  'playlist.numbering': 'нумеровать файлы',
+  'playlist.numberingHint': '01 - название, в порядке списка',
+  'playlist.folder': 'сложить в отдельную папку',
+  'playlist.folderHint': '«{name}» внутри папки загрузок',
 
   // ---- streaming picker ----
   'streaming.voiceover': 'озвучка',
@@ -150,6 +154,8 @@ export const ru: Dictionary = {
   'streaming.follow': 'следить за новыми сериями',
   'streaming.watching': 'уже следим - показать',
   'streaming.selectEpisode': 'выберите хотя бы одну серию',
+  'streaming.latest': 'последняя',
+  'streaming.latestHint': 'самая новая серия последнего сезона',
 
   // ---- format selector ----
   'format.exactStream': 'выбрать конкретный поток ({count})',

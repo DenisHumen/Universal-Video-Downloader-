@@ -5,7 +5,6 @@ import {
   ArrowRight,
   ChevronDown,
   ClipboardPaste,
-  Folder,
   Globe,
   Layers,
   Loader2,
@@ -40,6 +39,7 @@ import { toClock } from '../lib/time'
 import { useT, type TranslationKey } from '../i18n'
 import FormatSelector, { type Selection } from '../components/FormatSelector'
 import PlaylistCard from '../components/PlaylistCard'
+import SaveLocation from '../components/SaveLocation'
 import StreamingCard from '../components/StreamingCard'
 import TrimEditor from '../components/TrimEditor'
 import CapabilitiesPanel from '../components/CapabilitiesPanel'
@@ -97,10 +97,15 @@ export default function HomeView(): JSX.Element {
   /** Re-encode for an exact cut, or copy the stream and land on a keyframe. */
   const [precise, setPrecise] = useState(true)
   /*
-    Where this download lands. `DownloadRequest.outputDir` was always honoured
-    by the main process but nothing ever set it, so every file in every project
-    went to the one folder in Settings. Deliberately sticky across downloads:
-    the reason to change it is usually "everything for this job goes here".
+    Where the job on screen lands. `DownloadRequest.outputDir` was always
+    honoured by the main process but nothing ever set it, so every file in
+    every project went to the one folder in Settings.
+
+    One value for every card here - a video, a playlist, a series, a batch -
+    and each of them shows it above its button. It lives as long as this
+    screen does: queueing moves to the Downloads view, which unmounts Home, so
+    the next job starts from the Settings folder again. A folder picked for
+    one job is never applied to another without being on screen.
   */
   const [saveDir, setSaveDir] = useState('')
   const inputRef = useRef<HTMLInputElement>(null)
@@ -266,11 +271,6 @@ export default function HomeView(): JSX.Element {
     void detect(link)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pendingUrl])
-
-  const chooseSaveDir = async (): Promise<void> => {
-    const dir = await window.api.chooseDirectory()
-    if (dir) setSaveDir(dir)
-  }
 
   const paste = async (): Promise<void> => {
     const text = await window.api.readClipboard().catch(() => '')
@@ -458,8 +458,14 @@ export default function HomeView(): JSX.Element {
                 className="field mono resize-none bg-canvas text-[13px]"
                 placeholder={'https://…\nhttps://…'}
               />
+              <SaveLocation
+                value={saveDir}
+                onChange={setSaveDir}
+                defaultDir={settings?.downloadDir ?? ''}
+                className="mt-4"
+              />
               <button
-                className="btn-solid mt-3 w-full py-3"
+                className="btn-solid mt-4 w-full py-3"
                 disabled={!batchLinks.length || starting}
                 onClick={queueBatch}
               >
@@ -566,7 +572,12 @@ export default function HomeView(): JSX.Element {
               animate={{ opacity: 1, y: 0 }}
               transition={enter}
             >
-              <StreamingCard info={info} onDone={() => setInfo(null)} />
+              <StreamingCard
+                info={info}
+                onDone={() => setInfo(null)}
+                saveDir={saveDir}
+                onSaveDirChange={setSaveDir}
+              />
             </motion.div>
           )}
 
@@ -577,7 +588,12 @@ export default function HomeView(): JSX.Element {
               animate={{ opacity: 1, y: 0 }}
               transition={enter}
             >
-              <PlaylistCard info={info} onDone={() => setInfo(null)} />
+              <PlaylistCard
+                info={info}
+                onDone={() => setInfo(null)}
+                saveDir={saveDir}
+                onSaveDirChange={setSaveDir}
+              />
             </motion.div>
           )}
 
@@ -727,27 +743,12 @@ export default function HomeView(): JSX.Element {
                   </div>
                 )}
 
-                <div className="mt-5 flex flex-wrap items-end justify-between gap-3 border-t border-edge pt-4">
-                  <div className="min-w-0 flex-1">
-                    <p className="label mb-1.5">{t('settings.saveLocation')}</p>
-                    <p
-                      className="mono truncate text-[12px] text-ink-2"
-                      title={saveDir || settings.downloadDir}
-                    >
-                      {saveDir || settings.downloadDir}
-                    </p>
-                  </div>
-                  <div className="flex shrink-0 items-center gap-2">
-                    {saveDir && (
-                      <button className="btn-quiet" onClick={() => setSaveDir('')}>
-                        {t('home.saveDefault')}
-                      </button>
-                    )}
-                    <button className="btn-quiet" onClick={chooseSaveDir}>
-                      <Folder size={14} /> {t('common.change')}
-                    </button>
-                  </div>
-                </div>
+                <SaveLocation
+                  value={saveDir}
+                  onChange={setSaveDir}
+                  defaultDir={settings.downloadDir}
+                  className="mt-5 border-t border-edge pt-4"
+                />
 
                 <button
                   className="btn-solid mt-4 w-full py-3.5 text-[14px]"

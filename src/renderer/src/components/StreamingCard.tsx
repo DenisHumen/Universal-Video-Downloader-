@@ -4,7 +4,9 @@ import type { MediaInfo, QualityPreset } from '@shared/types'
 import { watchingAlready, type Watch } from '@shared/automation'
 import { PROVIDER_NAMES, streamUrl } from '@shared/streaming'
 import Choice, { type ChoiceOption } from './Choice'
+import SaveLocation from './SaveLocation'
 import Thumbnail from './Thumbnail'
+import { latestEpisode } from '../lib/playlist'
 import { heightLabel, initialQuality } from '../lib/quality'
 import { toast } from '../lib/toast'
 import { queueDownload, queueDownloads } from '../lib/queue'
@@ -14,12 +16,15 @@ import { useStore } from '../store'
 interface Props {
   info: MediaInfo
   onDone: () => void
+  /** Home's save folder for the job on screen; '' is the one in Settings. */
+  saveDir: string
+  onSaveDirChange: (dir: string) => void
 }
 
 const pad2 = (n: number): string => String(n).padStart(2, '0')
 
 /** Translator → season → episodes → quality, in the order the site imposes. */
-export default function StreamingCard({ info, onDone }: Props): JSX.Element {
+export default function StreamingCard({ info, onDone, saveDir, onSaveDirChange }: Props): JSX.Element {
   const t = useT()
   const setView = useStore((s) => s.setView)
   const requestWatch = useStore((s) => s.requestWatch)
@@ -106,6 +111,19 @@ export default function StreamingCard({ info, onDone }: Props): JSX.Element {
   const buildEpisodeUrl = (seasonNum: number, ep: number): string =>
     streamUrl(s, translatorId, quality, { season: seasonNum, episode: ep })
 
+  /*
+    One click to the newest episode, which is what following a running series
+    mostly comes down to. Nothing is preselected instead: the picker opens on
+    the first season, so a preselected episode would be the wrong one, and a
+    loaded primary button is a one-click download nobody chose.
+  */
+  const latest = latestEpisode(seasonsForT)
+  const selectLatest = (): void => {
+    if (!latest) return
+    setSeason(latest.season)
+    setSelected({ [latest.season]: [latest.episode] })
+  }
+
   const toggleEpisode = (ep: number): void => {
     setSelected((prev) => {
       const arr = prev[season] || []
@@ -115,6 +133,7 @@ export default function StreamingCard({ info, onDone }: Props): JSX.Element {
   }
 
   const queueSeries = async (): Promise<void> => {
+    // The button is disabled with nothing selected; this is the backstop.
     if (!totalSelected) {
       toast(t('streaming.selectEpisode'), 'error')
       return
@@ -130,7 +149,8 @@ export default function StreamingCard({ info, onDone }: Props): JSX.Element {
             thumbnail: s.thumbnail,
             mode: 'video' as const,
             quality,
-            targetHeight: targetHeight(quality)
+            targetHeight: targetHeight(quality),
+            outputDir: saveDir || undefined
           }))
         )
       )
@@ -152,7 +172,8 @@ export default function StreamingCard({ info, onDone }: Props): JSX.Element {
         thumbnail: s.thumbnail,
         mode: 'video',
         quality,
-        targetHeight: targetHeight(quality)
+        targetHeight: targetHeight(quality),
+        outputDir: saveDir || undefined
       })
     } finally {
       setBusy(false)
@@ -230,6 +251,15 @@ export default function StreamingCard({ info, onDone }: Props): JSX.Element {
               <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
                 <p className="label">{t('streaming.episodes')}</p>
                 <div className="flex items-center gap-3">
+                  {latest && (
+                    <button
+                      className="btn-quiet px-3 py-1.5"
+                      onClick={selectLatest}
+                      title={t('streaming.latestHint')}
+                    >
+                      {t('streaming.latest')}
+                    </button>
+                  )}
                   <button
                     className="btn-quiet px-3 py-1.5"
                     onClick={() =>
@@ -280,9 +310,26 @@ export default function StreamingCard({ info, onDone }: Props): JSX.Element {
               />
             </div>
 
-            <button className="btn-solid w-full py-3.5 text-[14px]" onClick={queueSeries} disabled={busy}>
+            <SaveLocation
+              value={saveDir}
+              onChange={onSaveDirChange}
+              defaultDir={settings?.downloadDir ?? ''}
+            />
+
+            {/*
+              Dead until something is chosen, and saying what to do while it
+              is. Live at zero, the loudest control on the card answered its
+              own click with an error toast.
+            */}
+            <button
+              className="btn-solid w-full py-3.5 text-[14px]"
+              onClick={queueSeries}
+              disabled={busy || totalSelected === 0}
+            >
               {busy ? <Loader2 size={16} className="animate-spin" /> : null}
-              {t('playlist.selected', { count: totalSelected })}
+              {totalSelected
+                ? t('playlist.selected', { count: totalSelected })
+                : t('streaming.selectEpisode')}
             </button>
 
             {/*
@@ -309,6 +356,11 @@ export default function StreamingCard({ info, onDone }: Props): JSX.Element {
                 options={qualityOptions}
               />
             </div>
+            <SaveLocation
+              value={saveDir}
+              onChange={onSaveDirChange}
+              defaultDir={settings?.downloadDir ?? ''}
+            />
             <button className="btn-solid w-full py-3.5 text-[14px]" onClick={queueMovie} disabled={busy}>
               {busy ? <Loader2 size={16} className="animate-spin" /> : null}
               {t('common.download')}

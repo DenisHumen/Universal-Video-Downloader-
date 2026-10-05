@@ -137,6 +137,10 @@ export const en = {
   'playlist.range': 'items',
   'playlist.selectRange': 'select range',
   'playlist.added': 'added {count} videos to the queue',
+  'playlist.numbering': 'number the files',
+  'playlist.numberingHint': '01 - title, in the order of the list',
+  'playlist.folder': 'put them in a folder of their own',
+  'playlist.folderHint': '“{name}”, inside the save location',
 
   // ---- streaming picker ----
   /*
@@ -157,6 +161,8 @@ export const en = {
   'streaming.follow': 'follow new episodes',
   'streaming.watching': 'watching already - show it',
   'streaming.selectEpisode': 'select at least one episode',
+  'streaming.latest': 'latest',
+  'streaming.latestHint': 'the newest episode of the last season',
 
   // ---- format selector ----
   'format.exactStream': 'choose exact stream ({count})',

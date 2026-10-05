@@ -39,6 +39,7 @@ import { ffmpegProgressSeconds, isFfmpegNoise, splitOutputLines } from './ffmpeg
 import { lineReader } from './engine-output'
 import { markOf, shouldEmitProgress, type ProgressMark } from './throttle'
 import { recordDownloadFailure } from './report'
+import { normalisePlaylist, numberedName, playlistDir, playlistTagArgs } from './playlist'
 import { resolveUrl } from '../resolvers'
 import { pageUrlFromSniffUrl, SNIFF_SCHEME } from '../resolvers/universal'
 import { DIRECT_SCHEME, parseDirectUrl } from '../resolvers/universal/direct'
@@ -334,13 +335,16 @@ export function siteFolder(item: Pick<DownloadItem, 'extractor' | 'sourceUrl' | 
 
 /** Where this item's file goes, without touching the disk. */
 function plannedDir(item: DownloadItem, settings: AppSettings): string {
-  if (!settings.createSubfolders) return item.outputDir
-  return join(item.outputDir, siteFolder(item) || 'other')
+  const site = settings.createSubfolders
+    ? join(item.outputDir, siteFolder(item) || 'other')
+    : item.outputDir
+  // A playlist's own folder goes inside the site's, not around it: the site is the broader sort.
+  return playlistDir(site, item.playlist)
 }
 
 function outputDirFor(item: DownloadItem, settings: AppSettings): string {
-  if (!settings.createSubfolders) return item.outputDir
   const dir = plannedDir(item, settings)
+  if (dir === item.outputDir) return dir
   try {
     if (!existsSync(dir)) mkdirSync(dir, { recursive: true })
   } catch {
@@ -356,7 +360,8 @@ function outputDirFor(item: DownloadItem, settings: AppSettings): string {
  */
 function chosenStem(item: DownloadItem): string | undefined {
   if (!(item.referer || item.headers) || !item.title) return undefined
-  return safeName(item.title) || 'video'
+  // A playlist entry's number goes on the stem too: the finished file is looked for by it.
+  return numberedName(safeName(item.title) || 'video', item.playlist)
 }
 
 /**
@@ -410,6 +415,27 @@ function settleOutputStem(item: DownloadItem, dir: string, settings: AppSettings
 }
 
 /**
+ * The engine's `-o` for a download, and the stem its file is looked for under
+ * when the app chose the name itself. Pure, so naming is testable without
+ * spawning anything: a playlist entry's number, a trim's section and a
+ * collision's ` (2)` all land here, on the stem as well as the path.
+ */
+export function outputTarget(
+  item: DownloadItem,
+  settings: AppSettings,
+  dir: string
+): { path: string; stem?: string } {
+  const base = chosenStem(item)
+  if (base) {
+    const stem = item.outputStem ?? base + sectionSuffix(item.range)
+    return { path: join(dir, `${stem}.%(ext)s`), stem }
+  }
+  const template = numberedName(settings.filenameTemplate || '%(title)s [%(id)s].%(ext)s', item.playlist)
+  const suffix = sectionSuffix(item.range) + (item.copySuffix ?? '')
+  return { path: join(dir, withNameSuffix(template, suffix)) }
+}
+
+/**
  * The engine's command line for one download. Pure: the caller works out the
  * folder and the ffmpeg location, which touch the disk, so this can be tested.
  */
@@ -460,15 +486,7 @@ export function buildArgs(
     trimmed download carries its section in the name - see naming.ts for what
     sharing one name used to cost.
   */
-  const base = chosenStem(item)
-  if (base) {
-    const stem = item.outputStem ?? base + sectionSuffix(item.range)
-    args.push('-o', join(dir, `${stem}.%(ext)s`))
-  } else {
-    const template = settings.filenameTemplate || '%(title)s [%(id)s].%(ext)s'
-    const suffix = sectionSuffix(item.range) + (item.copySuffix ?? '')
-    args.push('-o', join(dir, withNameSuffix(template, suffix)))
-  }
+  args.push('-o', outputTarget(item, settings, dir).path)
 
   // Progress as machine-readable lines
   args.push(
@@ -520,6 +538,7 @@ export function buildArgs(
   }
 
   if (settings.embedMetadata) args.push('--embed-metadata')
+  args.push(...playlistTagArgs(item.playlist, settings.embedMetadata))
   if (settings.embedThumbnail) args.push('--embed-thumbnail')
   if (settings.embedChapters && item.mode === 'video') args.push('--embed-chapters')
   const subLangs = settings.subtitleLanguages.trim() || 'all'
@@ -1389,6 +1408,7 @@ export async function startDownload(request: DownloadRequest): Promise<DownloadI
     targetHeight: req.targetHeight,
     duration: req.duration,
     extractor: req.extractor,
+    playlist: normalisePlaylist(req.playlist),
     state: 'queued',
     percent: 0,
     attempts: 0,

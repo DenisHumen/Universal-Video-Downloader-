@@ -67,6 +67,8 @@ export interface PlaylistEntry {
   url: string
   title: string
   thumbnail?: string
+  /** The extractor that handles this entry, which is rarely the playlist's own. */
+  extractor?: string
 }
 
 export interface StreamTranslator {
@@ -188,6 +190,28 @@ export interface ConvertTarget {
 /** What a queue entry is doing: fetching a video, or reworking a local file. */
 export type QueueKind = 'download' | 'trim' | 'convert'
 
+/**
+ * Where a download sits in the playlist or channel it was picked from, which
+ * gives it its number, its folder and its track tag. Each entry runs with
+ * `--no-playlist`, so the engine itself knows nothing of the list; see
+ * main's playlist.ts.
+ */
+export interface PlaylistPlace {
+  /** The playlist's own title: names its folder. */
+  title: string
+  /** 1-based position in the whole list as the site lists it, not in the selection. */
+  index: number
+  /** How long the whole list is, which sets the width of the number. */
+  count: number
+  /**
+   * Chosen on the card when the entry was queued, and kept with it rather than
+   * read from Settings at start: a paused entry resumes with `--continue` into
+   * the file it began, which a later change of mind would have renamed.
+   */
+  folder: boolean
+  numbered: boolean
+}
+
 export interface DownloadRequest {
   url: string
   title?: string
@@ -228,6 +252,8 @@ export interface DownloadRequest {
    * say which one it resolved to.
    */
   targetHeight?: number
+  /** Picked from a playlist or channel: its number, its folder, its track tag. */
+  playlist?: PlaylistPlace
 }
 
 /** What ffmpeg found inside a local file. */
@@ -310,6 +336,7 @@ export interface DownloadItem {
   formatId?: string
   /** The height this download resolves to, when it was known at queue time. */
   targetHeight?: number
+  playlist?: PlaylistPlace
   state: DownloadState
   percent: number
   speed?: number
@@ -439,6 +466,10 @@ export interface AppSettings {
    * decides how deep to go.
    */
   playlistLimit: number
+  /** Start each playlist entry's file name with its number: `07 - …`. Set on the playlist card. */
+  playlistNumbering: boolean
+  /** Put a playlist's files in a folder named after it. Set on the playlist card. */
+  playlistFolder: boolean
   autoUpdate: boolean
   /** Pick interrupted downloads back up when the app starts. */
   resumeOnLaunch: boolean

@@ -35,6 +35,8 @@ const settings: AppSettings = {
   createSubfolders: false,
   speedLimit: '',
   playlistLimit: 500,
+  playlistNumbering: true,
+  playlistFolder: true,
   autoUpdate: true,
   resumeOnLaunch: true,
   theme: 'night',
@@ -292,9 +294,10 @@ export function installMockApi(): void {
         thumbnail: req.thumbnail,
         mode: req.mode,
         quality: req.quality,
+        playlist: req.playlist,
         state: 'queued',
         percent: 0,
-        outputDir: settings.downloadDir,
+        outputDir: req.outputDir || settings.downloadDir,
         createdAt: Date.now()
       }
       items.unshift(item)
