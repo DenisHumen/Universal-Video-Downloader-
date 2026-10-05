@@ -34,6 +34,7 @@ import {
   resolveSelection
 } from '../lib/quality'
 import { queueDownload, queueDownloads } from '../lib/queue'
+import { escapeClearsHome, linkIn } from '../lib/shortcuts'
 import { toClock } from '../lib/time'
 import { useT, type TranslationKey } from '../i18n'
 import FormatSelector, { type Selection } from '../components/FormatSelector'
@@ -145,6 +146,12 @@ export default function HomeView(): JSX.Element {
     inputRef.current?.focus({ preventScroll: true })
   }, [])
 
+  /** Stop listening for the detect in flight, and stop the engine working on it. */
+  const dropRequest = (): void => {
+    if (requestRef.current) void window.api.cancelDetect(requestRef.current)
+    requestRef.current = null
+  }
+
   const detect = async (value?: string): Promise<void> => {
     const target = (value ?? url).trim()
     if (!target) return
@@ -153,6 +160,8 @@ export default function HomeView(): JSX.Element {
       requestSearch(target)
       return
     }
+    // A new link supersedes one still detecting; the engine can stop on that.
+    dropRequest()
     const requestId = `${Date.now()}-${Math.random().toString(36).slice(2)}`
     requestRef.current = requestId
     setStatus('detecting')
@@ -192,12 +201,17 @@ export default function HomeView(): JSX.Element {
   }
 
   const cancelDetect = (): void => {
-    if (requestRef.current) void window.api.cancelDetect(requestRef.current)
-    requestRef.current = null
+    dropRequest()
     setStatus('idle')
   }
 
+  /*
+    Clearing the screen used to leave the detect running underneath it: Esc a
+    moment after pasting emptied the field, then the result card arrived under
+    the empty field a second later, and yt-dlp worked on to the end regardless.
+  */
   const reset = (): void => {
+    dropRequest()
     setInfo(null)
     setError('')
     setErrorCode(undefined)
@@ -206,52 +220,38 @@ export default function HomeView(): JSX.Element {
     setUrl('')
   }
 
-  // Paste a link anywhere to auto-detect; Esc clears; drop a link onto the window.
+  /*
+    Esc clears. Paste and drop live in usePasteDetect, which works on every
+    screen and hands the link over through `pendingUrl` below — listening here
+    as well would detect every pasted link twice.
+  */
   useEffect(() => {
-    const onPaste = (e: ClipboardEvent): void => {
-      const target = e.target as HTMLElement | null
-      if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA')) return
-      const text = e.clipboardData?.getData('text')?.trim()
-      if (text && isProbablyUrl(text)) {
-        setUrl(text)
-        void detect(text)
-      }
-    }
     const onKey = (e: KeyboardEvent): void => {
-      if (e.key === 'Escape') reset()
+      if (escapeClearsHome(e, useStore.getState().shortcutsOpen)) reset()
     }
-    const onDrop = (e: DragEvent): void => {
-      e.preventDefault()
-      const text = e.dataTransfer?.getData('text')?.trim()
-      if (text && isProbablyUrl(text)) {
-        setUrl(text)
-        void detect(text)
-      }
-    }
-    const prevent = (e: DragEvent): void => e.preventDefault()
-    window.addEventListener('paste', onPaste)
     window.addEventListener('keydown', onKey)
-    window.addEventListener('drop', onDrop)
-    window.addEventListener('dragover', prevent)
-    return () => {
-      window.removeEventListener('paste', onPaste)
-      window.removeEventListener('keydown', onKey)
-      window.removeEventListener('drop', onDrop)
-      window.removeEventListener('dragover', prevent)
-    }
+    return () => window.removeEventListener('keydown', onKey)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
+  // Leaving Home — ⌘/Ctrl+2…5 mid-detect — leaves no engine request behind.
+  useEffect(() => () => dropRequest(), [])
+
   /*
-    A link handed to this screen from elsewhere — the clipboard strip, a link
-    the OS opened the app with, a second instance. It arrives as state rather
-    than an event precisely because the event was dispatched before this
-    component existed to hear it.
+    A link handed to this screen from elsewhere — a paste or a drop on any
+    screen, the clipboard strip, a link the OS opened the app with, a second
+    instance. It arrives as state rather than an event precisely because the
+    event was dispatched before this component existed to hear it.
+
+    When the store comes back empty, the link from this render still stands.
+    StrictMode replays mount effects in development, cleanups first: the one
+    above drops the detect this started, and a rerun that asked the store
+    again would find it emptied — leaving the screen in its skeleton, waiting
+    on a request nobody listens for.
   */
   useEffect(() => {
     if (!pendingUrl) return
-    const link = takePendingUrl()
-    if (!link) return
+    const link = takePendingUrl() ?? pendingUrl
     setUrl(link)
     void detect(link)
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -370,6 +370,19 @@ export default function HomeView(): JSX.Element {
             value={url}
             onChange={(e) => setUrl(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && detect()}
+            /*
+              Fields take dropped text at the caret, and usePasteDetect leaves
+              them to it — which here would splice a second link into the
+              first. A link dropped on this field replaces it and is detected,
+              as it is anywhere else in the window.
+            */
+            onDrop={(e) => {
+              const link = linkIn(e.dataTransfer.getData('text'))
+              if (!link) return
+              e.preventDefault()
+              setUrl(link)
+              void detect(link)
+            }}
             placeholder={t('home.placeholder')}
             aria-label={t('home.placeholder')}
             className="no-drag min-w-0 flex-1 bg-transparent px-2.5 py-2 text-[16px] text-ink outline-none placeholder:text-ink-3"

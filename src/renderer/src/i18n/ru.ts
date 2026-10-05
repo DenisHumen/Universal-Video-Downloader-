@@ -299,6 +299,7 @@ export const ru: Dictionary = {
   'shortcuts.paste': 'вставить ссылку и определить',
   'shortcuts.help': 'этот список',
   'shortcuts.escape': 'очистить / закрыть',
+  'shortcuts.or': 'или',
 
   // ---- capabilities panel ----
   'cap.title': 'что умеет приложение',

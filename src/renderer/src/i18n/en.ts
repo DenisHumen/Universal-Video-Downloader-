@@ -306,6 +306,7 @@ export const en = {
   'shortcuts.paste': 'paste a link and detect',
   'shortcuts.help': 'this list',
   'shortcuts.escape': 'clear / close',
+  'shortcuts.or': 'or',
 
   // ---- capabilities panel ----
   'cap.title': 'what this does',
