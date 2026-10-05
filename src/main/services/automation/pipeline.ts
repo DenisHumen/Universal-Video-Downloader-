@@ -1,10 +1,12 @@
 import { randomUUID } from 'crypto'
 import { existsSync, renameSync, rmSync, statSync } from 'fs'
 import { dirname, extname, join } from 'path'
-import { downloadEvents, startDownload } from '../downloader'
+import { downloadEvents, getDownload, resumeDownload, startDownload } from '../downloader'
+import { shouldResume } from '../resume'
 import { getSettings } from '../settings'
 import { getSecret, SECRET } from '../secrets'
 import { log } from '../log'
+import { awaitDownload, type QueueView } from './await-download'
 import { downloadUrlFor } from './detect'
 import { addRun, updateRun, updateWatch } from './store'
 import { uploadFile } from './smb'
@@ -20,7 +22,6 @@ import {
   type TemplateValues,
   type Watch
 } from '@shared/automation'
-import type { DownloadItem } from '@shared/types'
 
 /**
  * Taking one episode through a watch's chain of steps.
@@ -35,36 +36,10 @@ import type { DownloadItem } from '@shared/types'
 /** Steps that always run first, in this order, whatever the user added after. */
 const HEAD: PipelineStep['kind'][] = ['download']
 
-const terminal = (state: string): boolean =>
-  state === 'completed' || state === 'error' || state === 'canceled'
+const QUEUE: QueueView = { events: downloadEvents, get: getDownload }
 
-/**
- * Wait for a queue item to finish.
- *
- * Subscribing before checking, because a very short download can be over
- * before the first event arrives — and a watcher that hangs for ever on a
- * finished download is worse than one that fails.
- */
-function awaitDownload(id: string): Promise<DownloadItem> {
-  return new Promise((resolve, reject) => {
-    const onUpdate = (item: DownloadItem): void => {
-      if (item.id !== id || !terminal(item.state)) return
-      downloadEvents.off('updated', onUpdate)
-      downloadEvents.off('removed', onRemoved)
-      if (item.state === 'completed') resolve(item)
-      else if (item.state === 'canceled') reject(new Error('The download was cancelled.'))
-      else reject(new Error(item.error || 'The download failed.'))
-    }
-    const onRemoved = (removedId: string): void => {
-      if (removedId !== id) return
-      downloadEvents.off('updated', onUpdate)
-      downloadEvents.off('removed', onRemoved)
-      reject(new Error('The download was removed from the queue.'))
-    }
-    downloadEvents.on('updated', onUpdate)
-    downloadEvents.on('removed', onRemoved)
-  })
-}
+/** On the download step while its queue item is paused. The screen says the same in its own words. */
+const PAUSED_NOTE = 'Paused in the queue; resume it there to continue.'
 
 function markStep(run: Run, kind: PipelineStep['kind'], patch: Partial<RunStep>): void {
   const step = run.steps.find((s) => s.kind === kind)
@@ -142,7 +117,28 @@ export async function runEpisode(watch: Watch, ref: EpisodeRef, seriesTitle: str
       quality: watch.quality as never
     })
     updateRun(run.id, { downloadId: item.id })
-    const finished = await awaitDownload(item.id)
+
+    /*
+      The duplicate check can hand back a paused item for this very episode:
+      one the last shutdown cut short with resuming on launch turned off, or
+      one somebody paused. The first was the app's doing and is picked back up
+      here. The second is the user's decision and stays theirs, so the run
+      waits for it - saying where, rather than reading "running" for ever as
+      it used to, with the watch never checked again.
+    */
+    if (shouldResume(item)) {
+      log.info('watcher', 'Resuming the download a shutdown interrupted', { id: shortId })
+      resumeDownload(item.id)
+    }
+    const finished = await awaitDownload(item.id, QUEUE, {
+      onPause: () => {
+        markStep(run, 'download', { message: PAUSED_NOTE })
+        log.info('watcher', `Waiting: ${seriesTitle} ${episodeKey(ref)} is paused in the queue`, {
+          id: shortId
+        })
+      },
+      onResume: () => markStep(run, 'download', { message: undefined })
+    })
     filepath = finished.filepath
     if (!filepath || !existsSync(filepath)) {
       throw new Error('The download finished but the file is not where it should be.')

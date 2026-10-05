@@ -158,6 +158,22 @@ export interface Run {
   finishedAt?: number
 }
 
+/**
+ * What one look at a series' page turned up, for the "check now" button.
+ *
+ * Answered as soon as the page has been read, not once every episode it found
+ * has been downloaded and sent on: the button used to spin for as long as the
+ * whole backlog took, and then said only "checked" - including when it had
+ * checked nothing at all because the watch was already busy.
+ */
+export type CheckSummary =
+  /** Already being checked, or still working through what the last check found. */
+  | { busy: true }
+  | { error: string }
+  | { notOut: true; releaseAt?: number }
+  /** `queued` is what went to the queue: nothing while paused, at most a check's worth otherwise. */
+  | { fresh: number; queued: number; paused: boolean }
+
 // ---------------------------------------------------------------------------
 // Templates
 // ---------------------------------------------------------------------------

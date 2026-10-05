@@ -453,7 +453,13 @@ export function installMockApi(): void {
       const i = mockWatches.findIndex((x) => x.id === id)
       if (i >= 0) mockWatches.splice(i, 1)
     },
-    autoCheckNow: async () => undefined,
+    // The commonest answer, or the waiting one for a title that is not out.
+    autoCheckNow: async (id) => {
+      const w = mockWatches.find((x) => x.id === id)
+      return w?.pending
+        ? { notOut: true, releaseAt: w.releaseAt }
+        : { fresh: 0, queued: 0, paused: !w?.enabled }
+    },
     autoTestSmb: async () => 'Connected.',
     autoTestTelegram: async () => 'Connected.',
     autoSetSecret: async () => undefined,

@@ -17,8 +17,9 @@ import {
 } from 'lucide-react'
 import { enter } from '../lib/motion'
 import { useStore } from '../store'
-import { resolveLanguage, useT, type TranslateFn } from '../i18n'
+import { resolveLanguage, useT, type TranslateFn, type TranslationKey } from '../i18n'
 import { toast } from '../lib/toast'
+import { describeCheck } from '../lib/checkSummary'
 import Thumbnail from '../components/Thumbnail'
 import EmptyState from '../components/EmptyState'
 import { span, type SpanUnit } from '../lib/span'
@@ -36,6 +37,7 @@ import {
   type StepKind,
   type Watch
 } from '@shared/automation'
+import type { DownloadItem } from '@shared/types'
 
 /**
  * Watching series, and what happens when one produces an episode.
@@ -104,6 +106,51 @@ function ago(at: number, t: TranslateFn): string {
 */
 const CLOCK_MS = 30_000
 
+/*
+  How far the queue item a running episode drives has got. Literals for the
+  dictionary check; the finished states are absent because by then the run
+  has moved past its download step.
+*/
+const QUEUE_LABEL: Partial<Record<DownloadItem['state'], TranslationKey>> = {
+  queued: 'state.queued',
+  detecting: 'state.detecting',
+  downloading: 'state.downloading',
+  processing: 'state.processing'
+}
+
+/**
+ * The queue row behind a running episode, and the way to it.
+ *
+ * A run whose download was paused - by hand, or by "pause all" - used to read
+ * "running" here for as long as anybody cared to look, with nothing to say the
+ * reason was a paused row on another screen. Its own component so a download's
+ * progress redraws this line rather than the whole screen.
+ */
+function QueueLink({ id }: { id: string }): JSX.Element | null {
+  const t = useT()
+  const item = useStore((s) => s.downloads.find((d) => d.id === id))
+  const setView = useStore((s) => s.setView)
+  if (!item) return null
+  const paused = item.state === 'paused'
+  const label = QUEUE_LABEL[item.state]
+  const percent = item.state === 'downloading' ? ` · ${Math.round(item.percent || 0)}%` : ''
+  const text = paused ? t('auto.runQueuePaused') : label ? `${t(label)}${percent}` : ''
+  // Finished: the run is past its download step, or about to say why not.
+  if (!text) return null
+  return (
+    <div className="mt-1.5 flex items-center gap-2">
+      <span
+        className={`mono min-w-0 flex-1 truncate text-[11px] ${paused ? 'text-warn' : 'text-ink-2'}`}
+      >
+        {text}
+      </span>
+      <button className="btn-quiet px-3 py-1 text-[12px]" onClick={() => setView('downloads')}>
+        {t('auto.showInQueue')}
+      </button>
+    </div>
+  )
+}
+
 export default function AutomationView(): JSX.Element {
   const t = useT()
   const [watches, setWatches] = useState<Watch[]>([])
@@ -113,7 +160,12 @@ export default function AutomationView(): JSX.Element {
   const [adding, setAdding] = useState<boolean | WatchIntent>(false)
   const [editing, setEditing] = useState<PipelineStep | StepKind | null>(null)
   const [confirmRemove, setConfirmRemove] = useState(false)
-  const [checking, setChecking] = useState(false)
+  /*
+    Per watch, not one flag for the screen: with a single boolean, picking
+    another series while one was being checked showed its button spinning and
+    disabled too.
+  */
+  const [checking, setChecking] = useState<ReadonlySet<string>>(new Set())
   const settings = useStore((s) => s.settings)
   const takePendingWatch = useStore((s) => s.takePendingWatch)
   const locale = useStore((s) =>
@@ -170,15 +222,21 @@ export default function AutomationView(): JSX.Element {
 
   const checkNow = async (): Promise<void> => {
     if (!selected) return
-    setChecking(true)
+    const id = selected.id
+    setChecking((current) => new Set(current).add(id))
     try {
-      await window.api.autoCheckNow(selected.id)
+      const summary = await window.api.autoCheckNow(id)
       await refresh()
-      const after = await window.api.autoList()
-      const w = after.find((x) => x.id === selected.id)
-      toast(w?.lastError ? w.lastError : t('auto.checked'), w?.lastError ? 'error' : 'success')
+      const { text, kind } = describeCheck(summary, t, (at) => releaseDate(at, locale))
+      toast(text, kind)
+    } catch (err) {
+      toast(err instanceof Error ? err.message : String(err), 'error')
     } finally {
-      setChecking(false)
+      setChecking((current) => {
+        const next = new Set(current)
+        next.delete(id)
+        return next
+      })
     }
   }
 
@@ -347,8 +405,12 @@ export default function AutomationView(): JSX.Element {
               <button className="btn" onClick={() => void patch({ enabled: !selected.enabled })}>
                 {selected.enabled ? t('auto.pause') : t('auto.resume')}
               </button>
-              <button className="btn" onClick={() => void checkNow()} disabled={checking}>
-                {checking ? (
+              <button
+                className="btn"
+                onClick={() => void checkNow()}
+                disabled={checking.has(selected.id)}
+              >
+                {checking.has(selected.id) ? (
                   <Loader2 size={14} className="animate-spin" />
                 ) : (
                   <RefreshCw size={14} />
@@ -467,6 +529,9 @@ export default function AutomationView(): JSX.Element {
                         </span>
                       ))}
                     </div>
+                    {run.state === 'running' && run.downloadId && (
+                      <QueueLink id={run.downloadId} />
+                    )}
                   </li>
                 ))}
               </ul>

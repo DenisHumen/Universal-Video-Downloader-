@@ -1,4 +1,4 @@
-import type { Run, SmbTarget, Watch } from '@shared/automation'
+import type { CheckSummary, Run, SmbTarget, Watch } from '@shared/automation'
 import type { SeriesOffer } from '../main/automation-ipc'
 import { contextBridge, ipcRenderer } from 'electron'
 import { IPC } from '@shared/ipc'
@@ -119,7 +119,7 @@ const api = {
   autoUpdate: (id: string, patch: Partial<Watch>): Promise<Watch | undefined> =>
     ipcRenderer.invoke(IPC.autoUpdate, id, patch),
   autoRemove: (id: string): Promise<void> => ipcRenderer.invoke(IPC.autoRemove, id),
-  autoCheckNow: (id: string): Promise<void> => ipcRenderer.invoke(IPC.autoCheckNow, id),
+  autoCheckNow: (id: string): Promise<CheckSummary> => ipcRenderer.invoke(IPC.autoCheckNow, id),
   autoTestSmb: (target: SmbTarget, password: string): Promise<string> =>
     ipcRenderer.invoke(IPC.autoTestSmb, target, password),
   autoTestTelegram: (token: string, chatId: string): Promise<string> =>

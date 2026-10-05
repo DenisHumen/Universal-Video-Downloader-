@@ -175,6 +175,12 @@ export function listDownloads(): DownloadItem[] {
     .map(publicItem)
 }
 
+/** One queue item as it stands now, for something waiting on it that may have missed its events. */
+export function getDownload(id: string): DownloadItem | undefined {
+  const item = items.get(id)
+  return item ? publicItem(item) : undefined
+}
+
 function emitUpdated(item: DownloadItem): void {
   /*
     Nothing to say about an item that is gone.

@@ -17,7 +17,13 @@ import { getSecret, hasSecret, SECRET, secretsPersist, setSecret } from './servi
 import { logFilePath } from './services/log'
 import { getSettings } from './services/settings'
 import { coalesce } from './services/coalesce'
-import { settleRunError, type Run, type SmbTarget, type Watch } from '@shared/automation'
+import {
+  settleRunError,
+  type CheckSummary,
+  type Run,
+  type SmbTarget,
+  type Watch
+} from '@shared/automation'
 
 /**
  * The automation's side of the bridge.
@@ -98,9 +104,14 @@ export function registerAutomationIpc(): void {
     broadcast()
   })
 
-  ipcMain.handle(IPC.autoCheckNow, async (_e, id: string): Promise<void> => {
-    await checkNow(id)
+  /*
+    Answers once the page has been read. Episodes it found carry on through the
+    chain afterwards, and reach the screen through the store's own broadcasts.
+  */
+  ipcMain.handle(IPC.autoCheckNow, async (_e, id: string): Promise<CheckSummary> => {
+    const summary = await checkNow(id)
     broadcast()
+    return summary
   })
 
   /*
