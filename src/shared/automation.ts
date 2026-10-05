@@ -119,6 +119,17 @@ export interface Watch {
   pending?: boolean
   /** When the site expects the release, in milliseconds. Absent when it does not say. */
   releaseAt?: number
+  /**
+   * Why the last episode failed somewhere along the chain, and when.
+   *
+   * Separate from `lastError`, which only a check writes and the next good check
+   * clears. An episode that failed is marked handled and never retried, so
+   * nothing on a schedule would ever clear this: the next episode that gets all
+   * the way through does, and so does the user, by editing the steps, pausing or
+   * resuming, or dismissing it.
+   */
+  lastRunError?: string
+  lastRunFailedAt?: number
 }
 
 export interface RunStep {
@@ -522,4 +533,39 @@ export function upcomingDelayMinutes(
 /** Whole days until a release, rounded up - "in 3 d" until the last day begins. */
 export function daysUntil(releaseAt: number, now: number): number {
   return Math.max(0, Math.ceil((releaseAt - now) / 86_400_000))
+}
+
+// ---------------------------------------------------------------------------
+// Something is wrong
+// ---------------------------------------------------------------------------
+
+/**
+ * What is wrong with a watch, if anything.
+ *
+ * A check that failed comes first, because until the page can be read again no
+ * episode is going anywhere. Then an episode that failed on its way through the
+ * chain - which used to be visible only in that watch's history, so a watch
+ * whose every upload was being refused after a password change read as healthy
+ * in the list and drew no mark on the tab.
+ */
+export function watchTrouble(watch: Watch): string | undefined {
+  return watch.lastError || watch.lastRunError || undefined
+}
+
+/** Whether a watch counts towards the mark on the tab. A paused one is not anyone's emergency. */
+export function watchFailing(watch: Watch): boolean {
+  return watch.enabled && Boolean(watchTrouble(watch))
+}
+
+/**
+ * A change from the screen, with the episode failure it settles cleared.
+ *
+ * Editing the steps is how somebody fixes a chain, and pausing or resuming is
+ * how they say they have seen it; either way the old failure is no longer news.
+ * A patch that names `lastRunError` at all is the dismiss button, and can only
+ * ever clear it - the screen has no business writing a failure of its own.
+ */
+export function settleRunError(patch: Partial<Watch>): Partial<Watch> {
+  if (!('steps' in patch || 'enabled' in patch || 'lastRunError' in patch)) return patch
+  return { ...patch, lastRunError: undefined, lastRunFailedAt: undefined }
 }

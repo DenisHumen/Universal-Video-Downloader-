@@ -1,8 +1,9 @@
 import { powerMonitor } from 'electron'
 import { log } from '../log'
 import { checkWatch } from './detect'
-import { markHandled, runEpisode } from './pipeline'
+import { alertChannel, markHandled, runEpisode } from './pipeline'
 import { getWatch, listWatches, updateWatch } from './store'
+import { composeCheckFailure, sendNotification } from './telegram'
 import { upcomingDelayMinutes, type Watch } from '@shared/automation'
 
 /**
@@ -36,6 +37,17 @@ const BACKOFF = [1, 2, 4, 8, 12]
  * is not a small number — but it is a number.
  */
 const MAX_PER_CHECK = 25
+
+/**
+ * Failed checks in a row before anybody is told.
+ *
+ * One is a site having a bad minute and two can be a short outage; three, with
+ * the backoff in between, is hours of a page that cannot be read. Compared for
+ * equality, not "at least": the count only climbs during a streak and a good
+ * check resets it, so this is one message per streak rather than one per
+ * backoff step for as long as the site stays broken.
+ */
+const REPORT_AFTER_FAILURES = 3
 
 let timer: NodeJS.Timeout | null = null
 let running = 0
@@ -128,6 +140,25 @@ async function checkOne(watch: Watch): Promise<void> {
       series: watch.title,
       attempt: failures
     })
+
+    /*
+      A page that has stopped parsing used to fail silently for weeks: the only
+      symptom of a check that finds nothing is the absence of news. After the
+      bookkeeping, and with its own catch, so a Telegram that is down cannot
+      undo the backoff. Re-read first, because a watch deleted or paused while
+      it was being checked is nobody's news.
+    */
+    const current = getWatch(watch.id)
+    if (failures === REPORT_AFTER_FAILURES && current?.enabled) {
+      const channel = alertChannel(current)
+      if (channel) {
+        await sendNotification(
+          channel.token,
+          channel.chatId,
+          composeCheckFailure(current.title, failures, why)
+        ).catch(() => undefined)
+      }
+    }
   } finally {
     running--
     inFlight.delete(watch.id)

@@ -73,6 +73,22 @@ function markStep(run: Run, kind: PipelineStep['kind'], patch: Partial<RunStep>)
 }
 
 /**
+ * Where bad news about this watch goes, or nowhere.
+ *
+ * The same three conditions for an episode that failed and for a page that has
+ * stopped answering: a bot token, a chat, and a watch that asked to be told.
+ * A watch without a notify step has said it does not want messages, and a
+ * failure is not a reason to start sending them.
+ */
+export function alertChannel(watch: Watch): { token: string; chatId: string } | undefined {
+  const token = getSecret(SECRET.telegramToken())
+  const chatId = getSettings().telegramChatId
+  if (!token || !chatId) return undefined
+  if (!watch.steps.some((s) => s.kind === 'notify' && s.enabled)) return undefined
+  return { token, chatId }
+}
+
+/**
  * Run one episode through one watch's steps.
  *
  * A step that fails stops this episode and nothing else: other watches, and the
@@ -224,12 +240,21 @@ export async function runEpisode(watch: Watch, ref: EpisodeRef, seriesTitle: str
       finishedAt: Date.now(),
       steps: run.steps
     })
+    // An episode that went all the way through is proof the chain works again.
+    updateWatch(watch.id, { lastRunError: undefined, lastRunFailedAt: undefined })
     log.info('watcher', `Finished ${seriesTitle} ${episodeKey(ref)}`, { id: shortId })
   } catch (err) {
     const why = err instanceof Error ? err.message : String(err)
     const failing = run.steps.find((s) => s.state === 'running')
     if (failing) Object.assign(failing, { state: 'failed', message: why, finishedAt: Date.now() })
     updateRun(run.id, { state: 'failed', filepath, finishedAt: Date.now(), steps: run.steps })
+    /*
+      On the watch as well as the run. The list, its dot and the mark on the
+      tab read the watch, and a run is only seen by somebody who opens that
+      watch's history - so every episode could be failing to upload while the
+      series read as healthy everywhere a person would glance.
+    */
+    updateWatch(watch.id, { lastRunError: why, lastRunFailedAt: Date.now() })
     log.error('watcher', `Failed on ${seriesTitle} ${episodeKey(ref)}: ${why}`, { id: shortId })
 
     /*
@@ -237,11 +262,11 @@ export async function runEpisode(watch: Watch, ref: EpisodeRef, seriesTitle: str
       feature: the window is closed, and the alternative is discovering weeks
       later that nothing has been downloaded since a password changed.
     */
-    const token = getSecret(SECRET.telegramToken())
-    if (token && settings.telegramChatId && watch.steps.some((s) => s.kind === 'notify' && s.enabled)) {
+    const channel = alertChannel(watch)
+    if (channel) {
       await sendNotification(
-        token,
-        settings.telegramChatId,
+        channel.token,
+        channel.chatId,
         composeFailure(seriesTitle, ref.season, ref.episode, why)
       ).catch(() => undefined)
     }

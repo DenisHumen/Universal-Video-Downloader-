@@ -1,4 +1,5 @@
 import { app } from 'electron'
+import { EventEmitter } from 'events'
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { log } from '../log'
@@ -20,6 +21,21 @@ import { MAX_RUNS, migrateWatches, type Run, type StoredWatches, type Watch } fr
  */
 
 const FILE = (): string => join(app.getPath('userData'), 'watches.json')
+
+/**
+ * Says `changed` after every write that actually changed something.
+ *
+ * Most writes come from the schedule, not from a button: a check recording its
+ * outcome, a run moving from one step to the next. The screen used to hear only
+ * about the button presses, so a check that failed at four in the morning drew
+ * no mark on the tab, and a run stayed "running" on screen long after it had
+ * finished, until somebody happened to click something.
+ */
+export const watchEvents = new EventEmitter()
+
+const changed = (): void => {
+  watchEvents.emit('changed')
+}
 
 let state: StoredWatches | null = null
 
@@ -88,6 +104,7 @@ export function getWatch(id: string): Watch | undefined {
 export function addWatch(watch: Watch): Watch {
   read().watches.push(watch)
   persist()
+  changed()
   return watch
 }
 
@@ -99,14 +116,17 @@ export function updateWatch(id: string, patch: Partial<Watch>): Watch | undefine
   const next = { ...store.watches[index], ...patch, id }
   store.watches[index] = next
   persist()
+  changed()
   return next
 }
 
 export function removeWatch(id: string): void {
   const store = read()
+  const before = store.watches.length
   store.watches = store.watches.filter((w) => w.id !== id)
   delete store.runs[id]
   persist()
+  if (store.watches.length !== before) changed()
 }
 
 export function listRuns(watchId: string): Run[] {
@@ -120,6 +140,7 @@ export function addRun(run: Run): Run {
   // Oldest first in storage, so trimming from the front drops the oldest.
   store.runs[run.watchId] = list.slice(-MAX_RUNS)
   persist()
+  changed()
   return run
 }
 
@@ -131,6 +152,7 @@ export function updateRun(runId: string, patch: Partial<Run>): Run | undefined {
     const next = { ...list[index], ...patch, id: runId }
     list[index] = next
     persist()
+    changed()
     return next
   }
   return undefined

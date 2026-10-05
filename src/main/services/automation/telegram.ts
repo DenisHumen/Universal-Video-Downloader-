@@ -240,3 +240,20 @@ export function composeFailure(series: string, season: number, episode: number, 
     esc(why)
   ].join('\n')
 }
+
+/**
+ * What a page that has stopped answering looks like.
+ *
+ * No episode to name, because no episode was found - which is the trouble: a
+ * site that changed its layout fails every check quietly, and the only symptom
+ * is the absence of news. Says that it keeps trying, so nobody rushes to fix
+ * what a site's own bad afternoon will fix by itself.
+ */
+export function composeCheckFailure(series: string, failures: number, why: string): string {
+  return [
+    `⚠️ <b>${esc(series)}</b>`,
+    `The last ${failures} checks failed. It keeps trying, less often, until one works.`,
+    '',
+    esc(why)
+  ].join('\n')
+}

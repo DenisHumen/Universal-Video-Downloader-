@@ -30,6 +30,7 @@ import StepEditor from '../components/StepEditor'
 import { RUN_LABEL, STEP_LABEL } from '../lib/automationLabels'
 import {
   upcomingDelayMinutes,
+  watchFailing,
   type PipelineStep,
   type Run,
   type StepKind,
@@ -84,6 +85,25 @@ function relative(at: number | undefined, t: TranslateFn): string {
   return delta > 0 ? `${t('auto.in')} ${text}` : `${text} ${t('auto.ago')}`
 }
 
+/**
+ * How long ago something happened.
+ *
+ * Not `relative`, whose first minute reads "any moment" - right for a check
+ * that is due, wrong for a run that has just started or an episode that has
+ * just failed, both of which now turn up on screen the moment they happen.
+ */
+function ago(at: number, t: TranslateFn): string {
+  const mins = Math.round((Date.now() - at) / 60_000)
+  return mins < 1 ? t('auto.justNow') : `${spanText(mins, t)} ${t('auto.ago')}`
+}
+
+/*
+  How often the screen redraws on its own. Every time it shows is relative to
+  now, and with nothing to redraw it, "in 5 min" sat there for an hour while
+  the view stayed open. Half a minute keeps a minute-grained clock honest.
+*/
+const CLOCK_MS = 30_000
+
 export default function AutomationView(): JSX.Element {
   const t = useT()
   const [watches, setWatches] = useState<Watch[]>([])
@@ -115,12 +135,20 @@ export default function AutomationView(): JSX.Element {
     const list = await window.api.autoList()
     setWatches(list)
     setSelectedId((current) => current ?? list[0]?.id ?? null)
+    // The mark on the tab reads the same list; keep the two from disagreeing.
+    void useStore.getState().refreshWatchAlerts()
   }, [])
 
   useEffect(() => {
     void refresh()
     return window.api.onAutomationChanged(() => void refresh())
   }, [refresh])
+
+  const [, setClock] = useState(0)
+  useEffect(() => {
+    const timer = setInterval(() => setClock((n) => n + 1), CLOCK_MS)
+    return () => clearInterval(timer)
+  }, [])
 
   useEffect(() => {
     if (!selectedId) {
@@ -206,14 +234,16 @@ export default function AutomationView(): JSX.Element {
                     {w.enabled
                       ? w.lastError
                         ? t('auto.failing')
-                        : w.pending
-                          ? releaseText(w.releaseAt, t)
-                          : relative(w.nextCheckAt, t)
+                        : w.lastRunError
+                          ? t('auto.runFailing')
+                          : w.pending
+                            ? releaseText(w.releaseAt, t)
+                            : relative(w.nextCheckAt, t)
                       : t('auto.paused')}
                   </span>
                 </span>
                 {!w.enabled && <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-ink-3" />}
-                {w.enabled && w.lastError && (
+                {watchFailing(w) && (
                   <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-bad" />
                 )}
               </button>
@@ -284,6 +314,31 @@ export default function AutomationView(): JSX.Element {
                 </p>
                 {selected.lastError && (
                   <p className="hint mt-1 text-bad">{selected.lastError}</p>
+                )}
+                {/*
+                  Nothing on a schedule clears this - a failed episode is not
+                  retried - so it can be put away by hand once it has been seen.
+                */}
+                {selected.lastRunError && (
+                  <div className="mt-1 flex items-start gap-1">
+                    <p className="hint min-w-0 flex-1 text-bad">
+                      {selected.lastRunFailedAt
+                        ? t('auto.runFailedAt', { when: ago(selected.lastRunFailedAt, t) })
+                        : t('auto.runFailing')}
+                      {': '}
+                      {selected.lastRunError}
+                    </p>
+                    <button
+                      className="btn-icon-bare -my-1 h-7 w-7"
+                      aria-label={t('auto.dismissRunError')}
+                      title={t('auto.dismissRunError')}
+                      onClick={() =>
+                        void patch({ lastRunError: undefined, lastRunFailedAt: undefined })
+                      }
+                    >
+                      <X size={13} />
+                    </button>
+                  </div>
                 )}
               </div>
             </header>
@@ -391,7 +446,7 @@ export default function AutomationView(): JSX.Element {
                         {t(RUN_LABEL[run.state])}
                       </span>
                       <span className="mono ml-auto text-[11px] text-ink-3">
-                        {relative(run.startedAt, t)}
+                        {ago(run.startedAt, t)}
                       </span>
                     </div>
                     <div className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5">

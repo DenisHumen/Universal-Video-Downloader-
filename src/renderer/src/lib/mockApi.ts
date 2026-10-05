@@ -210,7 +210,7 @@ declare global {
   }
 }
 
-import type { Watch } from '@shared/automation'
+import { settleRunError, type Watch } from '@shared/automation'
 
 const mockWatches: Watch[] = []
 
@@ -445,7 +445,8 @@ export function installMockApi(): void {
     },
     autoUpdate: async (id, changes) => {
       const i = mockWatches.findIndex((x) => x.id === id)
-      if (i >= 0) mockWatches[i] = { ...mockWatches[i], ...changes }
+      // The same rule main applies, so dismissing or pausing behaves here as it does there.
+      if (i >= 0) mockWatches[i] = { ...mockWatches[i], ...settleRunError(changes) }
       return mockWatches[i]
     },
     autoRemove: async (id) => {

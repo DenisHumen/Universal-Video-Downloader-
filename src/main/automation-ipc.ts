@@ -7,7 +7,8 @@ import {
   listRuns,
   listWatches,
   removeWatch,
-  updateWatch
+  updateWatch,
+  watchEvents
 } from './services/automation/store'
 import { checkNow } from './services/automation/watcher'
 import { testTarget } from './services/automation/smb'
@@ -15,7 +16,8 @@ import { sendTest } from './services/automation/telegram'
 import { getSecret, hasSecret, SECRET, secretsPersist, setSecret } from './services/secrets'
 import { logFilePath } from './services/log'
 import { getSettings } from './services/settings'
-import type { Run, SmbTarget, Watch } from '@shared/automation'
+import { coalesce } from './services/coalesce'
+import { settleRunError, type Run, type SmbTarget, type Watch } from '@shared/automation'
 
 /**
  * The automation's side of the bridge.
@@ -47,6 +49,15 @@ function broadcast(): void {
 }
 
 export function registerAutomationIpc(): void {
+  /*
+    Everything the schedule writes reaches the screen through here: checks, runs
+    moving through their steps, an episode marked handled. Folded so a run that
+    steps along quickly costs one refetch rather than one per step. The handlers
+    below still broadcast straight away, so a button press is not kept waiting
+    for the window; the duplicate that follows is harmless.
+  */
+  watchEvents.on('changed', coalesce(broadcast, 300))
+
   ipcMain.handle(IPC.autoDescribe, async (_e, url: string): Promise<SeriesOffer> => {
     const d = await describeSeries(url)
     return {
@@ -77,7 +88,7 @@ export function registerAutomationIpc(): void {
   })
 
   ipcMain.handle(IPC.autoUpdate, (_e, id: string, patch: Partial<Watch>): Watch | undefined => {
-    const next = updateWatch(id, patch)
+    const next = updateWatch(id, settleRunError(patch))
     broadcast()
     return next
   })
