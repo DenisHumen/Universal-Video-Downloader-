@@ -144,6 +144,15 @@ const RULES: Rule[] = [
     code: 'unsupportedPlayer',
     message: 'This kind of player is not supported yet.'
   },
+  /*
+    A Shikimori title the app found, and YummyAnime does not have. Its own
+    words for the same reason: nothing about the link or cookies will help.
+  */
+  {
+    re: /isn't available on yummyanime/,
+    code: 'notOnYummyAnime',
+    message: "This title isn't available on YummyAnime, where Shikimori links are downloaded from."
+  },
   {
     re: /unsupported url|no video formats|unable to extract|nothing to download/,
     code: 'noFormats',

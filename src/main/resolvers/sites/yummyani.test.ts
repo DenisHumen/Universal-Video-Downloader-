@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { animeIdCandidates, fullestDub, groupKodikDubs } from './yummyani'
+import { hasResolver } from '../index'
+import { animeIdCandidates, fullestDub, groupKodikDubs, YUMMY_DOMAIN } from './yummyani'
 
 /*
   A yummyani page carries two numbers that both look like the title's id, and
@@ -133,5 +134,24 @@ describe('groupKodikDubs', () => {
     const base = '//kodikplayer.com/season/3/cc/720p'
     const dubs = groupKodikDubs([video('A', 3, base), video('A', 1, base), video('A', 3, base)])
     expect(dubs[0].episodes).toEqual([1, 3])
+  })
+})
+
+/*
+  yummy-anime.ru and yani.tv are the site's old addresses, still on bookmarks
+  and share links. A title page on either had no resolver, so it never got the
+  picker and went down the slow generic path instead.
+*/
+describe("YummyAnime's old addresses", () => {
+  it('reach the resolver', () => {
+    expect(hasResolver('https://yummy-anime.ru/catalog/item/sousou-no-frieren')).toBe(true)
+    expect(hasResolver('https://yani.tv/catalog/item/sousou-no-frieren')).toBe(true)
+  })
+
+  it('are matched even by a caller that did not normalise first', () => {
+    expect(YUMMY_DOMAIN.test('https://yummy-anime.ru/catalog/item/sousou-no-frieren')).toBe(true)
+    expect(YUMMY_DOMAIN.test('https://old.yummy-anime.ru/catalog/item/sousou-no-frieren')).toBe(true)
+    expect(YUMMY_DOMAIN.test('https://yani.tv/catalog/item/sousou-no-frieren')).toBe(true)
+    expect(YUMMY_DOMAIN.test('https://api.yani.tv/anime/10661')).toBe(false)
   })
 })

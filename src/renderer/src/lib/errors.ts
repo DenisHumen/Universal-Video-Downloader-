@@ -36,7 +36,8 @@ const KEYS: Record<AppErrorCode, TranslationKey> = {
   corruptLink: 'err.corruptLink',
   emptyPage: 'err.emptyPage',
   cutFailed: 'err.cutFailed',
-  unsupportedPlayer: 'err.unsupportedPlayer'
+  unsupportedPlayer: 'err.unsupportedPlayer',
+  notOnYummyAnime: 'err.notOnYummyAnime'
 }
 
 export interface FailureLike {

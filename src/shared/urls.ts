@@ -149,6 +149,36 @@ export function normalizeUrl(input: string): string {
     host = host.replace(MOBILE_PREFIXES, 'www.')
   } else if (/(^|\.)(facebook\.com|fb\.watch)$/.test(host)) {
     host = host.replace(MOBILE_PREFIXES, 'www.')
+  }
+
+  // ---- YummyAnime -------------------------------------------------------
+  /*
+    yummy-anime.ru and yani.tv are the site's old addresses, and both still
+    redirect a title page to yummyani.me. Old bookmarks and share links carry
+    them, and nothing recognised them: no picker, just the slow generic path,
+    and the duplicate check saw two titles where there was one. The path guard
+    is what keeps api.yani.tv, the site's own API, out of this.
+  */
+  else if (
+    /^(?:[\w-]+\.)*(?:yummy-anime\.ru|yani\.tv)$/.test(host) &&
+    /^\/catalog\/item\//.test(path)
+  ) {
+    host = 'yummyani.me'
+  }
+
+  // ---- Telegram ---------------------------------------------------------
+  /*
+    The engine knows a post only as t.me/<channel>/<post>. telegram.me is
+    "Unsupported URL" to it, and the /s/ preview of the same post is read as a
+    generic page: a playlist of the same file twice, with no title or length.
+    `?single` stays, because it is what asks for one file of an album, and the
+    engine reads it with or without a value. A channel's /s/ feed has no post
+    to point at, and /c/ links are private channels; both are left as they are.
+  */
+  else if (/^(?:www\.)?(?:telegram\.(?:me|dog)|t\.me)$/.test(host)) {
+    host = 't.me'
+    const post = path.match(/^\/s\/(\w+)\/(\d+)\/?$/)
+    if (post) path = `/${post[1]}/${post[2]}`
   } else {
     // Everything else: only drop the mobile prefix, which is safe because the
     // desktop host is what every one of these sites canonicalises to itself.

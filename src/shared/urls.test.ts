@@ -88,12 +88,66 @@ describe('normalizeUrl', () => {
     expect(normalizeUrl('https://site.test/#!/video/9')).toBe('https://site.test/#!/video/9')
   })
 
+  it("moves YummyAnime's old addresses onto yummyani.me", () => {
+    // Neither was recognised: no picker, and a duplicate of the same title.
+    expect(normalizeUrl('https://yummy-anime.ru/catalog/item/sousou-no-frieren')).toBe(
+      'https://yummyani.me/catalog/item/sousou-no-frieren'
+    )
+    expect(normalizeUrl('https://www.yummy-anime.ru/catalog/item/sousou-no-frieren/')).toBe(
+      'https://yummyani.me/catalog/item/sousou-no-frieren'
+    )
+    expect(normalizeUrl('https://yani.tv/catalog/item/sousou-no-frieren')).toBe(
+      'https://yummyani.me/catalog/item/sousou-no-frieren'
+    )
+  })
+
+  it("leaves yani.tv's API and other pages where they are", () => {
+    expect(normalizeUrl('https://api.yani.tv/anime/10661')).toBe('https://api.yani.tv/anime/10661')
+    expect(normalizeUrl('https://api.yani.tv/search?q=frieren')).toBe(
+      'https://api.yani.tv/search?q=frieren'
+    )
+    expect(normalizeUrl('https://yani.tv/a10661')).toBe('https://yani.tv/a10661')
+  })
+
+  it('sends every Telegram host to t.me, the only one the engine knows', () => {
+    // telegram.me was "Unsupported URL" to the engine.
+    expect(normalizeUrl('https://telegram.me/bbcrussian/100035')).toBe(
+      'https://t.me/bbcrussian/100035'
+    )
+    expect(normalizeUrl('https://www.telegram.dog/bbcrussian/100035')).toBe(
+      'https://t.me/bbcrussian/100035'
+    )
+    expect(normalizeUrl('https://www.t.me/bbcrussian/100035')).toBe('https://t.me/bbcrussian/100035')
+  })
+
+  it("turns a post's /s/ preview into the post itself", () => {
+    // Read as a generic page, /s/ gave the same file twice with no title or length.
+    expect(normalizeUrl('https://t.me/s/bbcrussian/100035')).toBe('https://t.me/bbcrussian/100035')
+    expect(normalizeUrl('https://telegram.me/s/bbcrussian/100035/')).toBe(
+      'https://t.me/bbcrussian/100035'
+    )
+  })
+
+  it('keeps ?single, which asks for one file of an album', () => {
+    const out = normalizeUrl('https://t.me/s/vorposte/29342?single')
+    expect(out.startsWith('https://t.me/vorposte/29342?')).toBe(true)
+    expect(new URL(out).searchParams.has('single')).toBe(true)
+  })
+
+  it("leaves a channel's feed and private channel links alone", () => {
+    expect(normalizeUrl('https://t.me/s/bbcrussian')).toBe('https://t.me/s/bbcrussian')
+    expect(normalizeUrl('https://t.me/c/1234567890/42')).toBe('https://t.me/c/1234567890/42')
+    expect(normalizeUrl('https://telegram.me/c/1234567890/42')).toBe('https://t.me/c/1234567890/42')
+  })
+
   it('is idempotent', () => {
     for (const url of [
       'https://youtu.be/dQw4w9WgXcQ?si=xyz',
       'https://www.tiktok.com/@user/video/7123?is_from_webapp=1',
       'https://site.test/#/watch/123',
-      'https://instagram.com/reels/Cabc123/'
+      'https://instagram.com/reels/Cabc123/',
+      'https://yummy-anime.ru/catalog/item/sousou-no-frieren',
+      'https://telegram.me/s/vorposte/29342?single'
     ]) {
       const once = normalizeUrl(url)
       expect(normalizeUrl(once), url).toBe(once)

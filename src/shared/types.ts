@@ -131,6 +131,7 @@ export type AppErrorCode =
   | 'emptyPage'
   | 'cutFailed'
   | 'unsupportedPlayer'
+  | 'notOnYummyAnime'
 
 export type DownloadState =
   | 'queued'

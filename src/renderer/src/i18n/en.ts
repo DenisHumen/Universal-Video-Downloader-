@@ -437,6 +437,7 @@ export const en = {
   'err.emptyPage': 'no videos found on this page.',
   'err.cutFailed': 'nothing was recorded from the point you chose to start at, so there was nothing to process. try downloading it without cutting, then trim the file.',
   'err.unsupportedPlayer': 'this kind of Kodik player is not supported yet.',
+  'err.notOnYummyAnime': 'this title isn’t on YummyAnime, which is where Shikimori links are downloaded from.',
   'err.cookieHint': 'try switching on browser cookies in settings → access.',
   'common.save': 'save',
   'nav.automation': 'watch',

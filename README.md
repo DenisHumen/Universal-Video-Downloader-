@@ -155,7 +155,8 @@ get a small dedicated module in `src/main/resolvers/sites/` — currently **HDre
 mirror domains), **YummyAnime** (via the Kodik player) and **CumGloryHole**. **Vimeo** has one
 too, for a different reason: its video pages now want a login for the engine to read them, so a
 `vimeo.com/<id>` link is handed over as the same video's embedded player, which still opens
-without one.
+without one. **Shikimori** plays nothing itself, so a title link opens that title's YummyAnime
+picker, matched by the Shikimori id YummyAnime files against every title, never by a similar name.
 
 For streaming sites the app reads the available **voiceovers (озвучки)**, **seasons**,
 **episodes** and **qualities**, lets you multi-select episodes, and queues each as

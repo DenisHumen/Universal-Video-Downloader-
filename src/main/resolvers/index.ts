@@ -1,6 +1,7 @@
 import { cumgloryholeResolvers } from './sites/cumgloryhole'
 import { KODIK_SCHEME, kodikResolvers, resolveKodikStream } from './sites/kodik'
 import { rezkaResolvers, resolveRezkaStream } from './sites/rezka'
+import { shikimoriResolvers } from './sites/shikimori'
 import { vimeoResolvers } from './sites/vimeo'
 import { yummyaniResolvers, resolveYummyaniItem, resolveYummyaniStream } from './sites/yummyani'
 import { resolveSniffUrl, SNIFF_SCHEME } from './universal'
@@ -29,6 +30,7 @@ const resolvers: SiteResolver[] = [
   ...kodikResolvers,
   ...rezkaResolvers,
   ...vimeoResolvers,
+  ...shikimoriResolvers,
   ...yummyaniResolvers
 ]
 

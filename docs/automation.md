@@ -129,6 +129,9 @@ Worth knowing before choosing a default interval, because this runs unattended
 against someone else's server:
 
 - yummyani: **3 GETs** per check from the page URL, or 2 from `uvd-yummy-item://<id>`
+- a Shikimori link: **4 GETs** (Shikimori's API, one yani.tv search, then the
+  title's two yummyani requests), plus a search for each further name tried
+  when the romanised one does not find the title - at most two more
 - rezka: **1 GET + 1 POST** per check (the page, then the chosen dub's episode list)
 - downloading one episode adds 1 GET + 1 POST (yummyani) or 1 POST (rezka)
 

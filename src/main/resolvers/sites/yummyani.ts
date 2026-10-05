@@ -4,7 +4,14 @@ import { NotReleasedError, releaseAtFrom } from '../upcoming'
 import { kodikGetM3u8 } from './kodik'
 import type { SearchResult, StreamingInfo, StreamSeason, StreamTranslator } from '@shared/types'
 
-export const YUMMY_DOMAIN = /^https?:\/\/(?:[a-z0-9-]+\.)*yummyani\.me\/catalog\/item\//i
+/*
+  yummy-anime.ru and yani.tv are the site's old addresses. normalizeUrl moves a
+  title page on either onto yummyani.me before any resolver sees it; they are
+  matched here as well for a caller that skipped it, which is safe because the
+  page fetch follows the site's own redirect.
+*/
+export const YUMMY_DOMAIN =
+  /^https?:\/\/(?:[a-z0-9-]+\.)*(?:yummyani\.me|yummy-anime\.ru|yani\.tv)\/catalog\/item\//i
 
 const REFERER = 'https://old.yummyani.me/'
 
@@ -101,9 +108,10 @@ export function fullestDub(
 /**
  * Build the full streaming picker (dubbings → episodes → qualities) for an
  * anime from its numeric yani.tv id. Shared by the page resolver and the
- * search-result resolver (uvd-yummy-item://<id>).
+ * search-result resolver (uvd-yummy-item://<id>), and by Shikimori links,
+ * which are matched to a yani.tv id first.
  */
-async function streamingFromId(animeId: string, webUrl: string): Promise<ResolvedUrl> {
+export async function streamingFromId(animeId: string, webUrl: string): Promise<ResolvedUrl> {
   const meta = (
     JSON.parse(await fetchText(`https://api.yani.tv/anime/${animeId}`, { Referer: REFERER })) as {
       response: {
@@ -242,21 +250,28 @@ export async function resolveYummyaniStream(uvdUrl: string): Promise<ResolvedUrl
   }
 }
 
-interface YaniSearchItem {
+export interface YaniSearchItem {
   anime_id: number
   anime_url: string
   title: string
   poster?: YaniPoster
   year?: number
   views?: number
+  /** The title's ids on other catalogues; what a Shikimori link is matched by. */
+  remote_ids?: { shikimori_id?: number | string }
+}
+
+/** The yani.tv search answer as it comes, ids on other catalogues included. */
+export async function searchYani(query: string): Promise<YaniSearchItem[]> {
+  const raw = await fetchText(`https://api.yani.tv/search?q=${encodeURIComponent(query)}`, {
+    Referer: REFERER
+  })
+  return (JSON.parse(raw) as { response?: YaniSearchItem[] }).response || []
 }
 
 /** Search anime by title via the yani.tv API (powers the 'yummyani' service). */
 export async function searchYummyani(query: string, limit: number): Promise<SearchResult[]> {
-  const raw = await fetchText(`https://api.yani.tv/search?q=${encodeURIComponent(query)}`, {
-    Referer: REFERER
-  })
-  const list = (JSON.parse(raw) as { response?: YaniSearchItem[] }).response || []
+  const list = await searchYani(query)
   return list.slice(0, limit).map((it) => ({
     id: `yani-${it.anime_id}`,
     title: it.title,
