@@ -147,7 +147,11 @@ export default function AddWatchDialog({
                   spellCheck={false}
                   autoFocus
                 />
-                <button className="btn" onClick={() => void look()} disabled={looking || !url.trim()}>
+                <button
+                  className="btn-quiet"
+                  onClick={() => void look()}
+                  disabled={looking || !url.trim()}
+                >
                   {looking ? <Loader2 size={14} className="animate-spin" /> : null}
                   {t('auto.look')}
                 </button>
@@ -228,7 +232,7 @@ export default function AddWatchDialog({
           </div>
 
           <div className="flex justify-end gap-2 border-t border-edge px-4 py-3">
-            <button className="btn" onClick={onClose}>
+            <button className="btn-quiet" onClick={onClose}>
               {t('common.cancel')}
             </button>
             <button className="btn-solid" onClick={() => void add()} disabled={!offer || saving}>

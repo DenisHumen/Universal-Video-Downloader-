@@ -233,7 +233,7 @@ export default function StepEditor({
                     </div>
                   ))}
                   <button
-                    className="btn"
+                    className="btn-quiet"
                     onClick={() =>
                       set({ replacements: [...step.replacements, { from: '', to: '' }] })
                     }
@@ -336,7 +336,7 @@ export default function StepEditor({
                 <Trash2 size={14} /> {t('common.remove')}
               </button>
             )}
-            <button className="btn" onClick={onClose}>
+            <button className="btn-quiet" onClick={onClose}>
               {t('common.cancel')}
             </button>
             <button className="btn-solid" onClick={() => void save()} disabled={!canSave || saving}>

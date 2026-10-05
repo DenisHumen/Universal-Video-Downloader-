@@ -71,6 +71,7 @@ export const en = {
   'home.startFailed': 'could not start the download',
   'home.liveHint':
     'this is a live stream — it records from now until you stop it, so there is no length to trim and no percentage to report.',
+  'home.liveBadge': 'live',
 
   // ---- detection stages ----
   'detect.resolving': 'checking the link…',

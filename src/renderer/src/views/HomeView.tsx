@@ -33,6 +33,7 @@ import {
   maxHeightOf,
   resolveSelection
 } from '../lib/quality'
+import { detectIsDone, errorLead } from '../lib/emphasis'
 import { queueDownload, queueDownloads } from '../lib/queue'
 import { escapeClearsHome, linkIn } from '../lib/shortcuts'
 import { toClock } from '../lib/time'
@@ -77,6 +78,8 @@ export default function HomeView(): JSX.Element {
   const detectStatus = useStore((s) => s.detect)
 
   const [url, setUrl] = useState('')
+  /** The link the result or error on screen came from; see `detectIsDone`. */
+  const [detectedUrl, setDetectedUrl] = useState('')
   const [status, setStatus] = useState<Status>('idle')
   const [info, setInfo] = useState<MediaInfo | null>(null)
   const [error, setError] = useState('')
@@ -177,6 +180,7 @@ export default function HomeView(): JSX.Element {
     )
     if (requestRef.current !== requestId) return
     requestRef.current = null
+    setDetectedUrl(target)
     if (res.ok && res.info) {
       setInfo(res.info)
       // Preselect the user's defaults, falling back to automatic "best" when
@@ -345,6 +349,13 @@ export default function HomeView(): JSX.Element {
   const cutting = selection.mode === 'video' && trimOpen && hasTrim(section)
   const isSearchQuery = url.trim().length > 0 && !isProbablyUrl(url)
   const busy = status === 'detecting'
+  const detectDone = detectIsDone({
+    url,
+    detectedUrl,
+    showing: Boolean(info) || status === 'error',
+    batchOpen
+  })
+  const retryLeads = errorLead(errorCode) === 'retry'
 
   return (
     <div className="h-full overflow-y-auto" ref={scrollRef}>
@@ -398,7 +409,7 @@ export default function HomeView(): JSX.Element {
             <ClipboardPaste size={17} />
           </button>
           <button
-            className="btn-solid px-5"
+            className={detectDone ? 'btn-quiet px-5' : 'btn-solid px-5'}
             data-uvd="detect"
             onClick={() => detect()}
             disabled={!url.trim() || busy}
@@ -507,9 +518,10 @@ export default function HomeView(): JSX.Element {
                   </p>
                 )}
                 <div className="mt-4 flex flex-wrap items-center gap-2">
-                  {/* The honest escape hatch: let the user find it by hand. */}
+                  {/* The honest escape hatch: let the user find it by hand —
+                      unless the link is fine and only the moment wasn't. */}
                   <button
-                    className="btn-solid"
+                    className={retryLeads ? 'btn-quiet' : 'btn-solid'}
                     onClick={() => window.api.openBrowser(url || undefined)}
                   >
                     <Globe size={14} /> {t('browser.open')}
@@ -519,7 +531,10 @@ export default function HomeView(): JSX.Element {
                       {t('home.openAccessSettings')}
                     </button>
                   )}
-                  <button className="btn-quiet" onClick={() => void detect()}>
+                  <button
+                    className={retryLeads ? 'btn-solid' : 'btn-quiet'}
+                    onClick={() => void detect()}
+                  >
                     <RotateCw size={14} /> {t('common.retry')}
                   </button>
                 </div>
@@ -568,9 +583,17 @@ export default function HomeView(): JSX.Element {
                     loading="eager"
                     fallback={<div className="h-full w-full bg-sink" />}
                   />
+                  {/*
+                    The one mark that changes what the download means — no trim,
+                    no percentage — so it gets the label floor (11px) and a
+                    label colour checked against the fill; white on Night's pink
+                    was 2.69:1, at 9px, and in English whatever the language.
+                    `font-mono`, not `.mono`: that class sits after the utilities
+                    and its tight letter-spacing would win over the tracking.
+                  */}
                   {info.isLive && (
-                    <span className="mono absolute left-1.5 top-1.5 rounded-1 bg-bad px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-white">
-                      live
+                    <span className="absolute left-1.5 top-1.5 rounded-1 bg-bad px-1.5 py-0.5 font-mono text-[11px] font-semibold uppercase leading-none tracking-[0.08em] text-bad-fg">
+                      {t('home.liveBadge')}
                     </span>
                   )}
                 </div>

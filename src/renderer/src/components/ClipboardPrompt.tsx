@@ -35,7 +35,10 @@ export default function ClipboardPrompt(): JSX.Element {
                 {link}
               </p>
             </div>
-            <button className="btn-solid shrink-0 px-3 py-2" onClick={accept}>
+            {/* Quiet: the strip lands on top of whatever screen is open, each
+                with a solid button of its own, and the accent stamp already
+                says where to look. */}
+            <button className="btn-quiet shrink-0 px-3 py-2" onClick={accept}>
               {t('home.clipboardUse')}
             </button>
             <button className="btn-icon" onClick={dismiss} aria-label={t('common.close')}>

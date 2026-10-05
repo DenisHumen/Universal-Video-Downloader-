@@ -484,9 +484,9 @@ check, or what it is doing now). An add button at the top.
   each configured module, with a `+` below the last one. Clicking a tile opens
   its settings; clicking `+` offers the modules not yet added.
 
-It uses the existing design system — `panel`, `btn`, `field`, `label`, `hint`,
-the theme tokens — and adds no new colours. `npm run check:contrast` gates the
-palette and must stay green.
+It uses the existing design system — `panel`, `btn-quiet` (and one `btn-solid`
+per screen), `field`, `label`, `hint`, the theme tokens — and adds no new
+colours. `npm run check:contrast` gates the palette and must stay green.
 
 Both dictionaries get every string; `i18n.test.ts` fails the build on a key that
 is missing or unused, in either direction.

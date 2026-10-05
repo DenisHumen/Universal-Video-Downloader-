@@ -33,7 +33,12 @@ module.exports = {
         },
         good: 'rgb(var(--good) / <alpha-value>)',
         warn: 'rgb(var(--warn) / <alpha-value>)',
-        bad: 'rgb(var(--bad) / <alpha-value>)'
+        bad: {
+          DEFAULT: 'rgb(var(--bad) / <alpha-value>)',
+          // Label on a solid `bad` fill. White on Night's pink is 2.69:1, so
+          // unlike accent-fg this one flips: near-black in Night, white in Day.
+          fg: 'rgb(var(--bad-fg) / <alpha-value>)'
+        }
       },
       fontFamily: {
         sans: [

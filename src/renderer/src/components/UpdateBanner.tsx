@@ -105,7 +105,10 @@ export default function UpdateBanner(): JSX.Element {
                 </button>
               )}
               {update.state === 'error' && (
-                <button className="btn px-3 py-2" onClick={() => window.api.checkForUpdates()}>
+                <button
+                  className="btn-quiet px-3 py-2"
+                  onClick={() => window.api.checkForUpdates()}
+                >
                   <RefreshCw size={14} /> {t('common.retry')}
                 </button>
               )}

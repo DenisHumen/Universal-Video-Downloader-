@@ -515,7 +515,7 @@ function ResultTile({
 
       <div className="mt-auto flex items-center gap-1 pt-2.5">
         <button
-          className={`flex-1 py-2 ${added ? 'btn bg-good/12 text-good' : 'btn-quiet'}`}
+          className={`flex-1 py-2 ${added ? 'btn-base bg-good/12 text-good' : 'btn-quiet'}`}
           onClick={handle}
           disabled={downloading || busy || added}
         >

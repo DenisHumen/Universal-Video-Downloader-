@@ -4,6 +4,7 @@ import { useT } from '../i18n'
 import { useStore } from '../store'
 import { toast } from '../lib/toast'
 import { describeError } from '../lib/errors'
+import { telegramChanged } from '../lib/emphasis'
 import { emptyTarget, pathOf, ShareForm, TelegramForm, useSecretState } from './AutomationForms'
 import type { SmbTarget } from '@shared/automation'
 
@@ -129,7 +130,7 @@ export default function AutomationSettings(): JSX.Element {
                     passwordStored={Boolean(secrets.smb[target.id])}
                   />
                   <div className="flex justify-end gap-2">
-                    <button className="btn" onClick={() => setEditing(null)}>
+                    <button className="btn-quiet" onClick={() => setEditing(null)}>
                       {t('common.cancel')}
                     </button>
                     <button className="btn-solid" onClick={() => void saveShare()} disabled={saving}>
@@ -152,7 +153,7 @@ export default function AutomationSettings(): JSX.Element {
                 passwordStored={false}
               />
               <div className="flex justify-end gap-2">
-                <button className="btn" onClick={() => setEditing(null)}>
+                <button className="btn-quiet" onClick={() => setEditing(null)}>
                   {t('common.cancel')}
                 </button>
                 <button className="btn-solid" onClick={() => void saveShare()} disabled={saving}>
@@ -164,7 +165,7 @@ export default function AutomationSettings(): JSX.Element {
           )}
 
           {editing === null && (
-            <button className="btn" onClick={startNew}>
+            <button className="btn-quiet" onClick={startNew}>
               <Plus size={14} /> {t('settings.addShare')}
             </button>
           )}
@@ -181,8 +182,15 @@ export default function AutomationSettings(): JSX.Element {
           onChatId={setChatId}
           tokenStored={secrets.telegram}
         />
+        {/* Quiet, and armed only once there is something to save: it sits in
+            Settings among a page of other controls, and a solid button that is
+            always on is an accent pointing at nothing. */}
         <div className="mt-3 flex justify-end">
-          <button className="btn-solid" onClick={() => void saveTelegram()} disabled={saving}>
+          <button
+            className="btn-quiet"
+            onClick={() => void saveTelegram()}
+            disabled={saving || !telegramChanged(settings?.telegramChatId, chatId, token)}
+          >
             {saving ? <Loader2 size={14} className="animate-spin" /> : null}
             {t('common.save')}
           </button>

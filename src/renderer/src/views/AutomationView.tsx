@@ -178,7 +178,15 @@ export default function AutomationView(): JSX.Element {
       <aside className="flex w-[300px] shrink-0 flex-col border-r border-edge">
         <div className="flex items-center gap-2 border-b border-edge px-3 py-2.5">
           <h1 className="label flex-1">{t('auto.title')}</h1>
-          <button className="btn-solid px-2.5 py-1.5" onClick={() => setAdding(true)}>
+          {/*
+            With nothing watched, the empty state carries its own "add" — two
+            solid buttons doing one thing. Hidden rather than removed, so the
+            header keeps its height and nothing jumps when the first watch lands.
+          */}
+          <button
+            className={`btn-solid px-2.5 py-1.5 ${watches.length === 0 ? 'invisible' : ''}`}
+            onClick={() => setAdding(true)}
+          >
             <Plus size={14} /> {t('auto.add')}
           </button>
         </div>
@@ -289,10 +297,13 @@ export default function AutomationView(): JSX.Element {
             </header>
 
             <div className="mt-4 flex flex-wrap gap-2">
-              <button className="btn" onClick={() => void patch({ enabled: !selected.enabled })}>
+              <button
+                className="btn-quiet"
+                onClick={() => void patch({ enabled: !selected.enabled })}
+              >
                 {selected.enabled ? t('auto.pause') : t('auto.resume')}
               </button>
-              <button className="btn" onClick={() => void checkNow()} disabled={checking}>
+              <button className="btn-quiet" onClick={() => void checkNow()} disabled={checking}>
                 {checking ? (
                   <Loader2 size={14} className="animate-spin" />
                 ) : (
@@ -358,7 +369,7 @@ export default function AutomationView(): JSX.Element {
               {missing.length > 0 && (
                 <div className="flex flex-wrap gap-2 pt-1">
                   {missing.map((kind) => (
-                    <button key={kind} className="btn" onClick={() => setEditing(kind)}>
+                    <button key={kind} className="btn-quiet" onClick={() => setEditing(kind)}>
                       <Plus size={14} /> {t(STEP_LABEL[kind])}
                     </button>
                   ))}

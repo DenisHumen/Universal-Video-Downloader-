@@ -68,11 +68,21 @@
   --good: 74 222 128;
   --warn: 250 204 21;
   --bad: 251 113 133;
+  --bad-fg: 9 9 11;
+  --control-edge: transparent;
 }
 
 /* ---- Day ----
    Not a tint-inverted Night: light interfaces need a canvas *darker* than the
-   raised planes, otherwise every block dissolves into the page. */
+   raised planes, otherwise every block dissolves into the page.
+
+   --control-edge: the neutral buttons are a --surface-2 fill, which here sits
+   at 1.06:1 on a white panel and 1.07:1 on the canvas — the "change" button on
+   a result card was a pill you had to know was there. Darkening the fill
+   instead sinks every button on the canvas, so the plane stays and gains a
+   hairline. A token rather than a `[data-theme='day'] .btn-icon` rule because
+   `@apply btn-icon` copies such a rule into `.btn-icon-bare`, whose whole point
+   is having no surface; a token it can simply override. */
 [data-theme='day'] {
   color-scheme: light;
   --bg: 240 240 243;
@@ -89,6 +99,8 @@
   --good: 20 107 53;
   --warn: 134 84 6;
   --bad: 184 28 36;
+  --bad-fg: 255 255 255;
+  --control-edge: rgb(var(--line));
 }
 
 * {
@@ -145,52 +157,63 @@ body {
 /* ---- Type roles ----
    Five of them, and every screen is built from these rather than from ad-hoc
    sizes. Hierarchy comes from size and weight first; `.label` is for marking a
-   group of controls, never for saying what a screen is. */
+   group of controls, never for saying what a screen is.
 
-/* The one heading per screen. */
-.h1 {
-  font-size: 24px;
-  line-height: 1.2;
-  font-weight: 600;
-  letter-spacing: -0.02em;
-  color: rgb(var(--text));
-}
+   In the components layer so a colour utility beside them wins. Written after
+   the utilities, as they were, each role's own colour beat any `text-*` next
+   to it: the "clipboard" and "update" stamps meant to be accent came out grey,
+   and so did a failed run, a watch's last error, the warning that passwords
+   won't outlive the app and an unsafe filename template — all written
+   `text-bad`, all on screen in body grey.
+   `.mono` stays where it is: half a dozen wordmarks and meta lines pair it
+   with a `tracking-*` that has never once applied, and letting it apply now
+   is a redesign of those, not a fix. */
+@layer components {
+  /* The one heading per screen. */
+  .h1 {
+    font-size: 24px;
+    line-height: 1.2;
+    font-weight: 600;
+    letter-spacing: -0.02em;
+    color: rgb(var(--text));
+  }
 
-/* A section inside a screen. */
-.h2 {
-  font-size: 15px;
-  line-height: 1.35;
-  font-weight: 600;
-  color: rgb(var(--text));
-}
+  /* A section inside a screen. */
+  .h2 {
+    font-size: 15px;
+    line-height: 1.35;
+    font-weight: 600;
+    color: rgb(var(--text));
+  }
 
-/* The sentence under an h1 that says what the screen is for. Measure-capped:
-   past ~65 characters the eye loses the line it was on. */
-.lead {
-  font-size: 14px;
-  line-height: 1.6;
-  color: rgb(var(--text-2));
-  max-width: 62ch;
-}
+  /* The sentence under an h1 that says what the screen is for. Measure-capped:
+     past ~65 characters the eye loses the line it was on. */
+  .lead {
+    font-size: 14px;
+    line-height: 1.6;
+    color: rgb(var(--text-2));
+    max-width: 62ch;
+  }
 
-/* Explanatory text under a control. */
-.hint {
-  font-size: 12px;
-  line-height: 1.5;
-  color: rgb(var(--text-2));
-  max-width: 62ch;
-}
+  /* Explanatory text under a control. */
+  .hint {
+    font-size: 12px;
+    line-height: 1.5;
+    color: rgb(var(--text-2));
+    max-width: 62ch;
+  }
 
-/* Marks a group of controls. Small and uppercase, but no longer *tiny*: at
-   10px in the third text tier this was decorative rather than readable. */
-.label {
-  font-family: theme('fontFamily.mono');
-  font-size: 11px;
-  line-height: 1.2;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: rgb(var(--text-2));
+  /* Marks a group of controls. Small and uppercase, but no longer *tiny*: at
+     10px in the third text tier this was decorative rather than readable. */
+  .label {
+    font-family: theme('fontFamily.mono');
+    font-size: 11px;
+    line-height: 1.2;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: rgb(var(--text-2));
+  }
 }
 
 input,
@@ -225,7 +248,17 @@ textarea,
 
   /* ---------------- Buttons ---------------- */
 
-  .btn {
+  /*
+   * Shape and behaviour only — no fill, no colour. Never a button on its own:
+   * it is what the three below are built from, and what a one-off state
+   * (`btn-base bg-good/12 text-good`) builds on when it brings its own fill.
+   *
+   * It was called `.btn`, which is exactly what anyone reaches for, and fourteen
+   * places across Automation, the dialogs and the update strip did: they
+   * rendered as bare words beside filled fields, and a disabled one read as
+   * grey body text. `stylesheet.test.ts` fails on a bare one now.
+   */
+  .btn-base {
     border-radius: var(--r-pill);
     /* 38px minimum. Desktop pointing is more forgiving than touch, so this
        sits under the 44px touch floor by design — but 32px, which is where
@@ -240,14 +273,18 @@ textarea,
   }
   /* The single loud element on any screen. There is never more than one. */
   .btn-solid {
-    @apply btn bg-accent text-accent-fg hover:bg-accent/90;
+    @apply btn-base bg-accent text-accent-fg hover:bg-accent/90;
   }
   /* Everything else: a filled neutral that reads as a control, not a link. */
   .btn-quiet {
-    @apply btn bg-sink text-ink-2 hover:bg-edge hover:text-ink;
+    @apply btn-base bg-sink text-ink-2 hover:bg-edge hover:text-ink;
+    /* Day's hairline (see --control-edge). An inset shadow takes no room, so a
+       button that swaps to a solid or a tinted state doesn't move a pixel; on
+       hover the fill becomes the same --line and the ring melts into it. */
+    box-shadow: inset 0 0 0 1px var(--control-edge);
   }
   .btn-danger {
-    @apply btn bg-bad/12 text-bad hover:bg-bad/20;
+    @apply btn-base bg-bad/12 text-bad hover:bg-bad/20;
   }
   /*
    * Icon-only buttons. 36px, and they carry a visible surface rather than
@@ -261,7 +298,8 @@ textarea,
       background-color var(--t-fast) var(--ease),
       color var(--t-fast) var(--ease),
       border-color var(--t-fast) var(--ease);
-    @apply no-drag inline-flex h-9 w-9 shrink-0 cursor-pointer items-center justify-center border border-transparent bg-sink text-ink-2 hover:border-edge-strong hover:text-ink disabled:pointer-events-none disabled:opacity-30;
+    @apply no-drag inline-flex h-9 w-9 shrink-0 cursor-pointer items-center justify-center border bg-sink text-ink-2 hover:border-edge-strong hover:text-ink disabled:pointer-events-none disabled:opacity-30;
+    border-color: var(--control-edge);
   }
   /* For dense toolbars sitting on their own plane, where a filled square per
      action would read as a wall of chips. */
@@ -368,7 +406,7 @@ textarea,
    * planes — so any single offset colour paints a wrong-coloured halo on two
    * of them. An outline just draws over whatever is there.
    */
-  .btn:focus-visible,
+  .btn-base:focus-visible,
   .btn-icon:focus-visible,
   .choice:focus-visible,
   .tab:focus-visible,

@@ -55,15 +55,25 @@ theme swap is one attribute on `<html>`. Two themes, no accent picker.
 | `--good` | success | `#4ADE80` | `#146B35` |
 | `--warn` | caution | `#FACC15` | `#865406` |
 | `--bad` | failure | `#FB7185` | `#B81C24` |
+| `--bad-fg` | label on a solid `bad` fill (the live badge) | `#09090B` | `#FFFFFF` |
+| `--control-edge` | hairline round quiet and icon buttons | none | `--line` |
 
 **Why `--accent-ink` exists:** the fill colour never clears 4.5:1 as text on its
 own canvas. Accent text uses a lighter (Night) or darker (Day) cut of the same
 hue. **Never write text in `--accent`.**
 
 **Gate:** `npm run check:contrast` verifies all 7 text colours against all 3
-planes in both themes, `--accent-fg` on `--accent`, **and each status colour on
-a 12% tint of itself over each plane** — 62 pairings, all ≥ 4.5:1. Tightest
-today: Day `--bad` on `--bad/12` over `--bg` at 4.70:1.
+planes in both themes, `--accent-fg` on `--accent` and `--bad-fg` on `--bad`,
+**and each status colour on a 12% tint of itself over each plane** — 64
+pairings, all ≥ 4.5:1. Tightest today: Day `--bad` on `--bad/12` over `--bg` at
+4.70:1. It also holds Day's button hairline (`--line`) to 1.12:1 against each
+plane: not text, so not 4.5:1, but enough that the edge can't quietly vanish.
+
+> **Correction.** White on Night's `--bad` is 2.69:1, and the live badge was
+> exactly that, at 9px. `--bad-fg` is the one label token that flips between
+> themes. Day's quiet buttons were a `--surface-2` fill at 1.06:1 on a white
+> panel — present, and invisible; `--control-edge` gives them a hairline there
+> instead of a darker fill, which would sink every button on the canvas.
 
 > **Correction.** The tint checks were added after a live measurement caught
 > `.btn-danger` at 4.14:1 in Day while the gate reported the palette clean:
@@ -74,7 +84,7 @@ today: Day `--bad` on `--bad/12` over `--bg` at 4.70:1.
 
 Tailwind names: `canvas` · `raise` · `sink` · `edge` · `edge-strong` · `ink` ·
 `ink-2` · `ink-3` · `accent` · `accent-fg` · `accent-ink` · `good` · `warn` ·
-`bad`.
+`bad` · `bad-fg`.
 
 ## 3. Typography
 
@@ -92,6 +102,10 @@ sizes:
 | `.lead` | 14px, `--text-2`, max 62ch | The sentence under an `h1` |
 | `.hint` | 12px, `--text-2`, max 62ch | Explanation under a control |
 | `.label` | 11px mono, uppercase, 0.08em, `--text-2` | Marks a **group of controls** — never what a screen is |
+
+The roles live in the components layer, so a colour utility beside one wins
+(`label text-accent-ink`, `hint text-bad`). They used to sit after the
+utilities, and every such stamp and warning rendered in the role's own grey.
 
 Base body text is **14px / 1.5**. Nothing carrying prose goes below 12px; 11px
 is reserved for tags, badges, keys and short numerics.
@@ -123,8 +137,9 @@ Tailwind: `rounded-1` · `rounded-2` · `rounded-3` · `rounded-full`.
 |---|---|
 | `.panel` | Raised plane: one hairline, one flat fill, no shadow |
 | `.well` | Inset plane, nests inside `.panel` |
-| `.btn-solid` | The one loud action per screen — accent fill, pill |
-| `.btn-quiet` | Neutral filled control |
+| `.btn-solid` | The one loud action per screen — accent fill, pill. A button whose job is done steps down to quiet (Home's "get" once its result is showing) |
+| `.btn-quiet` | Neutral filled control; in Day it carries a `--control-edge` hairline |
+| `.btn-base` | Shape only, never on its own — for a one-off state that brings its own fill (`btn-base bg-good/12 text-good`). It was `.btn`, and fourteen buttons used it bare and rendered as plain words; `stylesheet.test.ts` now fails on that |
 | `.btn-danger` | Destructive — `bad` at 12% |
 | `.btn-icon` | 36px square, filled surface, always visible |
 | `.btn-icon-bare` | 36px square, transparent — for toolbars on their own plane |
