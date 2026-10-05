@@ -1,4 +1,5 @@
 import { net } from 'electron'
+import { describeNetError } from '../../resolvers/neterror'
 import { log } from '../log'
 
 /**
@@ -19,10 +20,14 @@ const API = 'https://api.telegram.org'
 const MAX_TEXT = 4096
 const MAX_CAPTION = 1024
 
+/** The longest a rate limit is waited out before the one retry. Telegram has asked for minutes. */
+const MAX_RATE_WAIT_S = 30
+
 export class TelegramError extends Error {
   constructor(
     message: string,
-    readonly kind: 'token' | 'chat' | 'network' | 'unknown'
+    /** `token` and `chat` are setup the user has to fix; `rate` passes on its own. */
+    readonly kind: 'token' | 'chat' | 'rate' | 'network' | 'unknown'
   ) {
     super(message)
     this.name = 'TelegramError'
@@ -50,7 +55,17 @@ interface Reply {
   result?: { message_id?: number }
   error_code?: number
   description?: string
+  /** With a 429: how many seconds to wait before sending to that chat again. */
+  parameters?: { retry_after?: number }
 }
+
+/*
+  A transport failure as a sentence naming Telegram, not `net::ERR_...`.
+  Described against the bare API address, never the request's URL: that one
+  carries the bot token in its path.
+*/
+const unreachable = (err: unknown): TelegramError =>
+  new TelegramError(describeNetError(err, API).message, 'network')
 
 function call(token: string, method: string, body: Record<string, unknown>): Promise<Reply> {
   return new Promise((resolve, reject) => {
@@ -80,12 +95,12 @@ function call(token: string, method: string, body: Record<string, unknown>): Pro
       })
       response.on('error', (err: Error) => {
         clearTimeout(timer)
-        reject(new TelegramError(err.message, 'network'))
+        reject(unreachable(err))
       })
     })
     request.on('error', (err) => {
       clearTimeout(timer)
-      reject(new TelegramError(err.message, 'network'))
+      reject(unreachable(err))
     })
     request.end(payload)
   })
@@ -107,7 +122,40 @@ function check(reply: Reply): void {
   if (reply.error_code === 403) {
     throw new TelegramError('The bot has been blocked by that chat.', 'chat')
   }
+  if (reply.error_code === 429) {
+    throw new TelegramError(
+      'Telegram is rate-limiting this bot: too many messages went to that chat at once.',
+      'rate'
+    )
+  }
   throw new TelegramError(description, 'unknown')
+}
+
+/**
+ * Send, and send once more if Telegram says too many.
+ *
+ * A group chat takes about twenty messages a minute, and a run of failures - a
+ * dub taken down, every episode of it refused - used to lose the tail of the
+ * burst to 429s that were never waited out. The wait is what the answer asks
+ * for, capped, and it happens inside the queue so it holds back the messages
+ * behind it too, which is the point.
+ *
+ * Only a 429 is repeated. After a timeout or a dropped connection the message
+ * may well have arrived, and a second go would post it twice.
+ */
+async function deliver(
+  token: string,
+  method: string,
+  body: Record<string, unknown>
+): Promise<void> {
+  let reply = await call(token, method, body)
+  if (!reply.ok && reply.error_code === 429) {
+    const seconds = Math.min(reply.parameters?.retry_after ?? 5, MAX_RATE_WAIT_S)
+    log.warn('notify', 'Telegram asked to slow down; waiting before one more try', { seconds })
+    await new Promise((r) => setTimeout(r, seconds * 1000))
+    reply = await call(token, method, body)
+  }
+  check(reply)
 }
 
 /**
@@ -132,15 +180,14 @@ function clamp(text: string, limit: number): string {
 }
 
 export async function sendMessage(token: string, chatId: string, html: string): Promise<void> {
-  await serialise(async () => {
-    const reply = await call(token, 'sendMessage', {
+  await serialise(() =>
+    deliver(token, 'sendMessage', {
       chat_id: chatId,
       parse_mode: 'HTML',
       disable_web_page_preview: true,
       text: clamp(html, MAX_TEXT)
     })
-    check(reply)
-  })
+  )
 }
 
 /**
@@ -159,18 +206,21 @@ export async function sendNotification(
 ): Promise<void> {
   if (photoUrl && html.length <= MAX_CAPTION) {
     try {
-      await serialise(async () => {
-        const reply = await call(token, 'sendPhoto', {
+      await serialise(() =>
+        deliver(token, 'sendPhoto', {
           chat_id: chatId,
           parse_mode: 'HTML',
           photo: photoUrl,
           caption: html
         })
-        check(reply)
-      })
+      )
       return
     } catch (err) {
-      if (err instanceof TelegramError && (err.kind === 'token' || err.kind === 'chat')) throw err
+      /*
+        Nothing to do with the poster: a broken setup, or a chat that has
+        already been waited out once, refuses the plain message just the same.
+      */
+      if (err instanceof TelegramError && err.kind !== 'network' && err.kind !== 'unknown') throw err
       log.warn('notify', 'The poster could not be sent; sending the text alone', {
         why: err instanceof Error ? err.message : String(err)
       })

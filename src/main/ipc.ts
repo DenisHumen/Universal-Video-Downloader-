@@ -13,7 +13,7 @@ import { searchVideos } from './services/search'
 import { probeMedia } from './services/ffmpeg'
 import { fetchThumbnail } from './services/thumbnails'
 import { registerBrowserIpc } from './services/browser'
-import { setKeepAwake } from './services/awake'
+import { acquireAwake, releaseAwake } from './services/awake'
 import { mt } from './services/locale'
 import {
   cancelDownload,
@@ -274,10 +274,15 @@ function getWindowForNotification(): BrowserWindow | null {
  * Everything the OS should know about the queue: the taskbar/dock progress bar,
  * and whether the machine is allowed to go to sleep. Both derive from the same
  * "is anything actually transferring" question, so they are answered together.
+ *
+ * This is only the queue's hold on the machine. An automated episode takes its
+ * own once its download is done, for the upload and the message after it,
+ * since nothing here hears about either.
  */
 function syncOsState(getWindow: () => BrowserWindow | null): void {
   const active = listDownloads().filter((d) => d.state === 'downloading' || d.state === 'processing')
-  setKeepAwake(active.length > 0)
+  if (active.length > 0) acquireAwake('queue')
+  else releaseAwake('queue')
 
   const win = getWindow()
   if (!win || win.isDestroyed()) return

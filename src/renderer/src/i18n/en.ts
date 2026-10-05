@@ -112,6 +112,8 @@ export const en = {
   'queue.log': 'engine output',
   'queue.copyError': 'copy the error',
   'queue.retryingIn': 'retrying automatically…',
+  'queue.onShare': 'on the share: {path}',
+  'queue.openFailed': 'could not open that file - it may have been moved or deleted',
 
   // ---- download states ----
   'state.queued': 'queued',
@@ -509,6 +511,10 @@ export const en = {
   'auto.startWatching': 'start watching',
   'auto.template': 'filename',
   'auto.templateHint': 'tokens: {title} {season} {episode} {season2} {episode2} {quality} {year}',
+  'auto.templateNoEpisode':
+    'there is no {episode} here, so the episode number goes on the end - otherwise each episode would replace the one before',
+  'auto.templateNoSeason':
+    'there is no {season} here: episodes of different seasons would share names and replace each other',
   'auto.replacements': 'replace in the title',
   'auto.replacementsHint': 'the site answers in its own language; this is how the file gets your name for it',
   'auto.replaceFrom': 'find',

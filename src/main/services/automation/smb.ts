@@ -1,3 +1,4 @@
+import { randomUUID } from 'crypto'
 import { createReadStream, statSync } from 'fs'
 import { pipeline } from 'stream/promises'
 import { log } from '../log'
@@ -28,39 +29,69 @@ type Client = any
 
 const SEP = String.fromCharCode(92)
 
-/** SMB status codes worth telling a person apart from one another. */
-const STATUS: Record<number, string> = {
-  0xc000006d: 'The server rejected that username or password.',
-  0xc000006a: 'The server rejected that password.',
-  0xc0000064: 'The server does not know that username.',
-  0xc0000022: 'That account is not allowed to write there.',
-  0xc00000cc: 'There is no share by that name on the server.',
-  0xc0000034: 'That path does not exist on the share.',
-  0xc000003a: 'That path does not exist on the share.'
+/** The status FILE_CREATE answers when the name is taken. */
+const NAME_COLLISION = 0xc0000035
+/** The name is taken by a file somebody has deleted but the server still holds open. */
+const DELETE_PENDING = 0xc0000056
+
+export type SmbErrorKind = 'auth' | 'network' | 'path' | 'full' | 'busy' | 'unknown'
+
+/**
+ * SMB status codes worth telling a person apart from one another.
+ *
+ * Each with its kind spelled out. It used to be worked out from where the code
+ * fell in a range, which would have called a full disk a password problem the
+ * moment one was added.
+ */
+const STATUS: Record<number, [string, SmbErrorKind]> = {
+  0xc000006d: ['The server rejected that username or password.', 'auth'],
+  0xc000006a: ['The server rejected that password.', 'auth'],
+  0xc0000064: ['The server does not know that username.', 'auth'],
+  0xc0000022: ['That account is not allowed to write there.', 'auth'],
+  0xc00000cc: ['There is no share by that name on the server.', 'path'],
+  0xc0000034: ['That path does not exist on the share.', 'path'],
+  0xc000003a: ['That path does not exist on the share.', 'path'],
+  0xc0000033: ['The share does not accept that file name.', 'path'],
+  [NAME_COLLISION]: ['A file with that name already exists on the share.', 'path'],
+  0xc000007f: ['The share is full.', 'full'],
+  0xc0000044: ['The account has used up its space on the share.', 'full'],
+  0xc0000043: ['That file is open on the server, so it cannot be replaced right now.', 'busy'],
+  [DELETE_PENDING]: ['The server is still deleting an earlier copy of that file.', 'busy']
 }
 
 export class SmbError extends Error {
   constructor(
     message: string,
-    /** So callers can tell "fix your password" from "try again later". */
-    readonly kind: 'auth' | 'network' | 'path' | 'unknown'
+    /**
+     * What sort of trouble it is. Nothing retries on it: an upload that fails
+     * is tried again by the next check, whatever the kind.
+     */
+    readonly kind: SmbErrorKind
   ) {
     super(message)
     this.name = 'SmbError'
   }
 }
 
+/** The SMB status a library failure carries, if it carries one. */
+function statusOf(err: unknown): number | undefined {
+  const status = (err as { header?: { status?: number | bigint } } | undefined)?.header?.status
+  return status === undefined ? undefined : Number(status) >>> 0
+}
+
+/** A create refused because the name is in use, by a finished file or one on its way out. */
+function nameTaken(err: unknown): boolean {
+  const n = statusOf(err)
+  return n === NAME_COLLISION || n === DELETE_PENDING
+}
+
 /** Turn whatever the library threw into something worth showing a person. */
-function wrap(err: unknown, host: string): SmbError {
-  const raw = err as { header?: { status?: number | bigint }; message?: string; code?: string }
-  const status = raw?.header?.status
-  if (status !== undefined) {
-    const n = Number(status) >>> 0
+export function toSmbError(err: unknown, host: string): SmbError {
+  const raw = err as { message?: string; code?: string }
+  const n = statusOf(err)
+  if (n !== undefined) {
     const known = STATUS[n]
-    if (known) {
-      const kind = n === 0xc0000022 ? 'auth' : n >= 0xc0000034 && n <= 0xc000003a ? 'path' : 'auth'
-      return new SmbError(known, n === 0xc00000cc ? 'path' : kind)
-    }
+    if (known) return new SmbError(known[0], known[1])
     return new SmbError(`The server refused the request (0x${n.toString(16)}).`, 'unknown')
   }
   const message = String(raw?.message ?? raw ?? '')
@@ -92,7 +123,7 @@ async function connect(input: SmbTarget, password: string): Promise<{ client: Cl
     } catch {
       /* it may never have opened */
     }
-    throw wrap(err, target.host)
+    throw toSmbError(err, target.host)
   }
 }
 
@@ -144,12 +175,41 @@ export async function uploadFile(
     .filter(Boolean)
     .join(SEP)
   const finalPath = dir ? dir + SEP + remoteName : remoteName
-  const tempPath = `${finalPath}.uvd-part`
+  let tempPath = `${finalPath}.uvd-part`
 
   try {
     if (dir) await ensureDirs(tree, dir)
 
-    const stream = await tree.createFileWriteStream(tempPath)
+    /*
+      An upload cut short - the connection dropped, the app quit mid-file -
+      leaves its temporary file behind, and the library creates with
+      FILE_CREATE, which refuses a name that is taken. Every later upload of
+      that episode then failed until somebody deleted the leftover by hand.
+      `exists` throws on anything but "not found", hence the catch.
+    */
+    try {
+      if (await tree.exists(tempPath)) await tree.removeFile(tempPath)
+    } catch {
+      /* the create below will say so if it still matters */
+    }
+
+    let stream: Client
+    try {
+      stream = await tree.createFileWriteStream(tempPath)
+    } catch (err) {
+      /*
+        A leftover the server still holds open - after a power cut, say - stays
+        "being deleted" until that handle lets go, and the name with it. Rather
+        than wait for that, write beside it under a name of its own.
+      */
+      if (!nameTaken(err)) throw err
+      tempPath = `${finalPath}.${randomUUID().slice(0, 8)}.uvd-part`
+      log.warn('upload', 'The temporary name is still taken on the share; using another', {
+        host: target.host,
+        path: tempPath
+      })
+      stream = await tree.createFileWriteStream(tempPath)
+    }
     if (onProgress) {
       let sent = 0
       stream.on('drain', () => onProgress(sent, total))
@@ -187,7 +247,7 @@ export async function uploadFile(
     } catch {
       /* it may not exist */
     }
-    throw wrap(err, target.host)
+    throw toSmbError(err, target.host)
   } finally {
     try {
       await client.close()
@@ -217,7 +277,7 @@ export async function testTarget(input: SmbTarget, password: string): Promise<st
     const where = folder ? folder.split(SEP).join('/') : target.share
     return `Connected. ${entries.length} item(s) in ${where}.`
   } catch (err) {
-    throw wrap(err, target.host)
+    throw toSmbError(err, target.host)
   } finally {
     try {
       await client.close()

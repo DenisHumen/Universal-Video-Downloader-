@@ -110,6 +110,8 @@ export const ru: Dictionary = {
   'queue.log': 'вывод движка',
   'queue.copyError': 'скопировать ошибку',
   'queue.retryingIn': 'повторяю автоматически…',
+  'queue.onShare': 'на шаре: {path}',
+  'queue.openFailed': 'не удалось открыть файл - возможно, его переместили или удалили',
 
   // ---- download states ----
   'state.queued': 'в очереди',
@@ -496,6 +498,10 @@ export const ru: Dictionary = {
   'auto.startWatching': 'начать следить',
   'auto.template': 'имя файла',
   'auto.templateHint': 'подстановки: {title} {season} {episode} {season2} {episode2} {quality} {year}',
+  'auto.templateNoEpisode':
+    'здесь нет {episode}, поэтому номер серии допишется в конец - иначе каждая серия заменяла бы предыдущую',
+  'auto.templateNoSeason':
+    'здесь нет {season}: у серий разных сезонов совпадут имена, и они заменят друг друга',
   'auto.replacements': 'замены в названии',
   'auto.replacementsHint': 'сайт отвечает на своём языке; так файл получит ваше название',
   'auto.replaceFrom': 'найти',

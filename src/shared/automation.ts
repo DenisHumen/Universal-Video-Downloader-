@@ -285,16 +285,62 @@ export function safeSegment(name: string): string {
     .slice(0, 180)
 }
 
-/** Build the filename for one episode, ready to use. */
+/** What a new rename step starts with, and what one that fills to nothing falls back to. */
+export const DEFAULT_RENAME_TEMPLATE = '{title} - S{season2}E{episode2}'
+
+/** Put after a template that does not name the episode. */
+const EPISODE_SUFFIX = ' - S{season2}E{episode2}'
+
+/*
+  Exact tokens only. `{Episode}` is not one - the template leaves it in the
+  name as text - so a looser match would wave through a template that still
+  gives every episode the same name.
+*/
+const EPISODE_TOKEN = /\{episode2?\}/
+const SEASON_TOKEN = /\{season2?\}/
+
+/**
+ * Build the filename for one episode, ready to use.
+ *
+ * Always one that tells episodes apart. A template without the episode in it -
+ * `{title}`, say - named every episode the same, and since both the rename and
+ * the upload replace a file already there (that is what lets a re-run replace
+ * its own), each new episode quietly deleted the one before, locally and on the
+ * share. The number is added here rather than demanded by the editor, so the
+ * watches saved before this are covered as well.
+ */
 export function renameFor(
   step: RenameStep,
   values: TemplateValues,
   now?: Date
 ): string {
   const title = applyReplacements(values.title, step.replacements)
-  const stem = safeSegment(fillTemplate(step.template, { ...values, title }, now))
+  const fill = (template: string): string =>
+    safeSegment(fillTemplate(template, { ...values, title }, now))
+  let stem = fill(step.template)
+  if (!EPISODE_TOKEN.test(step.template)) {
+    // Cut the stem, not the number, when the whole name would be too long.
+    const suffix = fillTemplate(EPISODE_SUFFIX, values, now)
+    stem = stem
+      ? safeSegment(stem.slice(0, 180 - suffix.length) + suffix)
+      : fill(DEFAULT_RENAME_TEMPLATE)
+  }
   const ext = values.ext ? `.${values.ext.replace(/^\./, '')}` : ''
   return `${stem || 'episode'}${ext}`
+}
+
+/**
+ * What a rename template leaves out that keeps episodes apart, for the editor
+ * to point out. Without the episode, `renameFor` adds it. Without the season,
+ * nothing does: a single-season series is fine as it is, but in one with
+ * several, E01 of the second season lands on E01 of the first. A blank
+ * template has nothing to say - it uses the default, and the preview shows it.
+ */
+export function renameGap(template: string): 'episode' | 'season' | undefined {
+  if (!template.trim()) return undefined
+  if (!EPISODE_TOKEN.test(template)) return 'episode'
+  if (!SEASON_TOKEN.test(template)) return 'season'
+  return undefined
 }
 
 /**

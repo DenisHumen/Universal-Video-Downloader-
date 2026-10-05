@@ -14,22 +14,46 @@ import type { DownloadItem, DownloadRequest } from '@shared/types'
 
 type Plan = 'ok' | 'fail' | 'cancel' | 'hang'
 
-const h = vi.hoisted(() => ({
-  dir: '',
-  plan: [] as Plan[],
-  started: [] as string[],
-  items: new Map<string, unknown>(),
-  events: null as unknown as import('events').EventEmitter,
-  upload: vi.fn(),
-  send: vi.fn(),
-  failures: [] as unknown[][]
-}))
+const h = vi.hoisted(() => {
+  class TelegramError extends Error {
+    constructor(
+      message: string,
+      readonly kind: string
+    ) {
+      super(message)
+    }
+  }
+  return {
+    dir: '',
+    plan: [] as Plan[],
+    started: [] as string[],
+    items: new Map<string, unknown>(),
+    events: null as unknown as import('events').EventEmitter,
+    upload: vi.fn(),
+    send: vi.fn(),
+    failures: [] as unknown[][],
+    TelegramError,
+    /** Power-save blockers started and not yet stopped. */
+    blockers: new Set<number>()
+  }
+})
 
-vi.mock('electron', () => ({
-  app: { getPath: () => h.dir },
-  net: { isOnline: () => true },
-  powerMonitor: { on: vi.fn(), off: vi.fn() }
-}))
+vi.mock('electron', () => {
+  let next = 0
+  return {
+    app: { getPath: () => h.dir },
+    net: { isOnline: () => true },
+    powerMonitor: { on: vi.fn(), off: vi.fn() },
+    powerSaveBlocker: {
+      start: () => {
+        h.blockers.add(++next)
+        return next
+      },
+      stop: (id: number) => h.blockers.delete(id),
+      isStarted: (id: number) => h.blockers.has(id)
+    }
+  }
+})
 vi.mock('../log', () => ({ log: { info: vi.fn(), warn: vi.fn(), error: vi.fn() } }))
 vi.mock('../settings', () => ({
   getSettings: () => ({
@@ -51,7 +75,8 @@ vi.mock('./telegram', () => ({
     h.failures.push(args)
     return 'episode failed'
   },
-  sendNotification: h.send
+  sendNotification: h.send,
+  TelegramError: h.TelegramError
 }))
 
 /** The site: every episode of dub "t" up to the fourth, minus what the watch has seen. */
@@ -75,6 +100,10 @@ vi.mock('../downloader', async () => {
   return {
     downloadEvents: h.events,
     getDownload: (id: string) => h.items.get(id),
+    relocateItem: (id: string, patch: Partial<DownloadItem>) => {
+      const item = h.items.get(id)
+      if (item) Object.assign(item, patch)
+    },
     resumeDownload: vi.fn(),
     cancelDownload: (id: string) => {
       const item = h.items.get(id) as DownloadItem
@@ -171,6 +200,7 @@ describe('an episode that fails', () => {
     h.started = []
     h.items.clear()
     h.failures = []
+    h.blockers.clear()
     h.upload.mockReset()
     h.upload.mockResolvedValue({ remotePath: 'Series/d1.mp4', seconds: 2 })
     h.send.mockReset()
@@ -256,15 +286,92 @@ describe('an episode that fails', () => {
     expect(seen4(m.store.getWatch('w1'))).toBe(true)
   })
 
-  it('does not upload again when only the message failed', async () => {
-    h.send.mockRejectedValueOnce(new Error('Telegram: Bad Gateway'))
+  /*
+    The episode is on the share. A message that did not follow it used to fail
+    the whole run, and the failure notice then went out through the same bot -
+    a second message into a chat that was already refusing them.
+  */
+  it('is done, and handled, when only the message failed', async () => {
+    h.send.mockRejectedValueOnce(new h.TelegramError('Telegram is rate-limiting this bot', 'rate'))
 
     await check()
-    expect(runs()[0].steps.map((s) => s.state)).toEqual(['done', 'done', 'failed'])
+    const [run] = runs()
+    expect(run.state).toBe('done')
+    expect(run.remotePath).toBe('Series/d1.mp4')
+    expect(run.steps.map((s) => s.state)).toEqual(['done', 'done', 'failed'])
+    expect(run.steps[2].message).toBe('Telegram is rate-limiting this bot')
+    expect(seen4(m.store.getWatch('w1'))).toBe(true)
+    expect(m.store.getWatch('w1')?.lastRunError).toBeUndefined()
+    expect(h.send).toHaveBeenCalledTimes(1)
+    expect(h.failures).toEqual([])
+
     await check()
     expect(h.started).toHaveLength(1)
     expect(h.upload).toHaveBeenCalledTimes(1)
+  })
+
+  // A blocked bot fails every episode's message, and the watch is where somebody looks.
+  it('puts a bot that cannot write to the chat on the watch', async () => {
+    h.send.mockRejectedValueOnce(new h.TelegramError('The bot has been blocked by that chat.', 'chat'))
+
+    await check()
     expect(runs()[0].state).toBe('done')
+    expect(m.store.getWatch('w1')?.lastRunError).toBe('The bot has been blocked by that chat.')
+  })
+
+  /*
+    The queue lets go of the machine as soon as the download completes, and the
+    upload after it ran with nothing to stop the machine sleeping halfway.
+  */
+  it('keeps the machine awake through the upload and the message, and lets go after', async () => {
+    const held: number[] = []
+    h.upload.mockImplementation(async () => {
+      held.push(h.blockers.size)
+      return { remotePath: 'Series/d1.mp4', seconds: 2 }
+    })
+    h.send.mockImplementation(async () => {
+      held.push(h.blockers.size)
+    })
+
+    await check()
+    expect(held).toEqual([1, 1])
+    expect(h.blockers.size).toBe(0)
+  })
+
+  it('lets the machine sleep again when the upload fails', async () => {
+    h.upload.mockRejectedValueOnce(new Error('Could not reach 192.168.1.10'))
+    await check()
+    expect(runs()[0].state).toBe('failed')
+    expect(h.blockers.size).toBe(0)
+  })
+
+  // The row in Downloads kept the name the file was downloaded under, so Play did nothing.
+  it('points the queue row at the renamed file', async () => {
+    m.store.updateWatch('w1', {
+      steps: [
+        watch().steps[0],
+        { id: 'r', kind: 'rename', enabled: true, template: '{title} {episode2}', replacements: [] },
+        ...watch().steps.slice(1)
+      ]
+    })
+
+    await check()
+    const item = h.items.get('d1') as DownloadItem
+    expect(item.filepath).toBe(join(h.dir, 'Series 04.mp4'))
+    expect(existsSync(item.filepath as string)).toBe(true)
+    expect(item.remotePath).toBe('Series/d1.mp4')
+  })
+
+  it('points the queue row at the share once the local copy is deleted', async () => {
+    const [download, upload, notify] = watch().steps
+    m.store.updateWatch('w1', {
+      steps: [download, { ...upload, deleteLocalAfter: true } as typeof upload, notify]
+    })
+
+    await check()
+    const item = h.items.get('d1') as DownloadItem
+    expect(item.filepath).toBeUndefined()
+    expect(item.remotePath).toBe('Series/d1.mp4')
   })
 
   // Somebody cancelled it in the queue on purpose; fetching it again behind their back would undo that.

@@ -9,6 +9,7 @@ import {
   newEpisodes,
   remoteDirFor,
   renameFor,
+  renameGap,
   safeSegment,
   type RenameStep
 } from './automation'
@@ -114,13 +115,71 @@ describe('renameFor', () => {
   })
 
   it('never produces a nameless file', () => {
-    expect(renameFor(step({ template: '///' }), values, AT)).toBe('episode.mkv')
+    expect(renameFor(step({ template: '///' }), values, AT)).toBe('Табакошка - S01E09.mkv')
   })
 
   it('cannot be made to escape its directory by a hostile title', () => {
     const out = renameFor(step({ template: '{title}' }), { ...values, title: '../../etc/passwd' }, AT)
     expect(out).not.toContain('/')
     expect(out).not.toContain('..')
+  })
+
+  /*
+    Both the rename and the upload replace a file already there, so a template
+    that named every episode alike kept only the latest - locally and on the
+    share - and deleted every one before it, without a word.
+  */
+  describe('tells every episode apart', () => {
+    const names = (template: string): string[] =>
+      [1, 2].map((episode) => renameFor(step({ template }), { ...values, episode }, AT))
+
+    it.each(['{title}', '{title} {quality}', '', '   ', '{Episode}', '{EPISODE2}'])(
+      'with the template "%s"',
+      (template) => {
+        const [first, second] = names(template)
+        expect(first).not.toBe(second)
+        expect(first).toContain('S01E01')
+      }
+    )
+
+    it('adds the episode to a template that leaves it out', () => {
+      expect(names('{title}')[1]).toBe('Табакошка - S01E02.mkv')
+    })
+
+    // Appended to '' it would read "- S01E02"; a blank template means the default.
+    it('uses the whole default for a blank template', () => {
+      expect(names('')[1]).toBe('Табакошка - S01E02.mkv')
+    })
+
+    it('keeps the number when a long title has to be cut', () => {
+      const out = renameFor(step({ template: '{title}' }), { ...values, title: 'x'.repeat(400) }, AT)
+      expect(out).toMatch(/ - S01E09[.]mkv$/)
+      expect(out.length).toBeLessThanOrEqual(180 + '.mkv'.length)
+    })
+
+    it('leaves a template that already names the episode exactly as written', () => {
+      expect(names('{title} E{episode2}')[1]).toBe('Табакошка E02.mkv')
+      expect(names('{episode}. {title}')[1]).toBe('2. Табакошка.mkv')
+    })
+  })
+})
+
+describe('renameGap', () => {
+  it('points out a template without the episode', () => {
+    expect(renameGap('{title}')).toBe('episode')
+    // Not a token: it stays in the name as text.
+    expect(renameGap('{title} {Episode}')).toBe('episode')
+  })
+
+  // Fine for a series with one season; in one with two, E01 of each would share a name.
+  it('points out a template with the episode but not the season', () => {
+    expect(renameGap('{title} E{episode2}')).toBe('season')
+  })
+
+  it('has nothing to say about a template that names both, or a blank one', () => {
+    expect(renameGap('{title} - S{season2}E{episode2}')).toBeUndefined()
+    expect(renameGap('{title} {season}x{episode}')).toBeUndefined()
+    expect(renameGap('')).toBeUndefined()
   })
 })
 

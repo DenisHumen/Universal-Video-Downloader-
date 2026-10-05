@@ -309,6 +309,11 @@ export interface DownloadItem {
   downloadedBytes?: number
   totalBytes?: number
   filepath?: string
+  /**
+   * Where an automated episode was uploaded, as `share/folder/name`. With no
+   * `filepath`, the local copy was deleted afterwards and this is the only copy.
+   */
+  remotePath?: string
   outputDir: string
   error?: string
   /** Machine-readable reason, so the UI can say it in the user's language. */

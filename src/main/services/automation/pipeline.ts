@@ -5,9 +5,11 @@ import {
   cancelDownload,
   downloadEvents,
   getDownload,
+  relocateItem,
   resumeDownload,
   startDownload
 } from '../downloader'
+import { acquireAwake, releaseAwake } from '../awake'
 import { shouldResume } from '../resume'
 import { getSettings } from '../settings'
 import { getSecret, SECRET } from '../secrets'
@@ -17,7 +19,7 @@ import { carryOver } from './carry-over'
 import { downloadUrlFor } from './detect'
 import { addRun, getWatch, lastRunFor, updateRun, updateWatch } from './store'
 import { uploadFile } from './smb'
-import { composeEpisodeNews, composeFailure, sendNotification } from './telegram'
+import { composeEpisodeNews, composeFailure, sendNotification, TelegramError } from './telegram'
 import {
   episodeKey,
   remoteDirFor,
@@ -175,6 +177,16 @@ export async function runEpisode(
   let ticket: Ticket | undefined
   /** The upload already went through on an earlier go: rename and upload are behind us too. */
   const uploaded = Boolean(carried.remotePath)
+  /** The queue row the episode's file came from: this go's, or that of the go whose file it kept. */
+  let queueId = carried.filepath ? previous?.downloadId : undefined
+  /** A setup problem with the bot, found by a message that did not go. */
+  let notifyTrouble: string | undefined
+  /*
+    Held from the end of the download until the run is over. The queue lets go
+    of the machine the moment the download completes, and the upload, which
+    can take as long again, ran with nothing stopping the machine sleeping.
+  */
+  const awake = `delivery:${run.id}`
 
   const values = (): TemplateValues => ({
     title: seriesTitle,
@@ -196,6 +208,15 @@ export async function runEpisode(
     return filepath
   }
 
+  /**
+   * Tell the queue row where its file went - only while it still points at the
+   * file being moved, since somebody may have retried that download by hand
+   * meanwhile, and its new file is not this run's to account for.
+   */
+  const follow = (from: string, patch: { filepath?: string; remotePath?: string }): void => {
+    if (queueId && getDownload(queueId)?.filepath === from) relocateItem(queueId, patch)
+  }
+
   /** Put the episode on the queue, wait for it, and say where it landed. */
   const download = async (): Promise<string> => {
     const item = await startDownload({
@@ -206,6 +227,7 @@ export async function runEpisode(
       quality: watch.quality as never
     })
     updateRun(run.id, { downloadId: item.id })
+    queueId = item.id
 
     ticket = { downloadId: item.id }
     waiting.set(watch.id, ticket)
@@ -263,6 +285,7 @@ export async function runEpisode(
       filepath = await download()
       markStep(run, 'download', { state: 'done', finishedAt: Date.now() })
     }
+    acquireAwake(awake)
     if (filepath && existsSync(filepath)) bytes = statSync(filepath).size
     updateRun(run.id, { filepath })
 
@@ -281,6 +304,7 @@ export async function runEpisode(
         renameSync(source, target)
         filepath = target
         updateRun(run.id, { filepath })
+        follow(source, { filepath: target })
       }
       markStep(run, 'rename', { state: 'done', finishedAt: Date.now(), message: name })
       log.info('watcher', `Renamed to ${name}`, { id: shortId })
@@ -321,10 +345,14 @@ export async function runEpisode(
       if (uploadStep.deleteLocalAfter) {
         try {
           rmSync(source, { force: true })
+          // The share's copy is the only one now, and the row says so instead of a dead path.
+          follow(source, { filepath: undefined, remotePath })
           log.info('watcher', 'Removed the local copy after upload', { id: shortId })
         } catch {
           /* the upload is what mattered */
         }
+      } else {
+        follow(source, { remotePath })
       }
     }
 
@@ -340,22 +368,40 @@ export async function runEpisode(
           message: 'Telegram is not set up.'
         })
       } else {
-        await sendNotification(
-          token,
-          settings.telegramChatId,
-          composeEpisodeNews({
-            series: seriesTitle,
-            season: ref.season,
-            episode: ref.episode,
-            translator: watch.translatorName,
-            quality: watch.quality,
-            remotePath,
-            bytes,
-            seconds
-          }),
-          watch.thumbnail
-        )
-        markStep(run, 'notify', { state: 'done', finishedAt: Date.now() })
+        try {
+          await sendNotification(
+            token,
+            settings.telegramChatId,
+            composeEpisodeNews({
+              series: seriesTitle,
+              season: ref.season,
+              episode: ref.episode,
+              translator: watch.translatorName,
+              quality: watch.quality,
+              remotePath,
+              bytes,
+              seconds
+            }),
+            watch.thumbnail
+          )
+          markStep(run, 'notify', { state: 'done', finishedAt: Date.now() })
+        } catch (err) {
+          /*
+            The episode is where it was meant to go; a message that did not
+            follow it is not a failed episode. It used to be one: the run read
+            as failed, and the failure notice went out through the very bot
+            that had just refused - a second message into a chat already
+            rate-limiting, or one that had blocked it. The step says what went
+            wrong, and the run is done.
+          */
+          const why = err instanceof Error ? err.message : String(err)
+          markStep(run, 'notify', { state: 'failed', finishedAt: Date.now(), message: why })
+          log.warn('watcher', 'Notification failed', { id: shortId, why })
+          // A bot that cannot write to that chat fails every message; that belongs on the watch.
+          if (err instanceof TelegramError && (err.kind === 'token' || err.kind === 'chat')) {
+            notifyTrouble = why
+          }
+        }
       }
     }
 
@@ -366,8 +412,13 @@ export async function runEpisode(
       finishedAt: Date.now(),
       steps: run.steps
     })
-    // An episode that went all the way through is proof the chain works again.
-    updateWatch(watch.id, { lastRunError: undefined, lastRunFailedAt: undefined })
+    // An episode that went all the way through is proof the chain works again - its messages aside.
+    updateWatch(
+      watch.id,
+      notifyTrouble
+        ? { lastRunError: notifyTrouble, lastRunFailedAt: Date.now() }
+        : { lastRunError: undefined, lastRunFailedAt: undefined }
+    )
     log.info('watcher', `Finished ${seriesTitle} ${episodeKey(ref)}`, { id: shortId })
   } catch (err) {
     const why = err instanceof Error ? err.message : String(err)
@@ -420,6 +471,8 @@ export async function runEpisode(
       ).catch(() => undefined)
     }
     return 'failed'
+  } finally {
+    releaseAwake(awake)
   }
 
   return 'done'
