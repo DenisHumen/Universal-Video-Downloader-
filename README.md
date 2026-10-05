@@ -346,14 +346,26 @@ three shapes.
 
 ## 🤝 Releasing
 
-Pushing a `v*` tag triggers the [release workflow](.github/workflows/release.yml), which builds on
-macOS, Windows and Linux runners and publishes artifacts to GitHub Releases — including the
-`latest*.yml` metadata that powers in-app auto-updates.
+Pushing a `v*` tag triggers the [release workflow](.github/workflows/release.yml). It opens a
+draft release for the tag, builds on macOS (Apple silicon and Intel), Windows and Linux runners that
+each upload into that draft, and publishes it only once every runner has finished. Before it does,
+[`scripts/finalize-release.mjs`](scripts/finalize-release.mjs) merges the two Macs'
+`latest-mac.yml`, checks that each `latest*.yml` gives the size and SHA-512 of the file actually on
+the release, and writes `SHA256SUMS`.
 
 ```bash
 npm version patch        # bump version + create tag
-git push --follow-tags   # CI builds & publishes the release
+git push --follow-tags   # CI builds, checks & publishes the release
 ```
+
+While the runners work, the release is a draft: its download links return 404 and installed copies
+keep seeing the previous version. Then every file appears at once. If a runner fails, the release
+stays a draft — re-run the failed jobs, and it is published when they pass. A release that is
+already public is refused rather than silently left as it was.
+
+Run by hand from a branch, the workflow builds every platform and keeps the installers as workflow
+artifacts for a week, but publishes nothing. `npm run release` on your own machine uploads into a
+draft too, and leaves publishing it to you.
 
 A new ffmpeg means new pins in [`scripts/ffmpeg-pins.mjs`](scripts/ffmpeg-pins.mjs) and the same
 URLs in [`THIRD_PARTY_NOTICES.txt`](THIRD_PARTY_NOTICES.txt): a test and the packaging step both fail

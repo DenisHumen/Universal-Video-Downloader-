@@ -4,6 +4,11 @@ on:
   push:
     tags:
       - 'v*'
+  # A manual run on a branch builds every platform and keeps the installers
+  # as workflow artifacts, but publishes nothing: electron-builder names the
+  # release after package.json, so a run after a version bump but before the
+  # tag used to make that release public, untagged and unchecked. Run it on a
+  # `v*` tag and it is the same as pushing that tag.
   workflow_dispatch:
 
 permissions:
@@ -13,13 +18,26 @@ concurrency:
   group: release-${{ github.ref }}
   cancel-in-progress: false
 
+# How a release goes out: the first job opens a draft for the tag, every
+# runner uploads into it, and only the finalize job, once all of them have
+# finished, makes it public. Until then the release is invisible: its download
+# links return 404 and installed copies keep seeing the previous version.
+#
+# It used to be the other way round. Each runner published on its own, so the
+# first one to finish made the release public while the rest were still
+# building: Windows users got an update error on every check (no latest.yml
+# yet), Mac and Linux users were sent to a page without their file, and a
+# runner that came in more than two hours late found a release electron-builder
+# will not touch, uploaded nothing and still went green. If a runner fails
+# now, the release simply stays a draft — re-run the failed jobs and it goes
+# out when they pass.
 jobs:
   # A tag that doesn't match package.json publishes artifacts under the old
   # version number, together with a latest.yml advertising it — so every
   # installed copy compares the version it already has against itself and
   # decides it is up to date. The release exists and nobody ever receives it.
   verify:
-    name: Tag matches package.json
+    name: Check the tag, open a draft
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -32,6 +50,29 @@ jobs:
           if [ "$tag" != "$pkg" ]; then
             echo "::error::Tag $GITHUB_REF_NAME does not match package.json version $pkg."
             exit 1
+          fi
+
+      # Opened once, here, before any runner starts: four runners racing to
+      # create it would leave four drafts for one tag. The title is the bare
+      # version, as electron-builder has always named releases (3.20.0, not
+      # v3.20.0). A re-run finds the draft and the runners fill it again.
+      #
+      # A release that is already public is refused: electron-builder uploads
+      # nothing to it from a draft build, and every runner would still pass.
+      - name: Open a draft release
+        if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          if draft="$(gh release view "$GITHUB_REF_NAME" --json isDraft --jq .isDraft 2>/dev/null)"; then
+            if [ "$draft" != "true" ]; then
+              echo "::error::$GITHUB_REF_NAME is already published, and electron-builder uploads nothing to a published release. Delete it first, or tag a new version."
+              exit 1
+            fi
+            echo "The draft for $GITHUB_REF_NAME already exists; the runners will upload into it."
+          else
+            gh release create "$GITHUB_REF_NAME" --draft --verify-tag --title "${GITHUB_REF_NAME#v}" --notes ""
           fi
 
   build:
@@ -81,10 +122,12 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      # 24, the active LTS. 20 reached end of life in April 2026, and
+      # setup-node goes on installing it without a word.
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 24
           cache: npm
 
       - name: Install Linux packaging tools
@@ -118,36 +161,100 @@ jobs:
       - name: Build renderer & main
         run: npm run build
 
-      - name: Build & publish (${{ matrix.label }})
-        run: npx --no-install electron-builder --${{ matrix.platform }} ${{ matrix.args }} --publish always
+      # Uploads into the draft on a tag (electron-builder.yml says
+      # `releaseType: draft`), and nowhere at all on a manual run.
+      - name: Build installers (${{ matrix.label }})
+        run: npx --no-install electron-builder --${{ matrix.platform }} ${{ matrix.args }} --publish ${{ startsWith(github.ref, 'refs/tags/v') && 'always' || 'never' }}
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           # No Apple/Windows signing certificates in CI — build unsigned artifacts.
           CSC_IDENTITY_AUTO_DISCOVERY: false
 
-  # A release page with an empty body is what every release here shipped with:
-  # the download badge in the README lands an ordinary person on a bare list of
-  # sixteen files, several of which are blockmaps, with nothing saying which one
-  # is theirs or what changed. This fills it in from the tag itself.
-  #
-  # `continue-on-error` on purpose — the binaries are already published and
-  # working by this point, and a failure to write prose must never mark a good
-  # release as failed.
-  notes:
-    name: Release notes
+      # Both Mac runners upload a latest-mac.yml of the same name and the second
+      # replaces the first, so v3.20.0's lists the Intel files only. Each keeps
+      # its own copy here, named for the runner, for the finalize job to merge.
+      - name: Keep this runner's latest-mac.yml
+        if: matrix.platform == 'mac' && startsWith(github.ref, 'refs/tags/v')
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.platform }}-${{ matrix.arch }}
+          path: release/*/latest-mac.yml
+          if-no-files-found: error
+          overwrite: true
+
+      - name: Keep the installers (manual run)
+        if: ${{ !startsWith(github.ref, 'refs/tags/v') }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: installers-${{ matrix.platform }}-${{ matrix.arch }}
+          path: |
+            release/*/*.exe
+            release/*/*.dmg
+            release/*/*.zip
+            release/*/*.AppImage
+            release/*/*.deb
+            release/*/*.rpm
+          if-no-files-found: error
+          retention-days: 7
+
+  # Runs only when every build passed: one failed or still queued, and the
+  # release stays a draft. scripts/finalize-release.mjs says what it checks.
+  finalize:
+    name: Publish the release
     needs: build
+    if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      GH_REPO: ${{ github.repository }}
+      TAG: ${{ github.ref_name }}
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
+      # No `npm ci`: finalize-release.mjs needs nothing but Node itself.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Collect each Mac runner's latest-mac.yml
+        uses: actions/download-artifact@v4
+        with:
+          pattern: mac-*
+          path: mac-update-info
+
+      - name: Download the installers and update files from the draft
+        run: |
+          gh release download "$TAG" --dir assets \
+            --pattern '*.exe' --pattern '*.dmg' --pattern '*.zip' \
+            --pattern '*.AppImage' --pattern '*.deb' --pattern '*.rpm' \
+            --pattern 'latest.yml' --pattern 'latest-linux.yml'
+          ls -l assets
+
+      - name: Merge latest-mac.yml, check every file, write SHA256SUMS
+        run: node scripts/finalize-release.mjs --version="${TAG#v}" --assets=assets --mac=mac-update-info
+
+      # The same sums, read back by coreutils, the way a packager will.
+      - name: Check SHA256SUMS against the downloads
+        working-directory: assets
+        run: sha256sum --check --strict SHA256SUMS
+
+      - name: Upload latest-mac.yml and SHA256SUMS
+        run: gh release upload "$TAG" assets/latest-mac.yml assets/SHA256SUMS --clobber
+
+      # A release page with an empty body is what every release here shipped
+      # with: the download badge in the README lands an ordinary person on a
+      # bare list of sixteen files, several of which are blockmaps, with nothing
+      # saying which one is theirs or what changed. This fills it in from the
+      # tag itself.
+      #
+      # `continue-on-error` on this step alone — the release is complete and
+      # checked by now, and a failure to write prose must never hold it back.
       - name: Write the release body
         continue-on-error: true
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          TAG: ${{ github.ref_name }}
           REPO: ${{ github.repository }}
         run: |
           set -eu
@@ -176,6 +283,9 @@ jobs:
             echo ".deb: it installs the AppArmor profile the app needs there, which an"
             echo "AppImage cannot."
             echo
+            echo "The SHA-256 of every file is in [SHA256SUMS]($BASE/SHA256SUMS):"
+            echo '`sha256sum --check --ignore-missing SHA256SUMS` in the folder you downloaded to.'
+            echo
             echo "### If macOS says the app is damaged"
             echo
             echo "It is not damaged. The app is not signed with a paid Apple developer"
@@ -201,6 +311,11 @@ jobs:
             echo "- first release" >> body.md
           fi
 
-          gh release edit "$TAG" --repo "$REPO" --notes-file body.md
+          gh release edit "$TAG" --notes-file body.md
           echo "--- body written ---"
           cat body.md
+
+      # Every file appears at once, and /releases/latest — where installed
+      # copies look for an update — moves to this release only now.
+      - name: Publish
+        run: gh release edit "$TAG" --draft=false --latest

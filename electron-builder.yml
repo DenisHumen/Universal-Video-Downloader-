@@ -161,8 +161,12 @@ rpm:
   afterInstall: build/linux/after-install.sh
   afterRemove: build/linux/after-remove.sh
 
+# A draft, never a release: each runner uploads into the draft the release
+# workflow opened for the tag, and its finalize job publishes it once all of
+# them are done. With `release`, the first runner to finish made it public
+# while the others were still building.
 publish:
   provider: github
   owner: DenisHumen
   repo: Universal-Video-Downloader-
-  releaseType: release
+  releaseType: draft
