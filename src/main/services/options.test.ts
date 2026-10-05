@@ -407,3 +407,50 @@ describe('classifyYtdlpError, when ffmpeg wrote nothing', () => {
     expect(classifyYtdlpError(real, false).code).toBe('postprocess')
   })
 })
+
+/*
+  A speed limit of "2MB" stops the engine at its own command line, and the line
+  it prints has "rate limit" in it - so the user was told the site was
+  rate-limiting them and to wait a minute, over and over, on every download.
+  The lines are yt-dlp 2026.03.17's own; a release build puts its file name
+  where the source build says "yt-dlp".
+*/
+describe('classifyYtdlpError, when the engine refuses a setting', () => {
+  const USAGE = 'Usage: yt-dlp.exe [OPTIONS] URL [URL...]\r\n\r\n'
+
+  it('blames the setting, not the site', () => {
+    const out = classifyYtdlpError('yt-dlp: error: invalid rate limit "2MB" given', false)
+    expect(out.code).toBe('badSetting')
+    expect(out.message).toMatch(/speed limit/i)
+    expect(out.cookieHint).toBe(false)
+  })
+
+  it('reads the whole usage block the engine writes', () => {
+    const raw = USAGE + 'yt-dlp.exe: error: invalid rate limit "2MB" given\r\n'
+    expect(classifyYtdlpError(raw, false).code).toBe('badSetting')
+  })
+
+  it('knows the program by any of its release names', () => {
+    // The prefix is the binary's own file name, and the app runs it under that name.
+    for (const prog of ['yt-dlp', 'yt-dlp.exe', 'yt-dlp_macos', 'yt-dlp_linux_aarch64']) {
+      const line = `${prog}: error: rate limit "0" must be positive`
+      expect(classifyYtdlpError(line, false).code, prog).toBe('badSetting')
+    }
+  })
+
+  it('is not led astray by what the refused value says', () => {
+    // A template is quoted back in full, and any word in it could match a rule below.
+    const line = 'yt-dlp: error: invalid default output template "%(title)s ffmpeg 404 %(": incomplete format key'
+    expect(classifyYtdlpError(line, false).code).toBe('badSetting')
+  })
+
+  it('still knows a real rate limit when it sees one', () => {
+    expect(
+      classifyYtdlpError('ERROR: [youtube] abc: HTTP Error 429: Too Many Requests', false).code
+    ).toBe('rateLimited')
+  })
+
+  it('does not retry it, since every attempt would fail the same way', () => {
+    expect(isTransientError(USAGE + 'yt-dlp.exe: error: invalid rate limit "2MB" given')).toBe(false)
+  })
+})

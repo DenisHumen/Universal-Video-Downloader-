@@ -130,6 +130,7 @@ export type AppErrorCode =
   | 'emptyPage'
   | 'cutFailed'
   | 'upcoming'
+  | 'badSetting'
 
 export type DownloadState =
   | 'queued'

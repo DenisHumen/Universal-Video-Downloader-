@@ -24,6 +24,7 @@ import Choice from '../components/Choice'
 import ConfirmDialog from '../components/ConfirmDialog'
 import AutomationSettings from '../components/AutomationSettings'
 import { isSafeTemplate } from '@shared/filename'
+import { normaliseRate } from '@shared/rate'
 
 type SectionId =
   | 'appearance'
@@ -212,6 +213,63 @@ function TemplateField({
       />
       {!safe && <p className="hint mt-1.5 text-bad">{t('settings.filenameTemplateUnsafe')}</p>}
     </>
+  )
+}
+
+/**
+ * The speed limit, which the engine reads far more strictly than people write.
+ *
+ * It used to save every keystroke as typed, and yt-dlp refuses anything but a
+ * number and a bare K, M or G - so "2MB", "1,5M" or a Russian "2 Мб" made every
+ * later download fail with a usage error that never mentioned this field. Now
+ * the draft is read into the engine's form and committed only once it is one;
+ * until then the stored limit stands and a line says what is expected.
+ */
+function SpeedLimitField({
+  value,
+  onCommit
+}: {
+  value: string
+  onCommit: (v: string) => void
+}): JSX.Element {
+  const t = useT()
+  const labelledBy = useContext(RowLabelId)
+  const hintId = useId()
+  const [draft, setDraft] = useState(value)
+
+  /*
+    Follow the store when it changes underneath us - a reset - but not when the
+    change is our own commit coming back normalised. Otherwise a Cyrillic "2М"
+    would turn Latin under the cursor, and "2MB" would lose its B mid-word.
+  */
+  useEffect(() => setDraft((d) => (normaliseRate(d) === value ? d : value)), [value])
+
+  const valid = normaliseRate(draft) !== null
+
+  return (
+    <div className="flex flex-col items-end">
+      <input
+        value={draft}
+        onChange={(e) => {
+          const next = e.target.value
+          setDraft(next)
+          const rate = normaliseRate(next)
+          if (rate !== null) onCommit(rate)
+        }}
+        onBlur={() => setDraft(normaliseRate(draft) ?? value)}
+        placeholder="2M"
+        aria-labelledby={labelledBy}
+        aria-invalid={!valid}
+        aria-describedby={valid ? undefined : hintId}
+        className="field mono w-36 text-[13px]"
+        spellCheck={false}
+      />
+      {!valid && (
+        <p id={hintId} className="hint mt-1.5 max-w-[16rem] text-right text-bad">
+          {t('settings.speedLimitInvalid')}
+        </p>
+      )}
+    </div>
   )
 }
 
@@ -467,11 +525,9 @@ export default function SettingsView(): JSX.Element {
               <Switch value={settings.resumeOnLaunch} onChange={(v) => set('resumeOnLaunch', v)} />
             </Row>
             <Row label={t('settings.speedLimit')} hint={t('settings.speedLimitHint')}>
-              <TextField
+              <SpeedLimitField
                 value={settings.speedLimit}
-                onChange={(v) => set('speedLimit', v)}
-                placeholder="2M"
-                className="field mono w-36 text-[13px]"
+                onCommit={(v) => set('speedLimit', v)}
               />
             </Row>
             <Row label={t('settings.playlistLimit')} hint={t('settings.playlistLimitHint')} stack>

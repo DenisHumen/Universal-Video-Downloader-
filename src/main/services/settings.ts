@@ -3,6 +3,7 @@ import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from '
 import { join } from 'path'
 import { LEGACY_THEMES, THEMES, type AppSettings, type ThemeId } from '@shared/types'
 import { isSafeTemplate } from '@shared/filename'
+import { normaliseRate } from '@shared/rate'
 import { normaliseSmbTarget } from '@shared/automation'
 
 export { isSafeTemplate }
@@ -82,6 +83,17 @@ export function migrate(raw: Record<string, unknown>): Partial<AppSettings> {
   }
   if (typeof next.filenameTemplate === 'string' && !isSafeTemplate(next.filenameTemplate)) {
     next.filenameTemplate = DEFAULT_TEMPLATE
+  }
+  /*
+    Older builds saved the speed limit exactly as typed, and the engine refuses
+    "2MB" before it downloads a byte - so one such entry failed every download
+    after it. Read here, a stored value is repaired on the first launch of this
+    build, and every write from the window goes through the same door. What
+    cannot be read as a rate falls back to no limit, which at least downloads.
+  */
+  if (next.speedLimit !== undefined) {
+    next.speedLimit =
+      typeof next.speedLimit === 'string' ? (normaliseRate(next.speedLimit) ?? '') : ''
   }
   return next
 }

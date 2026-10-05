@@ -37,7 +37,8 @@ const KEYS: Record<AppErrorCode, TranslationKey> = {
   notALink: 'err.notALink',
   emptyPage: 'err.emptyPage',
   cutFailed: 'err.cutFailed',
-  upcoming: 'err.upcoming'
+  upcoming: 'err.upcoming',
+  badSetting: 'err.badSetting'
 }
 
 export interface FailureLike {

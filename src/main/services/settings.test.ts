@@ -47,6 +47,25 @@ describe('migrate', () => {
       '%(title)s [%(id)s].%(ext)s'
     )
   })
+
+  it('repairs a speed limit an older build saved as typed', () => {
+    // A stored "2MB" made every download stop with an engine usage error.
+    expect(migrate({ speedLimit: '2MB' }).speedLimit).toBe('2M')
+    expect(migrate({ speedLimit: '1,5 Мб/с' }).speedLimit).toBe('1.5M')
+    expect(migrate({ speedLimit: '500K' }).speedLimit).toBe('500K')
+  })
+
+  it('lifts a speed limit that cannot be read rather than keep failing on it', () => {
+    expect(migrate({ speedLimit: 'fast' }).speedLimit).toBe('')
+    expect(migrate({ speedLimit: '500' }).speedLimit).toBe('')
+    // A hand-edited number would have thrown in the downloader's `.trim()`.
+    expect(migrate({ speedLimit: 500 }).speedLimit).toBe('')
+  })
+
+  it('leaves the speed limit alone when a write does not touch it', () => {
+    // setSettings runs every partial through here; most of them are about something else.
+    expect('speedLimit' in migrate({ theme: 'day' })).toBe(false)
+  })
 })
 
 describe('isSafeTemplate', () => {

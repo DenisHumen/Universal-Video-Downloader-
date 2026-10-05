@@ -76,9 +76,25 @@ interface Rule {
 
 const RULES: Rule[] = [
   /*
-    First on purpose. A tool that is missing or has failed says so unambiguously,
-    while several of the rules below are guesses from vaguer wording - and one of
-    them used to win this race. `not found` in the "unavailable" rule matched
+    The engine refusing its own command line, before it has touched the
+    network. The app's free-text settings are the only way a bad argument gets
+    there - a speed limit of "2MB" was the one people actually hit - and the
+    line quotes the refused value back, so any word in it could satisfy a rule
+    below: "invalid rate limit" was reported as the site rate-limiting us, with
+    advice to wait a minute that could never help. The program name is the
+    binary's own file name, so it is yt-dlp.exe or yt-dlp_macos as often as not.
+  */
+  {
+    re: /^yt-dlp[\w.-]*: error:|invalid rate limit/,
+    code: 'badSetting',
+    message:
+      'The engine refused one of your settings. Check the speed limit in Settings → Downloads ' +
+      'and the filename template in Settings → Post-processing.'
+  },
+  /*
+    Ahead of the guesses on purpose. A tool that is missing or has failed says
+    so unambiguously, while several of the rules below are guesses from vaguer
+    wording - and one of them used to win this race. `not found` in the "unavailable" rule matched
     "ffmpeg not found", so every post-processing failure was reported to the user
     as "this video may have been removed, or blocked in your region - try
     enabling cookies": a wrong diagnosis, a wrong remedy, and a file that had in

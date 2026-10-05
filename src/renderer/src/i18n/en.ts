@@ -211,6 +211,7 @@ export const en = {
     'when the app is closed mid-download, pick it back up on the next launch. downloads you paused yourself stay paused.',
   'settings.speedLimit': 'speed limit',
   'settings.speedLimitHint': 'e.g. 2M or 500K — leave empty for unlimited',
+  'settings.speedLimitInvalid': 'use a number with K, M or G, e.g. 2M',
   'settings.playlistLimit': 'channel & playlist depth',
   'settings.playlistLimitHint':
     'how many videos to list when you paste a channel or playlist link',
@@ -437,6 +438,7 @@ export const en = {
   'err.emptyPage': 'no videos found on this page.',
   'err.cutFailed': 'nothing was recorded from the point you chose to start at, so there was nothing to process. try downloading it without cutting, then trim the file.',
   'err.upcoming': 'this video hasn’t started yet — it’s a scheduled premiere or live stream. try again once it begins.',
+  'err.badSetting': 'the engine refused one of your settings. check the speed limit in settings → downloads and the filename template in settings → post-processing.',
   'err.cookieHint': 'try switching on browser cookies in settings → access.',
   'common.save': 'save',
   'nav.automation': 'watch',
