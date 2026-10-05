@@ -9,7 +9,7 @@ import type { StreamingInfo } from '@shared/types'
  * Asking a site what episodes exist, and turning one of them into something the
  * download queue understands.
  *
- * Both built-in resolvers already return the whole season/episode structure
+ * The streaming resolvers already return the whole season/episode structure
  * from one entry point, so a watcher needs no scraping of its own — only the
  * discipline about *which* list to read.
  */
@@ -239,15 +239,18 @@ export async function checkWatch(watch: Watch): Promise<CheckResult> {
 /**
  * The internal URL that downloads one episode.
  *
- * The two providers do not agree on shape, and neither should be assumed. For
- * yummyani the translator id *is* a season — it decodes to a player URL for one
- * season — so the episode number stands alone. Rezka names the season
- * separately.
+ * The providers do not agree on shape, and none should be assumed. For
+ * yummyani and a pasted Kodik player the translator id *is* a season — it
+ * decodes to a player URL for one season — so the episode number stands alone.
+ * Rezka names the season separately.
  */
 export function downloadUrlFor(watch: Watch, ref: EpisodeRef): string {
   const quality = encodeURIComponent(watch.quality || 'best')
   if (watch.provider === 'yummyani') {
     return `uvd-yummy://${watch.translatorId}/${ref.episode}/${quality}`
+  }
+  if (watch.provider === 'kodik') {
+    return `uvd-kodik://${watch.translatorId}/${ref.episode}/${quality}`
   }
   if (watch.provider === 'rezka') {
     /*

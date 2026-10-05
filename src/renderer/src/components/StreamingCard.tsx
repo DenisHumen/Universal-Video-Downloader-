@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import { Loader2, Radar } from 'lucide-react'
 import type { MediaInfo, QualityPreset } from '@shared/types'
+import { PROVIDER_NAMES, streamUrl } from '@shared/streaming'
 import Choice, { type ChoiceOption } from './Choice'
 import Thumbnail from './Thumbnail'
 import { heightLabel, initialQuality } from '../lib/quality'
@@ -80,9 +81,7 @@ export default function StreamingCard({ info, onDone }: Props): JSX.Element {
   }
 
   const buildEpisodeUrl = (seasonNum: number, ep: number): string =>
-    s.provider === 'yummyani'
-      ? `uvd-yummy://${translatorId}/${ep}/${quality}`
-      : `uvd-rezka://${s.host}/${s.id}/${translatorId}/${seasonNum}/${ep}/${quality}`
+    streamUrl(s, translatorId, quality, { season: seasonNum, episode: ep })
 
   const toggleEpisode = (ep: number): void => {
     setSelected((prev) => {
@@ -125,10 +124,7 @@ export default function StreamingCard({ info, onDone }: Props): JSX.Element {
     let ok = false
     try {
       ok = await queueDownload({
-        url:
-          s.provider === 'yummyani'
-            ? `uvd-yummy://${translatorId}/1/${quality}`
-            : `uvd-rezka://${s.host}/${s.id}/${translatorId}/movie/0/${quality}`,
+        url: streamUrl(s, translatorId, quality),
         title: `${s.title}${translatorName ? ` (${translatorName})` : ''}`,
         thumbnail: s.thumbnail,
         mode: 'video',
@@ -163,9 +159,11 @@ export default function StreamingCard({ info, onDone }: Props): JSX.Element {
               ? seasonsForT.length > 1
                 ? t('streaming.seriesSeasons', { count: seasonsForT.length })
                 : t('streaming.series')
-              : t('streaming.movie')}
+              : s.loneEpisode
+                ? t('streaming.episode')
+                : t('streaming.movie')}
             {'  ·  '}
-            {s.provider === 'yummyani' ? 'YummyAnime' : 'HDrezka'}
+            {PROVIDER_NAMES[s.provider]}
           </p>
           <span className="tag mt-2.5 inline-flex">{s.host}</span>
         </div>

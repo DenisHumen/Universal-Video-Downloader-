@@ -1,4 +1,5 @@
 import { cumgloryholeResolvers } from './sites/cumgloryhole'
+import { KODIK_SCHEME, kodikResolvers, resolveKodikStream } from './sites/kodik'
 import { rezkaResolvers, resolveRezkaStream } from './sites/rezka'
 import { vimeoResolvers } from './sites/vimeo'
 import { yummyaniResolvers, resolveYummyaniItem, resolveYummyaniStream } from './sites/yummyani'
@@ -25,6 +26,7 @@ export { directUrlFor, DIRECT_SCHEME } from './universal/direct'
  */
 const resolvers: SiteResolver[] = [
   ...cumgloryholeResolvers,
+  ...kodikResolvers,
   ...rezkaResolvers,
   ...vimeoResolvers,
   ...yummyaniResolvers
@@ -38,6 +40,7 @@ const internalSchemes: {
   { prefix: 'uvd-rezka://', resolve: resolveRezkaStream },
   { prefix: 'uvd-yummy-item://', resolve: resolveYummyaniItem },
   { prefix: 'uvd-yummy://', resolve: resolveYummyaniStream },
+  { prefix: KODIK_SCHEME, resolve: resolveKodikStream },
   { prefix: SNIFF_SCHEME, resolve: resolveSniffUrl },
   { prefix: DIRECT_SCHEME, resolve: resolveDirectUrl }
 ]

@@ -150,6 +150,7 @@ export const en = {
   'streaming.series': 'series',
   'streaming.seriesSeasons': 'series · {count} seasons',
   'streaming.movie': 'movie',
+  'streaming.episode': 'episode',
   'streaming.follow': 'follow new episodes',
   'streaming.selectEpisode': 'select at least one episode',
 
@@ -435,6 +436,7 @@ export const en = {
   'err.corruptLink': 'this download link is corrupted — pick the video again.',
   'err.emptyPage': 'no videos found on this page.',
   'err.cutFailed': 'nothing was recorded from the point you chose to start at, so there was nothing to process. try downloading it without cutting, then trim the file.',
+  'err.unsupportedPlayer': 'this kind of Kodik player is not supported yet.',
   'err.cookieHint': 'try switching on browser cookies in settings → access.',
   'common.save': 'save',
   'nav.automation': 'watch',

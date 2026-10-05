@@ -143,6 +143,7 @@ export const ru: Dictionary = {
   'streaming.series': 'сериал',
   'streaming.seriesSeasons': 'сериал · сезонов: {count}',
   'streaming.movie': 'фильм',
+  'streaming.episode': 'серия',
   'streaming.follow': 'следить за новыми сериями',
   'streaming.selectEpisode': 'выберите хотя бы одну серию',
 
@@ -422,6 +423,7 @@ export const ru: Dictionary = {
   'err.corruptLink': 'ссылка на загрузку повреждена — выберите видео заново.',
   'err.emptyPage': 'на этой странице не нашлось видео.',
   'err.cutFailed': 'с выбранного места начала ничего не записалось, так что обрабатывать было нечего. попробуйте скачать целиком, а потом обрезать готовый файл.',
+  'err.unsupportedPlayer': 'такой плеер Kodik пока не поддерживается.',
   'err.cookieHint': 'попробуйте включить cookies браузера в настройках → доступ.',
   'common.save': 'сохранить',
   'nav.automation': 'слежение',

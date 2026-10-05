@@ -1,128 +1,12 @@
-import { b64urlDecode, b64urlEncode, fetchText, netPost, pick } from '../http'
+import { b64urlDecode, b64urlEncode, fetchText, pick } from '../http'
 import type { ResolvedUrl, SiteResolver } from '../types'
 import { NotReleasedError, releaseAtFrom } from '../upcoming'
+import { kodikGetM3u8 } from './kodik'
 import type { SearchResult, StreamingInfo, StreamSeason, StreamTranslator } from '@shared/types'
 
 export const YUMMY_DOMAIN = /^https?:\/\/(?:[a-z0-9-]+\.)*yummyani\.me\/catalog\/item\//i
 
 const REFERER = 'https://old.yummyani.me/'
-
-function caesar(s: string, n: number): string {
-  return s.replace(/[a-zA-Z]/g, (c) => {
-    const base = c <= 'Z' ? 65 : 97
-    return String.fromCharCode(((c.charCodeAt(0) - base + n) % 26) + base)
-  })
-}
-
-/**
- * Kodik encodes its stream URLs as a Caesar cipher + base64. The shift changes
- * periodically (it has been 13, 16, 18, …), so we brute-force it and accept the
- * shift that decodes to a valid URL.
- */
-function kodikDecode(src: string): string {
-  for (let n = 1; n < 26; n++) {
-    try {
-      let out = Buffer.from(caesar(src, n), 'base64').toString('utf-8')
-      if (out.startsWith('//') || /^https?:\/\//.test(out)) {
-        if (out.startsWith('//')) out = 'https:' + out
-        return out
-      }
-    } catch {
-      /* try next shift */
-    }
-  }
-  let out = Buffer.from(src, 'base64').toString('utf-8')
-  if (out.startsWith('//')) out = 'https:' + out
-  return out
-}
-
-interface KodikLinks {
-  [quality: string]: { src: string; type?: string }[]
-}
-
-export interface KodikTarget {
-  id: string
-  hash: string
-  /** What Kodik calls this: a film is asked about differently from an episode. */
-  type: 'video' | 'seria'
-}
-
-/**
- * Work out which thing to ask Kodik for, and how to ask.
- *
- * A series player carries an <option> per episode, each with the id and hash
- * for that episode, and is asked about with type=seria. A film has no episode
- * list at all - the player is /video/<id>/<hash> and those two values in the
- * address are the whole answer - and asking about it as an episode is answered
- * with HTTP 500. Reading only the option list therefore worked for every series
- * and failed on every film, with nothing to show for it but "episode not found"
- * on a page that has no episodes to find.
- */
-export function kodikTarget(
-  playerUrl: string,
-  html: string,
-  episode: number
-): KodikTarget | undefined {
-  const film = playerUrl.match(/\/video\/(\d+)\/([a-f0-9]+)/)
-  if (film) return { id: film[1], hash: film[2], type: 'video' }
-
-  for (const opt of html.match(/<option[^>]*>/g) || []) {
-    const id = pick(/data-id="(\d+)"/, opt)
-    const hash = pick(/data-hash="([a-f0-9]+)"/, opt)
-    if (id && hash && Number(pick(/value="(\d+)"/, opt)) === episode) {
-      return { id, hash, type: 'seria' }
-    }
-  }
-
-  // Some players number their options from something other than one.
-  const seq = [...html.matchAll(/data-id="(\d+)"\s+data-hash="([a-f0-9]+)"/g)]
-  const fallback = seq[episode - 1]
-  return fallback ? { id: fallback[1], hash: fallback[2], type: 'seria' } : undefined
-}
-
-async function kodikGetM3u8(playerUrl: string, episode: number, requested: string): Promise<string> {
-  const url = playerUrl.startsWith('//') ? 'https:' + playerUrl : playerUrl
-  const html = await fetchText(url, { Referer: REFERER })
-  const upRaw = pick(/urlParams = '([^']+)'/, html)
-  if (!upRaw) throw new Error('Kodik player params not found')
-  const up = JSON.parse(upRaw) as Record<string, string>
-
-  const target = kodikTarget(url, html, episode)
-  if (!target) throw new Error('Episode not found in the Kodik player')
-
-  const body = new URLSearchParams({
-    d: up.d,
-    d_sign: up.d_sign,
-    pd: up.pd,
-    pd_sign: up.pd_sign,
-    ref: decodeURIComponent(up.ref || ''),
-    ref_sign: up.ref_sign,
-    bad_user: 'false',
-    cdn_is_working: 'true',
-    type: target.type,
-    hash: target.hash,
-    id: target.id
-  })
-  const raw = await netPost('https://kodikplayer.com/ftor', body.toString(), {
-    Referer: 'https://kodikplayer.com/'
-  })
-  const json = JSON.parse(raw) as { links?: KodikLinks }
-  const links = json.links || {}
-  const tiers = Object.keys(links)
-    .map((q) => ({ q, h: parseInt(q, 10) || 0 }))
-    .sort((a, b) => a.h - b.h)
-  if (!tiers.length) throw new Error('No streams returned by Kodik')
-  const want = requested === 'best' || requested === 'audio' ? Infinity : parseInt(requested, 10) || Infinity
-  /*
-    Nothing at or below the request means every tier is above it — so take the
-    lowest, the closest thing to what was asked for. This used to take
-    `tiers[tiers.length - 1]`, the highest, which is the furthest: ask for 360p
-    on a title Kodik only carries in 720p and 1080p and you were handed the
-    1080p. The rezka resolver has always fallen back the other way.
-  */
-  const chosen = tiers.filter((t) => t.h <= want).pop()?.q || tiers[0].q
-  return kodikDecode(links[chosen][0].src)
-}
 
 interface YaniVideo {
   number: string
@@ -349,7 +233,7 @@ export async function resolveYummyaniItem(uvdUrl: string): Promise<ResolvedUrl> 
 export async function resolveYummyaniStream(uvdUrl: string): Promise<ResolvedUrl> {
   const [tid, episode, quality] = uvdUrl.replace(/^uvd-yummy:\/\//, '').split('/')
   const base = b64urlDecode(tid)
-  const m3u8 = await kodikGetM3u8(base, Number(episode), decodeURIComponent(quality || 'best'))
+  const m3u8 = await kodikGetM3u8(base, Number(episode), decodeURIComponent(quality || 'best'), REFERER)
   return {
     url: m3u8,
     referer: 'https://kodikplayer.com/',

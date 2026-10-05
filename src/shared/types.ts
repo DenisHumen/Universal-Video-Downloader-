@@ -83,12 +83,14 @@ export interface StreamSeason {
 
 /** Rich info for streaming sites that need translator/episode/quality selection. */
 export interface StreamingInfo {
-  provider: 'rezka' | 'yummyani'
+  provider: 'rezka' | 'yummyani' | 'kodik'
   host: string
   id: string
   title: string
   thumbnail?: string
   isSeries: boolean
+  /** One episode on a player of its own (Kodik's /seria/): downloaded like a film, but not called one. */
+  loneEpisode?: boolean
   translators: StreamTranslator[]
   defaultTranslator: string
   seasons: StreamSeason[]
@@ -128,6 +130,7 @@ export type AppErrorCode =
   | 'corruptLink'
   | 'emptyPage'
   | 'cutFailed'
+  | 'unsupportedPlayer'
 
 export type DownloadState =
   | 'queued'

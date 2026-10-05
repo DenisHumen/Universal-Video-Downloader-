@@ -37,6 +37,13 @@ describe('downloadUrlFor', () => {
     const w = watch({ provider: 'yummyani', url: 'https://yummyani.me/catalog/item/x', translatorId: 'abc' })
     expect(downloadUrlFor(w, { season: 1, episode: 4 })).toBe('uvd-yummy://abc/4/720p')
   })
+
+  it('downloads a followed Kodik season through the Kodik resolver', () => {
+    // A Kodik season can be followed now, and without its own case here every
+    // episode it found would have thrown "No way to download an episode".
+    const w = watch({ provider: 'kodik', url: 'https://kodikplayer.com/season/94795/d5a2/720p', translatorId: 'abc' })
+    expect(downloadUrlFor(w, { season: 1, episode: 4 })).toBe('uvd-kodik://abc/4/720p')
+  })
 })
 
 const rezkaInfo = (over: Partial<StreamingInfo> = {}): StreamingInfo => ({
