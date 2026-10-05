@@ -1,4 +1,5 @@
 import { resolveUrl } from '../../resolvers'
+import { rezkaEpisodes, rezkaEpisodeUrl } from '../../resolvers/sites/rezka'
 import { NotReleasedError } from '../../resolvers/upcoming'
 import { log } from '../log'
 import { episodeKey, newEpisodes, type EpisodeRef, type Watch } from '@shared/automation'
@@ -49,6 +50,40 @@ function flatten(seasons: { season: number; episodes: number[] }[]): EpisodeRef[
 export function episodesForTranslator(info: StreamingInfo, translatorId: string): EpisodeRef[] {
   const per = info.episodesByTranslator?.[translatorId]
   return flatten(per ?? info.seasons)
+}
+
+const DUB_GONE = 'The translation this watch follows is no longer listed on the page.'
+
+/**
+ * Make sure `info` knows the episodes of the dub a watch follows.
+ *
+ * Yummyani answers with every dub's list at once. A rezka page lists only the
+ * dub it opens on, and the series list stood in for every other — which is the
+ * mistake described above. Measured on one series: 63 episodes in the page's
+ * dub, 62 in each of three others. A watch on a slower dub would be told of an
+ * episode its dub does not have yet, fail to download it, and mark it handled
+ * like any failure, so it would never be fetched once the dub caught up.
+ *
+ * So a rezka check asks for the chosen dub's own list: one request more, every
+ * time. Asking only when the dub differs from the page's would save it, but the
+ * resolver moves its default off a Premium dub the page may well open on, so
+ * which list the page shows is not something the result can say.
+ */
+export async function withEpisodesOf(
+  info: StreamingInfo,
+  translatorId: string
+): Promise<StreamingInfo> {
+  if (info.provider !== 'rezka' || !info.isSeries || !translatorId) return info
+  /*
+    Said here because the caller cannot: with no list of its own, a dub that has
+    gone would read the series list and be followed as if nothing had changed.
+  */
+  if (!info.translators.some((t) => t.id === translatorId)) throw new Error(DUB_GONE)
+  const seasons = await rezkaEpisodes(info.host, info.id, translatorId)
+  return {
+    ...info,
+    episodesByTranslator: { ...info.episodesByTranslator, [translatorId]: seasons }
+  }
 }
 
 /** Look at a page and describe what could be watched there. */
@@ -139,10 +174,11 @@ export async function checkWatch(watch: Watch): Promise<CheckResult> {
     }
     throw err
   }
-  const info = resolved.streaming
-  if (!info) {
+  const page = resolved.streaming
+  if (!page) {
     throw new Error('The page no longer looks like a series.')
   }
+  const info = watch.pending ? page : await withEpisodesOf(page, watch.translatorId)
 
   /*
     A watch added before release has no dub, because there was none to choose.
@@ -178,7 +214,7 @@ export async function checkWatch(watch: Watch): Promise<CheckResult> {
   if (available.length === 0 && !info.episodesByTranslator?.[watch.translatorId]) {
     const known = info.translators.some((t) => t.id === watch.translatorId)
     if (!known) {
-      throw new Error('The translation this watch follows is no longer listed on the page.')
+      throw new Error(DUB_GONE)
     }
   }
 
@@ -215,14 +251,14 @@ export function downloadUrlFor(watch: Watch, ref: EpisodeRef): string {
   }
   if (watch.provider === 'rezka') {
     /*
-      `uvd-rezka://<host>/<id>/<translatorId>/<season>/<episode>/<quality>`. The
-      host and id are carried in the watch's own URL, which is why a rezka watch
-      stores them at creation rather than parsing them here every time.
-      Unreachable today: rezka is not serving parseable pages to a plain client,
-      so no rezka watch can currently be created.
+      `uvd-rezka://<host>/<id>/<translatorId>/<season>/<episode>/<quality>`,
+      with the host and title id read from the page address the watch keeps.
+      This used to splice that whole address in where the host and id belong,
+      and leave the translator out, while rezka was unreachable and no rezka
+      watch could be made: the first episode one found would have been queued
+      as a link nothing could resolve.
     */
-    const rest = watch.url.replace(/^uvd-rezka:\/\//, '')
-    return `uvd-rezka://${rest}/${ref.season}/${ref.episode}/${quality}`
+    return rezkaEpisodeUrl(watch.url, watch.translatorId, ref.season, ref.episode, watch.quality)
   }
   throw new Error(`No way to download an episode from ${watch.provider}.`)
 }
