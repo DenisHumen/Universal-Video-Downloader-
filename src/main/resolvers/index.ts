@@ -1,5 +1,6 @@
 import { cumgloryholeResolvers } from './sites/cumgloryhole'
 import { rezkaResolvers, resolveRezkaStream } from './sites/rezka'
+import { vimeoResolvers } from './sites/vimeo'
 import { yummyaniResolvers, resolveYummyaniItem, resolveYummyaniStream } from './sites/yummyani'
 import { resolveSniffUrl, SNIFF_SCHEME } from './universal'
 import { DIRECT_SCHEME, resolveDirectUrl } from './universal/direct'
@@ -15,8 +16,9 @@ export { directUrlFor, DIRECT_SCHEME } from './universal/direct'
 /**
  * Hand-written resolvers, tried in order. Most sites never need one — the
  * engine or the universal resolver handles them. These exist for the awkward
- * cases: players that hide their stream behind a signed AJAX call, or listing
- * pages we want to turn into a downloadable playlist.
+ * cases: players that hide their stream behind a signed AJAX call, listing
+ * pages we want to turn into a downloadable playlist, or a page address the
+ * engine can no longer read where another address for the same video works.
  *
  * Adding a site: drop a module in `./sites`, export a `SiteResolver[]`, and
  * list it here. Nothing else in the app needs to change.
@@ -24,6 +26,7 @@ export { directUrlFor, DIRECT_SCHEME } from './universal/direct'
 const resolvers: SiteResolver[] = [
   ...cumgloryholeResolvers,
   ...rezkaResolvers,
+  ...vimeoResolvers,
   ...yummyaniResolvers
 ]
 

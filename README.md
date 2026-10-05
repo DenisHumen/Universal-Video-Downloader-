@@ -152,7 +152,10 @@ complete here still applies when a queued item is re-resolved later.
 
 Some players hide their stream behind a signed AJAX call that no generic scraper can reach. Those
 get a small dedicated module in `src/main/resolvers/sites/` — currently **HDrezka** (and its
-mirror domains), **YummyAnime** (via the Kodik player) and **CumGloryHole**.
+mirror domains), **YummyAnime** (via the Kodik player) and **CumGloryHole**. **Vimeo** has one
+too, for a different reason: its video pages now want a login for the engine to read them, so a
+`vimeo.com/<id>` link is handed over as the same video's embedded player, which still opens
+without one.
 
 For streaming sites the app reads the available **voiceovers (озвучки)**, **seasons**,
 **episodes** and **qualities**, lets you multi-select episodes, and queues each as
