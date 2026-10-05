@@ -55,7 +55,8 @@ export const IPC = {
 
   // events (main -> renderer)
   evtDownloadProgress: 'event:download-progress',
-  evtDownloadUpdated: 'event:download-updated',
+  /** Updated and removed queue entries, coalesced per turn: DownloadsChanged. */
+  evtDownloadsChanged: 'event:downloads-changed',
   evtYtdlpStatus: 'event:ytdlp-status',
   evtUpdateStatus: 'event:update-status',
   evtWindowState: 'event:window-state',

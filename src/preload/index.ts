@@ -11,6 +11,7 @@ import type {
   DownloadItem,
   DownloadProgress,
   DownloadRequest,
+  DownloadsChanged,
   MediaJobRequest,
   MediaProbe,
   PendingDelivery,
@@ -152,8 +153,9 @@ const api = {
   // Events
   onDownloadProgress: (cb: (p: DownloadProgress) => void) =>
     on<DownloadProgress>(IPC.evtDownloadProgress, cb),
-  onDownloadUpdated: (cb: (item: DownloadItem & { removed?: boolean }) => void) =>
-    on<DownloadItem & { removed?: boolean }>(IPC.evtDownloadUpdated, cb),
+  /** Updated and removed entries, one message per turn of the main process. */
+  onDownloadsChanged: (cb: (change: DownloadsChanged) => void) =>
+    on<DownloadsChanged>(IPC.evtDownloadsChanged, cb),
   onYtdlpStatus: (cb: (s: YtDlpStatus) => void) => on<YtDlpStatus>(IPC.evtYtdlpStatus, cb),
   onUpdateStatus: (cb: (s: UpdateStatus) => void) => on<UpdateStatus>(IPC.evtUpdateStatus, cb),
   onDetectStatus: (cb: (s: DetectStatus) => void) => on<DetectStatus>(IPC.evtDetectStatus, cb),

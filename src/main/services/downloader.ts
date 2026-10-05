@@ -1608,7 +1608,8 @@ export function clearFinished(): void {
       forgetProgress(id)
       items.delete(id)
       finalPaths.delete(id)
-      // Per-item 'removed' events — the only channel the renderer listens to.
+      // Per-item 'removed' events. The automation pipeline needs each one;
+      // ipc.ts folds them into a single message for the window.
       downloadEvents.emit('removed', id)
     }
   }

@@ -28,6 +28,8 @@ interface Props {
   item: DownloadItem
   /** Position in the visible list — the row's mono index. */
   index: number
+  /** Fade in on mount: true for entries that arrive while the queue is open. */
+  animateIn?: boolean
 }
 
 const STATE_META: Record<DownloadItem['state'], { label: TranslationKey; dot: string; text: string }> =
@@ -51,7 +53,7 @@ const STATE_META: Record<DownloadItem['state'], { label: TranslationKey; dot: st
  * Hairlines between rows carry the same separation at a fraction of the visual
  * cost.
  */
-function QueueRow({ item, index }: Props): JSX.Element {
+function QueueRow({ item, index, animateIn = true }: Props): JSX.Element {
   const t = useT()
   const [logOpen, setLogOpen] = useState(false)
   const [jobModal, setJobModal] = useState<JobMode | null>(null)
@@ -155,10 +157,17 @@ function QueueRow({ item, index }: Props): JSX.Element {
 
   return (
     <motion.li
+      /*
+        Measured only when the row moves or changes state. With no dependency,
+        framer measured the layout on every render, and a running download
+        renders its row with every progress tick. Neither value changes on a
+        tick; a row inserted or removed above changes `index`, so the rows
+        below still slide.
+      */
       layout
-      initial={{ opacity: 0 }}
+      layoutDependency={`${item.state}:${index}`}
+      initial={animateIn ? { opacity: 0 } : false}
       animate={{ opacity: 1 }}
-      exit={{ opacity: 0, transition: { duration: 0.12 } }}
       transition={listItem}
       className="group relative border-b border-edge"
     >
@@ -438,5 +447,9 @@ function QueueRow({ item, index }: Props): JSX.Element {
  *
  * The comparison is deliberately shallow on identity: `item` is a fresh object
  * exactly when that row's data changed, and `index` when the list reordered.
+ * `animateIn` never changes for a mounted row, so comparing it costs nothing.
  */
-export default memo(QueueRow, (a, b) => a.item === b.item && a.index === b.index)
+export default memo(
+  QueueRow,
+  (a, b) => a.item === b.item && a.index === b.index && a.animateIn === b.animateIn
+)

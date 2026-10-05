@@ -333,6 +333,16 @@ export interface DownloadItem {
   finishedAt?: number
 }
 
+/**
+ * Everything that happened to the queue in one turn of the main process, sent
+ * as one message. An id appears in at most one of the two lists, carrying its
+ * latest state; see queue-events.ts for why this is batched at all.
+ */
+export interface DownloadsChanged {
+  updated: DownloadItem[]
+  removed: string[]
+}
+
 export interface DownloadProgress {
   id: string
   state: DownloadState

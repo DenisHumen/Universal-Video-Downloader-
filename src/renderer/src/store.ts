@@ -9,6 +9,7 @@ import type {
 } from '@shared/types'
 import { normalizeUrl } from '@shared/urls'
 import type { AppInfo } from '../../preload/index'
+import { applyDownloadsChanged } from './lib/downloads'
 import { applyAppearance } from './lib/theme'
 
 export type ViewId = 'home' | 'search' | 'downloads' | 'automation' | 'settings'
@@ -109,20 +110,11 @@ async function runInit(set: SetState, get: GetState): Promise<void> {
     ready: true
   })
 
-  window.api.onDownloadUpdated((item) => {
+  // One store update per batch, however many rows a bulk action touched.
+  window.api.onDownloadsChanged((change) => {
     const list = get().downloads
-    if ((item as { removed?: boolean }).removed) {
-      set({ downloads: list.filter((d) => d.id !== item.id) })
-      return
-    }
-    const idx = list.findIndex((d) => d.id === item.id)
-    if (idx === -1) {
-      set({ downloads: [item, ...list] })
-    } else {
-      const next = [...list]
-      next[idx] = { ...next[idx], ...item }
-      set({ downloads: next })
-    }
+    const next = applyDownloadsChanged(list, change)
+    if (next !== list) set({ downloads: next })
   })
 
   window.api.onDownloadProgress((p: DownloadProgress) => {

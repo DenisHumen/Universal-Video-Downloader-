@@ -2,6 +2,7 @@ import type { UvdApi, AppInfo } from '../../../preload/index'
 import type {
   AppSettings,
   DownloadItem,
+  DownloadsChanged,
   MediaInfo,
   SearchResult,
   BrowserMedia,
@@ -193,8 +194,8 @@ const ytdlpListeners = new Set<YtdlpListener>()
 const updateListeners = new Set<UpdateListener>()
 const browserStateListeners = new Set<BrowserStateListener>()
 const browserMediaListeners = new Set<BrowserMediaListener>()
-type UpdatedListener = (item: DownloadItem) => void
-const updatedListeners = new Set<UpdatedListener>()
+type ChangedListener = (change: DownloadsChanged) => void
+const changedListeners = new Set<ChangedListener>()
 
 /** Preview-only: drive a state the mock bridge would otherwise never enter. */
 declare global {
@@ -247,7 +248,7 @@ export function installMockApi(): void {
       const at = items.findIndex((i) => i.id === item.id)
       if (at >= 0) items[at] = item
       else items.unshift(item)
-      updatedListeners.forEach((cb) => cb({ ...item }))
+      changedListeners.forEach((cb) => cb({ updated: [{ ...item }], removed: [] }))
       return item
     }
   }
@@ -388,9 +389,9 @@ export function installMockApi(): void {
     closeWindow: async () => undefined,
     isWindowMaximized: async () => false,
     onDownloadProgress: () => () => undefined,
-    onDownloadUpdated: (cb) => {
-      updatedListeners.add(cb)
-      return () => updatedListeners.delete(cb)
+    onDownloadsChanged: (cb) => {
+      changedListeners.add(cb)
+      return () => changedListeners.delete(cb)
     },
     /*
      * These two used to drop the callback on the floor, which meant the states

@@ -34,6 +34,7 @@ import {
   startDownload,
   startMediaJob
 } from './services/downloader'
+import { forwardQueueEvents } from './services/queue-events'
 import { getSettings, resetSettings, setSettings } from './services/settings'
 import { ensureYtdlp, getYtdlpStatus, updateYtdlp, ytdlpEvents } from './services/ytdlp'
 import { takePending } from './index'
@@ -219,19 +220,13 @@ export function registerIpc({ getWindow, openSearchWindow, onSettingsChanged }: 
   registerBrowserIpc()
 
   // ---- Forward service events to the renderer ----
-  downloadEvents.on('progress', (p) => {
-    send(IPC.evtDownloadProgress, p)
-    syncOsState(getWindow)
-  })
-  downloadEvents.on('updated', (item: DownloadItem) => {
-    send(IPC.evtDownloadUpdated, item)
-    maybeNotify(item)
-    syncOsState(getWindow)
-  })
-  downloadEvents.on('removed', (id: string) => {
-    forgetNotified(id)
-    send(IPC.evtDownloadUpdated, { id, removed: true })
-    syncOsState(getWindow)
+  // Coalesced per turn, so a bulk action is one message; see queue-events.ts.
+  forwardQueueEvents(downloadEvents, {
+    changed: (batch) => send(IPC.evtDownloadsChanged, batch),
+    progress: (p) => send(IPC.evtDownloadProgress, p),
+    notify: maybeNotify,
+    forget: forgetNotified,
+    syncOs: () => syncOsState(getWindow)
   })
   ytdlpEvents.on('status', (s) => send(IPC.evtYtdlpStatus, s))
   updateEvents.on('status', (s) => send(IPC.evtUpdateStatus, s))

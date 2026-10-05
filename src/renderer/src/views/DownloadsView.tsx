@@ -1,5 +1,4 @@
-import { useMemo, useState } from 'react'
-import { AnimatePresence } from 'framer-motion'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { FolderOpen, Inbox, Pause, Play, Plus, RotateCw, Search, SearchX, Trash2 } from 'lucide-react'
 import type { DownloadItem } from '@shared/types'
 import { useStore } from '../store'
@@ -34,6 +33,18 @@ function matches(item: DownloadItem, filter: Filter): boolean {
 }
 
 /**
+ * Rows drawn when the queue opens, and how many more join as the end nears.
+ *
+ * History is never pruned, and every row is a dozen elements and a handful of
+ * icons: drawing all of them blocked each visit to this tab for 250-400 ms at
+ * 500 entries and over half a second at 1000, before anything appeared. The
+ * first page is what fits on any screen several times over; the rest is drawn
+ * as the reader scrolls towards it. Windowing was the alternative, and the
+ * wrong one here - rows differ in height and a log opens inside a row.
+ */
+const PAGE = 100
+
+/**
  * The queue as a document: a header stating the totals, a control strip, then
  * one ruled list. Bulk actions live as icons in the header rather than inside
  * each row, so the per-row controls stay about that row.
@@ -43,15 +54,38 @@ export default function DownloadsView(): JSX.Element {
   const downloads = useStore((s) => s.downloads)
   const settings = useStore((s) => s.settings)
   const setView = useStore((s) => s.setView)
-  const refreshDownloads = useStore((s) => s.refreshDownloads)
 
   const [filter, setFilter] = useState<Filter>('all')
   const [query, setQuery] = useState('')
+  const [limit, setLimit] = useState(PAGE)
+  const scrollRef = useRef<HTMLDivElement>(null)
+  const sentinelRef = useRef<HTMLLIElement>(null)
+  /*
+    Rows that were already in the queue when it opened appear in place; only
+    entries that arrive while it is open fade in. Every row used to start its
+    own opacity spring on every visit to the tab - hundreds of animations to
+    say nothing more than "this screen is showing".
+  */
+  const [presentAtOpen] = useState(() => new Set(downloads.map((d) => d.id)))
 
-  const clearFinished = async (): Promise<void> => {
-    await window.api.clearFinished()
-    await refreshDownloads()
+  // A new filter or search starts again from the top, one page deep. Reset
+  // alongside the change, not in an effect after it, so the list is never
+  // drawn once at the old depth on the way.
+  const changeFilter = (next: Filter): void => {
+    setFilter(next)
+    setLimit(PAGE)
   }
+  const changeQuery = (next: string): void => {
+    setQuery(next)
+    setLimit(PAGE)
+  }
+
+  /*
+    No refresh afterwards. Main sends the removals as one batch, and the
+    full re-read that used to follow redrew the list a second time for
+    nothing.
+  */
+  const clearFinished = (): Promise<void> => window.api.clearFinished()
 
   const visible = useMemo(() => {
     const needle = query.trim().toLowerCase()
@@ -59,6 +93,29 @@ export default function DownloadsView(): JSX.Element {
       (d) => matches(d, filter) && (!needle || d.title.toLowerCase().includes(needle))
     )
   }, [downloads, filter, query])
+
+  const hasMore = visible.length > limit
+  useEffect(() => {
+    const root = scrollRef.current
+    const sentinel = sentinelRef.current
+    if (!hasMore || !root || !sentinel) return
+    /*
+      The root is the list's own scroller - the page never scrolls, this div
+      does, and an observer on the viewport would see the sentinel as hidden
+      however far down the reader went. A fresh observer for every new depth
+      reports where the sentinel is straight away, so a window tall enough to
+      show the whole new page asks for the next one without waiting for a
+      scroll.
+    */
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((e) => e.isIntersecting)) setLimit((l) => l + PAGE)
+      },
+      { root, rootMargin: '800px 0px' }
+    )
+    observer.observe(sentinel)
+    return () => observer.disconnect()
+  }, [hasMore, limit])
 
   const hasFinished = downloads.some((d) => ['completed', 'error', 'canceled'].includes(d.state))
   const hasRunning = downloads.some((d) =>
@@ -141,7 +198,7 @@ export default function DownloadsView(): JSX.Element {
           <Choice
             label={t('queue.title')}
             value={filter}
-            onChange={(v) => setFilter(v as Filter)}
+            onChange={(v) => changeFilter(v as Filter)}
             options={FILTERS.map((f) => ({ value: f.value, label: t(f.label) }))}
           />
           {/* A label, so the whole pill is the target — the padding around a bare
@@ -150,7 +207,7 @@ export default function DownloadsView(): JSX.Element {
             <Search size={15} className="shrink-0 text-ink-3" />
             <input
               value={query}
-              onChange={(e) => setQuery(e.target.value)}
+              onChange={(e) => changeQuery(e.target.value)}
               placeholder={t('queue.searchPlaceholder')}
               className="no-drag min-w-0 flex-1 self-stretch bg-transparent text-[13px] text-ink outline-none placeholder:text-ink-3"
               spellCheck={false}
@@ -159,7 +216,7 @@ export default function DownloadsView(): JSX.Element {
         </div>
       )}
 
-      <div className="mt-5 min-h-0 flex-1 overflow-y-auto">
+      <div ref={scrollRef} className="mt-5 min-h-0 flex-1 overflow-y-auto">
         {downloads.length === 0 ? (
           <EmptyState
             icon={<Inbox size={24} />}
@@ -180,8 +237,8 @@ export default function DownloadsView(): JSX.Element {
               <button
                 className="btn-quiet"
                 onClick={() => {
-                  setFilter('all')
-                  setQuery('')
+                  changeFilter('all')
+                  changeQuery('')
                 }}
               >
                 {t('queue.clearFilters')}
@@ -191,19 +248,25 @@ export default function DownloadsView(): JSX.Element {
         ) : (
           <ul className="border-t border-edge">
             {/*
-              Plain AnimatePresence, not `mode="popLayout"`.
-              popLayout takes a ref on each child so it can measure and pop it
-              out of flow — and `QueueRow` is a function component, so React
-              refused the ref and logged "Function components cannot be given
-              refs" on every render. The measurement never happened, which is
-              why exiting rows kept their space instead of being lifted out of
-              it. Rows fade; the list reflows immediately.
+              No AnimatePresence around the rows.
+              By default it hands every child a fresh context value on each of
+              its own renders - a `Math.random()` in the dependencies, for
+              presence-affects-layout - so every row redrew on every change to
+              the queue, memo or not, and its key lookups are quadratic in the
+              row count. With three downloads running that was 32 ms per
+              progress tick at 500 rows and 94 ms at 1000. All it bought was a
+              120 ms fade on the row being removed; a removed row now simply
+              goes, and the rows below still slide up into its place.
             */}
-            <AnimatePresence>
-              {visible.map((item, i) => (
-                <QueueRow key={item.id} item={item} index={i} />
-              ))}
-            </AnimatePresence>
+            {visible.slice(0, limit).map((item, i) => (
+              <QueueRow
+                key={item.id}
+                item={item}
+                index={i}
+                animateIn={!presentAtOpen.has(item.id)}
+              />
+            ))}
+            {hasMore && <li ref={sentinelRef} aria-hidden className="h-px" />}
           </ul>
         )}
       </div>
