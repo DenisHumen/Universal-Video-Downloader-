@@ -11,6 +11,7 @@ import {
   Plus,
   Radar,
   RefreshCw,
+  RotateCcw,
   Send,
   Trash2,
   X
@@ -30,6 +31,8 @@ import AddWatchDialog from '../components/AddWatchDialog'
 import StepEditor from '../components/StepEditor'
 import { RUN_LABEL, STEP_LABEL } from '../lib/automationLabels'
 import {
+  attemptsAt,
+  MAX_ATTEMPTS,
   upcomingDelayMinutes,
   watchFailing,
   type PipelineStep,
@@ -240,6 +243,23 @@ export default function AutomationView(): JSX.Element {
     }
   }
 
+  /*
+    A failed episode had no way back short of fetching and uploading it by
+    hand - not even after fixing the password that made it fail. Answers at
+    once; the new run replaces this one in the list as it goes.
+  */
+  const retry = async (run: Run): Promise<void> => {
+    try {
+      const answer = await window.api.autoRetryRun(run.id)
+      await refresh()
+      if ('started' in answer) toast(t('auto.retryStarted'), 'success')
+      else if ('busy' in answer) toast(t('auto.checkBusy'), 'info')
+      else toast(answer.error, 'error')
+    } catch (err) {
+      toast(err instanceof Error ? err.message : String(err), 'error')
+    }
+  }
+
   const saveStep = async (step: PipelineStep): Promise<void> => {
     if (!selected) return
     const exists = selected.steps.some((s) => s.id === step.id)
@@ -374,8 +394,9 @@ export default function AutomationView(): JSX.Element {
                   <p className="hint mt-1 text-bad">{selected.lastError}</p>
                 )}
                 {/*
-                  Nothing on a schedule clears this - a failed episode is not
-                  retried - so it can be put away by hand once it has been seen.
+                  Only an episode that gets all the way through clears this, and
+                  one that has been given up on never will, so it can be put
+                  away by hand once it has been seen.
                 */}
                 {selected.lastRunError && (
                   <div className="mt-1 flex items-start gap-1">
@@ -525,12 +546,34 @@ export default function AutomationView(): JSX.Element {
                           title={s.message}
                         >
                           {t(STEP_LABEL[s.kind])}
-                          {s.state === 'failed' && s.message ? `: ${s.message}` : ''}
+                          {(s.state === 'failed' || (run.state === 'skipped' && s.state === 'skipped')) &&
+                          s.message
+                            ? `: ${s.message}`
+                            : ''}
                         </span>
                       ))}
                     </div>
                     {run.state === 'running' && run.downloadId && (
                       <QueueLink id={run.downloadId} />
+                    )}
+                    {(run.state === 'failed' || run.state === 'skipped') && (
+                      <div className="mt-1.5 flex items-center gap-2">
+                        <span className="mono min-w-0 flex-1 truncate text-[11px] text-ink-2">
+                          {/* Counted on the watch only while the schedule still means to try again. */}
+                          {run.state === 'failed' && attemptsAt(selected, run) > 0
+                            ? t('auto.runWillRetry', {
+                                n: attemptsAt(selected, run),
+                                max: MAX_ATTEMPTS
+                              })
+                            : ''}
+                        </span>
+                        <button
+                          className="btn-quiet px-3 py-1 text-[12px]"
+                          onClick={() => void retry(run)}
+                        >
+                          <RotateCcw size={12} /> {t('auto.retryRun')}
+                        </button>
+                      </div>
                     )}
                   </li>
                 ))}

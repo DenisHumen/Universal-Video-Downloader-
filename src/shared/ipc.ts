@@ -76,6 +76,7 @@ export const IPC = {
   autoRemove: 'auto:remove',
   autoRuns: 'auto:runs',
   autoCheckNow: 'auto:check-now',
+  autoRetryRun: 'auto:retry-run',
   autoTestSmb: 'auto:test-smb',
   autoTestTelegram: 'auto:test-telegram',
   autoSetSecret: 'auto:set-secret',

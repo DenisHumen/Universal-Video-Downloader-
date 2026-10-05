@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import type { EpisodeRef, Watch } from '@shared/automation'
+import type { EpisodeRef, Run, Watch } from '@shared/automation'
 import type { CheckResult } from './detect'
 
 /*
@@ -14,7 +14,8 @@ const h = vi.hoisted(() => ({
   online: true,
   checkWatch: vi.fn(),
   runEpisode: vi.fn(),
-  markHandled: vi.fn()
+  recordOutcome: vi.fn(),
+  runs: new Map<string, Run>()
 }))
 
 vi.mock('electron', () => ({
@@ -25,11 +26,12 @@ vi.mock('../log', () => ({ log: { info: vi.fn(), warn: vi.fn(), error: vi.fn() }
 vi.mock('./detect', () => ({ checkWatch: h.checkWatch }))
 vi.mock('./pipeline', () => ({
   alertChannel: () => undefined,
-  markHandled: h.markHandled,
+  recordOutcome: h.recordOutcome,
   runEpisode: h.runEpisode
 }))
 vi.mock('./telegram', () => ({ composeCheckFailure: () => '', sendNotification: vi.fn() }))
 vi.mock('./store', () => ({
+  findRun: (id: string) => h.runs.get(id),
   getWatch: (id: string) => h.watches.get(id),
   listWatches: () => [...h.watches.values()],
   updateWatch: (id: string, patch: Partial<Watch>) => {
@@ -104,7 +106,8 @@ describe('watcher', () => {
     h.online = true
     h.checkWatch.mockReset()
     h.runEpisode.mockReset()
-    h.markHandled.mockReset()
+    h.recordOutcome.mockReset()
+    h.runs.clear()
     // A fresh module each time: the slots and the in-flight set are module state.
     vi.resetModules()
     watcher = await import('./watcher')
@@ -139,7 +142,7 @@ describe('watcher', () => {
 
     download.resolve()
     await settle()
-    expect(h.markHandled).toHaveBeenCalledTimes(3)
+    expect(h.recordOutcome).toHaveBeenCalledTimes(3)
     expect(watcher.watcherBusy()).toBe(false)
   })
 
@@ -196,7 +199,7 @@ describe('watcher', () => {
 
     download.resolve()
     await settle()
-    expect(h.markHandled).toHaveBeenCalledTimes(2)
+    expect(h.recordOutcome).toHaveBeenCalledTimes(2)
     expect(watcher.watcherBusy()).toBe(false)
   })
 
@@ -248,6 +251,72 @@ describe('watcher', () => {
     expect(after.lastError).toBeUndefined()
     expect(after.nextCheckAt).toBeGreaterThanOrEqual(NOW + 15 * MIN)
     expect(after.nextCheckAt).toBeLessThan(NOW + 17 * MIN)
+  })
+
+  /*
+    "Try again" and the schedule must not fetch the same episode side by side:
+    the button is refused while the watch is in flight, and holds the watch in
+    flight itself, so a tick in the meantime leaves it alone.
+  */
+  it('refuses "try again" while the watch is busy, and keeps the schedule off it while retrying', async () => {
+    watch('a')
+    h.runs.set('r1', {
+      id: 'r1',
+      watchId: 'a',
+      season: 1,
+      episode: 4,
+      title: 'a',
+      state: 'failed',
+      steps: [],
+      startedAt: 1
+    })
+    h.checkWatch.mockResolvedValue(found([ep(1)]))
+    const download = deferred<string>()
+    const retrying = deferred<string>()
+    h.runEpisode.mockReturnValueOnce(download.promise).mockReturnValueOnce(retrying.promise)
+
+    await watcher.checkNow('a')
+    expect(watcher.retryRun('r1')).toEqual({ busy: true })
+    download.resolve('done')
+    await settle()
+
+    expect(watcher.retryRun('r1')).toEqual({ started: true })
+    expect(h.runEpisode).toHaveBeenLastCalledWith(
+      expect.objectContaining({ id: 'a' }),
+      { season: 1, episode: 4 },
+      // The title the site gave at the last check, which the check wrote to the watch.
+      'A series',
+      expect.objectContaining({ final: false, attempt: 1, previous: expect.objectContaining({ id: 'r1' }) })
+    )
+
+    // Due again while the retry is still downloading: the tick leaves it alone.
+    h.watches.set('a', { ...(h.watches.get('a') as Watch), nextCheckAt: NOW - MIN })
+    watcher.tick()
+    await settle()
+    expect(h.checkWatch).toHaveBeenCalledTimes(1)
+    expect(watcher.retryRun('r1')).toEqual({ busy: true })
+
+    retrying.resolve('failed')
+    await settle()
+    expect(h.recordOutcome).toHaveBeenLastCalledWith('a', { season: 1, episode: 4 }, 'failed')
+    expect(watcher.watcherBusy()).toBe(false)
+  })
+
+  it('will not try again an episode that is running or done', () => {
+    watch('a')
+    h.runs.set('r2', {
+      id: 'r2',
+      watchId: 'a',
+      season: 1,
+      episode: 1,
+      title: 'a',
+      state: 'done',
+      steps: [],
+      startedAt: 1
+    })
+    expect(watcher.retryRun('r2')).toMatchObject({ error: expect.any(String) })
+    expect(watcher.retryRun('missing')).toMatchObject({ error: expect.any(String) })
+    expect(h.runEpisode).not.toHaveBeenCalled()
   })
 
   it('starts nothing while the machine says it is offline', async () => {

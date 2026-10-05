@@ -45,10 +45,17 @@ function flatten(seasons: { season: number; episodes: number[] }[]): EpisodeRef[
  * dub, compared against the series list, would be told six episodes were new
  * and would then fail six times downloading episodes that do not exist for the
  * translation it was asked for.
+ *
+ * A provider that lists episodes per dub never falls back to the series list,
+ * not even for a dub it no longer lists. That fallback was the same mistake by
+ * another road: a dub whose player moved read the default dub's episodes,
+ * queued every one it had not seen under the dead id, failed them all - and the
+ * watch looked healthy, because nothing had thrown. An id that is not in the
+ * map has no episodes, and `checkWatch` says so out loud.
  */
 export function episodesForTranslator(info: StreamingInfo, translatorId: string): EpisodeRef[] {
-  const per = info.episodesByTranslator?.[translatorId]
-  return flatten(per ?? info.seasons)
+  if (info.episodesByTranslator) return flatten(info.episodesByTranslator[translatorId] ?? [])
+  return flatten(info.seasons)
 }
 
 /** Look at a page and describe what could be watched there. */
@@ -107,7 +114,10 @@ export interface CheckResult {
   translatorName?: string
   /** Still not out. `releaseAt` is the site's current guess, which moves. */
   notOut?: { releaseAt?: number }
-  /** A watch that was waiting has something to follow now: the dub it should take. */
+  /**
+   * The dub the watch should follow from now on: the one a waiting watch takes
+   * once something is out, or the new id of a followed dub the site moved.
+   */
   adopt?: { translatorId: string; translatorName?: string }
 }
 
@@ -169,19 +179,34 @@ export async function checkWatch(watch: Watch): Promise<CheckResult> {
     }
   }
 
-  const available = episodesForTranslator(info, watch.translatorId)
+  let translatorId = watch.translatorId
+  let adopt: CheckResult['adopt']
   /*
     A translator that has gone away is worth saying out loud rather than
     silently falling back to the default one, which would start downloading a
-    different dub than the user chose.
+    different dub than the user chose. The watch gets the error, backs off and
+    shows a red dot, and nothing is queued.
+
+    Unless it has only moved. A yummyani dub's id is its player's address, so
+    the same dub on a new player arrives under a new id with the old name. Exactly
+    one dub by that name is taken to be it; none, or several - one dub can run
+    on several players - is the error.
   */
-  if (available.length === 0 && !info.episodesByTranslator?.[watch.translatorId]) {
-    const known = info.translators.some((t) => t.id === watch.translatorId)
-    if (!known) {
+  const listed =
+    info.translators.some((t) => t.id === translatorId) ||
+    Boolean(info.episodesByTranslator?.[translatorId])
+  if (!listed) {
+    const same = watch.translatorName
+      ? info.translators.filter((t) => t.name === watch.translatorName)
+      : []
+    if (same.length !== 1) {
       throw new Error('The translation this watch follows is no longer listed on the page.')
     }
+    translatorId = same[0].id
+    adopt = { translatorId, translatorName: same[0].name }
   }
 
+  const available = episodesForTranslator(info, translatorId)
   const fresh = newEpisodes(watch.seen, available)
   if (fresh.length) {
     log.info('watcher', `Found ${fresh.length} new episode(s)`, {
@@ -196,7 +221,8 @@ export async function checkWatch(watch: Watch): Promise<CheckResult> {
     available,
     title: info.title,
     thumbnail: info.thumbnail,
-    translatorName: info.translators.find((t) => t.id === watch.translatorId)?.name
+    translatorName: info.translators.find((t) => t.id === translatorId)?.name,
+    adopt
   }
 }
 

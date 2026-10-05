@@ -8,7 +8,8 @@
 
 export type StepKind = 'download' | 'rename' | 'upload' | 'notify'
 export type StepState = 'pending' | 'running' | 'done' | 'failed' | 'skipped'
-export type RunState = 'running' | 'done' | 'failed'
+/** `skipped`: somebody cancelled or removed the episode's download in the queue, or stopped the watch. */
+export type RunState = 'running' | 'done' | 'failed' | 'skipped'
 
 /** One find-and-replace applied to the title before it reaches a template. */
 export interface Replacement {
@@ -123,13 +124,22 @@ export interface Watch {
    * Why the last episode failed somewhere along the chain, and when.
    *
    * Separate from `lastError`, which only a check writes and the next good check
-   * clears. An episode that failed is marked handled and never retried, so
-   * nothing on a schedule would ever clear this: the next episode that gets all
-   * the way through does, and so does the user, by editing the steps, pausing or
-   * resuming, or dismissing it.
+   * clears. A check that finds nothing new does not mean the chain works again,
+   * so only an episode that gets all the way through clears this - a retry of
+   * the failed one included - and so does the user, by editing the steps,
+   * pausing or resuming, or dismissing it.
    */
   lastRunError?: string
   lastRunFailedAt?: number
+  /**
+   * Failed goes so far at each episode not yet given up on, by `episodeKey`.
+   *
+   * A failed episode is left out of `seen`, so the next check - at the watch's
+   * own pace, never sooner - finds it again and has another go; the
+   * `MAX_ATTEMPTS`th failure gives up and marks it handled. No entry means the
+   * episode has never failed, or has been settled since.
+   */
+  attempts?: Record<string, number>
 }
 
 export interface RunStep {
@@ -173,6 +183,16 @@ export type CheckSummary =
   | { notOut: true; releaseAt?: number }
   /** `queued` is what went to the queue: nothing while paused, at most a check's worth otherwise. */
   | { fresh: number; queued: number; paused: boolean }
+
+/**
+ * What the "try again" button on a failed or skipped episode gets back.
+ *
+ * Answered as soon as the episode is on its way, like "check now"; the run
+ * itself reaches the screen through the usual broadcasts. Busy while the
+ * schedule is working on the same watch, so the two cannot fetch one episode
+ * side by side.
+ */
+export type RetryAnswer = { started: true } | { busy: true } | { error: string }
 
 // ---------------------------------------------------------------------------
 // Templates
@@ -316,6 +336,78 @@ export function newEpisodes(seen: EpisodeRef[], available: EpisodeRef[]): Episod
 }
 
 // ---------------------------------------------------------------------------
+// Trying an episode again
+// ---------------------------------------------------------------------------
+
+/**
+ * Goes an episode gets before it is given up on: one per check, never closer.
+ *
+ * Every failure used to mark the episode handled on the spot, so a NAS that was
+ * asleep, a password changed that afternoon or one queue hiccup lost that
+ * episode for good. Retrying for ever is the opposite fault - a file the site
+ * keeps broken would be fetched unattended at every check for as long as it
+ * stays broken. Three checks at the watch's own interval rides out a night of
+ * the first kind and gives up on the second.
+ */
+export const MAX_ATTEMPTS = 3
+
+/**
+ * How one go at an episode ended, for deciding what it leaves on the watch.
+ *
+ * `skipped` is a person's decision - the download cancelled or removed in the
+ * queue - and is as final as success. `stopped` is the watch being paused or
+ * removed mid-run, which settles nothing: a paused watch fetches that episode
+ * again once it is resumed.
+ */
+export type EpisodeOutcome = 'done' | 'failed' | 'skipped' | 'stopped'
+
+function isSeen(watch: Watch, ref: EpisodeRef): boolean {
+  const key = episodeKey(ref)
+  return watch.seen.some((s) => episodeKey(s) === key)
+}
+
+/** Failed goes so far at this episode. */
+export function attemptsAt(watch: Watch, ref: EpisodeRef): number {
+  return watch.attempts?.[episodeKey(ref)] ?? 0
+}
+
+/**
+ * Whether a failure now would be the one that gives up.
+ *
+ * Also true for an episode already handled, which only "try again" can reach:
+ * nothing will try it on a schedule afterwards, so its failure is the last word.
+ */
+export function isFinalAttempt(watch: Watch, ref: EpisodeRef): boolean {
+  return isSeen(watch, ref) || attemptsAt(watch, ref) + 1 >= MAX_ATTEMPTS
+}
+
+/**
+ * What one go at an episode changes on its watch, if anything.
+ *
+ * Handled means added to `seen` - once, however many times it is retried by
+ * hand - with its count dropped. A failure short of the cap only counts, so the
+ * next check finds the episode again.
+ */
+export function settleEpisode(
+  watch: Watch,
+  ref: EpisodeRef,
+  outcome: EpisodeOutcome
+): Partial<Watch> | undefined {
+  if (outcome === 'stopped') return undefined
+  const key = episodeKey(ref)
+  const { [key]: count = 0, ...others } = watch.attempts ?? {}
+  const rest = Object.keys(others).length ? others : undefined
+
+  if (outcome === 'failed' && !isSeen(watch, ref) && count + 1 < MAX_ATTEMPTS) {
+    return { attempts: { ...others, [key]: count + 1 } }
+  }
+  return {
+    seen: isSeen(watch, ref) ? watch.seen : [...watch.seen, ref],
+    attempts: rest
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Stored shape
 // ---------------------------------------------------------------------------
 
@@ -368,6 +460,16 @@ function withoutTheSeasonFolder(step: PipelineStep): PipelineStep {
   return { ...step, remotePath: DEFAULT_REMOTE_PATH }
 }
 
+/** Counts that are counts. Anything else in the map is a corrupt file, and forgetting it costs one extra try. */
+function cleanAttempts(raw: unknown): Record<string, number> | undefined {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return undefined
+  const out: Record<string, number> = {}
+  for (const [key, n] of Object.entries(raw)) {
+    if (typeof n === 'number' && Number.isInteger(n) && n > 0) out[key] = n
+  }
+  return Object.keys(out).length ? out : undefined
+}
+
 export function migrateWatches(raw: unknown): StoredWatches {
   const source = (raw ?? {}) as Partial<StoredWatches>
   const watches: Watch[] = []
@@ -389,6 +491,7 @@ export function migrateWatches(raw: unknown): StoredWatches {
           : 360,
       nextCheckAt: Number(candidate.nextCheckAt) || 0,
       seen: Array.isArray(candidate.seen) ? candidate.seen : [],
+      attempts: cleanAttempts(candidate.attempts),
       steps: candidate.steps
         .filter((step) => step && typeof step.kind === 'string')
         .map(withoutTheSeasonFolder),
@@ -405,6 +508,51 @@ export function migrateWatches(raw: unknown): StoredWatches {
   }
 
   return { watches, runs }
+}
+
+/** What a step that was under way when the app went says. */
+export const INTERRUPTED_NOTE = 'Interrupted when the app closed.'
+
+/**
+ * End a run the file says is still going.
+ *
+ * Read from disk, "running" can only mean a process that has gone: the list is
+ * loaded once per launch, before this one has started anything. Left alone,
+ * such a run read "running" in the history for good, beside the real run the
+ * next check started for the same episode. It ends when its last step did -
+ * not now, or it would look as if it had taken days.
+ */
+export function endInterruptedRun(run: Run): Run {
+  if (run.state !== 'running') return run
+  const last = Math.max(
+    Number(run.startedAt) || 0,
+    ...(run.steps ?? []).map((s) => s.finishedAt ?? s.startedAt ?? 0)
+  )
+  return {
+    ...run,
+    state: 'failed',
+    finishedAt: run.finishedAt ?? last,
+    steps: (run.steps ?? []).map(
+      (s): RunStep => (s.state === 'running' ? { ...s, state: 'failed', message: INTERRUPTED_NOTE } : s)
+    )
+  }
+}
+
+/** Every interrupted run ended, and how many there were - so the store knows to write the file back. */
+export function endInterruptedRuns(runs: Record<string, Run[]>): {
+  runs: Record<string, Run[]>
+  ended: number
+} {
+  let ended = 0
+  const out: Record<string, Run[]> = {}
+  for (const [watchId, list] of Object.entries(runs)) {
+    out[watchId] = list.map((run) => {
+      const next = endInterruptedRun(run)
+      if (next !== run) ended++
+      return next
+    })
+  }
+  return { runs: out, ended }
 }
 
 // ---------------------------------------------------------------------------

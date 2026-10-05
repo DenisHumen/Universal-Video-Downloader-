@@ -3,7 +3,16 @@ import { EventEmitter } from 'events'
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { log } from '../log'
-import { MAX_RUNS, migrateWatches, type Run, type StoredWatches, type Watch } from '@shared/automation'
+import {
+  endInterruptedRuns,
+  episodeKey,
+  MAX_RUNS,
+  migrateWatches,
+  type EpisodeRef,
+  type Run,
+  type StoredWatches,
+  type Watch
+} from '@shared/automation'
 
 /**
  * The watches, and what has happened to them.
@@ -45,9 +54,20 @@ function read(): StoredWatches {
   if (state) return state
   try {
     const file = FILE()
-    state = existsSync(file)
+    const loaded = existsSync(file)
       ? migrateWatches(JSON.parse(readFileSync(file, 'utf-8')))
       : empty()
+    /*
+      Here rather than when the watcher starts, so it happens whether or not
+      automation is on, and before anything this launch adds a run of its own
+      that could be mistaken for one the last launch left behind.
+    */
+    const { runs, ended } = endInterruptedRuns(loaded.runs)
+    state = { ...loaded, runs }
+    if (ended) {
+      log.info('watcher', `Marked ${ended} run(s) the last session left unfinished as failed`)
+      persist()
+    }
   } catch (err) {
     log.error('watcher', 'Could not read the watch list; starting with an empty one', {
       why: err instanceof Error ? err.message : String(err)
@@ -133,9 +153,15 @@ export function listRuns(watchId: string): Run[] {
   return [...(read().runs[watchId] ?? [])].sort((a, b) => b.startedAt - a.startedAt)
 }
 
-export function addRun(run: Run): Run {
+/**
+ * Add a run to its watch's history, in place of `replaces` if that is given.
+ *
+ * A retry takes the place of the go it retries, so an episode reads as one row
+ * that says how it stands rather than a stack of failures above a success.
+ */
+export function addRun(run: Run, replaces?: string): Run {
   const store = read()
-  const list = store.runs[run.watchId] ?? []
+  const list = (store.runs[run.watchId] ?? []).filter((r) => !replaces || r.id !== replaces)
   list.push(run)
   // Oldest first in storage, so trimming from the front drops the oldest.
   store.runs[run.watchId] = list.slice(-MAX_RUNS)
@@ -158,9 +184,15 @@ export function updateRun(runId: string, patch: Partial<Run>): Run | undefined {
   return undefined
 }
 
-/** Every run still in flight — used to pick up where a restart left off. */
-export function unfinishedRuns(): Run[] {
+/** A run by its id, whichever watch it belongs to. */
+export function findRun(runId: string): Run | undefined {
   return Object.values(read().runs)
     .flat()
-    .filter((r) => r.state === 'running')
+    .find((r) => r.id === runId)
+}
+
+/** The latest go at one episode of one watch. */
+export function lastRunFor(watchId: string, ref: EpisodeRef): Run | undefined {
+  const key = episodeKey(ref)
+  return listRuns(watchId).find((r) => episodeKey(r) === key)
 }

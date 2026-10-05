@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import {
   DEFAULT_REMOTE_PATH,
+  endInterruptedRun,
+  endInterruptedRuns,
+  INTERRUPTED_NOTE,
   MAX_RUNS,
   migrateWatches,
   type PipelineStep,
@@ -182,5 +185,73 @@ describe('migrateWatches, for the season folder that nobody wanted', () => {
       replacements: []
     }
     expect(stepsOf(rename)[0]).toEqual(rename)
+  })
+})
+
+/*
+  The count of failed goes at an episode is what stands between a transient
+  failure and a lost episode. Dropped on load, every restart would hand a
+  broken episode three fresh goes - and keeping junk in it could give up on
+  an episode that never failed.
+*/
+describe('migrateWatches, for the failed goes at each episode', () => {
+  it('keeps the count across a restart', () => {
+    const [w] = migrateWatches({ watches: [watch({ attempts: { s1e4: 2 } })], runs: {} }).watches
+    expect(w.attempts).toEqual({ s1e4: 2 })
+  })
+
+  it('drops what is not a count, and the map when nothing is left', () => {
+    const junk = { s1e1: 0, s1e2: -1, s1e3: 1.5, s1e4: 'two', s1e5: 1 } as unknown as Record<string, number>
+    const [w] = migrateWatches({ watches: [watch({ attempts: junk })], runs: {} }).watches
+    expect(w.attempts).toEqual({ s1e5: 1 })
+
+    const [none] = migrateWatches({
+      watches: [watch({ attempts: ['s1e1'] as unknown as Record<string, number> })],
+      runs: {}
+    }).watches
+    expect(none.attempts).toBeUndefined()
+  })
+})
+
+/*
+  A run the app was in the middle of when it closed stayed "running" in the
+  history for good, next to the real run the next check started for the same
+  episode, so nobody could tell whether anything was still happening.
+*/
+describe('endInterruptedRun', () => {
+  const interrupted = (): Run =>
+    run({
+      state: 'running',
+      startedAt: 1_000,
+      steps: [
+        { kind: 'download', state: 'done', startedAt: 1_000, finishedAt: 5_000 },
+        { kind: 'upload', state: 'running', startedAt: 6_000 },
+        { kind: 'notify', state: 'pending' }
+      ]
+    })
+
+  it('ends it as failed, with the step it was on saying why', () => {
+    const ended = endInterruptedRun(interrupted())
+    expect(ended.state).toBe('failed')
+    expect(ended.steps.map((s) => s.state)).toEqual(['done', 'failed', 'pending'])
+    expect(ended.steps[1].message).toBe(INTERRUPTED_NOTE)
+  })
+
+  // Not the moment it was noticed, or a run cut short in a minute reads as lasting days.
+  it('ends it when its last step was heard from', () => {
+    expect(endInterruptedRun(interrupted()).finishedAt).toBe(6_000)
+    expect(endInterruptedRun(run({ state: 'running', startedAt: 700, steps: [] })).finishedAt).toBe(700)
+  })
+
+  it('leaves a finished run exactly as it was', () => {
+    const done = run({ state: 'done', finishedAt: 9 })
+    expect(endInterruptedRun(done)).toBe(done)
+  })
+
+  it('says how many it ended, so the file is written back only when something changed', () => {
+    const out = endInterruptedRuns({ w1: [run(), interrupted()], w2: [run({ id: 'r2', state: 'failed' })] })
+    expect(out.ended).toBe(1)
+    expect(out.runs.w1[1].state).toBe('failed')
+    expect(endInterruptedRuns(out.runs).ended).toBe(0)
   })
 })

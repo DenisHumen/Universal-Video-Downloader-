@@ -1,7 +1,7 @@
 import { EventEmitter } from 'events'
 import { describe, expect, it, vi } from 'vitest'
 import type { DownloadItem } from '@shared/types'
-import { awaitDownload, type QueueView } from './await-download'
+import { awaitDownload, DownloadStopped, type QueueView } from './await-download'
 
 const item = (state: DownloadItem['state'], extra: Partial<DownloadItem> = {}): DownloadItem => ({
   id: 'd1',
@@ -73,6 +73,21 @@ describe('awaitDownload', () => {
     const wait = awaitDownload('d1', q)
     q.events.emit('removed', 'd1')
     await expect(wait).rejects.toThrow('removed')
+  })
+
+  /*
+    Somebody stopping a download on purpose is not a failure: retried at the
+    next check, the episode came straight back after they had cancelled it.
+    The pipeline tells the two apart by type.
+  */
+  it('says a cancel or a removal was somebody stopping it, and a failure was not', async () => {
+    await expect(awaitDownload('d1', queue(item('canceled')))).rejects.toBeInstanceOf(DownloadStopped)
+    const q = queue(item('queued'))
+    const removed = awaitDownload('d1', q)
+    q.events.emit('removed', 'd1')
+    await expect(removed).rejects.toMatchObject({ how: 'removed' })
+    const failed = awaitDownload('d1', queue(item('error', { error: 'HTTP 403' })))
+    await expect(failed).rejects.not.toBeInstanceOf(DownloadStopped)
   })
 
   /*

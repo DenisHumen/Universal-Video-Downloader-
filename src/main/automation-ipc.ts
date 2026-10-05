@@ -10,7 +10,8 @@ import {
   updateWatch,
   watchEvents
 } from './services/automation/store'
-import { checkNow } from './services/automation/watcher'
+import { checkNow, retryRun } from './services/automation/watcher'
+import { stopEpisode } from './services/automation/pipeline'
 import { testTarget } from './services/automation/smb'
 import { sendTest } from './services/automation/telegram'
 import { getSecret, hasSecret, SECRET, secretsPersist, setSecret } from './services/secrets'
@@ -20,6 +21,7 @@ import { coalesce } from './services/coalesce'
 import {
   settleRunError,
   type CheckSummary,
+  type RetryAnswer,
   type Run,
   type SmbTarget,
   type Watch
@@ -95,11 +97,18 @@ export function registerAutomationIpc(): void {
 
   ipcMain.handle(IPC.autoUpdate, (_e, id: string, patch: Partial<Watch>): Watch | undefined => {
     const next = updateWatch(id, settleRunError(patch))
+    // Pausing stops the episode downloading now too, not only the ones after it; resuming fetches it again.
+    if (patch.enabled === false) stopEpisode(id, 'paused')
     broadcast()
     return next
   })
 
+  /*
+    The episode downloading for it is stopped first. Left running, it went on
+    to be uploaded and announced for a series nobody was watching any more.
+  */
   ipcMain.handle(IPC.autoRemove, (_e, id: string): void => {
+    stopEpisode(id, 'removed')
     removeWatch(id)
     broadcast()
   })
@@ -112,6 +121,13 @@ export function registerAutomationIpc(): void {
     const summary = await checkNow(id)
     broadcast()
     return summary
+  })
+
+  // Answers once the episode is on its way; the run reaches the screen like any other.
+  ipcMain.handle(IPC.autoRetryRun, (_e, runId: string): RetryAnswer => {
+    const answer = retryRun(runId)
+    broadcast()
+    return answer
   })
 
   /*

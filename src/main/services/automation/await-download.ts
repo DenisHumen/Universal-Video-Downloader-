@@ -21,6 +21,19 @@ export interface WaitHooks {
   onResume?(item: DownloadItem): void
 }
 
+/**
+ * Somebody cancelled the item, or removed it from the queue.
+ *
+ * Its own type because it is not a failure: trying again at the next check
+ * would undo what a person just did on purpose. The run is skipped instead.
+ */
+export class DownloadStopped extends Error {
+  constructor(readonly how: 'cancelled' | 'removed') {
+    super(how === 'cancelled' ? 'The download was cancelled.' : 'The download was removed from the queue.')
+    this.name = 'DownloadStopped'
+  }
+}
+
 const terminal = (state: DownloadItem['state']): boolean =>
   state === 'completed' || state === 'error' || state === 'canceled'
 
@@ -49,7 +62,7 @@ export function awaitDownload(id: string, queue: QueueView, hooks: WaitHooks = {
     const settle = (item: DownloadItem): void => {
       stop()
       if (item.state === 'completed') resolve(item)
-      else if (item.state === 'canceled') reject(new Error('The download was cancelled.'))
+      else if (item.state === 'canceled') reject(new DownloadStopped('cancelled'))
       else reject(new Error(item.error || 'The download failed.'))
     }
 
@@ -68,7 +81,7 @@ export function awaitDownload(id: string, queue: QueueView, hooks: WaitHooks = {
     const onRemoved = (removedId: string): void => {
       if (removedId !== id) return
       stop()
-      reject(new Error('The download was removed from the queue.'))
+      reject(new DownloadStopped('removed'))
     }
 
     queue.events.on('updated', onUpdate)

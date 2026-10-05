@@ -232,13 +232,25 @@ export function composeEpisodeNews(news: EpisodeNews): string {
   return lines.join('\n')
 }
 
-/** What a failure looks like. Worth telling, since nobody is watching. */
-export function composeFailure(series: string, season: number, episode: number, why: string): string {
-  return [
-    `⚠️ <b>${esc(series)}</b> — S${pad(season)}E${pad(episode)}`,
-    '',
-    esc(why)
-  ].join('\n')
+/**
+ * What a failure looks like. Worth telling, since nobody is watching.
+ *
+ * Sent once, for the go that gives up. After several goes it says so, and where
+ * to pick it back up: nothing on the schedule will try that episode again.
+ */
+export function composeFailure(
+  series: string,
+  season: number,
+  episode: number,
+  why: string,
+  attempts = 1
+): string {
+  const lines = [`⚠️ <b>${esc(series)}</b> — S${pad(season)}E${pad(episode)}`]
+  if (attempts > 1) {
+    lines.push(`Failed ${attempts} times and will not be tried again on its own; retry it from the watch screen.`)
+  }
+  lines.push('', esc(why))
+  return lines.join('\n')
 }
 
 /**

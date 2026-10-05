@@ -460,6 +460,7 @@ export function installMockApi(): void {
         ? { notOut: true, releaseAt: w.releaseAt }
         : { fresh: 0, queued: 0, paused: !w?.enabled }
     },
+    autoRetryRun: async () => ({ started: true }),
     autoTestSmb: async () => 'Connected.',
     autoTestTelegram: async () => 'Connected.',
     autoSetSecret: async () => undefined,

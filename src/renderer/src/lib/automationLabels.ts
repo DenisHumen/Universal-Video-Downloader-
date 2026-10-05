@@ -21,5 +21,6 @@ export const STEP_LABEL: Record<StepKind, TranslationKey> = {
 export const RUN_LABEL: Record<RunState, TranslationKey> = {
   running: 'auto.run.running',
   done: 'auto.run.done',
-  failed: 'auto.run.failed'
+  failed: 'auto.run.failed',
+  skipped: 'auto.run.skipped'
 }

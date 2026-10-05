@@ -2,13 +2,19 @@ import { net, powerMonitor } from 'electron'
 import { log } from '../log'
 import { backoffMinutes, settleFailedCheck } from './backoff'
 import { checkWatch } from './detect'
-import { alertChannel, markHandled, runEpisode } from './pipeline'
-import { getWatch, listWatches, updateWatch } from './store'
+import { alertChannel, recordOutcome, runEpisode } from './pipeline'
+import { findRun, getWatch, listWatches, updateWatch } from './store'
 import { composeCheckFailure, sendNotification } from './telegram'
 import {
+  attemptsAt,
+  episodeKey,
+  isFinalAttempt,
+  MAX_ATTEMPTS,
   upcomingDelayMinutes,
   type CheckSummary,
   type EpisodeRef,
+  type RetryAnswer,
+  type Run,
   type Watch
 } from '@shared/automation'
 
@@ -115,8 +121,19 @@ async function look(watch: Watch, manual: boolean, read: () => void): Promise<Fo
       return nothing({ notOut: true, releaseAt })
     }
 
-    // Out at last: from here on this is an ordinary watch on the dub it adopted.
+    /*
+      Out at last: from here on this is an ordinary watch on the dub it
+      adopted. Or the dub it followed moved to a new id; `fresh` is already
+      worked out against the new one.
+    */
     if (result.adopt) {
+      if (!watch.pending) {
+        log.info('watcher', 'The translation this watch follows moved; following it there', {
+          id: watch.id.slice(0, 8),
+          series: result.title,
+          dub: result.adopt.translatorName
+        })
+      }
       updateWatch(watch.id, {
         translatorId: result.adopt.translatorId,
         translatorName: result.adopt.translatorName,
@@ -211,8 +228,30 @@ async function drain(watchId: string, todo: EpisodeRef[], title: string): Promis
     // Re-read: the user may have disabled or deleted the watch mid-run.
     const live = getWatch(watchId)
     if (!live || !live.enabled) break
-    await runEpisode(live, ref, title)
-    markHandled(getWatch(watchId) ?? live, ref)
+    await attempt(live, ref, title)
+  }
+}
+
+/**
+ * One go at one episode, and what it leaves on the watch.
+ *
+ * A failure short of the cap leaves the episode unhandled, so the next check -
+ * at the watch's own interval, never in a loop - finds it again and the
+ * pipeline picks up where this go stopped.
+ */
+async function attempt(watch: Watch, ref: EpisodeRef, title: string, previous?: Run): Promise<void> {
+  const tries = attemptsAt(watch, ref) + 1
+  const final = isFinalAttempt(watch, ref)
+  const outcome = await runEpisode(watch, ref, title, { final, attempt: tries, previous })
+  recordOutcome(watch.id, ref, outcome)
+  if (outcome === 'failed') {
+    log.info(
+      'watcher',
+      final
+        ? `Gave up on ${episodeKey(ref)} after ${tries} attempt(s)`
+        : `Will try ${episodeKey(ref)} again at the next check (attempt ${tries} of ${MAX_ATTEMPTS})`,
+      { id: watch.id.slice(0, 8), series: title }
+    )
   }
 }
 
@@ -221,9 +260,9 @@ async function drain(watchId: string, todo: EpisodeRef[], title: string): Promis
  *
  * Two answers. `checked` comes as soon as the page has been read and recorded,
  * and is what "check now" waits for. `done` comes once every episode found has
- * been through the chain and marked handled, and the watch stays in flight
- * until then: let it go any sooner and the next tick reads the page again,
- * finds the same episodes not yet marked, and queues them a second time.
+ * been through the chain and its outcome written down, and the watch stays in
+ * flight until then: let it go any sooner and the next tick reads the page
+ * again, finds the same episodes not yet marked, and queues them a second time.
  *
  * The concurrency slot is the other way round: held for the reading alone, and
  * given back exactly once whichever way that ends - a second release would let
@@ -303,6 +342,40 @@ export async function checkNow(watchId: string): Promise<CheckSummary> {
   if (!watch) return { error: 'This series is no longer being watched.' }
   if (inFlight.has(watchId)) return { busy: true }
   return checkOne(watch, true).checked
+}
+
+/**
+ * Have another go at an episode that failed or was skipped. For "try again".
+ *
+ * There was no way back for a failed episode short of downloading and uploading
+ * it by hand - including after fixing the password that made it fail. This goes
+ * through the same chain as the schedule, picking up where the run stopped, and
+ * the new run takes that one's place in the history.
+ *
+ * The watch is held in flight for the length of it, as a check would hold it,
+ * and a watch already in flight is refused: the schedule and the button must
+ * not fetch the same episode side by side.
+ */
+export function retryRun(runId: string): RetryAnswer {
+  const run = findRun(runId)
+  if (!run) return { error: 'That episode is no longer in the history.' }
+  const watch = getWatch(run.watchId)
+  if (!watch) return { error: 'This series is no longer being watched.' }
+  if (run.state !== 'failed' && run.state !== 'skipped') {
+    return { error: 'Only an episode that failed or was skipped can be tried again.' }
+  }
+  if (inFlight.has(watch.id)) return { busy: true }
+
+  inFlight.add(watch.id)
+  const ref: EpisodeRef = { season: run.season, episode: run.episode }
+  void attempt(watch, ref, watch.title || run.title, run)
+    .catch((err) => {
+      log.warn('watcher', `Trying ${episodeKey(ref)} again stopped part-way: ${String(err)}`, {
+        id: watch.id.slice(0, 8)
+      })
+    })
+    .finally(() => inFlight.delete(watch.id))
+  return { started: true }
 }
 
 /** A delayed tick that finds the watcher stopped does nothing. */

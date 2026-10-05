@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { composeCheckFailure } from './telegram'
+import { composeCheckFailure, composeFailure } from './telegram'
 
 /*
   Telegram rejects the whole message over one unescaped `<` or `&`, and both
@@ -20,5 +20,22 @@ describe('composeCheckFailure', () => {
 
   it('says how many checks failed', () => {
     expect(composeCheckFailure('Show', 3, 'gone')).toContain('last 3 checks failed')
+  })
+})
+
+/*
+  An episode is now sent to Telegram once, when it is given up on, rather than
+  at every failed go. That one message has to say nothing will try again.
+*/
+describe('composeFailure', () => {
+  it('says it gave up after several goes, and where to try again', () => {
+    const html = composeFailure('Show', 1, 4, 'Could not reach 192.168.1.10', 3)
+    expect(html).toContain('S01E04')
+    expect(html).toContain('Failed 3 times')
+    expect(html).toContain('watch screen')
+  })
+
+  it('says nothing about goes for a single one', () => {
+    expect(composeFailure('Show', 1, 4, 'gone')).not.toContain('times')
   })
 })
