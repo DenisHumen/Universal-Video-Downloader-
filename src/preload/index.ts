@@ -85,6 +85,7 @@ const api = {
   browserRefreshState: (): Promise<void> => ipcRenderer.invoke(IPC.browserState),
   onBrowserState: (cb: (state: BrowserState) => void) => on<BrowserState>(IPC.evtBrowserState, cb),
   onBrowserMedia: (cb: (media: BrowserMedia[]) => void) => on<BrowserMedia[]>(IPC.evtBrowserMedia, cb),
+  onBrowserQueued: (cb: () => void) => on<void>(IPC.evtBrowserQueued, () => cb()),
 
   pauseAll: (): Promise<void> => ipcRenderer.invoke(IPC.downloadPauseAll),
   resumeAll: (): Promise<void> => ipcRenderer.invoke(IPC.downloadResumeAll),

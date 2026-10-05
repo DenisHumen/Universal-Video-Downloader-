@@ -3,13 +3,20 @@ import { join } from 'path'
 import { randomUUID } from 'crypto'
 import { IPC } from '@shared/ipc'
 import { UA } from '../resolvers/http'
-import { attachCapture, browsingSession } from '../resolvers/universal/capture'
+import {
+  attachCapture,
+  browsingSession,
+  registerBrowserPage,
+  type QueuedPageDownload
+} from '../resolvers/universal/capture'
 import { isPlausible, scoreUrl, type MediaCandidate } from '../resolvers/universal/candidates'
 import { directUrlFor } from '../resolvers'
 import { startDownload } from './downloader'
 import { getSettings } from './settings'
 import { mt } from './locale'
-import type { BrowserMedia, BrowserState, DownloadItem } from '@shared/types'
+import { rendererIndex, wireNavigation } from './navigation'
+import { log } from './log'
+import type { BrowserMedia, BrowserState, DownloadItem, DownloadRequest } from '@shared/types'
 
 /**
  * The built-in browser.
@@ -46,6 +53,7 @@ const PANEL_WIDTH = 300
 let win: BrowserWindow | null = null
 let view: WebContentsView | null = null
 let detach: (() => void) | null = null
+let releasePage: (() => void) | null = null
 let picking = false
 
 const media = new Map<string, BrowserMedia>()
@@ -203,9 +211,16 @@ export function openBrowserWindow(initialUrl?: string): void {
       preload: shellPreload(),
       contextIsolation: true,
       nodeIntegration: false,
-      sandbox: false
+      // The shell holds the bridge; same reasoning as the main window's.
+      sandbox: true
     }
   })
+  /*
+    The shell is the app's own document and nothing else. A link dropped on it
+    used to load right there, a remote page holding the full preload bridge;
+    it now opens in the page view, which is where a dropped link was meant to go.
+  */
+  wireNavigation(win, (url) => void view?.webContents.loadURL(url, { userAgent: UA }))
 
   view = new WebContentsView({
     webPreferences: {
@@ -232,6 +247,11 @@ export function openBrowserWindow(initialUrl?: string): void {
   detach = attachCapture(browsingSession(), rememberCandidate)
 
   const wc = view.webContents
+  releasePage = registerBrowserPage({
+    webContentsId: wc.id,
+    onScreen: () => Boolean(win && !win.isDestroyed() && win.isVisible()),
+    queue: (download) => void queuePageDownload(download)
+  })
   wc.setUserAgent(UA)
   wc.setWindowOpenHandler(({ url }) => {
     // Keep popups inside the browser rather than spawning stray windows.
@@ -264,6 +284,8 @@ export function openBrowserWindow(initialUrl?: string): void {
   win.on('closed', () => {
     detach?.()
     detach = null
+    releasePage?.()
+    releasePage = null
     view = null
     win = null
     picking = false
@@ -276,7 +298,7 @@ export function openBrowserWindow(initialUrl?: string): void {
   if (devUrl) {
     void win.loadURL(`${devUrl}#/browser`)
   } else {
-    void win.loadFile(join(__dirname, '../renderer/index.html'), { hash: '/browser' })
+    void win.loadFile(rendererIndex(), { hash: '/browser' })
   }
 
   win.webContents.once('did-finish-load', () => {
@@ -287,35 +309,78 @@ export function openBrowserWindow(initialUrl?: string): void {
   void wc.loadURL(normalizeInput(initialUrl || 'https://duckduckgo.com'), { userAgent: UA })
 }
 
-/** Queue whatever the user picked in the browser. */
-async function download(target: { mediaId?: string; url?: string }): Promise<DownloadItem | null> {
+function defaultFormat(): Pick<DownloadRequest, 'mode' | 'quality'> {
   const settings = getSettings()
   const mode = settings.defaultMode
-  const quality = mode === 'audio' ? 'audio' : settings.defaultQuality
+  return { mode, quality: mode === 'audio' ? 'audio' : settings.defaultQuality }
+}
 
-  if (target.url) {
-    // A page link — let the normal detection pipeline handle it.
-    return startDownload({ url: target.url, title: target.url, mode, quality })
-  }
-
-  const entry = [...media.values()].find((m) => m.id === target.mediaId)
-  if (!entry) return null
-  const headers = { ...(candidateHeaders.get(entry.url) ?? {}) }
-  const referer = headers.Referer || entry.pageUrl
+/** Queue a stream the browser saw, with the headers it was fetched with. */
+function queueStream(stream: {
+  url: string
+  captured: Record<string, string>
+  pageUrl: string
+  title: string
+}): Promise<DownloadItem> {
+  const headers = { ...stream.captured }
+  const referer = headers.Referer || stream.pageUrl
   delete headers.Referer
 
   return startDownload({
     url: directUrlFor({
-      url: entry.url,
+      url: stream.url,
       headers: Object.keys(headers).length ? headers : undefined,
       referer,
-      pageUrl: entry.pageUrl,
-      title: entry.pageTitle || entry.label
+      pageUrl: stream.pageUrl,
+      title: stream.title
     }),
-    title: entry.pageTitle || entry.label,
-    mode,
-    quality
+    title: stream.title,
+    ...defaultFormat()
   })
+}
+
+/** Queue whatever the user picked in the browser. */
+async function download(target: { mediaId?: string; url?: string }): Promise<DownloadItem | null> {
+  if (target.url) {
+    // A page link — let the normal detection pipeline handle it.
+    return startDownload({ url: target.url, title: target.url, ...defaultFormat() })
+  }
+
+  const entry = [...media.values()].find((m) => m.id === target.mediaId)
+  if (!entry) return null
+  return queueStream({
+    url: entry.url,
+    captured: candidateHeaders.get(entry.url) ?? {},
+    pageUrl: entry.pageUrl,
+    title: entry.pageTitle || entry.label
+  })
+}
+
+/**
+ * A video or audio file the page itself offered as a download.
+ *
+ * It goes where the user's own click in the media panel would have sent it,
+ * rather than to a Save dialog and a folder the queue knows nothing about. The
+ * shell is told so it can say so: the click was on the page, so there is no
+ * button of ours to turn into "queued".
+ */
+async function queuePageDownload(download: QueuedPageDownload): Promise<void> {
+  // The name the browser would have saved it under, less the extension the
+  // engine adds back.
+  const name = download.filename.replace(/\.[a-z0-9]{1,5}$/i, '').trim()
+  try {
+    await queueStream({
+      url: download.url,
+      captured: download.headers,
+      pageUrl: download.pageUrl,
+      title: name || download.pageTitle || labelFor(download.url)
+    })
+    if (win && !win.isDestroyed()) win.webContents.send(IPC.evtBrowserQueued)
+  } catch (err) {
+    log.warn('browser', 'Could not queue a download the page started', {
+      why: err instanceof Error ? err.message : String(err)
+    })
+  }
 }
 
 export function registerBrowserIpc(): void {

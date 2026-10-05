@@ -1,7 +1,7 @@
 import { BrowserWindow } from 'electron'
 import { UA } from '../http'
 import { rank, scoreUrl, type MediaCandidate } from './candidates'
-import { attachCapture, browsingSession } from './capture'
+import { attachCapture, browsingSession, sniffers } from './capture'
 
 /**
  * The universal fallback: open the page in a real (hidden) Chromium window,
@@ -195,6 +195,7 @@ async function sniffOnce(
 
   const cleanup = (): void => {
     detach()
+    if (ownWebContentsId !== undefined) sniffers.delete(ownWebContentsId)
     if (graceTimer) clearTimeout(graceTimer)
     if (deadlineTimer) clearTimeout(deadlineTimer)
     if (onAbort) signal?.removeEventListener('abort', onAbort)
@@ -218,6 +219,8 @@ async function sniffOnce(
       }
     })
     ownWebContentsId = win.webContents.id
+    // Nothing this window starts may become a Save dialog nobody asked for.
+    sniffers.add(ownWebContentsId)
     win.webContents.setAudioMuted(true)
     win.webContents.setWindowOpenHandler(() => ({ action: 'deny' }))
 

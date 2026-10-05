@@ -1,4 +1,13 @@
-import { app, BrowserWindow, clipboard, dialog, ipcMain, Notification, shell } from 'electron'
+import {
+  app,
+  BrowserWindow,
+  clipboard,
+  dialog,
+  ipcMain,
+  Notification,
+  shell,
+  type IpcMainInvokeEvent
+} from 'electron'
 import { IPC } from '@shared/ipc'
 import type {
   AppSettings,
@@ -39,6 +48,8 @@ import { getSettings, resetSettings, setSettings } from './services/settings'
 import { ensureYtdlp, getYtdlpStatus, updateYtdlp, ytdlpEvents } from './services/ytdlp'
 import { takePending } from './index'
 import { registerAutomationIpc } from './automation-ipc'
+import { fromRenderer } from './services/navigation'
+import { log } from './services/log'
 import {
   checkForUpdates,
   downloadUpdate,
@@ -53,6 +64,21 @@ export interface IpcContext {
   getWindow: () => BrowserWindow | null
   openSearchWindow: (query: string) => void
   onSettingsChanged: (settings: AppSettings) => void
+}
+
+/**
+ * Refuse a call that did not come from the app's own document.
+ *
+ * Only for the handlers that reach outside the app: opening a path or a link,
+ * and rewriting the settings, which decide the proxy every request goes
+ * through, where files are written and which cookies the engine is handed. A
+ * rejected promise rather than a quiet no-op, so anything legitimate that ever
+ * trips this shows up as an error.
+ */
+function requireRenderer(event: IpcMainInvokeEvent, channel: string): void {
+  if (fromRenderer(event)) return
+  log.warn('app', 'Refused a call from a page that is not the app', { channel })
+  throw new Error(`${channel} is only available to the app itself`)
 }
 
 /** In-flight detections, so the UI can cancel a slow universal scan. */
@@ -118,7 +144,8 @@ export function registerIpc({ getWindow, openSearchWindow, onSettingsChanged }: 
 
   // ---- Settings ----
   ipcMain.handle(IPC.settingsGet, () => getSettings())
-  ipcMain.handle(IPC.settingsSet, (_e, partial: Partial<AppSettings>) => {
+  ipcMain.handle(IPC.settingsSet, (event, partial: Partial<AppSettings>) => {
+    requireRenderer(event, IPC.settingsSet)
     const next = setSettings(partial)
     onSettingsChanged(next)
     // The concurrency limit is read when the queue is pumped, and nothing
@@ -127,7 +154,8 @@ export function registerIpc({ getWindow, openSearchWindow, onSettingsChanged }: 
     kickQueue()
     return next
   })
-  ipcMain.handle(IPC.settingsReset, () => {
+  ipcMain.handle(IPC.settingsReset, (event) => {
+    requireRenderer(event, IPC.settingsReset)
     const next = resetSettings()
     onSettingsChanged(next)
     return next
@@ -154,9 +182,13 @@ export function registerIpc({ getWindow, openSearchWindow, onSettingsChanged }: 
     if (result.canceled || !result.filePaths.length) return null
     return result.filePaths[0]
   })
-  ipcMain.handle(IPC.openPath, (_e, path: string) => shell.openPath(path))
+  ipcMain.handle(IPC.openPath, (event, path: string) => {
+    requireRenderer(event, IPC.openPath)
+    return shell.openPath(path)
+  })
   ipcMain.handle(IPC.showInFolder, (_e, path: string) => shell.showItemInFolder(path))
-  ipcMain.handle(IPC.openExternal, (_e, url: string) => {
+  ipcMain.handle(IPC.openExternal, (event, url: string) => {
+    requireRenderer(event, IPC.openExternal)
     if (!/^https?:\/\//i.test(url)) return Promise.resolve()
     return shell.openExternal(url)
   })

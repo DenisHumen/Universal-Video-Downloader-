@@ -1,6 +1,8 @@
 import { session, type Session, type OnBeforeSendHeadersListenerDetails } from 'electron'
 import { UA } from '../http'
+import { log } from '../../services/log'
 import { scoreUrl, type MediaCandidate } from './candidates'
+import { downloadVerdict, floodGuard } from './page-downloads'
 
 /**
  * Network media capture for a session.
@@ -24,6 +26,81 @@ import { scoreUrl, type MediaCandidate } from './candidates'
 const BROWSING_PARTITION = 'persist:uvd-browser'
 
 let hardened = false
+
+/** The hidden sniffer windows that exist right now, by webContents id. */
+export const sniffers = new Set<number>()
+
+/** A download the visible browser's page started, on its way to the queue. */
+export interface QueuedPageDownload {
+  url: string
+  /** What the browser sent for that URL, cookies included: the CDN may want them. */
+  headers: Record<string, string>
+  /** The name the server suggested for the file. */
+  filename: string
+  pageUrl: string
+  pageTitle: string
+}
+
+/** The built-in browser's page, the one place in this session a person is looking at. */
+export interface BrowserPage {
+  webContentsId: number
+  onScreen: () => boolean
+  queue: (download: QueuedPageDownload) => void
+}
+
+let browserPage: BrowserPage | null = null
+
+/**
+ * Let the built-in browser's page download. Returns the undo, for when its
+ * window closes. Every other page in the session has its downloads cancelled.
+ */
+export function registerBrowserPage(page: BrowserPage): () => void {
+  browserPage = page
+  return () => {
+    if (browserPage === page) browserPage = null
+  }
+}
+
+/** Five in fifteen seconds is more than a person clicks; a page in a loop is not. */
+const tooManyDownloads = floodGuard(5, 15_000)
+
+function onWillDownload(
+  ses: Session,
+  event: Electron.Event,
+  item: Electron.DownloadItem,
+  wc: Electron.WebContents | undefined
+): void {
+  const id = wc?.id
+  const sniffer = id !== undefined && sniffers.has(id)
+  const page = !sniffer && id !== undefined && browserPage?.webContentsId === id ? browserPage : null
+  const onScreen = Boolean(page?.onScreen())
+  const url = item.getURL()
+  const mimeType = item.getMimeType()
+  const flooding = onScreen && tooManyDownloads(String(id))
+  const verdict = downloadVerdict({ url, mimeType, onScreen, flooding })
+  if (verdict === 'ask') return
+
+  event.preventDefault()
+  const type = mimeType || 'unknown'
+  if (verdict === 'cancel' || !page || !wc) {
+    log.info('browser', 'Cancelled a download a page started', {
+      reason: sniffer ? 'detection window' : flooding ? 'too many at once' : 'page not on screen',
+      type
+    })
+    return
+  }
+  page.queue({
+    url,
+    headers: installations.get(ses)?.recentHeaders.get(url) ?? {
+      Referer: wc.getURL(),
+      'User-Agent': UA
+    },
+    filename: item.getFilename(),
+    pageUrl: wc.getURL(),
+    pageTitle: wc.getTitle()
+  })
+  log.info('browser', 'Sent a download the page started to the queue', { type })
+}
 
 /**
  * The session both the visible browser and the hidden sniffer load pages into.
@@ -49,6 +126,14 @@ export function browsingSession(): Session {
     )
     ses.setPermissionCheckHandler((_wc, permission) => permission === 'fullscreen')
     ses.setDevicePermissionHandler(() => false)
+    /*
+      Without this, a download any page in here started got Electron's default:
+      a native Save dialog. The hidden sniffer clicks every play-button shape on
+      pages nobody has looked at, so that dialog could appear from nowhere, as
+      many times as the page liked. Only the browser's visible page may
+      download now; see `downloadVerdict` for what happens to what it starts.
+    */
+    ses.on('will-download', (event, item, wc) => onWillDownload(ses, event, item, wc))
   }
   return ses
 }

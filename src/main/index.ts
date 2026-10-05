@@ -29,6 +29,7 @@ import {
   isEngineBusy
 } from './services/downloader'
 import { startClipboardWatch, stopClipboardWatch } from './services/clipboard'
+import { rendererIndex, wireNavigation } from './services/navigation'
 import { currentLanguage, mt, type MainLanguage } from './services/locale'
 import type { AppSettings, PendingDelivery } from '@shared/types'
 
@@ -81,26 +82,8 @@ function loadIcon(name: string): Electron.NativeImage {
 function wireWindow(win: BrowserWindow): void {
   win.on('ready-to-show', () => win.show())
 
-  win.webContents.setWindowOpenHandler(({ url }) => {
-    if (/^https?:\/\//i.test(url)) shell.openExternal(url)
-    return { action: 'deny' }
-  })
-
-  // Never let the renderer navigate away from the app bundle.
-  win.webContents.on('will-navigate', (event, url) => {
-    /*
-      The dev server's own URL is the one navigation this must allow, and
-      only when there is one. The previous form defaulted to a NUL character
-      as a "matches nothing" sentinel — which worked, and also made this file
-      binary as far as git, grep and every diff tool are concerned.
-    */
-    const devUrl = process.env['ELECTRON_RENDERER_URL']
-    const isDev = Boolean(devUrl) && url.startsWith(devUrl as string)
-    if (!isDev && !url.startsWith('file://')) {
-      event.preventDefault()
-      if (/^https?:\/\//i.test(url)) void shell.openExternal(url)
-    }
-  })
+  // Never let the renderer navigate away from the app's own document.
+  wireNavigation(win)
 
   // If the renderer ever crashes (GPU/OOM/…) the window turns into a black
   // rectangle until it's reloaded — do that reload automatically.
@@ -127,7 +110,14 @@ function windowOptions(width: number, height: number): Electron.BrowserWindowCon
       preload: join(__dirname, '../preload/index.js'),
       contextIsolation: true,
       nodeIntegration: false,
-      sandbox: false,
+      /*
+        These are the windows holding the bridge, and they were the ones
+        running without the OS sandbox while the site view and the hidden
+        sniffer had it. The preload is one bundled file that needs nothing but
+        `contextBridge` and `ipcRenderer`, both of which work sandboxed; the
+        smoke script checks that the bridge still arrives.
+      */
+      sandbox: true,
       spellcheck: false
     }
   }
@@ -138,7 +128,7 @@ function loadRenderer(win: BrowserWindow, hash?: string): void {
   if (devUrl) {
     win.loadURL(hash ? `${devUrl}#${hash}` : devUrl)
   } else {
-    win.loadFile(join(__dirname, '../renderer/index.html'), hash ? { hash } : undefined)
+    win.loadFile(rendererIndex(), hash ? { hash } : undefined)
   }
 }
 

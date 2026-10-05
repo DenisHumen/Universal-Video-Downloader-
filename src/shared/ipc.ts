@@ -64,6 +64,8 @@ export const IPC = {
   evtDetectStatus: 'event:detect-status',
   evtBrowserState: 'event:browser-state',
   evtBrowserMedia: 'event:browser-media',
+  /** A download the page itself started went to the queue. */
+  evtBrowserQueued: 'event:browser-queued',
   evtClipboardLink: 'event:clipboard-link',
   evtNavigate: 'event:navigate',
   /** What main tried to hand the window before it was listening. */

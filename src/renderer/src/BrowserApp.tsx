@@ -22,7 +22,7 @@ import { enter } from './lib/motion'
 import { toast } from './lib/toast'
 import { formatBytes } from './lib/format'
 import { applyAppearance } from './lib/theme'
-import { useT } from './i18n'
+import { t as tNow, useT } from './i18n'
 
 const PANEL_WIDTH = 300
 
@@ -63,10 +63,17 @@ export default function BrowserApp(): JSX.Element {
     })()
     const offState = window.api.onBrowserState(setState)
     const offMedia = window.api.onBrowserMedia(setMedia)
+    /*
+      A video the page offered as a download goes to the queue, not to a Save
+      dialog. The non-reactive lookup: this effect runs once, and `t` from the
+      hook would answer in whatever language was set before settings loaded.
+    */
+    const offQueued = window.api.onBrowserQueued(() => toast(tNow('browser.queued'), 'success'))
     void window.api.browserRefreshState()
     return () => {
       offState()
       offMedia()
+      offQueued()
     }
   }, [])
 

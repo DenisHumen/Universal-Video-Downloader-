@@ -9,8 +9,16 @@
  * assumption `services/thumbnails.ts` rests on: that `net.request` sends the
  * `Referer` we set rather than stripping it. Nothing here touches app code, so
  * it also serves as an early warning when an Electron upgrade moves things.
+ *
+ * After `npm run build` it also loads the built preload into sandboxed windows,
+ * one per shell, and checks that `window.api` arrives in each. The app windows
+ * run sandboxed, where a preload can require nothing but `electron` and a few
+ * built-ins - so a preload that ever imports a Node module loses the whole
+ * bridge, and this is where that shows.
  */
 import { app, BrowserWindow, WebContentsView, net, session } from 'electron'
+import { existsSync } from 'fs'
+import { fileURLToPath } from 'url'
 
 const results = []
 const check = (name, ok, detail = '') => {
@@ -126,7 +134,49 @@ app.whenReady().then(async () => {
     console.log('SKIP  thumbnail referer check (pass a URL as an argument)')
   }
 
+  await checkSandboxedBridge()
+
   finish()
+
+  async function checkSandboxedBridge() {
+    const preload = fileURLToPath(new URL('../out/preload/index.js', import.meta.url))
+    const page = fileURLToPath(new URL('../out/renderer/index.html', import.meta.url))
+    if (!existsSync(preload) || !existsSync(page)) {
+      console.log('SKIP  sandboxed preload check (run `npm run build` first)')
+      return
+    }
+    /*
+      The app's own IPC handlers are not running here, so every call a shell
+      makes while it boots is reported as unhandled. That is expected and not
+      what this checks; left in, it buried the PASS lines.
+    */
+    const consoleError = console.error
+    console.error = (...args) => {
+      if (!String(args[0]).startsWith('Error occurred in handler for')) consoleError(...args)
+    }
+    // The three shells one renderer bundle serves: main, search, browser.
+    for (const hash of ['', '/search?q=smoke', '/browser']) {
+      const name = `window.api in a sandboxed window${hash ? ` (#${hash.split('?')[0]})` : ''}`
+      const shellWindow = new BrowserWindow({
+        show: false,
+        webPreferences: { preload, contextIsolation: true, nodeIntegration: false, sandbox: true }
+      })
+      const preloadErrors = []
+      shellWindow.webContents.on('preload-error', (_e, _path, err) => preloadErrors.push(err.message))
+      try {
+        await shellWindow.loadFile(page, hash ? { hash } : undefined)
+        const kind = await shellWindow.webContents.executeJavaScript(
+          'typeof window.api === "object" && typeof window.api.getSettings === "function"'
+        )
+        check(name, kind === true && !preloadErrors.length, preloadErrors[0] ?? `bridge=${kind}`)
+      } catch (err) {
+        check(name, false, err.message)
+      } finally {
+        shellWindow.destroy()
+      }
+    }
+    console.error = consoleError
+  }
 
   function finish() {
     const failed = results.filter((r) => !r.ok)

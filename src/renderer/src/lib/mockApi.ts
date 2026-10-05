@@ -348,6 +348,8 @@ export function installMockApi(): void {
       browserMediaListeners.add(cb)
       return () => browserMediaListeners.delete(cb)
     },
+    // The preview has no page that could start a download of its own.
+    onBrowserQueued: () => () => undefined,
     pauseAll: async () => undefined,
     resumeAll: async () => undefined,
     retryFailed: async () => undefined,
