@@ -1,5 +1,5 @@
 import { net } from 'electron'
-import { describeNetError } from './neterror'
+import { describeNetError, REQUEST_TIMED_OUT } from './neterror'
 
 /** A recent desktop Chrome UA — many sites gate on this. */
 export const UA =
@@ -31,7 +31,7 @@ function request(
 
     let req: Electron.ClientRequest
     const timer = setTimeout(() => {
-      finish(() => reject(new Error('Request timed out')))
+      finish(() => reject(new Error(REQUEST_TIMED_OUT)))
       try {
         req?.abort()
       } catch {
@@ -107,7 +107,7 @@ export function fetchBinary(
 
     let req: Electron.ClientRequest
     const timer = setTimeout(() => {
-      finish(() => reject(new Error('Request timed out')))
+      finish(() => reject(new Error(REQUEST_TIMED_OUT)))
       try {
         req?.abort()
       } catch {

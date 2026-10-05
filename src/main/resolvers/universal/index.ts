@@ -1,7 +1,8 @@
 import { b64urlDecode, b64urlEncode, hostOf } from '../http'
+import { unreachableCode } from '../neterror'
 import type { ResolveOptions, ResolvedUrl } from '../types'
 import { best, type MediaCandidate } from './candidates'
-import { scrapeStatic } from './static'
+import { scrapeStatic, type StaticScrape } from './static'
 import { sniffPage } from './sniffer'
 
 /**
@@ -63,6 +64,17 @@ function toResolved(
   }
 }
 
+/**
+ * A stream for the page, or null when neither strategy found one.
+ *
+ * Rejects - with the reason, in words that name the host - when the page could
+ * not be reached at all: no address for the name, no route, nobody answering.
+ * The browser pass would have loaded the same address over the same network
+ * and failed the same way, only after its whole timeout; an unreachable host
+ * used to take about two minutes to report, most of it spent here. A
+ * certificate error or an HTTP status is not that: the site is there, and a
+ * real browser may still get through, so those carry on to the browser pass.
+ */
 export async function resolveUniversal(
   pageUrl: string,
   options: UniversalOptions = {}
@@ -70,7 +82,12 @@ export async function resolveUniversal(
   const { allowBrowser = true, onStage, browserTimeoutMs, signal } = options
 
   onStage?.('scraping')
-  const scraped = await scrapeStatic(pageUrl).catch(() => null)
+  let scraped: StaticScrape | null = null
+  try {
+    scraped = await scrapeStatic(pageUrl)
+  } catch (err) {
+    if (unreachableCode(err)) throw err
+  }
   const staticBest = scraped ? best(scraped.candidates) : undefined
 
   // A manifest found in the markup is as trustworthy as one seen on the wire.

@@ -96,8 +96,64 @@ const RULES: Rule[] = [
       'This video is unavailable — it may have been removed, made private, or the site is blocking access from your region.',
     cookies: true
   },
+  /*
+    The engine's own wording for outcomes that the looser rules further down
+    either missed or gave to the wrong code. They are exact phrases, so they
+    go before the rules that guess from single words: "Video unavailable. This
+    video has been removed because the account ... has been terminated" was a
+    sign-in problem by way of `account`, and a format that is not available
+    is not a video that is unavailable. A bare "is not available" is not here
+    on purpose - it would take the format and region lines above it.
+  */
   {
-    re: /age|verify your age|18 u\.s\.c|age-?restricted|sensitive content/,
+    re: /requested format is not available/,
+    code: 'noFormats',
+    message: 'Could not find a downloadable video at this link.'
+  },
+  {
+    re: /not available from your location|geo.?restrict|made this video available in your country|not available in your country|ip address is blocked|blocked from accessing/,
+    code: 'geo',
+    message: 'This video is not available in your region.'
+  },
+  {
+    re: /video (is )?unavailable|no longer available|account .* terminated/,
+    code: 'unavailable',
+    message:
+      'This video is unavailable — it may have been removed, made private, or the site is blocking access from your region.',
+    cookies: true
+  },
+  {
+    re: /only available for (subscribers|members)|members?[- ]only|join this channel/,
+    code: 'signIn',
+    message: 'This video requires you to be signed in.',
+    cookies: true
+  },
+  {
+    re: /live event will (begin|start)|premieres? in|premiere will begin|is upcoming/,
+    code: 'upcoming',
+    message:
+      'This video has not started yet — it is a scheduled premiere or live stream. Try again once it begins.'
+  },
+  /*
+    A failure to reach the host at all, in the words of the resolver, the OS
+    and the TLS library. Up here because the line that carries it also carries
+    the address: "Failed to resolve 'login.example.com'" or a path with
+    /region/ in it would otherwise be read by the sign-in or region rules.
+  */
+  {
+    re: /getaddrinfo|name or service not known|nodename nor servname|no address associated|temporary failure in name resolution|errno (-[23]|1100[14])\b|failed to establish a new connection|certificate verify failed|\[ssl/,
+    code: 'network',
+    message: 'Network problem reaching the site. Check your connection or proxy and try again.'
+  },
+  /*
+    Anchored. This was a bare `age`, which matched inside "webpage" - and
+    "Unable to download webpage: ..." is how the engine opens nearly every
+    network failure it has. A refused connection, a 403, a 429, a timeout and
+    a DNS failure were all reported as age-restricted content, with advice to
+    set up cookies that could not have helped.
+  */
+  {
+    re: /\bage[- ]?(restricted|gate|verif)|confirm your age|verify your age|18 u\.s\.c|inappropriate for some users|sensitive content/,
     code: 'ageRestricted',
     message: 'This content is age-restricted.',
     cookies: true
@@ -109,7 +165,7 @@ const RULES: Rule[] = [
       'The site is rate-limiting us. Wait a minute and retry, or set a proxy in Settings → Network.'
   },
   {
-    re: /sign in|log ?in|logged in|private video|members? only|requires authentication|account/,
+    re: /sign in|log ?in|logged in|private video|members?[- ]only|requires authentication|account/,
     code: 'signIn',
     message: 'This video requires you to be signed in.',
     cookies: true
@@ -210,17 +266,63 @@ export function humanizeYtdlpError(raw: string, cookiesEnabled: boolean): string
   return classifyYtdlpError(raw, cookiesEnabled).message
 }
 
-/** Transient failures worth retrying automatically before bothering the user. */
+/**
+ * Lines that describe the run rather than the way it ended: ffmpeg's indented
+ * input summary (Duration, Stream, Metadata), its section headers, warnings,
+ * and the engine's own note that it is retrying a connection it then made.
+ */
+const NOT_THE_FAILURE =
+  /^(\s|WARNING:|Input #|Output #|Stream mapping|Press \[q\])|retrying with new connection/i
+
+/**
+ * The last few lines that say why the run ended.
+ *
+ * Not only `ERROR:` lines: when the engine hands a download to ffmpeg, the
+ * transient reason - "Connection reset by peer" - is in ffmpeg's own line just
+ * above the engine's flat "ffmpeg exited with code 1".
+ */
+function failureTail(raw: string): string {
+  return raw
+    .split('\n')
+    .filter((line) => line.trim() && !NOT_THE_FAILURE.test(line))
+    .slice(-4)
+    .join('\n')
+    .toLowerCase()
+}
+
+/**
+ * Transient failures worth retrying automatically before bothering the user.
+ *
+ * Read from the end of the output only, and a 5xx only where it is an HTTP
+ * status. This used to scan the whole 4000-character tail for any three-digit
+ * number starting with 5, so ffmpeg's "bitrate: 548 kb/s" in the input summary,
+ * or "Top 500" in the file name, made a permanent failure wait twelve seconds
+ * and run twice more before the user heard about it.
+ */
 export function isTransientError(raw: string): boolean {
-  const lower = raw.toLowerCase()
+  const tail = failureTail(raw)
   if (
     /drm|widevine|private|removed|deleted|age-?restricted|premium|no space left|permission denied|unsupported url/.test(
-      lower
+      tail
     )
   ) {
     return false
   }
-  return /timed out|timeout|connection|network|unreachable|reset|\b5\d{2}\b|\b429\b|temporar|try again|incomplete|broken pipe/.test(
-    lower
+  return /timed out|timeout|connection|network|unreachable|reset|http error 5\d\d|\b5\d\d:? (internal server error|bad gateway|service unavailable|gateway time-?out)|server returned 5xx|\b429\b|temporar|try again|incomplete|broken pipe/.test(
+    tail
+  )
+}
+
+/**
+ * The engine was still trying to connect when its time ran out.
+ *
+ * With warnings off the engine says little until it gives up, but whatever it
+ * did write before the probe was killed is worth reading: a connect timeout or
+ * a failed name lookup means the host is unreachable from here, which is a
+ * different thing to tell someone than "the site may be unsupported".
+ */
+export function stalledConnecting(stderr: string): boolean {
+  return /connect timeout|failed to establish a new connection|getaddrinfo|name or service not known/i.test(
+    stderr
   )
 }

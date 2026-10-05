@@ -297,7 +297,10 @@ async function scrapeOne(
   let html: string
   try {
     html = await fetcher(url, { Referer: refererFor(url, parent) })
-  } catch {
+  } catch (err) {
+    // The page itself failing is the caller's to judge (it may mean the host
+    // is unreachable); a player iframe failing is one less place to look.
+    if (parent === undefined) throw err
     return { candidates: [] }
   }
   const text = unescapeMarkup(html)
@@ -321,7 +324,10 @@ async function scrapeOne(
   return meta
 }
 
-/** Scrape a page (and one level of player iframes) for downloadable media. */
+/**
+ * Scrape a page (and one level of player iframes) for downloadable media.
+ * Rejects when the page itself could not be fetched.
+ */
 export function scrapeStatic(url: string, fetcher?: Fetcher): Promise<StaticScrape> {
   return scrapeOne(url, 1, undefined, fetcher)
 }

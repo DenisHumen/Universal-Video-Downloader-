@@ -129,6 +129,7 @@ export type AppErrorCode =
   | 'notALink'
   | 'emptyPage'
   | 'cutFailed'
+  | 'upcoming'
 
 export type DownloadState =
   | 'queued'

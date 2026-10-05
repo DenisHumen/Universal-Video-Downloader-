@@ -35,3 +35,28 @@ export function describeNetError(err: unknown, url: string): Error {
   const reason = REASONS.find(([re]) => re.test(code))?.[1] ?? 'a network error occurred'
   return new Error(`Could not reach ${host}: ${reason}. Check your connection or proxy. (${code})`)
 }
+
+/** What `http.ts` rejects with when its own clock runs out before the site answers. */
+export const REQUEST_TIMED_OUT = 'Request timed out'
+
+/*
+  Codes that mean the host was never reached, as opposed to reached and turned
+  away. A certificate error or an HTTP status is deliberately not among them:
+  the site is there, and a real browser may still get through where a bare
+  request did not.
+*/
+const NO_ANSWER = /ERR_(CONNECTION_TIMED_OUT|TIMED_OUT)\b/
+const NO_ROUTE =
+  /ERR_(NAME_NOT_RESOLVED|NAME_RESOLUTION_FAILED|CONNECTION_REFUSED|ADDRESS_UNREACHABLE|INTERNET_DISCONNECTED|PROXY_CONNECTION_FAILED)\b/
+
+/**
+ * Whether a failed request means the host cannot be reached from here at all,
+ * and if so, which code says so: `timeout` when nothing answered, `network`
+ * when the name, the route or the connection failed outright.
+ */
+export function unreachableCode(err: unknown): 'network' | 'timeout' | undefined {
+  const raw = err instanceof Error ? err.message : String(err ?? '')
+  if (raw === REQUEST_TIMED_OUT || NO_ANSWER.test(raw)) return 'timeout'
+  if (NO_ROUTE.test(raw)) return 'network'
+  return undefined
+}

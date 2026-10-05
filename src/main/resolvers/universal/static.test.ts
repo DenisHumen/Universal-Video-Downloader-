@@ -181,6 +181,32 @@ describe('scrapeStatic referer', () => {
 
 })
 
+/*
+  A page that could not be fetched used to come back as a page with nothing on
+  it, so the caller could not tell an unreachable host from an empty page - and
+  opened the hidden browser to wait out its whole timeout on a host that was
+  never going to answer.
+*/
+describe('scrapeStatic failures', () => {
+  const PAGE = 'https://site.test/watch/42'
+  const FRAME = 'https://player.cdn.test/embed/abc'
+
+  it('passes on the reason the page itself could not be fetched', async () => {
+    const refused = new Error('Could not reach site.test: the connection was refused.')
+    await expect(scrapeStatic(PAGE, () => Promise.reject(refused))).rejects.toBe(refused)
+  })
+
+  it('shrugs off a player iframe that fails', async () => {
+    const fetcher = async (url: string): Promise<string> => {
+      if (url === FRAME) throw new Error('HTTP 403')
+      return `<title>Film</title><iframe src="${FRAME}"></iframe>`
+    }
+    const out = await scrapeStatic(PAGE, fetcher)
+    expect(out.candidates).toEqual([])
+    expect(out.title).toBe('Film')
+  })
+})
+
 describe('refererFor', () => {
   it('prefers the page that pointed at the URL', () => {
     expect(refererFor('https://player.cdn.test/embed/1', 'https://site.test/watch/42')).toBe(

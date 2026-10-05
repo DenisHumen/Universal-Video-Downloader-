@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { describeNetError } from './neterror'
+import { describeNetError, REQUEST_TIMED_OUT, unreachableCode } from './neterror'
 
 /*
   A toast once read `net::ERR_CONNECTION_REFUSED` and nothing else: no host, no
@@ -46,5 +46,44 @@ describe('describeNetError', () => {
     expect(describeNetError(new Error('net::ERR_FAILED'), 'not a url').message).toContain(
       'Could not reach not a url'
     )
+  })
+})
+
+/*
+  A host blocked from this network took about two minutes to report: after the
+  engine gave up, the hidden browser loaded the same address over the same
+  network and waited out its whole timeout to fail the same way.
+*/
+describe('unreachableCode', () => {
+  const url = 'https://ok.ru/video/1234567'
+  const described = (code: string): Error => describeNetError(new Error(`net::${code}`), url)
+
+  it('knows a host that could not be reached at all', () => {
+    for (const code of [
+      'ERR_NAME_NOT_RESOLVED',
+      'ERR_NAME_RESOLUTION_FAILED',
+      'ERR_CONNECTION_REFUSED',
+      'ERR_ADDRESS_UNREACHABLE',
+      'ERR_INTERNET_DISCONNECTED',
+      'ERR_PROXY_CONNECTION_FAILED'
+    ]) {
+      expect(unreachableCode(described(code)), code).toBe('network')
+    }
+  })
+
+  it('calls a host that never answered a timeout', () => {
+    expect(unreachableCode(described('ERR_CONNECTION_TIMED_OUT'))).toBe('timeout')
+    expect(unreachableCode(described('ERR_TIMED_OUT'))).toBe('timeout')
+    expect(unreachableCode(new Error(REQUEST_TIMED_OUT))).toBe('timeout')
+  })
+
+  it('leaves a site that answered alone, even with a refusal', () => {
+    // The site is there; a real browser may still get past a bad certificate
+    // chain or a 403 that a bare request could not.
+    expect(unreachableCode(described('ERR_CERT_AUTHORITY_INVALID'))).toBeUndefined()
+    expect(unreachableCode(described('ERR_SSL_PROTOCOL_ERROR'))).toBeUndefined()
+    expect(unreachableCode(new Error('HTTP 403'))).toBeUndefined()
+    expect(unreachableCode(new Error('HTTP 503'))).toBeUndefined()
+    expect(unreachableCode(undefined)).toBeUndefined()
   })
 })

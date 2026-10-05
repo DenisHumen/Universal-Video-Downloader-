@@ -2,8 +2,9 @@ import { spawn } from 'child_process'
 import { ytdlpBinaryPath, ytdlpSpawnOptions } from './ytdlp'
 import { getSettings } from './settings'
 import { killTree } from './process'
-import { accessArgs, classifyYtdlpError, hasCookies, headerArgs } from './options'
+import { accessArgs, classifyYtdlpError, hasCookies, headerArgs, stalledConnecting } from './options'
 import { resolveUniversal, resolveUrl, type ResolvedUrl } from '../resolvers'
+import { unreachableCode } from '../resolvers/neterror'
 import { isAbsoluteUrl, looksLikeCollection, normalizeUrl } from '@shared/urls'
 import type {
   AppErrorCode,
@@ -246,11 +247,28 @@ export async function detect(
   // The engine gave up. Fall back to universal detection: scrape the page, and
   // if that isn't enough, open it in a hidden browser and watch for the stream.
   if (!wasRewritten && !signal?.aborted) {
-    const universal = await resolveUniversal(url, {
-      allowBrowser: settings.universalFallback,
-      onStage: (stage) => onStage(stage),
-      signal
-    }).catch(() => null)
+    let universal: ResolvedUrl | null = null
+    try {
+      universal = await resolveUniversal(url, {
+        allowBrowser: settings.universalFallback,
+        onStage: (stage) => onStage(stage),
+        signal
+      })
+    } catch (err) {
+      /*
+        The app's own request could not reach the host either. That is the
+        answer, in words that name the host - unless the engine already has a
+        better one: to be told "sign in" or "not in your region" it had to
+        reach the site, and that diagnosis stands.
+      */
+      const code = unreachableCode(err)
+      const engineHasBetter =
+        probe.errorCode !== undefined && probe.errorCode !== 'network' && probe.errorCode !== 'timeout'
+      if (code && !engineHasBetter && !signal?.aborted) {
+        onStage('done')
+        return { ok: false, error: err instanceof Error ? err.message : String(err), errorCode: code }
+      }
+    }
 
     if (universal) {
       onStage('probing')
@@ -335,11 +353,19 @@ function spawnJson(args: string[], signal: AbortSignal | undefined, timeoutMs: n
 
     const timer = setTimeout(() => {
       killTree(child)
-      done({
-        ok: false,
-        error: 'Detection timed out. The site may be unsupported or unreachable.',
-        errorCode: 'timeout'
-      })
+      done(
+        stalledConnecting(stderr)
+          ? {
+              ok: false,
+              error: 'Could not connect to the site. Check your connection or proxy and try again.',
+              errorCode: 'network'
+            }
+          : {
+              ok: false,
+              error: 'Detection timed out. The site may be unsupported or unreachable.',
+              errorCode: 'timeout'
+            }
+      )
     }, timeoutMs)
 
     const onAbort = (): void => {
@@ -385,6 +411,15 @@ export function playlistEntries(raw: RawInfo[]): PlaylistEntry[] {
   })
 }
 
+/*
+  How long one connection attempt may sit silent while detecting. The engine's
+  default is 20 s, and it retries: on a host blocked from this network it was
+  still connecting when the 75 s probe cap killed it, so the user got "timed
+  out, may be unsupported" instead of the engine's own "connection timed out".
+  At 10 s a blocked host fails in about 40 s, inside the cap, with its reason.
+*/
+const PROBE_SOCKET_TIMEOUT = ['--socket-timeout', '10']
+
 /** Expand a playlist/channel URL into its entries without extracting each one. */
 async function probeCollection(url: string, signal?: AbortSignal): Promise<MediaInfo | null> {
   const settings = getSettings()
@@ -396,6 +431,7 @@ async function probeCollection(url: string, signal?: AbortSignal): Promise<Media
     '--ignore-config',
     '--encoding',
     'utf-8',
+    ...PROBE_SOCKET_TIMEOUT,
     '--playlist-end',
     String(settings.playlistLimit),
     ...accessArgs(settings),
@@ -436,6 +472,7 @@ async function probeWithEngine(resolved: ResolvedUrl, signal?: AbortSignal): Pro
     '--ignore-config',
     '--encoding',
     'utf-8',
+    ...PROBE_SOCKET_TIMEOUT,
     ...accessArgs(settings),
     ...headerArgs(resolved.headers)
   ]
