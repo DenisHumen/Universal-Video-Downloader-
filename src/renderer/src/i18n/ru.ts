@@ -247,6 +247,8 @@ export const ru: Dictionary = {
 
   'settings.proxy': 'прокси',
   'settings.proxyPlaceholder': 'http://host:port (необязательно)',
+  'settings.proxyInvalid':
+    'это не похоже на адрес прокси — попробуйте host:port или http://host:port. пока адрес не исправлен, действует прежняя настройка.',
 
   'settings.notifications': 'уведомления',
   'settings.notificationsHint': 'сообщать о завершении загрузки',

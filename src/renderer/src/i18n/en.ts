@@ -254,6 +254,8 @@ export const en = {
 
   'settings.proxy': 'proxy',
   'settings.proxyPlaceholder': 'http://host:port (optional)',
+  'settings.proxyInvalid':
+    'that doesn’t look like a proxy address — try host:port or http://host:port. until it does, the previous setting stays in effect.',
 
   'settings.notifications': 'desktop notifications',
   'settings.notificationsHint': 'tell me when a download finishes',

@@ -3,7 +3,7 @@ import { join } from 'path'
 import { randomUUID } from 'crypto'
 import { IPC } from '@shared/ipc'
 import { UA } from '../resolvers/http'
-import { attachCapture, BROWSING_PARTITION, browsingSession } from '../resolvers/universal/capture'
+import { attachCapture, browsingSession } from '../resolvers/universal/capture'
 import { isPlausible, scoreUrl, type MediaCandidate } from '../resolvers/universal/candidates'
 import { directUrlFor } from '../resolvers'
 import { startDownload } from './downloader'
@@ -209,7 +209,7 @@ export function openBrowserWindow(initialUrl?: string): void {
 
   view = new WebContentsView({
     webPreferences: {
-      partition: BROWSING_PARTITION,
+      session: browsingSession(),
       preload: sitePreload(),
       contextIsolation: true,
       nodeIntegration: false,

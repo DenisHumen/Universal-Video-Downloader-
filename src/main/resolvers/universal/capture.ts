@@ -12,8 +12,16 @@ import { scoreUrl, type MediaCandidate } from './candidates'
  * installing on the first attach and removing on the last detach.
  */
 
-/** The session used by both the hidden sniffer and the in-app browser. */
-export const BROWSING_PARTITION = 'persist:uvd-browser'
+/**
+ * The session used by both the hidden sniffer and the in-app browser.
+ *
+ * A session of its own, sharing nothing with the default one: whatever the app
+ * sets on `session.defaultSession` - the proxy, most obviously - has to be set
+ * here as well, or these windows quietly go without it. Not exported: windows
+ * are built from `browsingSession()`, so there is one way in, and it is the one
+ * that hardens the session first.
+ */
+const BROWSING_PARTITION = 'persist:uvd-browser'
 
 let hardened = false
 

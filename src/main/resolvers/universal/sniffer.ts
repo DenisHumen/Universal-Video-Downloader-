@@ -1,7 +1,7 @@
 import { BrowserWindow } from 'electron'
 import { UA } from '../http'
 import { rank, scoreUrl, type MediaCandidate } from './candidates'
-import { attachCapture, BROWSING_PARTITION, browsingSession } from './capture'
+import { attachCapture, browsingSession } from './capture'
 
 /**
  * The universal fallback: open the page in a real (hidden) Chromium window,
@@ -207,7 +207,7 @@ async function sniffOnce(
       width: 1280,
       height: 800,
       webPreferences: {
-        partition: BROWSING_PARTITION,
+        session: browsingSession(),
         contextIsolation: true,
         nodeIntegration: false,
         sandbox: true,

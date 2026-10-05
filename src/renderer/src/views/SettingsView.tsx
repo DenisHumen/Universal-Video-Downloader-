@@ -25,6 +25,7 @@ import ConfirmDialog from '../components/ConfirmDialog'
 import AutomationSettings from '../components/AutomationSettings'
 import { isSafeTemplate } from '@shared/filename'
 import { normaliseRate } from '@shared/rate'
+import { isProxyValue } from '@shared/proxy'
 
 type SectionId =
   | 'appearance'
@@ -164,10 +165,10 @@ function TextField({
 }
 
 /**
- * The filename template, which is the one setting that can be refused.
+ * The filename template, which is one of two settings that can be refused.
  *
- * Every other field here saves on each keystroke, which is fine when nothing
- * can reject the value. This one is checked before it is written, and a
+ * Most fields here save on each keystroke, which is fine when nothing can
+ * reject the value. This one is checked before it is written, and a
  * rejected template is replaced with the default — so typing the first
  * character of an absolute path, a lone slash or the drive letter, wiped
  * everything already typed and put the default in its place, mid-word, with no
@@ -270,6 +271,77 @@ function SpeedLimitField({
         </p>
       )}
     </div>
+  )
+}
+
+/**
+ * The proxy, saved when the user is done with it rather than per keystroke.
+ *
+ * Saving the proxy reconfigures the app's own network, so a field that saved on
+ * every change applied every prefix of the address on the way to it - `h`,
+ * `ht`, `http` - and downloads resolving at that moment were sent to hosts that
+ * do not exist, while the log gained a line per letter.
+ *
+ * Committed on blur, on Enter, and when the screen goes away with the field
+ * still focused: a keyboard shortcut switches views without a blur. A value
+ * without the shape of a proxy address is not committed at all. It stays in the
+ * field, marked, with a line saying why, and the previous setting stays in
+ * effect - rather than being silently put back the way the template is.
+ */
+function ProxyField({
+  value,
+  onCommit,
+  placeholder
+}: {
+  value: string
+  onCommit: (v: string) => void
+  placeholder?: string
+}): JSX.Element {
+  const t = useT()
+  const labelledBy = useContext(RowLabelId)
+  const hintId = useId()
+  const [draft, setDraft] = useState(value)
+
+  // Follow the store when it changes underneath us — a reset, most obviously.
+  useEffect(() => setDraft(value), [value])
+
+  const commit = (text: string): void => {
+    const next = text.trim()
+    if (next !== value && isProxyValue(next)) onCommit(next)
+  }
+
+  // The cleanup below is created once, so it reads the latest draft from here.
+  const latest = useRef({ draft, commit })
+  latest.current = { draft, commit }
+  useEffect(() => () => latest.current.commit(latest.current.draft), [])
+
+  const valid = isProxyValue(draft)
+
+  return (
+    <>
+      <input
+        value={draft}
+        onChange={(e) => setDraft(e.target.value)}
+        onBlur={() => {
+          commit(draft)
+          if (valid) setDraft(draft.trim())
+        }}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') commit(draft)
+        }}
+        placeholder={placeholder}
+        aria-labelledby={labelledBy}
+        aria-invalid={!valid}
+        aria-describedby={valid ? undefined : hintId}
+        className="field mono text-[13px]"
+        spellCheck={false}
+      />
+      {!valid && (
+        <p id={hintId} className="hint mt-1.5 text-bad">
+          {t('settings.proxyInvalid')}
+        </p>
+      )}
+    </>
   )
 }
 
@@ -648,9 +720,9 @@ export default function SettingsView(): JSX.Element {
 
           <Group id="network" title={t('settings.section.network')}>
             <Row label={t('settings.proxy')} stack>
-              <TextField
+              <ProxyField
                 value={settings.proxy}
-                onChange={(v) => set('proxy', v)}
+                onCommit={(v) => set('proxy', v)}
                 placeholder={t('settings.proxyPlaceholder')}
               />
             </Row>
