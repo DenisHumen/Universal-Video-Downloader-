@@ -19,18 +19,28 @@ files:
   - '!.claude{,/**/*}'
   - '!{vitest.config.ts,vite.preview.config.ts}'
   - '!electron.vite.config.{js,ts,mjs,cjs}'
-  - '!{.eslintignore,.eslintrc.cjs,.prettierignore,.prettierrc.yaml,dev-app-update.yml,CHANGELOG.md,README.md}'
+  - '!{.eslintignore,.eslintrc.cjs,.prettierignore,.prettierrc.yaml,dev-app-update.yml,CHANGELOG.md,README.md,THIRD_PARTY_NOTICES.txt}'
   - '!{.env,.env.*,.npmrc,pnpm-lock.yaml,package-lock.json}'
   - '!{tsconfig.json,tsconfig.node.json,tsconfig.web.json,tailwind.config.js,postcss.config.js}'
 
 # ffmpeg-static ships a per-platform binary that must stay executable on disk.
 # Checks the ffmpeg inside each packed target, before its installer is built -
-# and on Linux the icon sizes and the AppArmor profile as well.
+# that it runs there, that it may be redistributed and that its notices are
+# beside it - and on Linux the icon sizes and the AppArmor profile as well.
 afterPack: scripts/after-pack.mjs
 
 asarUnpack:
   - resources/**
   - '**/node_modules/ffmpeg-static/**'
+
+# The licences of what ships inside the app, with the source of the bundled
+# ffmpeg (GPLv3) and the written offer for it. README.md is not packaged, so
+# this and the ffmpeg.README / ffmpeg.LICENSE beside the binary are the only
+# notice a user receives. electron-builder adds linux.extraResources to this
+# list rather than replacing it.
+extraResources:
+  - from: THIRD_PARTY_NOTICES.txt
+    to: THIRD_PARTY_NOTICES.txt
 
 win:
   executableName: Universal Video Downloader

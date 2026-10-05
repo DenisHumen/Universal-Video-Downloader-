@@ -355,6 +355,37 @@ npm version patch        # bump version + create tag
 git push --follow-tags   # CI builds & publishes the release
 ```
 
+A new ffmpeg means new pins in [`scripts/ffmpeg-pins.mjs`](scripts/ffmpeg-pins.mjs) and the same
+URLs in [`THIRD_PARTY_NOTICES.txt`](THIRD_PARTY_NOTICES.txt): a test and the packaging step both fail
+until the two agree.
+
+## 🧩 Third-party components
+
+| Component | Licence | How it ships |
+| --- | --- | --- |
+| [Electron](https://www.electronjs.org/) 33 | MIT | the runtime the app is built on |
+| [FFmpeg](https://ffmpeg.org/) 9.0.2 | GPL-3.0-or-later | bundled as a separate executable, not linked into the app |
+| [yt-dlp](https://github.com/yt-dlp/yt-dlp) | Unlicense | not bundled — downloaded from its own releases on first run |
+
+Each platform carries its own build of the same FFmpeg release:
+
+| Package | Built by | Source |
+| --- | --- | --- |
+| Windows x64 | [gyan.dev](https://www.gyan.dev/ffmpeg/builds/) | [n9.0.2](https://github.com/FFmpeg/FFmpeg/tree/n9.0.2) · [ffmpeg-9.0.2.tar.xz](https://ffmpeg.org/releases/ffmpeg-9.0.2.tar.xz) |
+| macOS arm64 and x64 | [Martin Riedl](https://git.martin-riedl.de/ffmpeg/build-script) | [n9.0.2](https://github.com/FFmpeg/FFmpeg/tree/n9.0.2) · [ffmpeg-9.0.2.tar.xz](https://ffmpeg.org/releases/ffmpeg-9.0.2.tar.xz) |
+| Linux x64 | [BtbN/FFmpeg-Builds](https://github.com/BtbN/FFmpeg-Builds/tree/6c9aec5fc9a72ec3abedd1fa84db141fa18cf52b), GPL variant | [2a571b6](https://github.com/FFmpeg/FFmpeg/tree/2a571b606854520cf89804d8030c8b328e621689) — 9.0.2 and 17 fixes from release/9.0 · [archive](https://github.com/FFmpeg/FFmpeg/archive/2a571b606854520cf89804d8030c8b328e621689.tar.gz) |
+
+Every package carries `THIRD_PARTY_NOTICES.txt` in its resources folder, and beside the ffmpeg
+binary an `ffmpeg.README` naming the exact archive and its SHA-256 and an `ffmpeg.LICENSE` with the
+GPLv3. A build that FFmpeg itself marks as not redistributable (`--enable-nonfree`), or whose
+notices describe another version, fails before any installer is made.
+
+**Written offer.** For three years from the day you received a copy, and for as long after that as
+a release containing it is offered for download, the complete corresponding source of the FFmpeg
+build inside it — FFmpeg itself, the libraries compiled into it and the scripts that built it — is
+yours on request, as a download at no charge: open an
+[issue](https://github.com/DenisHumen/Universal-Video-Downloader-/issues).
+
 ## ⚖️ Legal
 
 This tool is for downloading content you have the right to access. Respect the terms of service

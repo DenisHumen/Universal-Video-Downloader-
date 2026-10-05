@@ -97,7 +97,9 @@ jobs:
         run: npm ci
 
       # ffmpeg-static stops at 6.1.1, which cannot seek into fragmented-MP4 HLS
-      # (every trimmed Twitch VOD came out empty). Pinned by URL and SHA-256.
+      # (every trimmed Twitch VOD came out empty). Pinned by URL and SHA-256,
+      # refused if FFmpeg marks the build nonfree, and written with the README
+      # and GPLv3 text that ship beside it (scripts/ffmpeg-pins.mjs).
       - name: Replace the bundled ffmpeg with the pinned release
         run: node scripts/fetch-ffmpeg.mjs
 

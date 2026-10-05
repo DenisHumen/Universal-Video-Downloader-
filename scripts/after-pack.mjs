@@ -16,12 +16,18 @@
  * merge, trim and convert — which is essentially every download, since the
  * default format is separate video and audio streams that have to be joined.
  *
+ * It also refuses an ffmpeg we may not hand out, or one without its notices:
+ * the Linux build pinned for v3.20.0 was a nonfree one, and beside every
+ * platform's binary sat a README for 6.1.1 naming the wrong source. Both rules
+ * are in scripts/ffmpeg-pins.mjs.
+ *
  * electron-builder calls this once per packed target, before the installer is
  * built, so throwing here stops the artifact from ever being published.
  */
 import { existsSync, readdirSync, readFileSync } from 'fs'
-import { join } from 'path'
+import { basename, join } from 'path'
 import { archOf } from './check-ffmpeg-arch.mjs'
+import { noticeProblems, thirdPartyProblems } from './ffmpeg-pins.mjs'
 import { iconProblems, profileProblem } from './linux-package.mjs'
 
 /** electron-builder's Arch enum, which arrives as a number. */
@@ -35,14 +41,15 @@ export default async function afterPack(context) {
   if (target === 'universal') return
 
   const product = context.packager.appInfo.productFilename
-  const unpacked = join('app.asar.unpacked', 'node_modules', 'ffmpeg-static')
+  const resources =
+    electronPlatformName === 'darwin'
+      ? join(appOutDir, `${product}.app`, 'Contents', 'Resources')
+      : join(appOutDir, 'resources')
+  const unpacked = join(resources, 'app.asar.unpacked', 'node_modules', 'ffmpeg-static')
   const candidates =
     electronPlatformName === 'darwin'
-      ? [join(appOutDir, `${product}.app`, 'Contents', 'Resources', unpacked, 'ffmpeg')]
-      : [
-          join(appOutDir, 'resources', unpacked, 'ffmpeg.exe'),
-          join(appOutDir, 'resources', unpacked, 'ffmpeg')
-        ]
+      ? [join(unpacked, 'ffmpeg')]
+      : [join(unpacked, 'ffmpeg.exe'), join(unpacked, 'ffmpeg')]
 
   const binary = candidates.find((p) => existsSync(p))
   if (!binary) {
@@ -68,7 +75,38 @@ export default async function afterPack(context) {
 
   console.log(`  • bundled ffmpeg is ${arches.join(', ')} — correct for ${target}`)
 
+  checkNotices(binary, resources)
   if (electronPlatformName === 'linux') checkLinux(context)
+}
+
+/**
+ * The ffmpeg has to be one FFmpeg's licence lets us pass on, with its README
+ * and GPLv3 text beside it, and THIRD_PARTY_NOTICES.txt has to describe it.
+ * README.md says the same but is not packaged, so these files are the only
+ * notice a user ever receives.
+ */
+function checkNotices(binary, resources) {
+  const name = basename(binary)
+  const text = (p) => (existsSync(p) ? readFileSync(p, 'utf8') : null)
+  const problems = noticeProblems({
+    name,
+    binary: readFileSync(binary),
+    readme: text(`${binary}.README`),
+    licence: text(`${binary}.LICENSE`)
+  })
+  const notices = text(join(resources, 'THIRD_PARTY_NOTICES.txt'))
+  if (notices == null) problems.push('THIRD_PARTY_NOTICES.txt is missing from the resources')
+  else problems.push(...thirdPartyProblems(notices))
+
+  if (problems.length > 0) {
+    throw new Error(
+      `after-pack: this package may not be distributed as it stands:\n` +
+        problems.map((p) => `    ${p}`).join('\n') +
+        `\n  \`npm run fetch:ffmpeg\` installs the pinned ffmpeg with its README and licence;` +
+        `\n  the pins and their sources are in scripts/ffmpeg-pins.mjs.`
+    )
+  }
+  console.log(`  • ${name} is redistributable and its notices describe it`)
 }
 
 /**

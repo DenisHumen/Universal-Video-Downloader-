@@ -12,12 +12,15 @@
  *  - hicolor must hold every size from 16 to 512, or launchers show a generic
  *    icon;
  *  - the desktop entry must pass desktop-file-validate and carry a
- *    StartupWMClass that matches the window, or the dock grows a second icon.
+ *    StartupWMClass that matches the window, or the dock grows a second icon;
+ *  - the ffmpeg must be one we may redistribute, with its README, its GPLv3
+ *    text and THIRD_PARTY_NOTICES.txt installed beside the app - a repository
+ *    that carries the package carries this obligation too.
  *
- * The rules live in scripts/linux-package.mjs, with tests; this only gets the
- * packages open. Linux only. Needs dpkg-deb, rpm and desktop-file-validate,
- * and uses apparmor_parser too when it is there, to read the profile exactly
- * the way the postinst will:
+ * The rules live in scripts/linux-package.mjs and scripts/ffmpeg-pins.mjs, with
+ * tests; this only gets the packages open. Linux only. Needs dpkg-deb, rpm and
+ * desktop-file-validate, and uses apparmor_parser too when it is there, to
+ * read the profile exactly the way the postinst will:
  *
  *   node scripts/check-linux-packages.mjs                 # release/<version>/*.{deb,rpm}
  *   node scripts/check-linux-packages.mjs some.deb x.rpm  # particular files
@@ -26,6 +29,7 @@ import { execFileSync } from 'child_process'
 import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync } from 'fs'
 import { tmpdir } from 'os'
 import { join, relative } from 'path'
+import { missingNotices, noticeProblems, thirdPartyProblems } from './ffmpeg-pins.mjs'
 import {
   desktopEntryProblems,
   layoutProblems,
@@ -91,6 +95,26 @@ function checkDeb(file) {
       }
     }
 
+    const resources = join(root, 'opt', product, 'resources')
+    const ffmpeg = join(resources, 'app.asar.unpacked', 'node_modules', 'ffmpeg-static', 'ffmpeg')
+    if (existsSync(ffmpeg)) {
+      const text = (p) => (existsSync(p) ? read(p) : null)
+      problems.push(
+        ...noticeProblems({
+          name: 'ffmpeg',
+          binary: readFileSync(ffmpeg),
+          readme: text(`${ffmpeg}.README`),
+          licence: text(`${ffmpeg}.LICENSE`)
+        })
+      )
+      const notices = text(join(resources, 'THIRD_PARTY_NOTICES.txt'))
+      problems.push(
+        ...(notices == null
+          ? ['resources/THIRD_PARTY_NOTICES.txt is missing']
+          : thirdPartyProblems(notices))
+      )
+    } else problems.push('the bundled ffmpeg is missing')
+
     const desktopPath = join(root, 'usr', 'share', 'applications', `${executable}.desktop`)
     for (const p of desktopEntryProblems(read(desktopPath), executable))
       problems.push(`desktop entry: ${p}`)
@@ -115,6 +139,9 @@ function checkRpm(file) {
 
   const paths = run('rpm', ['-qlp', file]).split('\n').filter(Boolean)
   problems.push(...layoutProblems(paths))
+  // Only listed: checkDeb reads the same files in full, and both packages are
+  // made from one unpacked app.
+  for (const n of missingNotices(paths)) problems.push(`${n} is not installed`)
   const { executable } = packageLayout(paths)
   if (executable) {
     const s = rpmScriptlets(run('rpm', ['-qp', '--scripts', file]))
