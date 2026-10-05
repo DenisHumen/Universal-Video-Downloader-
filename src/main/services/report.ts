@@ -14,7 +14,10 @@ import {
   type ReportPreview,
   type SendOutcome
 } from '@shared/report'
+import { redact } from '@shared/redact'
 import type { DetectResult, DownloadItem } from '@shared/types'
+import { DIRECT_SCHEME, parseDirectUrl } from '../resolvers/universal/direct'
+import { pageUrlFromSniffUrl, SNIFF_SCHEME } from '../resolvers/universal'
 import { DEFAULT_TEMPLATE, getSettings } from './settings'
 import { hasCookies } from './options'
 import { getYtdlpStatus } from './ytdlp'
@@ -70,18 +73,57 @@ export function recordFailure(context: Omit<FailureContext, 'at' | 'flags'>): st
   return id
 }
 
+/**
+ * Turning reports off forgets the failures already kept, too: what the switch
+ * promises is that nothing is held for a report, not merely that nobody asks.
+ */
+export function forgetFailures(): void {
+  failures.clear()
+}
+
+/*
+  The queue's internal addresses, spelled as the page they stand for.
+
+  A stream picked in the built-in browser is queued as `uvd-direct://` and a
+  base64 blob of the signed CDN address and its headers: opaque to the user
+  reading the preview, no use to the developer, and out of reach of the
+  redaction that masks a signed address's token. Decoded, the page becomes the
+  link, and the stream goes in as the resolved link, where the scrubbing
+  applies. `uvd-sniff://` is just the page, encoded.
+*/
+function readableLink(url: string): { link: string; stream?: string; title?: string } {
+  if (url.startsWith(DIRECT_SCHEME)) {
+    const payload = parseDirectUrl(url)
+    if (!payload) return { link: url }
+    // No page to point at: the stream is all there is, so its signature goes.
+    if (!payload.pageUrl) return { link: redact(payload.url), title: payload.title }
+    return { link: payload.pageUrl, stream: payload.url, title: payload.title }
+  }
+  if (url.startsWith(SNIFF_SCHEME)) {
+    try {
+      return { link: pageUrlFromSniffUrl(url) || url }
+    } catch {
+      return { link: url }
+    }
+  }
+  return { link: url }
+}
+
 /** The hook in the downloader's failure path. */
 export function recordDownloadFailure(item: DownloadItem, rawError: string): string | undefined {
   const local = item.kind === 'trim' || item.kind === 'convert'
-  const link = local ? (item.sourcePath ?? item.url) : item.sourceUrl || item.url
+  const given = local ? (item.sourcePath ?? item.url) : item.sourceUrl || item.url
+  const { link, stream, title } = local ? { link: given } : readableLink(given)
+  // By now `url` is whatever the last resolve produced — the stream itself.
+  const resolved = !local && item.url !== given ? item.url : stream
+  const shownTitle = item.title && item.title !== given && item.title !== link ? item.title : title
   return recordFailure({
     stage: 'download',
     kind: item.kind ?? 'download',
     url: link,
     local,
-    // By now `url` is whatever the last resolve produced — the stream itself.
-    resolvedUrl: !local && item.url !== link ? item.url : undefined,
-    title: item.title !== link ? item.title : undefined,
+    resolvedUrl: resolved !== link ? resolved : undefined,
+    title: shownTitle,
     extractor: item.extractor,
     mode: item.mode,
     quality: item.quality,
@@ -115,10 +157,12 @@ export type DetectVerdict = DetectResult & {
  */
 export function reportDetectFailure(result: DetectVerdict, url: string, trace: DetectTrace): DetectResult {
   if (result.ok) return { ok: true, info: result.info }
+  const { link, stream, title } = readableLink(url)
   const reportId = recordFailure({
     stage: 'detect',
-    url,
-    title: result.title,
+    url: link,
+    resolvedUrl: stream,
+    title: result.title ?? title,
     extractor: result.extractor ?? trace.resolver,
     errorCode: result.errorCode,
     message: result.error || 'Detection failed.',
@@ -209,14 +253,23 @@ async function build(id: string): Promise<BuiltReport | null> {
   return context ? buildReport(context, await environment()) : null
 }
 
+/*
+  Asked again at every preview and send, not only when a failure is recorded:
+  the window hides the offer when reports are off, but an id it already holds
+  must not be able to send anything either.
+*/
+const reportsOff = (): boolean => getSettings().errorReports === 'off'
+
 /** Exactly what would be sent, for the user to read first. */
 export async function previewReport(id: string): Promise<ReportPreview | null> {
+  if (reportsOff()) return null
   const report = await build(id)
   return report ? { subject: report.subject, text: report.text } : null
 }
 
 /** Send one report. Only ever called from the window, after a click on "send". */
 export async function sendReport(id: string): Promise<SendOutcome> {
+  if (reportsOff()) return { ok: false, reason: 'expired' }
   const report = await build(id)
   if (!report) return { ok: false, reason: 'expired' }
   if (!limiter.take()) {
@@ -229,8 +282,9 @@ export async function sendReport(id: string): Promise<SendOutcome> {
     log.info('report', 'Error report sent')
     // One failure, one email: whatever the window asks next, this one is done.
     failures.delete(id)
-  } else {
-    log.warn('report', 'Error report not sent', { why: outcome.reason })
+    return outcome
   }
-  return outcome
+  // FormSubmit's own words about the form; the window gets the reason alone.
+  log.warn('report', 'Error report not sent', { why: outcome.reason, relay: outcome.detail })
+  return { ok: false, reason: outcome.reason }
 }

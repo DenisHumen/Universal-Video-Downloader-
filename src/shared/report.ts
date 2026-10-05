@@ -1,5 +1,6 @@
 import { hasTrim, type AppErrorCode, type DownloadMode, type QueueKind, type TrimRange } from './types'
 import { redact } from './redact'
+import { normalizeUrl } from './urls'
 
 /**
  * Error reports to the developer: what goes into one, and how it is sent.
@@ -29,10 +30,18 @@ import { redact } from './redact'
  * like any other failure, offering the mail app instead. Once it is active,
  * FormSubmit can also issue a random alias for the endpoint; putting that here
  * in place of the address keeps the address itself out of the source.
+ *
+ * FormSubmit also wants to know which page a form lives on, and refuses a
+ * submission that does not say — its answer is "open this page through a web
+ * server". A browser says so in the Referer; a request from main has no page,
+ * so `formUrl` stands in for one, sent both as the Referer and as FormSubmit's
+ * own `_url` field. It is fixed on purpose: the one-time activation belongs to
+ * that form URL, and a different one would ask to be activated all over again.
  */
 export const REPORT_TARGET = {
   address: 'denis@krokosha.com',
-  endpoint: 'https://formsubmit.co/ajax/denis@krokosha.com'
+  endpoint: 'https://formsubmit.co/ajax/denis@krokosha.com',
+  formUrl: 'https://github.com/DenisHumen/Universal-Video-Downloader-'
 } as const
 
 // ---------------------------------------------------------------------------
@@ -103,12 +112,24 @@ export function isUnsupportedSite(stage: ReportStage, code?: AppErrorCode): bool
  */
 export function reportHost(url: string): string {
   try {
-    const parsed = new URL(url.trim())
+    // Through normalizeUrl, so a link pasted without https:// still has a site.
+    const parsed = new URL(normalizeUrl(url))
     if (!/^https?:$/.test(parsed.protocol)) return parsed.protocol.replace(/:$/, '')
     return parsed.hostname.replace(/^www\./i, '')
   } catch {
     return ''
   }
+}
+
+/**
+ * What "already answered" is remembered by: the site and the error code.
+ *
+ * Home hands over the link as typed and the queue the one main normalised, so
+ * `example.com/a` and `https://www.example.com/b` have to come out the same
+ * here, or one failure would be asked about twice.
+ */
+export function reportAnswerKey(url: string, code?: AppErrorCode): string {
+  return `${reportHost(url) || url.trim()}|${code ?? 'unclassified'}`
 }
 
 // ---------------------------------------------------------------------------
@@ -201,6 +222,8 @@ export interface ReportPreview {
 
 export type SendFailure = 'expired' | 'rateLimited' | 'notActivated' | 'rejected' | 'network'
 export type SendOutcome = { ok: true } | { ok: false; reason: SendFailure }
+/** The same, plus the relay's own explanation of a refusal — for the log, not the window. */
+export type PostOutcome = { ok: true } | { ok: false; reason: SendFailure; detail?: string }
 
 // ---------------------------------------------------------------------------
 // Privacy
@@ -246,20 +269,57 @@ const COOKIE_PATH =
   /(["'])(?:[A-Za-z]:)?[~\\/][^"'\r\n]*cookie[^"'\r\n]*\1|(?<![\w:/\\.-])(?:[A-Za-z]:)?[~\\/][^\s"']*cookie[^\s"']*/gi
 
 /*
+  A cookies.txt line the engine could not parse, which it then prints whole —
+  value and all — as `WARNING: skipping cookie file entry due to invalid length
+  1: '.site.com    TRUE    /    ...'`. One bad line is enough, and a file whose
+  tabs became spaces in a copy-paste has nothing but bad lines, so every cookie
+  in it would be printed. The reason goes with the line: an "invalid expires
+  at" quotes a field of it.
+*/
+const COOKIE_WARNING = /(skipping cookie file entry)[^\r\n]*/gi
+
+/*
+  And any line that still looks like a Netscape cookie entry — domain, TRUE or
+  FALSE, path, TRUE or FALSE, expiry, name, value — whether the fields are
+  separated by tabs, by the spaces a copy-paste left, or by the `\t` Python's
+  repr writes. Upper-case TRUE/FALSE is that format's own spelling; nothing
+  else the engine prints looks like it.
+*/
+const COOKIE_ENTRY =
+  /^[^\r\n]*?(?:TRUE|FALSE)(?:[\t ]+|\\t)\S*?(?:[\t ]+|\\t)(?:TRUE|FALSE)(?:[\t ]+|\\t)\d[^\r\n]*$/gm
+
+/*
   Somebody's profile folder, when it is not spelled the way os.homedir() spells
   it: Windows' 8.3 short name (`C:\Users\DENISH~1`), another account, a path the
   engine printed with its slashes turned round. The same lookbehind as above
   keeps it out of URLs — `site.com/home/videos` is not a home directory.
+
+  The engine reports a Windows file error through Python's repr, which doubles
+  every backslash (`'C:\\Users\\denis\\x.mp4'`), and ffmpeg names its output
+  `file:C:\Users\...` — so a doubled backslash counts as one separator, and a
+  `file:` prefix may stand where the lookbehind would otherwise refuse a colon.
+  A folder name with spaces in it (`Denis Humen`) is taken whole, as long as a
+  separator follows to show where it ends. Never across a colon, which no
+  folder name has: in `C:\Users\bob and C:\Users\ann\x` the first match must
+  stop at "bob", or it would swallow the drive of the second and leave "ann".
 */
-const PROFILE_DIR = /(?<![\w:/\\.~-])(?:[A-Za-z]:)?[\\/](?:Users|home)[\\/](?!Public(?:[\\/]|$))[^\\/\s"'<>|?*]+/gi
+const PROFILE_DIR =
+  /(?:(?<![\w:/\\.~-])|(?<=(?<![\w-])file:(?:\/{2,3})?))(?:[A-Za-z]:)?(?:\\\\|[\\/])(?:Users|home)(?:\\\\|[\\/])(?!Public(?:[\\/]|$))(?:[^\\/\s"'<>|?*:]+(?: [^\\/\s"'<>|?*:]+)*(?=[\\/])|[^\\/\s"'<>|?*]+)/gi
+
+/*
+  A web address, kept in the split so it can be left alone. `file:` is not one:
+  it is a path on this machine with a prefix.
+*/
+const WEB_ADDRESS = /(\b(?!file:)[a-z][a-z0-9+.-]*:\/\/[^\s"'<>]*)/i
 
 function escapeRegExp(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 }
 
-/** One path, spelled with either kind of slash. */
+/** One path, spelled with either kind of slash, and with backslashes doubled the way a repr spells them. */
 function slashVariants(path: string): string[] {
-  return [...new Set([path, path.replace(/\\/g, '/'), path.replace(/\//g, '\\')])]
+  const back = path.replace(/\//g, '\\')
+  return [...new Set([path, path.replace(/\\/g, '/'), back, back.replace(/\\/g, '\\\\')])]
 }
 
 /**
@@ -286,13 +346,16 @@ export function stripUrlCredentials(url: string): string {
 /**
  * Make a piece of text safe to send.
  *
- * Literal secrets first, while they are still whole — every later rule
- * rewrites text and could break one up so it no longer matches. `redact` goes
- * last and catches the generic shapes: headers, signed query parameters,
+ * Cookie file lines go before anything else, since nothing about them is
+ * worth keeping. Then literal secrets, while they are still whole — every later
+ * rule rewrites text and could break one up so it no longer matches. `redact`
+ * goes last and catches the generic shapes: headers, signed query parameters,
  * Telegram tokens.
  */
 export function scrubText(text: string, scrub: Scrub): string {
   let out = text
+    .replace(COOKIE_WARNING, '$1 (contents removed)')
+    .replace(COOKIE_ENTRY, '<cookie file entry removed>')
 
   const literals = [...(scrub.secrets ?? []), ...proxyCredentials(scrub.proxy)]
     .filter((value) => value && value.length >= MIN_LITERAL)
@@ -315,16 +378,19 @@ export function scrubText(text: string, scrub: Scrub): string {
   out = out.replace(PROFILE_DIR, '~')
 
   /*
-    The user name as a folder anywhere else — `D:\Profiles\denis\...`. Only in
-    tokens that are not web addresses: a Windows account called "user" must not
-    turn YouTube's `/user/` channel links into `/~/`.
+    The user name as a folder anywhere else — `D:\Profiles\denis\...`. Never
+    inside a web address: a Windows account called "user" must not turn
+    YouTube's `/user/` channel links into `/~/`. Everything between addresses
+    is searched as it stands rather than word by word, so a name with a space
+    in it is still one name.
   */
   const user = scrub.userName?.trim()
   if (user && user.length >= 2) {
-    const segment = new RegExp(`([\\\\/])${escapeRegExp(user)}(?=[\\\\/]|$)`, 'gi')
-    out = out.replace(/[^\s"'<>]+/g, (token) =>
-      token.includes('://') ? token : token.replace(segment, '$1~')
-    )
+    const segment = new RegExp(`(?<=[\\\\/])${escapeRegExp(user)}(?=[\\\\/\\s"'<>|]|$)`, 'gim')
+    out = out
+      .split(WEB_ADDRESS)
+      .map((part, i) => (i % 2 ? part : part.replace(segment, '~')))
+      .join('')
   }
 
   return redact(out)
@@ -490,9 +556,9 @@ export function buildReport(ctx: FailureContext, env: ReportEnv): BuiltReport {
   return { subject, fields, text: lines.join('\n') }
 }
 
-/** The JSON FormSubmit expects: the fields, plus its own two settings. */
+/** The JSON FormSubmit expects: the fields, plus its own settings and the form's page. */
 export function formSubmitBody(report: BuiltReport): Record<string, string> {
-  return { _subject: report.subject, _template: 'table', ...report.fields }
+  return { _subject: report.subject, _template: 'table', _url: REPORT_TARGET.formUrl, ...report.fields }
 }
 
 // ---------------------------------------------------------------------------
@@ -516,18 +582,25 @@ export type FetchLike = (
  * `fetch` is passed in: main hands over Electron's `net.fetch`, which follows
  * the session proxy like the rest of the app's own requests, and the tests
  * hand over a stub so nothing is ever sent from a test run.
+ *
+ * The Referer is set by hand because nothing else would set it: `net.fetch`
+ * copies the headers it is given and has no page of its own to refer from.
  */
 export async function postReport(
   report: BuiltReport,
   fetchImpl: FetchLike,
   timeoutMs = 20_000
-): Promise<SendOutcome> {
+): Promise<PostOutcome> {
   const controller = new AbortController()
   const timer = setTimeout(() => controller.abort(), timeoutMs)
   try {
     const response = await fetchImpl(REPORT_TARGET.endpoint, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        Accept: 'application/json',
+        Referer: REPORT_TARGET.formUrl
+      },
       body: JSON.stringify(formSubmitBody(report)),
       signal: controller.signal
     })
@@ -537,8 +610,15 @@ export async function postReport(
     } | null
     // FormSubmit sends the flag as a string. Anything short of a clear yes is a no.
     if (response.ok && (reply?.success === true || reply?.success === 'true')) return { ok: true }
-    const message = typeof reply?.message === 'string' ? reply.message : ''
-    return { ok: false, reason: /activat/i.test(message) ? 'notActivated' : 'rejected' }
+    /*
+      FormSubmit's message is the only place a refusal says why — "needs
+      Activation", "open this page through a web server". It is about the form,
+      never the report, so it can go in the log; without it every refusal
+      reads the same there.
+    */
+    const message = typeof reply?.message === 'string' ? reply.message.slice(0, 300) : ''
+    const reason = /activat/i.test(message) ? 'notActivated' : 'rejected'
+    return message ? { ok: false, reason, detail: message } : { ok: false, reason }
   } catch {
     return { ok: false, reason: 'network' }
   } finally {

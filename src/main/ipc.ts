@@ -34,7 +34,7 @@ import {
   startMediaJob
 } from './services/downloader'
 import { getSettings, resetSettings, setSettings } from './services/settings'
-import { previewReport, sendReport } from './services/report'
+import { forgetFailures, previewReport, sendReport } from './services/report'
 import { isReportMailto } from '@shared/report'
 import { ensureYtdlp, getYtdlpStatus, updateYtdlp, ytdlpEvents } from './services/ytdlp'
 import { takePending } from './index'
@@ -114,6 +114,8 @@ export function registerIpc({ getWindow, openSearchWindow, onSettingsChanged }: 
   ipcMain.handle(IPC.settingsSet, (_e, partial: Partial<AppSettings>) => {
     const next = setSettings(partial)
     onSettingsChanged(next)
+    // Reports off: drop the failures already kept for one, not just the offer.
+    if (next.errorReports === 'off') forgetFailures()
     // The concurrency limit is read when the queue is pumped, and nothing
     // pumped it on a settings change — so raising it did nothing visible until
     // something happened to finish.

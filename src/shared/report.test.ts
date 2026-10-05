@@ -13,6 +13,7 @@ import {
   outputTail,
   postReport,
   proxyCredentials,
+  reportAnswerKey,
   reportHost,
   scrubText,
   type FailureContext,
@@ -130,6 +131,27 @@ describe('reportHost', () => {
   it('names an internal address by its scheme, and gives up on garbage', () => {
     expect(reportHost('uvd-rezka://123/456')).toBe('uvd-rezka')
     expect(reportHost('not a url')).toBe('')
+  })
+
+  it('names the site of a link pasted without https://', () => {
+    expect(reportHost('example.com/video/1')).toBe('example.com')
+    expect(reportHost('www.example.com/video/1')).toBe('example.com')
+  })
+})
+
+describe('reportAnswerKey', () => {
+  // Home passes the link as typed; the queue passes the one main normalised.
+  it('is the same for one site however the link was written', () => {
+    expect(reportAnswerKey('example.com/a', 'noFormats')).toBe(
+      reportAnswerKey('https://www.example.com/b', 'noFormats')
+    )
+    expect(reportAnswerKey('example.com/a')).toBe('example.com|unclassified')
+  })
+
+  it('keeps different errors from one site apart', () => {
+    expect(reportAnswerKey('example.com/a', 'noFormats')).not.toBe(
+      reportAnswerKey('example.com/a', 'postprocess')
+    )
   })
 })
 
@@ -282,6 +304,40 @@ describe('buildReport — privacy', () => {
     expect(link).toBe('https://example.com/v')
   })
 
+  /*
+    yt-dlp prints a cookies.txt line it cannot parse whole, value included, as
+    its repr. Tabs turned into spaces by a copy-paste make every line one field
+    long; a value with a tab in it makes one eight fields long.
+  */
+  it('never carries a cookies.txt line the engine quoted back', () => {
+    const output = [
+      '[debug] Command-line config: [...]',
+      "WARNING: skipping cookie file entry due to invalid length 1: '.youtube.com    TRUE    /    TRUE    1767225600    SID    g.a000kQh2-SECRETSESSIONVALUE\\n'",
+      "WARNING: skipping cookie file entry due to invalid length 8: '.youtube.com\\tTRUE\\t/\\tTRUE\\t1767225600\\tHSID\\tTABBED\\tSECRETVALUETWO\\n'",
+      'ERROR: Unsupported URL: https://example.com/page/12'
+    ].join('\n')
+    const report = buildReport(
+      context({ stage: 'detect', errorCode: undefined, rawError: output, engineOutput: output }),
+      env()
+    )
+    for (const field of [report.fields['raw error'], report.fields['engine output'], report.text]) {
+      expect(field).not.toContain('SECRETSESSIONVALUE')
+      expect(field).not.toContain('SECRETVALUETWO')
+      expect(field).not.toContain('youtube.com')
+    }
+    expect(report.fields['engine output']).toContain('skipping cookie file entry (contents removed)')
+    // The line that matters survives the cleaning.
+    expect(report.fields['engine output']).toContain('Unsupported URL: https://example.com/page/12')
+  })
+
+  it('removes a raw Netscape cookie line, whatever separates its fields', () => {
+    const tabs = '.site.com\tTRUE\t/\tFALSE\t0\tsession\tRAWSECRET1'
+    const spaces = '#HttpOnly_.site.com  TRUE  /  TRUE  1767225600  token  RAWSECRET2'
+    const out = scrubText(`${tabs}\n${spaces}\n[info] done`, {})
+    expect(out).not.toContain('RAWSECRET')
+    expect(out).toContain('[info] done')
+  })
+
   it('caps long engine output to its last lines', () => {
     const long = Array.from({ length: 500 }, (_, i) => `line ${i} ${'x'.repeat(40)}`).join('\n')
     const out = buildReport(context({ engineOutput: long }), env()).fields['engine output']
@@ -318,6 +374,58 @@ describe('scrubText', () => {
 
   it('is safe with a home directory of /', () => {
     expect(scrubText('/usr/bin/ffmpeg', { homeDir: '/' })).toBe('/usr/bin/ffmpeg')
+  })
+
+  /*
+    On Windows the engine reports a file error through Python's repr, which
+    doubles every backslash: `[Errno 2] No such file or directory: 'C:\\Users\\...'`.
+  */
+  describe('paths as a repr spells them', () => {
+    it('finds the cookies file with its backslashes doubled', () => {
+      const s = { homeDir: HOME, userName: 'denis', cookiesFile: 'C:\\Users\\denis\\Documents\\yt.txt' }
+      expect(
+        scrubText("[Errno 2] No such file or directory: 'C:\\\\Users\\\\denis\\\\Documents\\\\yt.txt'", s)
+      ).toBe("[Errno 2] No such file or directory: '<cookies file>'")
+      expect(scrubText("open 'D:\\\\keys\\\\yt.txt'", { cookiesFile: 'D:\\keys\\yt.txt' })).toBe(
+        "open '<cookies file>'"
+      )
+    })
+
+    it('finds the home folder, and a profile folder named user.DOMAIN', () => {
+      const s = { homeDir: 'C:\\Users\\denis.CORP', userName: 'denis' }
+      const line =
+        "[WinError 32] The process cannot access the file because it is being used by another process: 'C:\\\\Users\\\\denis.CORP\\\\Downloads\\\\x.mp4'"
+      expect(scrubText(line, s)).toBe(
+        "[WinError 32] The process cannot access the file because it is being used by another process: '~\\\\Downloads\\\\x.mp4'"
+      )
+      // Another account's folder, spelled the same way.
+      expect(scrubText("'C:\\\\Users\\\\other.CORP\\\\x.mp4'", {})).toBe("'~\\\\x.mp4'")
+    })
+  })
+
+  it('takes a user name with a space in it whole', () => {
+    const s = { homeDir: 'C:\\Users\\Denis Humen', userName: 'Denis Humen' }
+    expect(scrubText("'C:\\\\Users\\\\Denis Humen\\\\Downloads\\\\a?b.mp4'", s)).toBe(
+      "'~\\\\Downloads\\\\a?b.mp4'"
+    )
+    expect(scrubText('saved D:\\Denis Humen\\Videos\\x.mp4', s)).toBe('saved D:\\~\\Videos\\x.mp4')
+    // Somebody else's profile, with no home directory to match it against.
+    expect(scrubText('C:\\Users\\Anna Maria\\Videos\\x.mp4', {})).toBe('~\\Videos\\x.mp4')
+    // Two profiles on one line: the first must not run on into the second.
+    expect(scrubText('from C:\\Users\\bob and C:\\Users\\ann\\x.mp4', {})).toBe('from ~ and ~\\x.mp4')
+  })
+
+  it('finds a profile folder behind ffmpeg’s file: prefix, short name included', () => {
+    expect(scrubText("Output #0, mp4, to 'file:C:\\Users\\DENIS~1\\Videos\\x.mp4':", {})).toBe(
+      "Output #0, mp4, to 'file:~\\Videos\\x.mp4':"
+    )
+    expect(scrubText('file:///C:/Users/DENIS~1/x.mp4', {})).toBe('file:///~/x.mp4')
+  })
+
+  it('still leaves the same words in a web address alone', () => {
+    const s = { homeDir: 'C:\\Users\\Denis Humen', userName: 'Denis Humen' }
+    const link = 'https://site.com/Users/Denis Humen'
+    expect(scrubText(link, s)).toBe(link)
   })
 })
 
@@ -455,11 +563,21 @@ describe('postReport', () => {
     expect(url).toBe(REPORT_TARGET.endpoint)
     expect(url).toBe(`https://formsubmit.co/ajax/${REPORT_TARGET.address}`)
     expect(init.method).toBe('POST')
-    expect(init.headers).toEqual({ 'Content-Type': 'application/json', Accept: 'application/json' })
+    /*
+      FormSubmit refuses a submission that names no page ("open this page
+      through a web server"), and a request from main has none of its own.
+    */
+    expect(init.headers).toEqual({
+      'Content-Type': 'application/json',
+      Accept: 'application/json',
+      Referer: REPORT_TARGET.formUrl
+    })
     const body = JSON.parse(init.body)
     expect(body).toEqual(formSubmitBody(report))
     expect(body._subject).toBe(report.subject)
     expect(body._template).toBe('table')
+    expect(body._url).toBe(REPORT_TARGET.formUrl)
+    expect(REPORT_TARGET.formUrl).toMatch(/^https:\/\//)
     expect(body.link).toBe('https://www.example.com/watch?v=abc')
     // Flat: FormSubmit renders one row per field and nothing nested.
     expect(Object.values(body).every((v) => typeof v === 'string')).toBe(true)
@@ -475,7 +593,12 @@ describe('postReport', () => {
       success: 'false',
       message: "This form needs Activation. We've sent you an email containing an 'Activate Form' link."
     }
-    expect(await postReport(report, reply(answer))).toEqual({ ok: false, reason: 'notActivated' })
+    // FormSubmit's own words come back for the log: they are about the form, not the report.
+    expect(await postReport(report, reply(answer))).toEqual({
+      ok: false,
+      reason: 'notActivated',
+      detail: answer.message
+    })
   })
 
   it('treats anything short of a clear yes as a no', async () => {

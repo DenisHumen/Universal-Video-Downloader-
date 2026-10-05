@@ -1,12 +1,12 @@
 import { useState, useSyncExternalStore } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
-import { Check, ChevronDown, Copy, Loader2, Mail, Send } from 'lucide-react'
+import { Check, ChevronDown, Copy, Loader2, Mail, RefreshCw, Send } from 'lucide-react'
 import type { AppErrorCode } from '@shared/types'
 import {
   buildMailto,
   isReportable,
   isUnsupportedSite,
-  reportHost,
+  reportAnswerKey,
   type ReportPreview,
   type ReportStage,
   type SendFailure
@@ -48,8 +48,7 @@ export interface ReportFailure {
   errorCode?: AppErrorCode
 }
 
-const answerKey = (failure: ReportFailure): string =>
-  `${reportHost(failure.url) || failure.url}|${failure.errorCode ?? 'unclassified'}`
+const answerKey = (failure: ReportFailure): string => reportAnswerKey(failure.url, failure.errorCode)
 
 /** Whether this failure should offer a report right now. */
 export function useReportOffer(failure: ReportFailure): boolean {
@@ -179,14 +178,30 @@ export default function ReportPrompt(props: ReportFailure): JSX.Element | null {
         {phase === 'failed' && (
           <div className="w-full">
             <p className="text-[13px] leading-relaxed text-bad">{outcome}</p>
-            {preview && (
+            {/*
+              Answering already retired every other prompt for this site and
+              error, so this card is the one way left to send it through the
+              relay — after a dropped connection, the hour's limit, or once the
+              relay is activated. A report main no longer holds has nothing to
+              retry.
+            */}
+            {(failure !== 'expired' || preview) && (
               <div className="mt-3 flex flex-wrap items-center gap-2">
-                <button className="btn-quiet" onClick={openMail}>
-                  <Mail size={14} /> {t('report.mail')}
-                </button>
-                <button className="btn-quiet" onClick={copyReport}>
-                  <Copy size={14} /> {t('report.copy')}
-                </button>
+                {failure !== 'expired' && (
+                  <button className="btn bg-accent/12 text-accent-ink hover:bg-accent/20" onClick={send}>
+                    <RefreshCw size={14} /> {t('common.retry')}
+                  </button>
+                )}
+                {preview && (
+                  <>
+                    <button className="btn-quiet" onClick={openMail}>
+                      <Mail size={14} /> {t('report.mail')}
+                    </button>
+                    <button className="btn-quiet" onClick={copyReport}>
+                      <Copy size={14} /> {t('report.copy')}
+                    </button>
+                  </>
+                )}
               </div>
             )}
           </div>

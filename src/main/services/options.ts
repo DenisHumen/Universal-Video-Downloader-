@@ -90,8 +90,22 @@ const RULES: Rule[] = [
       'This video is unavailable — it may have been removed, made private, or the site is blocking access from your region.',
     cookies: true
   },
+  /*
+    Ahead of the access rules below. "Unsupported URL" is the failure an error
+    report exists for, and it used to lose to them: they matched bare letter
+    runs, so `age` found itself in "page" and "webpage", `geo` in "geology",
+    `log in` in "login-free" - and a site the app simply did not know yet was
+    filed as age-restricted, which is not worth reporting. The access rules
+    now match whole words, but the engine's own verdict still goes first.
+  */
   {
-    re: /age|verify your age|18 u\.s\.c|age-?restricted|sensitive content/,
+    re: /unsupported url|no video formats|unable to extract|nothing to download/,
+    code: 'noFormats',
+    message: 'Could not find a downloadable video at this link.',
+    cookies: true
+  },
+  {
+    re: /\bage(?![a-z])|verify your age|18 u\.s\.c|age-?restricted|sensitive content/,
     code: 'ageRestricted',
     message: 'This content is age-restricted.',
     cookies: true
@@ -103,7 +117,7 @@ const RULES: Rule[] = [
       'The site is rate-limiting us. Wait a minute and retry, or set a proxy in Settings → Network.'
   },
   {
-    re: /sign in|log ?in|logged in|private video|members? only|requires authentication|account/,
+    re: /\bsign in|\blog ?in(?![a-z])|logged in|private video|members?[- ]only|requires authentication|\baccounts?\b/,
     code: 'signIn',
     message: 'This video requires you to be signed in.',
     cookies: true
@@ -115,7 +129,7 @@ const RULES: Rule[] = [
     cookies: true
   },
   {
-    re: /geo|not available in your country|region|blocked in your/,
+    re: /\bgeo(?![a-z])|\bgeo-?(?:restrict|block)|available (?:in|from) your (?:country|location)|\bregions?\b|blocked in your/,
     code: 'geo',
     message: 'This video is not available in your region.'
   },
@@ -135,18 +149,18 @@ const RULES: Rule[] = [
     message: 'No permission to write to the download folder. Pick another one in Settings.'
   },
   {
-    re: /unsupported url|no video formats|unable to extract|nothing to download/,
-    code: 'noFormats',
-    message: 'Could not find a downloadable video at this link.',
-    cookies: true
-  },
-  {
     re: /timed out|timeout/,
     code: 'timeout',
     message: 'The site took too long to answer. Check your connection or proxy and try again.'
   },
+  /*
+    A name that would not resolve is spelled by the OS, not by yt-dlp. It used
+    to be caught by accident - "Unable to download webpage" matched `age` - and
+    without these it would now be unclassified, offering a report for a DNS
+    failure.
+  */
   {
-    re: /connection|network|resolve host|unreachable/,
+    re: /connection|network|resolve host|unreachable|getaddrinfo|failed to resolve|name or service not known|nodename nor servname/,
     code: 'network',
     message: 'Network problem reaching the site. Check your connection or proxy and try again.'
   }
@@ -179,7 +193,15 @@ export function classifyYtdlpError(raw: string, cookiesEnabled: boolean): Classi
       .map((l) => l.trim())
       .filter(Boolean)
       .pop() || raw.trim()
-  const lower = line.toLowerCase()
+  /*
+    The rules read the engine's words, not the link or the video id it quotes.
+    Either can say anything: `Unsupported URL: https://site/region/403-login`
+    is still an unsupported URL, and `[generic] geology-101:` is a slug.
+  */
+  const lower = line
+    .toLowerCase()
+    .replace(/\b[a-z][a-z0-9+.-]*:\/\/\S+/g, ' ')
+    .replace(/\[[\w:.-]+\]\s+[^\s:]+:\s/g, ' ')
 
   for (const rule of RULES) {
     if (!rule.re.test(lower)) continue
