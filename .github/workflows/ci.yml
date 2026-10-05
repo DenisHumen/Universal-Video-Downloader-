@@ -82,3 +82,21 @@ jobs:
       - run: npx --no-install electron-builder --dir ${{ matrix.args }}
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: false
+
+      # The .deb and .rpm themselves, not only the unpacked app. The AppArmor
+      # profile, the hicolor icons and the desktop entry are all written by
+      # electron-builder's deb/rpm step, and each of them shipped broken while
+      # `--dir` stayed green: the .deb could not start on Ubuntu 24.04, every
+      # launcher showed a generic icon, and the desktop entry was invalid.
+      # scripts/check-linux-packages.mjs says what it looks for.
+      - name: Install Linux packaging tools
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y rpm fakeroot desktop-file-utils apparmor
+      - name: Build the .deb and .rpm
+        if: runner.os == 'Linux'
+        run: npx --no-install electron-builder --linux deb rpm --x64 --publish never
+      - name: Check what the .deb and .rpm install
+        if: runner.os == 'Linux'
+        run: node scripts/check-linux-packages.mjs

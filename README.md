@@ -28,8 +28,9 @@ macOS · Windows · Linux &nbsp;·&nbsp; English / Русский &nbsp;·&nbsp;
 | **Windows 10/11** | [**Latest release ↓**](https://github.com/DenisHumen/Universal-Video-Downloader-/releases/latest) | `…-windows-x64-setup.exe` |
 | **macOS** (Apple Silicon) | [**Latest release ↓**](https://github.com/DenisHumen/Universal-Video-Downloader-/releases/latest) | `…-mac-arm64.dmg` |
 | **macOS** (Intel) | [**Latest release ↓**](https://github.com/DenisHumen/Universal-Video-Downloader-/releases/latest) | `…-mac-x64.dmg` |
-| **Ubuntu / Debian** | [**Latest release ↓**](https://github.com/DenisHumen/Universal-Video-Downloader-/releases/latest) | `.deb` or `.AppImage` |
-| **Fedora / RHEL** | [**Latest release ↓**](https://github.com/DenisHumen/Universal-Video-Downloader-/releases/latest) | `.rpm` or `.AppImage` |
+| **Ubuntu / Debian / Mint** | [**Latest release ↓**](https://github.com/DenisHumen/Universal-Video-Downloader-/releases/latest) | `…-linux-amd64.deb` |
+| **Fedora / RHEL / openSUSE** | [**Latest release ↓**](https://github.com/DenisHumen/Universal-Video-Downloader-/releases/latest) | `…-linux-x86_64.rpm` |
+| **Other Linux** | [**Latest release ↓**](https://github.com/DenisHumen/Universal-Video-Downloader-/releases/latest) | `…-linux-x86_64.AppImage` |
 
 On first run the app fetches the yt-dlp engine binary (~30 MB) by itself, and keeps it up to date after that. ffmpeg is bundled.
 
@@ -49,6 +50,14 @@ The command is printed on the install window itself, so you don't have to come b
 (Or: right-click the app in Applications → **Open** → **Open**.) Because they're unsigned, macOS
 builds also can't install updates in place — the app offers you the download page instead of
 pretending it can restart into a new version.
+
+### Ubuntu 24.04 and newer: take the `.deb`
+
+Since 24.04, Ubuntu (and Mint, Pop!_OS and Zorin, which are built on it) lets an app use the
+sandbox Chromium relies on only if an AppArmor profile allows it. The `.deb` installs that profile,
+so it just works. The AppImage can't install one, so there it closes as soon as it starts. The
+usual workaround, starting it with `--no-sandbox`, switches off the wall between the websites the
+app opens and your system, which is why we don't recommend it.
 
 ---
 

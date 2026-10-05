@@ -8,6 +8,7 @@
   },
   "license": "MIT",
   "main": "./out/main/index.js",
+  "desktopName": "universal-video-downloader.desktop",
   "homepage": "https://github.com/DenisHumen/Universal-Video-Downloader-",
   "repository": {
     "type": "git",

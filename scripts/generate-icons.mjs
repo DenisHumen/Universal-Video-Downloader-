@@ -1,10 +1,16 @@
 // Rasterises assets/logo.svg into the platform icon assets electron-builder needs.
 // electron-builder auto-derives .icns (macOS) and .ico (Windows) from build/icon.png,
-// so a single high-resolution PNG is enough; we also emit a few Linux sizes.
+// so a single high-resolution PNG is enough for those two.
+//
+// Linux is different: the hicolor theme only looks in the sizes its index.theme
+// lists, so build/icons holds exactly those, and is committed rather than
+// regenerated — CI packages from what is in git, and a 1024px icon alone is
+// one no launcher ever finds.
 import { readFileSync, mkdirSync, existsSync } from 'fs'
 import { dirname, join, resolve } from 'path'
 import { fileURLToPath } from 'url'
 import sharp from 'sharp'
+import { HICOLOR_SIZES } from './linux-package.mjs'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const root = resolve(__dirname, '..')
@@ -48,7 +54,7 @@ async function render(size, outPath, source = svg) {
 
 console.log('Generating icons from assets/logo.svg…')
 await render(1024, join(buildDir, 'icon.png'))
-for (const size of [512, 256, 128, 64, 32, 16]) {
+for (const size of HICOLOR_SIZES) {
   await render(size, join(iconsDir, `${size}x${size}.png`))
 }
 

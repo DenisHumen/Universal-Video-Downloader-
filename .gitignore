@@ -7,9 +7,11 @@ node_modules/
 out/
 dist/
 release/
+# Derived from build/icon.png by electron-builder on the machine that packages.
+# build/icons/ is not: CI only has what is committed, and without those sizes
+# the Linux packages shipped a 1024px icon no launcher looks up.
 build/icon.icns
 build/icon.ico
-build/icons/
 
 # Logs
 *.log

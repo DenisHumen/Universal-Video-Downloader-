@@ -1,0 +1,4 @@
+# The package scripts and the AppArmor profile are read on Linux, where a
+# carriage return is part of the line: bash stops at `$'\r': command not found`
+# and a Windows checkout with core.autocrlf would hand it exactly that.
+build/linux/* text eol=lf

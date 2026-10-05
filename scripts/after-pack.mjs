@@ -19,9 +19,10 @@
  * electron-builder calls this once per packed target, before the installer is
  * built, so throwing here stops the artifact from ever being published.
  */
-import { existsSync } from 'fs'
+import { existsSync, readdirSync, readFileSync } from 'fs'
 import { join } from 'path'
 import { archOf } from './check-ffmpeg-arch.mjs'
+import { iconProblems, profileProblem } from './linux-package.mjs'
 
 /** electron-builder's Arch enum, which arrives as a number. */
 const ARCH_NAME = { 0: 'ia32', 1: 'x64', 2: 'armv7l', 3: 'arm64', 4: 'universal' }
@@ -66,4 +67,46 @@ export default async function afterPack(context) {
   }
 
   console.log(`  • bundled ffmpeg is ${arches.join(', ')} — correct for ${target}`)
+
+  if (electronPlatformName === 'linux') checkLinux(context)
+}
+
+/**
+ * The rest of what a Linux package needs in order to start and to have an icon,
+ * both of which shipped broken without any build noticing (the header of
+ * scripts/linux-package.mjs has the story).
+ *
+ * The profile is checked against the path this very build installs to, not a
+ * copy of it: a profile for any other path attaches to nothing, and on Ubuntu
+ * 24.04 the app aborts as if there were no profile at all.
+ */
+function checkLinux(context) {
+  const { appOutDir, packager } = context
+  const problems = []
+
+  const iconsDir = join(packager.buildResourcesDir, 'icons')
+  const icons = new Map(
+    existsSync(iconsDir)
+      ? readdirSync(iconsDir).map((name) => [name, readFileSync(join(iconsDir, name))])
+      : []
+  )
+  for (const p of iconProblems(icons)) problems.push(`build/icons/${p}`)
+
+  const executable = packager.executableName
+  const installed = `/opt/${packager.appInfo.sanitizedProductName}/${executable}`
+  const profilePath = join(appOutDir, 'resources', 'apparmor-profile')
+  const profile = existsSync(profilePath)
+    ? profileProblem(readFileSync(profilePath, 'utf8'), installed, executable)
+    : 'resources/apparmor-profile is missing'
+  if (profile) problems.push(profile)
+
+  if (problems.length > 0) {
+    throw new Error(
+      `after-pack: this Linux package would not start or would have no icon:\n` +
+        problems.map((p) => `    ${p}`).join('\n') +
+        `\n  Icons come from \`npm run make:icons\` and are committed; the profile is` +
+        `\n  build/linux/apparmor-profile, copied in by linux.extraResources.`
+    )
+  }
+  console.log(`  • hicolor icons and the AppArmor profile for ${installed} are in place`)
 }
