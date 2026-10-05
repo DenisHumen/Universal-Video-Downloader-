@@ -26,6 +26,7 @@ import { pendingOrder } from './schedule'
 import { acceptsPostprocess, overallProgress, postprocessorLabel } from './progress'
 import { ffmpegProgressSeconds, isFfmpegNoise, splitOutputLines } from './ffmpeg-output'
 import { markOf, shouldEmitProgress, type ProgressMark } from './throttle'
+import { recordDownloadFailure } from './report'
 import { resolveUrl } from '../resolvers'
 import { normalizeUrl } from '@shared/urls'
 import { hasTrim } from '@shared/types'
@@ -118,6 +119,8 @@ export function loadHistory(): void {
       // and this is a no-op. Same rule either way; see resume.ts.
       markInterrupted(item)
       item.attempts = 0
+      // The failure it pointed at lived in the previous run's memory.
+      item.reportId = undefined
       items.set(item.id, item)
     }
   } catch (err) {
@@ -1055,6 +1058,7 @@ function fail(item: DownloadItem, rawError: string): void {
   item.error = message
   item.errorCode = code
   item.cookieHint = cookieHint
+  item.reportId = recordDownloadFailure(item, rawError)
   emitUpdated(item)
   processQueue()
 }
@@ -1066,6 +1070,7 @@ function failWith(item: DownloadItem, code: AppErrorCode, message: string): void
   item.error = message
   item.errorCode = code
   item.cookieHint = false
+  item.reportId = recordDownloadFailure(item, message)
   emitUpdated(item)
   processQueue()
 }
@@ -1238,6 +1243,7 @@ export function resumeDownload(id: string): void {
   item.error = undefined
   item.errorCode = undefined
   item.cookieHint = undefined
+  item.reportId = undefined
   item.attempts = 0
   item.interrupted = false
   // A fresh run decides its own output path; see retryDownload.
@@ -1358,6 +1364,8 @@ export function retryDownload(id: string): void {
   item.error = undefined
   item.errorCode = undefined
   item.cookieHint = undefined
+  // A retry is a fresh outcome; a report offer for the last one would be stale.
+  item.reportId = undefined
   resetProgress(item)
   item.attempts = 0
   item.log = undefined

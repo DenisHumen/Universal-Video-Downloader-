@@ -45,6 +45,7 @@ function settings(overrides: Partial<AppSettings> = {}): AppSettings {
     proxy: '',
     cookiesFromBrowser: '',
     cookiesFile: '',
+    errorReports: 'ask',
     ...overrides
   }
 }

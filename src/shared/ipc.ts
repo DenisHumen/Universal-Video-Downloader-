@@ -52,6 +52,8 @@ export const IPC = {
   windowMaximize: 'window:maximize',
   windowClose: 'window:close',
   windowIsMaximized: 'window:is-maximized',
+  reportPreview: 'report:preview',
+  reportSend: 'report:send',
 
   // events (main -> renderer)
   evtDownloadProgress: 'event:download-progress',

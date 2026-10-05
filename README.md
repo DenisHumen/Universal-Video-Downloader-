@@ -180,7 +180,10 @@ For streaming sites the app reads the available **voiceovers (озвучки)**,
   paste-anywhere, a native menu bar and keyboard shortcuts (⌘/Ctrl+1…4, ⌘/Ctrl+, and ⌘/Ctrl+/).
 - **Self-updating** — checks for new releases on launch and installs them. The yt-dlp engine keeps
   itself up to date too — once a day, and never while a download is running.
-- **Private & local** — everything runs on your machine. No accounts, no telemetry.
+- **Private & local** — everything runs on your machine. No accounts, no telemetry. When a link
+  fails, the app can offer to send the developer a report — only when you press *send*, after
+  showing exactly what it contains, with cookies, passwords and your user name taken out. Turn the
+  offer off in *Settings → system*.
 
 ---
 
@@ -200,7 +203,9 @@ In rough order of how often it helps:
 4. **Give it a minute.** An unknown site takes up to half a minute: the app is
    loading the page in a hidden window and waiting for its player to ask for
    the video.
-5. **Still nothing?** [Open an issue](https://github.com/DenisHumen/Universal-Video-Downloader-/issues/new)
+5. **Still nothing?** Press *send* on the report the app offers under the
+   error — it carries the link and the engine output, which is everything
+   needed to add the site. Or [open an issue](https://github.com/DenisHumen/Universal-Video-Downloader-/issues/new)
    with the link and the engine output from the queue row's *engine output*
    drawer. Most sites need no code at all; the ones that do get a small module
    in `src/main/resolvers/sites/`.

@@ -50,7 +50,8 @@ const settings: AppSettings = {
   logVerbose: false,
   proxy: '',
   cookiesFromBrowser: '',
-  cookiesFile: ''
+  cookiesFile: '',
+  errorReports: 'ask'
 }
 
 const appInfo: AppInfo = {
@@ -255,6 +256,10 @@ export function installMockApi(): void {
     detect: async (url) => {
       await delay(700)
       if (url.startsWith('uvd-yummy-item://')) return { ok: true, info: fakeAnimeInfo(url) }
+      // A link with "unsupported" in it fails the way an unknown site does, report offer and all.
+      if (/unsupported/i.test(url)) {
+        return { ok: false, error: `Unsupported URL: ${url}`, reportId: 'mock-detect' }
+      }
       return { ok: true, info: fakeInfo(url) }
     },
     cancelDetect: async () => undefined,
@@ -410,6 +415,36 @@ export function installMockApi(): void {
     onDetectStatus: () => () => undefined,
     onClipboardLink: () => () => undefined,
     takePending: async () => ({}),
+    /*
+      A sample report, so the prompt's preview and every state after "send" can
+      be looked at in the browser. Nothing here touches the network: a real
+      send exists only in main. A report id with "fail-send" in it fails —
+      `__uvdMock.queue({ state: 'error', reportId: 'fail-send' })` — which is
+      the only way to see the mail-app and copy fallbacks without a real one.
+    */
+    reportPreview: async () => ({
+      subject: '[UVD dev] unsupported site: example.com',
+      text: [
+        'Universal Video Downloader error report',
+        '',
+        'what failed: detection',
+        'site: example.com',
+        'link: https://example.com/unsupported',
+        'error code: unclassified',
+        'message: Unsupported URL: https://example.com/watch',
+        'detection: built-in resolver: none · universal detection: page scan → hidden browser, found nothing',
+        'settings: cookies off · proxy off · custom filename template off',
+        'app: dev',
+        'system: win32 x64 10.0.26200',
+        '',
+        'engine output:',
+        'ERROR: Unsupported URL: https://example.com/watch'
+      ].join('\n')
+    }),
+    reportSend: async (id) => {
+      await delay(900)
+      return /fail-send/.test(id) ? { ok: false, reason: 'rejected' } : { ok: true }
+    },
     /*
       A link with "upcoming" in it is a title that is not out yet, so the
       waiting state can be looked at without waiting for a real one.

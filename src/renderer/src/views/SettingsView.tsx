@@ -610,6 +610,13 @@ export default function SettingsView(): JSX.Element {
             <Row label={t('settings.tray')} hint={t('settings.trayHint')}>
               <Switch value={settings.trayEnabled} onChange={(v) => set('trayEnabled', v)} />
             </Row>
+            {/* On or off, never "send by itself": on still asks every time. */}
+            <Row label={t('settings.errorReports')} hint={t('settings.errorReportsHint')}>
+              <Switch
+                value={settings.errorReports !== 'off'}
+                onChange={(v) => set('errorReports', v ? 'ask' : 'off')}
+              />
+            </Row>
             <Row label={t('settings.reset')}>
               <button className="btn-danger" onClick={() => setConfirmReset(true)}>
                 <RotateCcw size={14} /> {t('settings.reset')}
