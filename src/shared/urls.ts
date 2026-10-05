@@ -173,6 +173,24 @@ export function normalizeUrl(input: string): string {
   return out
 }
 
+/**
+ * Whether a string is a `scheme://` address, and so safe to hand the engine as
+ * the thing to download.
+ *
+ * Anything else in that slot was read as something else. A value starting with
+ * `-` is an option as far as yt-dlp is concerned - `--version` queued as a
+ * download printed the version and "completed" - and yt-dlp has options that
+ * read files and run commands. Such values reach the queue from more places
+ * than the address box: playlist entries are copied out of the site's own JSON,
+ * and a `uvd-direct://` payload is decoded from a string anyone can write.
+ *
+ * Deliberately not an http(s) whitelist: rtmp, rtsp and mms links are real
+ * inputs the engine handles, and the app's own `uvd-*://` links pass as well.
+ */
+export function isAbsoluteUrl(input: string): boolean {
+  return /^[a-z][a-z0-9+.-]*:\/\//i.test(input)
+}
+
 /** Path shapes that name one specific video, whatever else is in the URL. */
 const SINGLE_ITEM =
   /\/(watch|video|videos|shorts|reel|reels|clip|clips|status|episode|embed|movie|film)\/|\/watch$|[?&]v=[\w-]+/i

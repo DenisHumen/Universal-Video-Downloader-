@@ -85,4 +85,26 @@ describe('resolveDirectUrl', () => {
   it('refuses a corrupted link rather than downloading something arbitrary', async () => {
     await expect(resolveDirectUrl(DIRECT_SCHEME + 'not-base64-json')).rejects.toThrow(/corrupted/i)
   })
+
+  it('refuses a payload whose stream is not an http(s) address', async () => {
+    // The payload is base64 anyone can write, and its `url` went straight into
+    // the engine's URL slot - an option, a file:// path, whatever it said.
+    const crafted = (payload: object): string =>
+      DIRECT_SCHEME + Buffer.from(JSON.stringify({ capturedAt: Date.now(), ...payload })).toString('base64url')
+    for (const url of ['--exec=calc', 'file:///C:/Windows/win.ini', 'rtmp://host/app', 42]) {
+      await expect(resolveDirectUrl(crafted({ url })), String(url)).rejects.toThrow(/corrupted/i)
+    }
+    await expect(resolveDirectUrl(crafted({}))).rejects.toThrow(/corrupted/i)
+  })
+
+  it('refuses a page address that is not http(s), since a stale capture would open it', async () => {
+    const url = directUrlFor({ url: 'https://cdn.test/a.mp4', pageUrl: 'file:///C:/secret.html' })
+    await expect(resolveDirectUrl(url)).rejects.toThrow(/corrupted/i)
+  })
+
+  it('still accepts a capture with no page address at all', async () => {
+    // The built-in browser records an empty one when it has nothing better.
+    const url = directUrlFor({ url: 'https://cdn.test/a.mp4', pageUrl: '' })
+    await expect(resolveDirectUrl(url)).resolves.toMatchObject({ url: 'https://cdn.test/a.mp4' })
+  })
 })

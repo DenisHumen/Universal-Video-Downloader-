@@ -33,6 +33,12 @@ export function headerArgs(headers?: Record<string, string>): string[] {
     */
     const clean = value.replace(/[\r\n]+/g, ' ').trim()
     if (!clean) continue
+    /*
+      A NUL is dropped rather than patched. No real header carries one, and
+      `spawn` refuses any argument containing it by throwing - which, before the
+      download path caught that, left the row stuck on "downloading" for good.
+    */
+    if (clean.includes('\u0000') || key.includes('\u0000')) continue
     args.push('--add-header', `${key}:${clean}`)
   }
   return args

@@ -2,6 +2,7 @@ import { app, BrowserWindow, clipboard, dialog, ipcMain, Notification, shell } f
 import { IPC } from '@shared/ipc'
 import type {
   AppSettings,
+  DetectResult,
   DetectStage,
   DownloadItem,
   DownloadRequest,
@@ -64,8 +65,13 @@ export function registerIpc({ getWindow, openSearchWindow, onSettingsChanged }: 
   }
 
   // ---- Media detection & search ----
-  ipcMain.handle(IPC.detect, async (event, url: string, requestId?: string) => {
-    await ensureYtdlp()
+  ipcMain.handle(IPC.detect, async (event, url: string, requestId?: string): Promise<DetectResult> => {
+    /*
+      Registered before the engine check, not after it. On first launch that
+      check downloads the engine, and a cancel pressed meanwhile looked up an id
+      nobody had registered yet - so it was lost, and the detection the user
+      had walked away from started as soon as the download finished.
+    */
     const controller = new AbortController()
     if (requestId) detections.set(requestId, controller)
     const report = (stage: DetectStage): void => {
@@ -74,6 +80,8 @@ export function registerIpc({ getWindow, openSearchWindow, onSettingsChanged }: 
       }
     }
     try {
+      await ensureYtdlp()
+      if (controller.signal.aborted) return { ok: false, error: 'Detection canceled.', errorCode: 'canceled' }
       return await detect(url, report, controller.signal)
     } finally {
       if (requestId) detections.delete(requestId)

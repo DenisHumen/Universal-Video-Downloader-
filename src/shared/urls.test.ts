@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { looksLikeCollection, needsCookiesOften, normalizeUrl } from './urls'
+import { isAbsoluteUrl, looksLikeCollection, needsCookiesOften, normalizeUrl } from './urls'
 
 describe('normalizeUrl', () => {
   it('leaves internal and non-http links untouched', () => {
@@ -153,5 +153,36 @@ describe('needsCookiesOften', () => {
     expect(needsCookiesOften('https://www.instagram.com/reel/Cabc123')).toBe(true)
     expect(needsCookiesOften('https://www.facebook.com/watch/?v=1')).toBe(true)
     expect(needsCookiesOften('https://www.youtube.com/watch?v=abc123')).toBe(false)
+  })
+})
+
+describe('isAbsoluteUrl', () => {
+  it('refuses anything the engine would read as an option', () => {
+    // `--version` queued as a download printed the version and "completed";
+    // the same slot takes options that read files and run commands.
+    expect(isAbsoluteUrl('--version')).toBe(false)
+    expect(isAbsoluteUrl('--config-locations=x')).toBe(false)
+    expect(isAbsoluteUrl('-o')).toBe(false)
+    expect(isAbsoluteUrl('--exec=calc https://example.com')).toBe(false)
+  })
+
+  it('refuses bare words and paths', () => {
+    expect(isAbsoluteUrl('not a url')).toBe(false)
+    expect(isAbsoluteUrl('C:/Users/me/video.mp4')).toBe(false)
+    expect(isAbsoluteUrl('example.com/watch/1')).toBe(false)
+    expect(isAbsoluteUrl('')).toBe(false)
+  })
+
+  it('accepts every scheme the engine can fetch, not just the web', () => {
+    expect(isAbsoluteUrl('https://www.youtube.com/watch?v=abc123')).toBe(true)
+    expect(isAbsoluteUrl('HTTP://EXAMPLE.COM/A')).toBe(true)
+    expect(isAbsoluteUrl('rtmp://live.example.com/app/stream')).toBe(true)
+    expect(isAbsoluteUrl('rtsp://192.168.1.10/cam')).toBe(true)
+    expect(isAbsoluteUrl('mms://media.example.com/clip')).toBe(true)
+  })
+
+  it('accepts the internal links the app makes itself', () => {
+    expect(isAbsoluteUrl('uvd-rezka://abc')).toBe(true)
+    expect(isAbsoluteUrl('uvd-direct://eyJ1cmwiOiIifQ')).toBe(true)
   })
 })

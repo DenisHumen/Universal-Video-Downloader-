@@ -433,6 +433,7 @@ export const en = {
   'err.ffmpegMissing': 'the bundled ffmpeg is missing — reinstall the app.',
   'err.streamGone': 'the stream this link pointed at is no longer there.',
   'err.corruptLink': 'this download link is corrupted — pick the video again.',
+  'err.notALink': 'this isn’t a link the app can open. paste the full address, starting with https://',
   'err.emptyPage': 'no videos found on this page.',
   'err.cutFailed': 'nothing was recorded from the point you chose to start at, so there was nothing to process. try downloading it without cutting, then trim the file.',
   'err.cookieHint': 'try switching on browser cookies in settings → access.',

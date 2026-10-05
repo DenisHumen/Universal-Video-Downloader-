@@ -126,6 +126,7 @@ export type AppErrorCode =
   | 'ffmpegMissing'
   | 'streamGone'
   | 'corruptLink'
+  | 'notALink'
   | 'emptyPage'
   | 'cutFailed'
 

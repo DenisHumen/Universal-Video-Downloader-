@@ -74,16 +74,16 @@ export function ytdlpSpawnOptions(): {
 } {
   const env: NodeJS.ProcessEnv = { ...process.env }
   /*
-    Make the engine speak UTF-8 on its pipes.
+    These two do not make the engine speak UTF-8, whatever they look like.
 
-    Without this it writes to stdout in the console's own code page, and this
-    app reads that as UTF-8 - so every non-Latin character in a title came back
-    as replacement characters. That is not cosmetic: the destination path is
-    parsed out of those lines, so a download named in Cyrillic finished
-    perfectly on disk and the app then could not find it, reporting that the
-    file "is not where it should be". Most of a Russian-language library would
-    hit this, and the failure only appears after the whole file has been
-    fetched.
+    The binaries we ship are PyInstaller bundles, and measured with both set,
+    yt-dlp.exe still wrote its pipes in the console's code page - cp1251 for a
+    Cyrillic title. The comment that used to sit here claimed otherwise, and
+    the destination paths parsed out of that output pointed at files that did
+    not exist. What does the work is `--encoding utf-8`, which every engine
+    command line now carries (buildArgs in downloader.ts, the probes in
+    detector.ts, search.ts, and `spawnYtdlp` below). The variables stay only
+    because they are harmless.
   */
   env.PYTHONIOENCODING = 'utf-8'
   env.PYTHONUTF8 = '1'
@@ -209,11 +209,13 @@ function repairMacSignature(path: string): void {
 
 function spawnYtdlp(args: string[]): Promise<{ code: number; stdout: string; stderr: string }> {
   return new Promise((resolve) => {
-    const child = spawn(ytdlpBinaryPath(), args, ytdlpSpawnOptions())
+    const child = spawn(ytdlpBinaryPath(), ['--encoding', 'utf-8', ...args], ytdlpSpawnOptions())
     let stdout = ''
     let stderr = ''
-    child.stdout.on('data', (d) => (stdout += d.toString()))
-    child.stderr.on('data', (d) => (stderr += d.toString()))
+    child.stdout.setEncoding('utf8')
+    child.stderr.setEncoding('utf8')
+    child.stdout.on('data', (d: string) => (stdout += d))
+    child.stderr.on('data', (d: string) => (stderr += d))
     child.on('error', () => resolve({ code: -1, stdout, stderr }))
     child.on('close', (code) => resolve({ code: code ?? -1, stdout, stderr }))
   })

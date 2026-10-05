@@ -102,6 +102,16 @@ describe('headerArgs', () => {
   it('skips empty values', () => {
     expect(headerArgs({ Cookie: '' })).toEqual([])
   })
+
+  it('drops a header with a NUL in it rather than letting spawn throw on it', () => {
+    // A captured value with a NUL made `spawn` throw synchronously, and the row
+    // sat on "downloading" with no process behind it until restart.
+    expect(headerArgs({ 'X-Token': 'a\u0000b', Origin: 'https://site.test' })).toEqual([
+      '--add-header',
+      'Origin:https://site.test'
+    ])
+    expect(headerArgs({ 'X-\u0000': 'value' })).toEqual([])
+  })
 })
 
 describe('humanizeYtdlpError', () => {

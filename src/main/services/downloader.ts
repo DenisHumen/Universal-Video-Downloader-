@@ -1,7 +1,7 @@
 import { app } from 'electron'
 import { EventEmitter } from 'events'
-import { spawn, ChildProcess } from 'child_process'
-import { existsSync, mkdirSync, readFileSync, writeFileSync, readdirSync, rmSync, renameSync } from 'fs'
+import { spawn, ChildProcess, type ChildProcessWithoutNullStreams } from 'child_process'
+import { existsSync, mkdirSync, readFileSync, writeFileSync, readdirSync, rmSync, renameSync, statSync } from 'fs'
 import { dirname, join } from 'path'
 import { randomUUID } from 'crypto'
 import { ytdlpBinaryPath, ensureYtdlp, ytdlpSpawnOptions } from './ytdlp'
@@ -25,9 +25,10 @@ import { markInterrupted, shouldResume } from './resume'
 import { pendingOrder } from './schedule'
 import { acceptsPostprocess, overallProgress, postprocessorLabel } from './progress'
 import { ffmpegProgressSeconds, isFfmpegNoise, splitOutputLines } from './ffmpeg-output'
+import { lineReader } from './engine-output'
 import { markOf, shouldEmitProgress, type ProgressMark } from './throttle'
 import { resolveUrl } from '../resolvers'
-import { normalizeUrl } from '@shared/urls'
+import { isAbsoluteUrl, normalizeUrl } from '@shared/urls'
 import { hasTrim } from '@shared/types'
 import type {
   AppErrorCode,
@@ -77,17 +78,14 @@ const deliberateStops = new Set<string>()
 /*
   What we told the engine to name each file, so the result can be found again.
 
-  The engine writes its progress to a pipe in the console's own code page, not
-  UTF-8 - measured here as cp1251 for a Cyrillic title, and neither
-  PYTHONIOENCODING nor PYTHONUTF8 changes it. The app reads those lines as UTF-8,
-  so every non-Latin character in the destination path came back as U+FFFD. The
-  file downloaded perfectly and then could not be found, which surfaced as "the
-  download finished but the file is not where it should be" - after fetching the
-  whole thing. Most of a Russian-language library would hit that.
-
-  Rather than guess at a code page that varies by machine, the app compares
-  against the name it chose itself: `readdirSync` hands back real strings, and
-  the only thing the engine decides is the extension.
+  Left to itself the engine writes its pipes in the console's own code page,
+  not UTF-8 - measured here as cp1251 for a Cyrillic title, and neither
+  PYTHONIOENCODING nor PYTHONUTF8 changes it. Every non-Latin character in the
+  destination path came back as U+FFFD, and the file downloaded perfectly and
+  then could not be found. `buildArgs` now passes `--encoding utf-8`, which is
+  the actual fix; this is the second line of defence for the streams whose name
+  the app chose itself. `readdirSync` hands back real strings, and the only
+  thing the engine decides is the extension.
 */
 const expectedNames = new Map<string, { dir: string; stem: string }>()
 
@@ -224,10 +222,17 @@ function qualityFormat(quality: QualityPreset | undefined): string {
   return `bv*[height<=?${height}]+ba/b[height<=?${height}]/bv*+ba/b`
 }
 
-/** Strip characters no filesystem we support will accept. */
-function safeName(title: string): string {
+/**
+ * Strip characters no filesystem we support will accept.
+ *
+ * Control characters included. Titles are scraped off pages we did not write,
+ * and a NUL in one ends up in the `-o` argument, where `spawn` refuses it by
+ * throwing - which used to leave the row saying "downloading" for good, with
+ * no process behind it and a concurrency slot gone until restart.
+ */
+export function safeName(title: string): string {
   return title
-    .replace(/[%/\\:*?"<>|]+/g, ' ')
+    .replace(/[%/\\:*?"<>|\u0000-\u001f\u007f]+/g, ' ')
     .replace(/\s+/g, ' ')
     .trim()
     .slice(0, 150)
@@ -266,10 +271,39 @@ function outputDirFor(item: DownloadItem, settings: AppSettings): string {
   return dir
 }
 
-function buildArgs(item: DownloadItem): string[] {
-  const settings = getSettings()
+/**
+ * The name the app gives a custom-resolved stream (e.g. a scraped .m3u8),
+ * whose title according to the engine is meaningless. Undefined when the
+ * engine's own filename template decides.
+ */
+function chosenStem(item: DownloadItem): string | undefined {
+  if (!(item.referer || item.headers) || !item.title) return undefined
+  return safeName(item.title) || 'video'
+}
+
+/**
+ * The engine's command line for one download. Pure: the caller works out the
+ * folder and the ffmpeg location, which touch the disk, so this can be tested.
+ */
+export function buildArgs(
+  item: DownloadItem,
+  settings: AppSettings,
+  dir: string,
+  ffmpeg?: string
+): string[] {
   const args: string[] = [
     '--ignore-config',
+    /*
+      UTF-8 on its pipes. Left to itself yt-dlp.exe writes them in the console's
+      ANSI code page, and the destination path is parsed out of those lines - so
+      a Cyrillic title, a Downloads folder under a Cyrillic profile name, and even
+      an English title with a colon in it (saved with a fullwidth `：` that cp1251
+      cannot spell) all came back as a path that does not exist. The file was
+      fine; Open, Show in folder and the notification click did nothing, and a
+      cancel could not find the partials to clean up.
+    */
+    '--encoding',
+    'utf-8',
     '--no-playlist',
     '--newline',
     '--no-color',
@@ -285,7 +319,6 @@ function buildArgs(item: DownloadItem): string[] {
     '30'
   ]
 
-  const ffmpeg = ffmpegLocation()
   if (ffmpeg) args.push('--ffmpeg-location', ffmpeg)
   args.push(...accessArgs(settings))
   args.push(...headerArgs(item.headers))
@@ -293,13 +326,9 @@ function buildArgs(item: DownloadItem): string[] {
   if (settings.restrictFilenames) args.push('--restrict-filenames')
   if (settings.speedLimit.trim()) args.push('--limit-rate', settings.speedLimit.trim())
 
-  const dir = outputDirFor(item, settings)
-
-  // Output template. For custom-resolved streams (e.g. a scraped .m3u8) the
-  // engine's own title is meaningless, so we bake in the title we scraped.
-  if ((item.referer || item.headers) && item.title) {
-    const stem = safeName(item.title) || 'video'
-    expectedNames.set(item.id, { dir, stem })
+  // Output template. For custom-resolved streams we bake in the title we scraped.
+  const stem = chosenStem(item)
+  if (stem) {
     args.push('-o', join(dir, `${stem}.%(ext)s`))
   } else {
     const template = settings.filenameTemplate || '%(title)s [%(id)s].%(ext)s'
@@ -387,7 +416,13 @@ function buildArgs(item: DownloadItem): string[] {
     if (item.precise !== false) args.push('--force-keyframes-at-cuts')
   }
 
-  args.push(item.url)
+  /*
+    Last, and behind `--`, so whatever sits in the URL slot can only ever be
+    read as a URL. A value starting with `-` used to be taken as an option, and
+    it can come from places the user never typed: a playlist entry copied out of
+    the site's JSON, or the decoded payload of a `uvd-direct://` link.
+  */
+  args.push('--', item.url)
   return args
 }
 
@@ -411,6 +446,29 @@ function parseFinalPath(line: string, item: DownloadItem): void {
   }
 }
 
+/** What the engine can name a finished download, after the stem we gave it. */
+const MEDIA_EXTENSION = /^(mp4|mkv|webm|m4a|mp3|opus|flac|wav|ogg|aac|mov|m4v|flv|ts)$/i
+
+/**
+ * Which of a folder's files is the download we named `stem`.
+ *
+ * Exactly `<stem>.<media extension>`, newest first. The engine writes more than
+ * the video beside it - `Title.ru.srt`, `Title.webp`, a `Title.f137.mp4` it is
+ * about to merge, a `Title.mp4.part` - and the alphabetical last of those was
+ * what this used to pick, so a download with subtitles switched on "opened" as
+ * a subtitle file. Newest, because an earlier attempt in another container can
+ * still be lying in the same folder.
+ */
+export function pickFinishedFile(
+  files: { name: string; mtimeMs: number }[],
+  stem: string
+): string | undefined {
+  const prefix = stem + '.'
+  const ours = (name: string): boolean =>
+    name.startsWith(prefix) && MEDIA_EXTENSION.test(name.slice(prefix.length))
+  return files.filter((file) => ours(file.name)).sort((a, b) => b.mtimeMs - a.mtimeMs)[0]?.name
+}
+
 /**
  * Find the finished file by the name we asked for, when the engine's own
  * report of it came back unreadable. See `expectedNames`.
@@ -419,12 +477,16 @@ function findByExpectedName(id: string): string | undefined {
   const expected = expectedNames.get(id)
   if (!expected) return undefined
   try {
-    const match = readdirSync(expected.dir)
-      .filter((name) => name.startsWith(expected.stem + '.'))
-      // A leftover `.part` or `.ytdl` is not the finished file.
-      .filter((name) => !/[.](part|ytdl|temp)$/i.test(name))
-      .sort()
-      .pop()
+    // Only the candidates get a stat: a Downloads folder can hold thousands of files.
+    const candidates = readdirSync(expected.dir).filter((name) => name.startsWith(expected.stem + '.'))
+    const files = candidates.flatMap((name) => {
+      try {
+        return [{ name, mtimeMs: statSync(join(expected.dir, name)).mtimeMs }]
+      } catch {
+        return []
+      }
+    })
+    const match = pickFinishedFile(files, expected.stem)
     return match ? join(expected.dir, match) : undefined
   } catch {
     return undefined
@@ -906,12 +968,35 @@ async function runDownload(item: DownloadItem): Promise<void> {
   item.state = 'downloading'
   emitUpdated(item)
 
-  const args = buildArgs(item)
-  const child = spawn(ytdlpBinaryPath(), args, ytdlpSpawnOptions())
+  /*
+    Everything up to a running process, under one catch.
+
+    `spawn` throws synchronously for an argument it will not pass on - a NUL in
+    a scraped title or URL - and so do the engine paths when the folder they
+    create cannot be made. This function is started fire-and-forget, so the
+    throw became an unhandled rejection after the row had already been set to
+    'downloading': it stayed that way with no process behind it, held one of
+    the concurrent slots until restart, and stuck again on every relaunch. None
+    of these errors is transient, so `fail()` settles it at once and frees the
+    slot.
+  */
+  let child: ChildProcessWithoutNullStreams
+  try {
+    const settings = getSettings()
+    const dir = outputDirFor(item, settings)
+    const stem = chosenStem(item)
+    expectedNames.delete(item.id)
+    if (stem) expectedNames.set(item.id, { dir, stem })
+    const args = buildArgs(item, settings, dir, ffmpegLocation())
+    child = spawn(ytdlpBinaryPath(), args, ytdlpSpawnOptions())
+  } catch (err) {
+    expectedNames.delete(item.id)
+    fail(item, err instanceof Error ? err.message : String(err))
+    return
+  }
   procs.set(item.id, child)
 
   let stderrTail = ''
-  let buffer = ''
 
   const onOutputLine = (line: string): void => {
     if (line.startsWith(PROGRESS_PREFIX)) {
@@ -922,13 +1007,6 @@ async function runDownload(item: DownloadItem): Promise<void> {
       parseFinalPath(line, item)
       appendLog(item, line + '\n')
     }
-  }
-
-  const onData = (data: Buffer): void => {
-    buffer += data.toString()
-    const lines = buffer.split(/\r?\n/)
-    buffer = lines.pop() || ''
-    for (const line of lines) onOutputLine(line)
   }
 
   const onErrorLine = (line: string): void => {
@@ -944,24 +1022,20 @@ async function runDownload(item: DownloadItem): Promise<void> {
     appendLog(item, line + '\n')
   }
 
-  child.stdout.on('data', onData)
+  // Both pipes go through `lineReader`, which keeps torn lines and torn
+  // characters together across chunk boundaries.
+  const stdout = lineReader((text) => text.split(/\r?\n/), onOutputLine)
+  child.stdout.on('data', (chunk: Buffer) => stdout.push(chunk))
   /*
-    Buffered, and split on carriage returns as well as newlines.
+    Split on carriage returns as well as newlines.
 
     ffmpeg — which the engine spawns for trimmed sections and most live
     captures, with its console inherited — overwrites a single status line
     rather than printing new ones, so its whole output arrives as one
-    `\r`-separated run that a newline split never breaks apart. And a chunk
-    boundary falls wherever the pipe happens to flush, so without the buffer
-    the line naming the output file can be torn in half and never recognised.
+    `\r`-separated run that a newline split never breaks apart.
   */
-  let errBuffer = ''
-  child.stderr.on('data', (d) => {
-    errBuffer += d.toString()
-    const lines = splitOutputLines(errBuffer)
-    errBuffer = lines.pop() ?? ''
-    for (const line of lines) onErrorLine(line)
-  })
+  const stderr = lineReader(splitOutputLines, onErrorLine)
+  child.stderr.on('data', (chunk: Buffer) => stderr.push(chunk))
 
   /*
     Node emits `close` after `error` for a spawn that never started, so without
@@ -990,14 +1064,8 @@ async function runDownload(item: DownloadItem): Promise<void> {
       most: the reason a run failed, or the path a successful one wrote to,
       which the completion branch below is about to look up.
     */
-    if (buffer) {
-      onOutputLine(buffer)
-      buffer = ''
-    }
-    if (errBuffer) {
-      onErrorLine(errBuffer)
-      errBuffer = ''
-    }
+    stdout.flush()
+    stderr.flush()
     // If we deliberately stopped it, the state was already set — or has since
     // been changed again by a resume, which is equally not a failure.
     const stoppedOnPurpose = deliberateStops.delete(item.id)
@@ -1086,6 +1154,9 @@ export async function startDownload(request: DownloadRequest): Promise<DownloadI
     used to queue twice and have the two runs fight over the same output file.
   */
   const req: DownloadRequest = { ...request, url: normalizeUrl(request.url) }
+  // `--` in the engine's arguments already keeps this from being read as an
+  // option; refusing it here keeps it out of the queue and history as well.
+  if (!isAbsoluteUrl(req.url)) throw new Error('This is not a link the app can download.')
   const existing = findInFlight(req)
   /*
     Through `publicItem` like everything else that crosses the bridge. This

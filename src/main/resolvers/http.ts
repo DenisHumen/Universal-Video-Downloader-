@@ -166,6 +166,13 @@ export function pick(re: RegExp, html: string): string | undefined {
   return m ? m[1] : undefined
 }
 
+/**
+ * Markup down to plain text, for titles and labels scraped off a page.
+ *
+ * Control characters go too. These strings become download titles and file
+ * names, and a NUL in an argument makes `spawn` throw instead of starting the
+ * engine.
+ */
 export function cleanHtml(s: string): string {
   return s
     .replace(/<[^>]*>/g, '')
@@ -175,6 +182,7 @@ export function cleanHtml(s: string): string {
     .replace(/&nbsp;/g, ' ')
     .replace(/&lt;/g, '<')
     .replace(/&gt;/g, '>')
+    .replace(/[\u0000-\u001f\u007f]+/g, ' ')
     .trim()
 }
 

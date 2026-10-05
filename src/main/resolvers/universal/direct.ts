@@ -94,7 +94,17 @@ export async function resolveDirectUrl(
   options: ResolveOptions = {}
 ): Promise<ResolvedUrl> {
   const payload = parseDirectUrl(uvdUrl)
-  if (!payload) throw new Error('This download link is corrupted — pick the video again.')
+  /*
+    The payload is decoded JSON, and nothing guarantees this app wrote it: a
+    `uvd-direct://` link is just base64 anyone can produce, and its `url` went
+    straight to the engine. The built-in browser only ever captures http(s), so
+    holding both addresses to that loses nothing real - and it keeps an option,
+    a `file://` path or anything stranger out of the download slot.
+  */
+  const web = (value: unknown): boolean => typeof value === 'string' && /^https?:\/\//i.test(value)
+  if (!payload || !web(payload.url) || (payload.pageUrl && !web(payload.pageUrl))) {
+    throw new Error('This download link is corrupted — pick the video again.')
+  }
 
   const fresh = Date.now() - payload.capturedAt < FRESH_MS
   if (!fresh && payload.pageUrl) {

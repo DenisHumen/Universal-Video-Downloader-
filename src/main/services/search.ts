@@ -5,6 +5,7 @@ import { getSettings } from './settings'
 import { classifyYtdlpError } from './options'
 import { searchYummyani } from '../resolvers'
 import { SEARCH_ALL_SERVICES } from '@shared/types'
+import { isAbsoluteUrl } from '@shared/urls'
 import type { SearchResponse, SearchResult, SearchScope, SearchService } from '@shared/types'
 
 interface FlatEntry {
@@ -51,11 +52,20 @@ function thumbnailOf(entry: FlatEntry, service: SearchService): string | undefin
 /** Run one engine search (prefix- or URL-based) and map the flat entries. */
 function ytdlpSearch(target: string, service: SearchService, limit: number): Promise<SearchResponse> {
   const settings = getSettings()
-  const args = ['-J', '--flat-playlist', '--no-warnings', '--no-progress', '--ignore-config']
+  const args = [
+    '-J',
+    '--flat-playlist',
+    '--no-warnings',
+    '--no-progress',
+    '--ignore-config',
+    '--encoding',
+    'utf-8'
+  ]
   // Proxy matters for reachability; cookies are skipped — extracting them per
   // search would slow every roundtrip for no benefit.
   if (settings.proxy) args.push('--proxy', settings.proxy)
-  args.push('--playlist-end', String(Math.max(1, Math.min(30, limit))), target)
+  // The target is always prefixed today; `--` keeps it that way whatever changes.
+  args.push('--playlist-end', String(Math.max(1, Math.min(30, limit))), '--', target)
 
   return new Promise((resolve) => {
     const child = spawn(ytdlpBinaryPath(), args, ytdlpSpawnOptions())
@@ -77,8 +87,10 @@ function ytdlpSearch(target: string, service: SearchService, limit: number): Pro
       })
     }, 45_000)
 
-    child.stdout.on('data', (d) => (stdout += d.toString()))
-    child.stderr.on('data', (d) => (stderr += d.toString()))
+    child.stdout.setEncoding('utf8')
+    child.stderr.setEncoding('utf8')
+    child.stdout.on('data', (d: string) => (stdout += d))
+    child.stderr.on('data', (d: string) => (stderr += d))
     child.on('error', (err) => done({ ok: false, error: err.message }))
     child.on('close', (code) => {
       if (code !== 0 || !stdout.trim()) {
@@ -91,7 +103,8 @@ function ytdlpSearch(target: string, service: SearchService, limit: number): Pro
       try {
         const raw = JSON.parse(stdout) as FlatPlaylist
         const results: SearchResult[] = (raw.entries || [])
-          .filter((e) => (e.url || e.webpage_url) && e.title)
+          // A result is queued by its URL as-is, and the list is the site's data.
+          .filter((e) => isAbsoluteUrl(e.webpage_url || e.url || '') && e.title)
           .map((e) => ({
             id: e.id || e.url || e.webpage_url || '',
             title: e.title || 'Untitled',

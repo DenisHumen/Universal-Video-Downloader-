@@ -4,7 +4,7 @@ import { getSettings } from './settings'
 import { killTree } from './process'
 import { accessArgs, classifyYtdlpError, hasCookies, headerArgs } from './options'
 import { resolveUniversal, resolveUrl, type ResolvedUrl } from '../resolvers'
-import { looksLikeCollection, normalizeUrl } from '@shared/urls'
+import { isAbsoluteUrl, looksLikeCollection, normalizeUrl } from '@shared/urls'
 import type {
   AppErrorCode,
   DetectResult,
@@ -73,6 +73,10 @@ function errorResult(err: unknown): DetectResult {
   const raw = err instanceof Error ? err.message : String(err)
   const { code, message, cookieHint } = classifyYtdlpError(raw, hasCookies(getSettings()))
   return { ok: false, error: code ? message : raw, errorCode: code, cookieHint }
+}
+
+function canceled(): { ok: false; error: string; errorCode: AppErrorCode } {
+  return { ok: false, error: 'Detection canceled.', errorCode: 'canceled' }
 }
 
 function formatKind(f: RawFormat): FormatKind {
@@ -152,14 +156,27 @@ export async function detect(
     fallback.
   */
   const url = normalizeUrl(input)
+  // Anything else would reach the engine's URL slot; see `isAbsoluteUrl`.
+  if (!isAbsoluteUrl(url)) {
+    return { ok: false, error: 'This is not a link the app can open.', errorCode: 'notALink' }
+  }
 
   onStage('resolving')
   let resolved: ResolvedUrl
   try {
-    resolved = await resolveUrl(url)
+    resolved = await resolveUrl(url, { signal })
   } catch (err) {
+    if (signal?.aborted) return canceled()
     return errorResult(err)
   }
+  /*
+    A cancel during the resolve stage - seconds long on resolver-backed sites -
+    used to change nothing. The probe below attaches its abort listener to a
+    signal that has already fired, and a listener added after the fact never
+    runs: the engine went on probing for up to two minutes after the user had
+    given up on it.
+  */
+  if (signal?.aborted) return canceled()
 
   // A streaming site (translator/episode/quality selection) — present its picker.
   if (resolved.streaming) {
@@ -208,6 +225,8 @@ export async function detect(
     onStage('engine')
     const collection = await probeCollection(url, signal)
     if (collection) return { ok: true, info: collection }
+    // A canceled listing also comes back as null; don't carry on to the next stage.
+    if (signal?.aborted) return canceled()
   }
 
   onStage(wasRewritten ? 'probing' : 'engine')
@@ -291,6 +310,15 @@ type JsonProbe =
 
 function spawnJson(args: string[], signal: AbortSignal | undefined, timeoutMs: number): Promise<JsonProbe> {
   return new Promise((resolve) => {
+    /*
+      Before spawning, because an abort that has already happened will never
+      fire the listener below. Every route here can arrive after a cancel: the
+      resolve stage, a canceled collection listing, the universal pass.
+    */
+    if (signal?.aborted) {
+      resolve(canceled())
+      return
+    }
     const settings = getSettings()
     const child = spawn(ytdlpBinaryPath(), args, ytdlpSpawnOptions())
     let stdout = ''
@@ -300,6 +328,8 @@ function spawnJson(args: string[], signal: AbortSignal | undefined, timeoutMs: n
       if (settled) return
       settled = true
       clearTimeout(timer)
+      // The signal can outlive this probe by a long way; don't keep the child reachable from it.
+      signal?.removeEventListener('abort', onAbort)
       resolve(value)
     }
 
@@ -312,15 +342,17 @@ function spawnJson(args: string[], signal: AbortSignal | undefined, timeoutMs: n
       })
     }, timeoutMs)
 
-    if (signal) {
-      signal.addEventListener('abort', () => {
-        killTree(child)
-        done({ ok: false, error: 'Detection canceled.', errorCode: 'canceled' })
-      })
+    const onAbort = (): void => {
+      killTree(child)
+      done(canceled())
     }
+    signal?.addEventListener('abort', onAbort, { once: true })
 
-    child.stdout.on('data', (d) => (stdout += d.toString()))
-    child.stderr.on('data', (d) => (stderr += d.toString()))
+    // As text, decoded across chunk boundaries; the engine writes UTF-8 (`--encoding`).
+    child.stdout.setEncoding('utf8')
+    child.stderr.setEncoding('utf8')
+    child.stdout.on('data', (d: string) => (stdout += d))
+    child.stderr.on('data', (d: string) => (stderr += d))
     child.on('error', (err) => done({ ok: false, error: err.message }))
     child.on('close', (code) => {
       if (code !== 0 || !stdout.trim()) {
@@ -338,6 +370,21 @@ function spawnJson(args: string[], signal: AbortSignal | undefined, timeoutMs: n
   })
 }
 
+/**
+ * The pickable entries of a flat playlist listing.
+ *
+ * Only the ones with a `scheme://` address. This list is the site's own data,
+ * and each URL in it is queued as-is when the user ticks it - an entry whose
+ * "URL" was `--config-locations=…` reached the engine as an option.
+ */
+export function playlistEntries(raw: RawInfo[]): PlaylistEntry[] {
+  return raw.flatMap((e) => {
+    const url = e.webpage_url || e.url
+    if (!url || !isAbsoluteUrl(url)) return []
+    return [{ url, title: e.title || 'Untitled', thumbnail: pickThumbnail(e) }]
+  })
+}
+
 /** Expand a playlist/channel URL into its entries without extracting each one. */
 async function probeCollection(url: string, signal?: AbortSignal): Promise<MediaInfo | null> {
   const settings = getSettings()
@@ -347,9 +394,12 @@ async function probeCollection(url: string, signal?: AbortSignal): Promise<Media
     '--no-warnings',
     '--no-progress',
     '--ignore-config',
+    '--encoding',
+    'utf-8',
     '--playlist-end',
     String(settings.playlistLimit),
     ...accessArgs(settings),
+    '--',
     url
   ]
   // Listing a big channel is cheap but not instant — give it room.
@@ -358,13 +408,7 @@ async function probeCollection(url: string, signal?: AbortSignal): Promise<Media
   const raw = result.raw
   if (raw._type !== 'playlist' || !raw.entries || raw.entries.length < 2) return null
 
-  const entries: PlaylistEntry[] = raw.entries
-    .filter((e) => e.url || e.webpage_url)
-    .map((e) => ({
-      url: (e.webpage_url || e.url)!,
-      title: e.title || 'Untitled',
-      thumbnail: pickThumbnail(e)
-    }))
+  const entries = playlistEntries(raw.entries)
   if (entries.length < 2) return null
 
   return {
@@ -390,11 +434,14 @@ async function probeWithEngine(resolved: ResolvedUrl, signal?: AbortSignal): Pro
     '--no-playlist',
     '--no-progress',
     '--ignore-config',
+    '--encoding',
+    'utf-8',
     ...accessArgs(settings),
     ...headerArgs(resolved.headers)
   ]
   if (resolved.referer) args.push('--referer', resolved.referer)
-  args.push(resolved.url)
+  // Behind `--`, so it can only be read as a URL; see buildArgs in downloader.ts.
+  args.push('--', resolved.url)
 
   const result = await spawnJson(args, signal, 75_000)
   if (!result.ok) {

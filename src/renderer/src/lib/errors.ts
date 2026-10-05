@@ -34,6 +34,7 @@ const KEYS: Record<AppErrorCode, TranslationKey> = {
   ffmpegMissing: 'err.ffmpegMissing',
   streamGone: 'err.streamGone',
   corruptLink: 'err.corruptLink',
+  notALink: 'err.notALink',
   emptyPage: 'err.emptyPage',
   cutFailed: 'err.cutFailed'
 }
