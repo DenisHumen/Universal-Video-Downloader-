@@ -414,7 +414,8 @@ function buildTray(): void {
     )
     tray.on('click', showMainWindow)
   } catch (err) {
-    console.error('Tray unavailable', err)
+    // Background watching relies on the tray to keep a closed window findable.
+    log.error('app', 'Tray unavailable', { error: String(err) })
   }
 }
 
@@ -538,7 +539,7 @@ if (!gotLock) {
     applySettings(getSettings())
 
     // Prepare the download engine in the background.
-    ensureYtdlp().catch((err) => console.error('yt-dlp ensure failed:', err))
+    ensureYtdlp().catch((err) => log.error('engine', 'Setup failed', { error: String(err) }))
 
     /*
       Pick up whatever the last shutdown cut short.
@@ -597,8 +598,13 @@ if (!gotLock) {
     // still a change the user made.
     flushSettings()
     flushWatches()
-    flushLog()
     shutdownDownloads()
+    /*
+      Last. Closing the log is final - anything logged afterwards is only
+      queued, never written - and the shutdown above writes history.json,
+      whose failure is exactly the kind of thing that has to reach the file.
+    */
+    flushLog()
   })
 
   app.on('window-all-closed', () => {

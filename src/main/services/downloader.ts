@@ -18,6 +18,8 @@ import {
   uniqueOutputPath
 } from './ffmpeg'
 import { getSettings } from './settings'
+import { log } from './log'
+import { downloadFields } from './log-fields'
 import { accessArgs, classifyYtdlpError, hasCookies, headerArgs, isTransientError } from './options'
 import { IN_FLIGHT_STATES, isSameDownload } from './dedupe'
 import {
@@ -138,7 +140,12 @@ export function loadHistory(): void {
       items.set(item.id, item)
     }
   } catch (err) {
-    console.error('Failed to load history', err)
+    /*
+      The queue the user had is gone for this session, and a packaged build
+      has no console: the log is the only place that can say why - a disk or
+      permissions error, or a history.json that no longer parses.
+    */
+    log.error('history', 'Load failed', { error: String(err) })
   }
 }
 
@@ -162,7 +169,7 @@ export function flushHistory(): void {
     writeFileSync(tmp, JSON.stringify([...items.values()].map(publicItem), null, 2), 'utf-8')
     renameSync(tmp, target)
   } catch (err) {
-    console.error('Failed to save history', err)
+    log.error('history', 'Save failed', { error: String(err) })
   }
 }
 
@@ -900,6 +907,7 @@ async function runMediaJob(item: DownloadItem): Promise<void> {
   item.error = undefined
   item.errorCode = undefined
   emitUpdated(item)
+  log.info('download', 'Started', downloadFields(item))
 
   const probe = await probeMedia(source)
   /*
@@ -1007,11 +1015,13 @@ async function runMediaJob(item: DownloadItem): Promise<void> {
     item.state = 'completed'
     finishProgress(item)
     item.finishedAt = Date.now()
+    log.info('download', 'Finished', downloadFields(item))
     emitUpdated(item)
     processQueue()
     return
   }
   appendLog(item, stderr)
+  log.debug('engine', stderr, { id: item.id.slice(0, 8) })
   // ffmpeg failures are never the flaky-network kind, so skip the retry path
   // and give the user a plain explanation straight away.
   const failure = classifyFfmpegError(stderr || `ffmpeg exited with code ${code}`)
@@ -1079,6 +1089,8 @@ async function runDownload(item: DownloadItem): Promise<void> {
 
   item.state = 'downloading'
   emitUpdated(item)
+  const retried = item.attempts || 0
+  log.info('download', 'Started', { ...downloadFields(item), attempt: retried ? retried + 1 : undefined })
 
   /*
     Everything up to a running process, under one catch.
@@ -1110,7 +1122,14 @@ async function runDownload(item: DownloadItem): Promise<void> {
   procs.set(item.id, child)
 
   let stderrTail = ''
+  const shortId = item.id.slice(0, 8)
 
+  /*
+    The engine's own words go to the log only when "detailed log" is on. They
+    are the most useful thing in a bug report and also the least tidy: full
+    media addresses, the destination path. The sink redacts what it can
+    recognise; the debug level keeps the rest out of an ordinary run.
+  */
   const onOutputLine = (line: string): void => {
     if (line.startsWith(PROGRESS_PREFIX)) {
       handleProgressLine(line, item)
@@ -1119,6 +1138,7 @@ async function runDownload(item: DownloadItem): Promise<void> {
     } else if (line.trim()) {
       parseFinalPath(line, item)
       appendLog(item, line + '\n')
+      log.debug('engine', line, { id: shortId })
     }
   }
 
@@ -1133,6 +1153,7 @@ async function runDownload(item: DownloadItem): Promise<void> {
     if (isFfmpegNoise(line)) return
     stderrTail = (stderrTail + line + '\n').slice(-4000)
     appendLog(item, line + '\n')
+    log.debug('engine', line, { id: shortId })
   }
 
   // Both pipes go through `lineReader`, which keeps torn lines and torn
@@ -1208,6 +1229,7 @@ async function runDownload(item: DownloadItem): Promise<void> {
       }
       finalPaths.delete(item.id)
       expectedNames.delete(item.id)
+      log.info('download', 'Finished', downloadFields(item))
       emitUpdated(item)
       processQueue()
       return
@@ -1257,6 +1279,7 @@ function fail(item: DownloadItem, rawError: string): void {
     // otherwise the never-backwards rule pins it wherever the failure left it.
     resetProgress(item)
     emitUpdated(item)
+    log.info('download', 'Failed; retrying', { ...downloadFields(item), attempt: attempts })
     const timer = setTimeout(() => {
       retryTimers.delete(item.id)
       processQueue()
@@ -1265,6 +1288,13 @@ function fail(item: DownloadItem, rawError: string): void {
     return
   }
   const { code, message, cookieHint } = classifyYtdlpError(rawError, hasCookies(getSettings()))
+  /*
+    The code, not the engine's text. `rawError` is the tail of its output, and
+    that holds media addresses and file paths; with "detailed log" on, those
+    lines are already in the file above this one, at the level that asked for
+    them.
+  */
+  log.warn('download', 'Failed', { ...downloadFields(item), code, attempt: attempts })
   item.state = 'error'
   clearPhase(item)
   item.error = message
@@ -1276,6 +1306,7 @@ function fail(item: DownloadItem, rawError: string): void {
 
 /** A failure the app diagnosed itself, so it already knows what to call it. */
 function failWith(item: DownloadItem, code: AppErrorCode, message: string): void {
+  log.warn('download', 'Failed', { ...downloadFields(item), code })
   item.state = 'error'
   clearPhase(item)
   item.error = message

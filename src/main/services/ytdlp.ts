@@ -15,6 +15,7 @@ import {
 import { join } from 'path'
 import type { YtDlpStatus } from '@shared/types'
 import { groupSpawnOptions } from './process'
+import { log } from './log'
 
 export const ytdlpEvents = new EventEmitter()
 
@@ -242,9 +243,11 @@ export function ensureYtdlp(): Promise<string> {
         const version = await getVersion()
         if (version) {
           emit({ state: 'ready', version, message: 'Ready' })
+          log.info('engine', 'Ready', { version })
           return path
         }
         // Present but won't run (e.g. a previously broken download) — replace it.
+        log.warn('engine', 'The installed engine does not start; fetching it again')
       }
       emit({ state: 'checking', message: 'Preparing download engine…' })
       await downloadBinary()
@@ -258,6 +261,7 @@ export function ensureYtdlp(): Promise<string> {
         throw new Error('The download engine was installed but failed to start on this system.')
       }
       emit({ state: 'ready', version, message: 'Ready' })
+      log.info('engine', 'Installed', { version })
       return path
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err)
@@ -309,10 +313,12 @@ export async function updateYtdlp(isBusy: () => boolean = () => false): Promise<
       markRefreshed()
       const version = await getVersion()
       emit({ state: 'ready', version, message: 'Ready' })
+      log.info('engine', 'Updated', { version, via: code === 0 ? 'self-update' : 'fresh download' })
       return version
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err)
       emit({ state: 'error', message })
+      log.warn('engine', 'Update failed', { error: message })
       throw err
     }
   })()
@@ -363,13 +369,18 @@ function markRefreshed(): void {
  */
 export async function refreshEngineIfDue(isBusy: () => boolean): Promise<void> {
   if (Date.now() - lastRefresh() < REFRESH_INTERVAL) return
-  if (isBusy()) return
+  if (isBusy()) {
+    log.info('engine', 'Daily refresh skipped; a download is using the engine')
+    return
+  }
   if (!existsSync(ytdlpBinaryPath())) return
   try {
-    await spawnYtdlp(['-U'])
+    const { code } = await spawnYtdlp(['-U'])
     markRefreshed()
     const version = await getVersion()
     if (version) emit({ state: 'ready', version, message: 'Ready' })
+    if (code === 0) log.info('engine', 'Daily refresh done', { version })
+    else log.warn('engine', 'Daily refresh failed', { code, version })
   } catch {
     /* best-effort */
   }

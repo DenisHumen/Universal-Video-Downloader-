@@ -5,6 +5,7 @@ import { LEGACY_THEMES, THEMES, type AppSettings, type ThemeId } from '@shared/t
 import { isSafeTemplate } from '@shared/filename'
 import { normaliseRate } from '@shared/rate'
 import { normaliseSmbTarget } from '@shared/automation'
+import { log } from './log'
 
 export { isSafeTemplate }
 
@@ -101,6 +102,19 @@ export function migrate(raw: Record<string, unknown>): Partial<AppSettings> {
 
 let cache: AppSettings | null = null
 
+/**
+ * What kind of failure it was, and nothing of what it said.
+ *
+ * A JSON parse error quotes the text it choked on, and this text is the
+ * settings file: the proxy with its password, the cookies file's path, the
+ * Telegram chat. The name and the system error code (EACCES, ENOSPC) are what
+ * tell a corrupt file from a locked one, and they quote nothing.
+ */
+function failure(err: unknown): Record<string, string | undefined> {
+  if (!(err instanceof Error)) return { error: typeof err }
+  return { error: err.name, code: (err as NodeJS.ErrnoException).code }
+}
+
 export function getSettings(): AppSettings {
   if (cache) return cache
   try {
@@ -118,7 +132,7 @@ export function getSettings(): AppSettings {
       download folder, the cookies, the proxy — and it runs on the first launch
       after every update, for every existing user. Silently was not good enough.
     */
-    console.error('Could not read settings; falling back to defaults', err)
+    log.error('settings', 'Could not read settings; falling back to defaults', failure(err))
     cache = defaults()
   }
   return cache!
@@ -134,7 +148,7 @@ function writeNow(settings: AppSettings): void {
     writeFileSync(tmp, JSON.stringify(settings, null, 2), 'utf-8')
     renameSync(tmp, target)
   } catch (err) {
-    console.error('Failed to persist settings', err)
+    log.error('settings', 'Could not save settings', failure(err))
   }
 }
 
