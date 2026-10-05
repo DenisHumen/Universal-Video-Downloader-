@@ -3,6 +3,7 @@ import { log } from '../log'
 import { checkWatch } from './detect'
 import { markHandled, runEpisode } from './pipeline'
 import { getWatch, listWatches, updateWatch } from './store'
+import { createTicker } from './ticker'
 import { upcomingDelayMinutes, type Watch } from '@shared/automation'
 
 /**
@@ -37,7 +38,6 @@ const BACKOFF = [1, 2, 4, 8, 12]
  */
 const MAX_PER_CHECK = 25
 
-let timer: NodeJS.Timeout | null = null
 let running = 0
 const inFlight = new Set<string>()
 
@@ -108,9 +108,14 @@ async function checkOne(watch: Watch): Promise<void> {
     }
 
     for (const ref of todo) {
-      // Re-read: the user may have disabled or deleted the watch mid-run.
+      /*
+        Re-read: the user may have disabled or deleted the watch mid-run, or
+        stopped schedules altogether by closing the window with background
+        watching off. Whatever is left is still new next time and is picked up
+        then; nothing here has been marked as handled.
+      */
       const live = getWatch(watch.id)
-      if (!live || !live.enabled) break
+      if (!live || !live.enabled || !ticker.running()) break
       await runEpisode(live, ref, result.title)
       markHandled(getWatch(watch.id) ?? live, ref)
     }
@@ -154,28 +159,32 @@ export async function checkNow(watchId: string): Promise<void> {
   await checkOne(watch)
 }
 
+/*
+  Waking up looks immediately rather than waiting out the rest of a tick. A
+  machine that has been asleep is exactly the machine whose watches are all
+  overdue. The early tick is five seconds in: nothing is due in the first
+  moments of a launch that is not already late.
+*/
+const ticker = createTicker({
+  tick,
+  everyMs: TICK_MS,
+  firstAfterMs: 5_000,
+  wake: powerMonitor,
+  onWake: () => log.info('watcher', 'Woke up; checking what is overdue')
+})
+
+/** Start looking at schedules. Calling it while already running does nothing. */
 export function startWatcher(): void {
-  if (timer) return
-  timer = setInterval(tick, TICK_MS)
-
-  /*
-    Waking up should look immediately rather than waiting out the rest of a
-    tick. A machine that has been asleep is exactly the machine whose watches
-    are all overdue.
-  */
-  powerMonitor.on('resume', () => {
-    log.info('watcher', 'Woke up; checking what is overdue')
-    tick()
-  })
-
-  // Nothing is due in the first moments of a launch that is not already late.
-  setTimeout(tick, 5_000)
+  if (!ticker.start()) return
   log.info('watcher', `Watching ${listWatches().filter((w) => w.enabled).length} series`)
 }
 
+/**
+ * Stop looking at schedules. A check already under way finishes the episode
+ * it is on and goes no further; see the loop in `checkOne`.
+ */
 export function stopWatcher(): void {
-  if (timer) clearInterval(timer)
-  timer = null
+  if (ticker.stop()) log.info('watcher', 'Stopped')
 }
 
 /** True while anything is being checked or downloaded on a schedule. */

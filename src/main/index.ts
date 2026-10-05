@@ -16,9 +16,10 @@ import { flushSettings, getSettings } from './services/settings'
 import { applyProxy } from './services/proxy'
 import { ensureYtdlp, refreshEngineIfDue } from './services/ytdlp'
 import { checkForUpdates, initUpdater } from './services/updater'
-import { flushLog, initLog, log } from './services/log'
+import { flushLog, initLog, log, setLogLevel } from './services/log'
 import { flushWatches } from './services/automation/store'
-import { startWatcher } from './services/automation/watcher'
+import { startWatcher, stopWatcher } from './services/automation/watcher'
+import { autostartNeedsApplying } from './services/autostart'
 import {
   loadHistory,
   pauseAll,
@@ -147,12 +148,24 @@ function createWindow(): void {
   loadRenderer(mainWindow)
 
   mainWindow.on('close', (event) => {
-    // With the tray enabled, closing the window just hides the app.
-    if (!quitting && getSettings().trayEnabled && tray) {
+    /*
+      With the tray enabled, closing the window just hides the app. Background
+      watching keeps a tray icon too (see applySettings), so it hides as well
+      rather than leaving a process with no window and no icon. Hidden is not
+      the same as watching, though: without background watching, closing the
+      window stops the schedules, as the switch's hint says it does.
+    */
+    const settings = getSettings()
+    if (!quitting && (settings.trayEnabled || settings.automationEnabled) && tray) {
       event.preventDefault()
       mainWindow?.hide()
+      if (!settings.automationEnabled) stopWatcher()
     }
   })
+
+  // Schedules run whenever the window is up, however it came back: the tray,
+  // a second launch, a notification, the dock.
+  mainWindow.on('show', () => startWatcher())
 
   mainWindow.on('closed', () => {
     mainWindow = null
@@ -199,6 +212,9 @@ export function takePending(): PendingDelivery {
   delete pending.view
   return out
 }
+
+/** What start-with-system was last set to this session; nothing yet at launch. */
+let appliedAutostart: boolean | undefined
 
 /**
  * Start with the system, or stop doing so.
@@ -446,13 +462,34 @@ function applySettings(settings: AppSettings): void {
     }
   }
 
-  if (settings.trayEnabled) buildTray()
+  /*
+    Background watching implies the tray. Without it, turning that on and
+    closing the window left a process running with no window and no icon -
+    nothing to reopen it with and nothing to quit it from, short of logging out.
+  */
+  if (settings.trayEnabled || settings.automationEnabled) buildTray()
   else destroyTray()
 
   if (settings.clipboardWatch) {
     startClipboardWatch((url) => deliver(IPC.evtClipboardLink, 'link', url))
   } else {
     stopClipboardWatch()
+  }
+
+  /*
+    These three were read once at launch, so each switch did nothing until the
+    next one. Turning background watching on mid-session and closing the window
+    left a process with no watcher at all, and "detailed log" never worked: the
+    level was fixed when the file opened.
+
+    Turning background watching off stops nothing here. Schedules run while the
+    window is open either way; the switch only decides what closing it does.
+  */
+  if (settings.automationEnabled) startWatcher()
+  setLogLevel(settings.logVerbose ? 'debug' : 'info')
+  if (autostartNeedsApplying(settings.autostart, appliedAutostart)) {
+    applyAutostart(settings.autostart)
+    appliedAutostart = settings.autostart
   }
 }
 
@@ -534,8 +571,14 @@ if (!gotLock) {
     */
     setTimeout(() => void refreshEngineIfDue(isEngineBusy), 30_000)
 
-    if (getSettings().automationEnabled) startWatcher()
-    applyAutostart(getSettings().autostart)
+    /*
+      Schedules run whenever the app is open. This used to wait for background
+      watching to be switched on, which is off by default - so a new user could
+      add a series and never have it checked, while the screen kept promising a
+      next check in six hours. Watches the user paused stay paused: `tick`
+      skips them. Start-with-system is applied by applySettings above.
+    */
+    startWatcher()
 
     const initialLink = linkFromArgv(process.argv)
     if (initialLink) pending.link = initialLink
@@ -566,6 +609,8 @@ if (!gotLock) {
       schedule they had set up.
     */
     const settings = getSettings()
+    // A process kept alive by the tray alone, or the macOS dock, is not watching.
+    if (!settings.automationEnabled) stopWatcher()
     if (!isMac && !settings.trayEnabled && !settings.automationEnabled) app.quit()
   })
 }
