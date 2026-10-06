@@ -9,6 +9,7 @@ import type {
 } from '@shared/types'
 import { normalizeUrl } from '@shared/urls'
 import { watchFailing } from '@shared/automation'
+import type { ImportOutcome } from '@shared/backup'
 import type { AppInfo } from '../../preload/index'
 import { applyDownloadsChanged } from './lib/downloads'
 import { applyAppearance } from './lib/theme'
@@ -70,6 +71,8 @@ interface AppState {
   setView: (view: ViewId) => void
   saveSettings: (partial: Partial<AppSettings>) => Promise<void>
   resetSettings: () => Promise<void>
+  /** Pick a backup and merge it in. The settings it brings are adopted the way a save's are. */
+  importBackup: () => Promise<ImportOutcome>
   refreshDownloads: () => Promise<void>
   dismissUpdate: () => void
   dismissClipboardLink: () => void
@@ -239,6 +242,20 @@ export const useStore = create<AppState>((set, get) => ({
     const next = await window.api.resetSettings()
     applyAppearance(next, get().appInfo?.locale ?? 'en')
     set({ settings: next })
+  },
+
+  /*
+    A backup can bring a theme and a language with it, so its settings take the
+    same route a save's do. The watches it adds reach the watch screen through
+    main's own broadcast, like any other change to the list.
+  */
+  importBackup: async () => {
+    const outcome = await window.api.importBackup()
+    if (outcome.ok) {
+      applyAppearance(outcome.settings, get().appInfo?.locale ?? 'en')
+      set({ settings: outcome.settings })
+    }
+    return outcome
   },
 
   refreshDownloads: async () => {

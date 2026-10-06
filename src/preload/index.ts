@@ -1,5 +1,6 @@
 import type { AddedWatch, CheckSummary, RetryAnswer, Run, SmbTarget, Watch } from '@shared/automation'
 import type { ReportPreview, SendOutcome } from '@shared/report'
+import type { ExportOutcome, ImportOutcome } from '@shared/backup'
 import type { SeriesOffer } from '../main/automation-ipc'
 import { contextBridge, ipcRenderer } from 'electron'
 import { IPC } from '@shared/ipc'
@@ -101,6 +102,9 @@ const api = {
   setSettings: (partial: Partial<AppSettings>): Promise<AppSettings> =>
     ipcRenderer.invoke(IPC.settingsSet, partial),
   resetSettings: (): Promise<AppSettings> => ipcRenderer.invoke(IPC.settingsReset),
+  /** Both open a file dialog in main; `canceled` is what closing it answers. */
+  exportBackup: (): Promise<ExportOutcome> => ipcRenderer.invoke(IPC.backupExport),
+  importBackup: (): Promise<ImportOutcome> => ipcRenderer.invoke(IPC.backupImport),
 
   // Shell / dialogs
   chooseDirectory: (): Promise<string | null> => ipcRenderer.invoke(IPC.chooseDirectory),

@@ -202,6 +202,7 @@ export const en = {
   'settings.section.network': 'network',
   'settings.section.system': 'system',
   'settings.section.updates': 'updates',
+  'settings.section.backup': 'backup',
   'settings.section.about': 'about',
 
   'settings.language': 'language',
@@ -305,6 +306,32 @@ export const en = {
   'settings.resetConfirm': 'reset every setting?',
   'settings.resetConfirmBody':
     'your download folder, cookies, proxy and every other choice on this page go back to how they started. downloads already finished are not touched.',
+
+  'settings.backupExport': 'export settings and watches',
+  'settings.backupExportHint':
+    'your settings, watched series and network shares in one file, for a new computer or a reinstall. passwords and the telegram bot token are never written to it.',
+  'settings.backupExportButton': 'export…',
+  'settings.backupExported': 'backup saved · series: {watches} · shares: {targets}',
+  'settings.backupImport': 'import a backup',
+  'settings.backupImportHint':
+    'settings from the file replace the ones here. series and shares you don’t have yet are added; nothing is removed.',
+  'settings.backupImportButton': 'import…',
+  'settings.backupImported': 'backup imported',
+  'settings.backupResultSettings': 'settings applied',
+  'settings.backupResultSettingsSame': 'settings unchanged',
+  'settings.backupResultWatches': 'series added: {added} · already watched: {skipped}',
+  'settings.backupResultInvalid': 'entries that could not be read: {n}',
+  'settings.backupResultTargets': 'network shares added: {n}',
+  'settings.backupResultFolder':
+    'the backup’s download folder doesn’t exist on this computer, so the current one was kept',
+  'settings.backupSecrets':
+    'passwords for network shares and the telegram bot token are never in a backup. enter them again in the watching section above.',
+  'settings.backupErrJson': 'this file isn’t valid JSON',
+  'settings.backupErrFormat': 'this isn’t a backup made by universal video downloader',
+  'settings.backupErrVersion': 'this backup was made by a newer version of the app. update first, then import it.',
+  'settings.backupErrShape': 'this backup is damaged: parts of it aren’t what they should be',
+  'settings.backupErrRead': 'couldn’t read the file',
+  'settings.backupErrWrite': 'couldn’t save the backup there. try another folder.',
 
   // ---- error reports ----
   'report.stamp': 'report',

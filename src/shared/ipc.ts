@@ -36,6 +36,8 @@ export const IPC = {
   settingsGet: 'settings:get',
   settingsSet: 'settings:set',
   settingsReset: 'settings:reset',
+  backupExport: 'backup:export',
+  backupImport: 'backup:import',
   chooseDirectory: 'dialog:choose-directory',
   chooseCookiesFile: 'dialog:choose-cookies-file',
   openPath: 'shell:open-path',

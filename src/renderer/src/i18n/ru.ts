@@ -195,6 +195,7 @@ export const ru: Dictionary = {
   'settings.section.network': 'сеть',
   'settings.section.system': 'система',
   'settings.section.updates': 'обновления',
+  'settings.section.backup': 'резервная копия',
   'settings.section.about': 'о программе',
 
   'settings.language': 'язык',
@@ -298,6 +299,32 @@ export const ru: Dictionary = {
   'settings.resetConfirm': 'сбросить все настройки?',
   'settings.resetConfirmBody':
     'папка загрузок, куки, прокси и любой другой выбор на этой странице вернутся к исходным. уже скачанные файлы это не затронет.',
+
+  'settings.backupExport': 'сохранить настройки и слежение',
+  'settings.backupExportHint':
+    'настройки, сериалы на слежении и сетевые папки в одном файле - для нового компьютера или после переустановки. пароли и токен бота telegram в файл не записываются.',
+  'settings.backupExportButton': 'экспорт…',
+  'settings.backupExported': 'копия сохранена · сериалов: {watches} · сетевых папок: {targets}',
+  'settings.backupImport': 'загрузить из копии',
+  'settings.backupImportHint':
+    'настройки из файла заменят текущие. сериалы и сетевые папки, которых здесь ещё нет, добавятся; ничего не удаляется.',
+  'settings.backupImportButton': 'импорт…',
+  'settings.backupImported': 'копия загружена',
+  'settings.backupResultSettings': 'настройки применены',
+  'settings.backupResultSettingsSame': 'настройки не изменились',
+  'settings.backupResultWatches': 'сериалов добавлено: {added} · уже на слежении: {skipped}',
+  'settings.backupResultInvalid': 'не удалось прочитать записей: {n}',
+  'settings.backupResultTargets': 'сетевых папок добавлено: {n}',
+  'settings.backupResultFolder':
+    'папки загрузок из копии на этом компьютере нет, поэтому осталась текущая',
+  'settings.backupSecrets':
+    'пароли сетевых папок и токен бота telegram в копию не входят. введите их заново выше, в разделе слежения.',
+  'settings.backupErrJson': 'файл не читается как JSON',
+  'settings.backupErrFormat': 'это не резервная копия universal video downloader',
+  'settings.backupErrVersion': 'копия сделана более новой версией приложения. сначала обновите его, потом загрузите копию.',
+  'settings.backupErrShape': 'копия повреждена: часть данных не в том виде, в каком должна быть',
+  'settings.backupErrRead': 'не удалось прочитать файл',
+  'settings.backupErrWrite': 'не удалось сохранить копию туда. попробуйте другую папку.',
 
   // ---- error reports ----
   'report.stamp': 'отчёт',
