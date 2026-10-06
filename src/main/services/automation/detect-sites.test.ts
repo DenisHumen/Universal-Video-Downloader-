@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { downloadUrlFor, withEpisodesOf } from './detect'
+import { parseAnilibStreamUrl } from '../../resolvers/sites/aniliberty'
 import type { Watch } from '@shared/automation'
 import type { StreamingInfo } from '@shared/types'
 
@@ -43,6 +44,18 @@ describe('downloadUrlFor', () => {
     // episode it found would have thrown "No way to download an episode".
     const w = watch({ provider: 'kodik', url: 'https://kodikplayer.com/season/94795/d5a2/720p', translatorId: 'abc' })
     expect(downloadUrlFor(w, { season: 1, episode: 4 })).toBe('uvd-kodik://abc/4/720p')
+  })
+
+  it('downloads a followed AniLiberty release through its own resolver', () => {
+    // The dub's id is the release's alias, so the page address is not read at all.
+    const w = watch({
+      provider: 'aniliberty',
+      url: 'https://aniliberty.top/anime/releases/release/some-show/episodes',
+      translatorId: 'some-show'
+    })
+    const link = downloadUrlFor(w, { season: 1, episode: 4 })
+    expect(link).toBe('uvd-anilib://some-show/4/720p')
+    expect(parseAnilibStreamUrl(link)).toEqual({ alias: 'some-show', ordinal: 4, quality: '720p' })
   })
 })
 

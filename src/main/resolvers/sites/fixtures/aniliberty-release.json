@@ -1,0 +1,72 @@
+{
+  "id": 10172,
+  "type": {
+    "value": "ONA",
+    "description": "ОNA"
+  },
+  "year": 2026,
+  "name": {
+    "main": "Невероятные приключения ДжоДжо: Гонка «Стальной шар»",
+    "english": "Steel Ball Run: JoJo no Kimyou na Bouken",
+    "alternative": null
+  },
+  "alias": "steel-ball-run-jojo-no-kimyou-na-bouken",
+  "poster": {
+    "src": "/storage/releases/posters/10172/5bHZeLaIKOser7WZsyhCy6jVrneAKOfO.jpg",
+    "preview": "/storage/releases/posters/10172/5bHZeLaIKOser7WZsyhCy6jVrneAKOfO.jpg",
+    "thumbnail": "/storage/releases/posters/10172/A8HKy0PJxtKlqtgpd4zT2xL8doPKORhT.jpg",
+    "optimized": {
+      "src": "/storage/releases/posters/10172/cQ4uyJmWs16t9MxMEv0eltZp0nIaYtIz.webp",
+      "preview": "/storage/releases/posters/10172/cQ4uyJmWs16t9MxMEv0eltZp0nIaYtIz.webp",
+      "thumbnail": "/storage/releases/posters/10172/elJLNZVty6zatexvXdpdN7ircRyEdOQJ.webp"
+    }
+  },
+  "is_ongoing": true,
+  "is_in_production": true,
+  "episodes_total": null,
+  "external_player": null,
+  "is_blocked_by_geo": false,
+  "is_blocked_by_copyrights": false,
+  "average_duration_of_episode": 24,
+  "episodes": [
+    {
+      "id": "a159552a-9fa7-4737-867b-d22cf7115602",
+      "name": "Гонка «Стальной шар»",
+      "ordinal": 1,
+      "hls_480": "https://cache.libria.fun/videos/media/ts/10172/1/480/601093fb6e5cda6520b2b12022ed6049.m3u8?countryIso=XX&isAuthorized=0&isWithVideoAds=1&isWithVideoAdsAlways=1",
+      "hls_720": "https://cache.libria.fun/videos/media/ts/10172/1/720/95216005ac03802f81e45e186892600c.m3u8?countryIso=XX&isAuthorized=0&isWithVideoAds=1&isWithVideoAdsAlways=1",
+      "hls_1080": "https://cache.libria.fun/videos/media/ts/10172/1/1080/09c3f314f335e3c5786c237c9f2f5529.m3u8?countryIso=XX&isAuthorized=0&isWithVideoAds=1&isWithVideoAdsAlways=1",
+      "duration": 2924,
+      "rutube_id": null,
+      "youtube_id": null,
+      "sort_order": 1,
+      "release_id": 10172
+    },
+    {
+      "id": "a2da78c8-fe85-4dce-a582-b9ae70b0d028",
+      "name": null,
+      "ordinal": 2,
+      "hls_480": "https://cache.libria.fun/videos/media/ts/10172/2/480/fc7cd344a539d205ecf98397ccaee0e6.m3u8?countryIso=XX&isAuthorized=0&isWithVideoAds=1&isWithVideoAdsAlways=1",
+      "hls_720": "https://cache.libria.fun/videos/media/ts/10172/2/720/3ea40799c54a119386c013863504ab65.m3u8?countryIso=XX&isAuthorized=0&isWithVideoAds=1&isWithVideoAdsAlways=1",
+      "hls_1080": "https://cache.libria.fun/videos/media/ts/10172/2/1080/9a5b8a78784369048688991c1ae59408.m3u8?countryIso=XX&isAuthorized=0&isWithVideoAds=1&isWithVideoAdsAlways=1",
+      "duration": 1516,
+      "rutube_id": null,
+      "youtube_id": null,
+      "sort_order": 2,
+      "release_id": 10172
+    },
+    {
+      "id": "a2e8c9d4-c61f-4c3d-b57e-50c7545b17bf",
+      "name": null,
+      "ordinal": 3,
+      "hls_480": "https://cache.libria.fun/videos/media/ts/10172/3/480/6c12e1cb417f83ca8bd800a04a83edc4.m3u8?countryIso=XX&isAuthorized=0&isWithVideoAds=1&isWithVideoAdsAlways=1",
+      "hls_720": "https://cache.libria.fun/videos/media/ts/10172/3/720/a1c66c82f8c7e06ce8e5131e82512664.m3u8?countryIso=XX&isAuthorized=0&isWithVideoAds=1&isWithVideoAdsAlways=1",
+      "hls_1080": "https://cache.libria.fun/videos/media/ts/10172/3/1080/e3f9fc5142168fc53e112af1a7f6acea.m3u8?countryIso=XX&isAuthorized=0&isWithVideoAds=1&isWithVideoAdsAlways=1",
+      "duration": 1512,
+      "rutube_id": null,
+      "youtube_id": null,
+      "sort_order": 3,
+      "release_id": 10172
+    }
+  ]
+}

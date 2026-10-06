@@ -1,4 +1,5 @@
 import { resolveUrl } from '../../resolvers'
+import { anilibStreamUrl } from '../../resolvers/sites/aniliberty'
 import { rezkaEpisodes, rezkaEpisodeUrl } from '../../resolvers/sites/rezka'
 import { NotReleasedError } from '../../resolvers/upcoming'
 import { log } from '../log'
@@ -110,10 +111,10 @@ export async function describeSeries(url: string): Promise<SeriesDescription> {
         url,
         title: err.title,
         thumbnail: err.thumbnail,
-        provider: 'yummyani',
+        provider: err.provider ?? 'yummyani',
         translators: [],
         defaultTranslator: '',
-        qualities: ['360p', '480p', '720p'],
+        qualities: err.qualities ?? ['360p', '480p', '720p'],
         episodesFor: () => [],
         upcoming: { releaseAt: err.releaseAt }
       }
@@ -268,7 +269,8 @@ export async function checkWatch(watch: Watch): Promise<CheckResult> {
  * The providers do not agree on shape, and none should be assumed. For
  * yummyani and a pasted Kodik player the translator id *is* a season — it
  * decodes to a player URL for one season, or for a YummyAnime dub on Aksor to
- * the title and dub — so the episode number stands alone.
+ * the title and dub — so the episode number stands alone. An AniLiberty
+ * release has one season and one dub, whose id is the release's alias.
  * Rezka names the season separately.
  */
 export function downloadUrlFor(watch: Watch, ref: EpisodeRef): string {
@@ -278,6 +280,9 @@ export function downloadUrlFor(watch: Watch, ref: EpisodeRef): string {
   }
   if (watch.provider === 'kodik') {
     return `uvd-kodik://${watch.translatorId}/${ref.episode}/${quality}`
+  }
+  if (watch.provider === 'aniliberty') {
+    return anilibStreamUrl(watch.translatorId, ref.episode, watch.quality || 'best')
   }
   if (watch.provider === 'rezka') {
     /*
