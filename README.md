@@ -79,6 +79,25 @@ Universal Video Downloader is a free desktop app for macOS, Windows and Linux th
 2. Paste a link on the **download** tab (or drop it anywhere in the window).
 3. Pick the quality and format — the app shows what you will actually get — and press download. Files go to your system *Downloads* folder by default.
 
+### Linux: install with apt or dnf
+
+Ubuntu, Debian, Mint:
+
+```bash
+curl -fsSL https://denishumen.github.io/Universal-Video-Downloader-/uvd.gpg | sudo tee /usr/share/keyrings/uvd.gpg > /dev/null
+echo "deb [arch=amd64 signed-by=/usr/share/keyrings/uvd.gpg] https://github.com/DenisHumen/Universal-Video-Downloader-/releases/latest/download/ ./" | sudo tee /etc/apt/sources.list.d/universal-video-downloader.list
+sudo apt update && sudo apt install universal-video-downloader
+```
+
+Fedora, RHEL, openSUSE (on openSUSE the file goes to `/etc/zypp/repos.d/`):
+
+```bash
+sudo curl -fsSL -o /etc/yum.repos.d/universal-video-downloader.repo https://denishumen.github.io/Universal-Video-Downloader-/universal-video-downloader.repo
+sudo dnf install universal-video-downloader
+```
+
+Updates then arrive with the rest of the system (`sudo apt upgrade`, `sudo dnf upgrade`). The repositories are signed; Arch users can install `universal-video-downloader-bin` from the AUR once it is published there.
+
 ### macOS: “the app is damaged and can’t be opened”
 
 **It isn’t.** These builds are unsigned — there is no €99/year Apple Developer certificate behind them — and on recent macOS, Gatekeeper reports *any* quarantined unsigned app with that sentence. It sounds like a corrupt download, so people re-download it and see it again.

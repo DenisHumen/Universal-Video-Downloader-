@@ -337,3 +337,132 @@ jobs:
       # copies look for an update — moves to this release only now.
       - name: Publish
         run: gh release edit "$TAG" --draft=false --latest
+
+  # apt and dnf, once the release is public. The .deb and .rpm stay on the
+  # release; only signed index files are added (see scripts/linux-repo.sh).
+  # Without the signing key every step is skipped and the release is unaffected.
+  linux-repo:
+    name: Publish the apt and dnf repositories
+    needs: finalize
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      GH_REPO: ${{ github.repository }}
+      TAG: ${{ github.ref_name }}
+      HAS_KEY: ${{ secrets.REPO_GPG_PRIVATE_KEY != '' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: No signing key, nothing to publish
+        if: env.HAS_KEY != 'true'
+        run: echo "::notice::REPO_GPG_PRIVATE_KEY is not set, so the apt and dnf repositories were not published."
+
+      - name: Install the repository tools
+        if: env.HAS_KEY == 'true'
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq apt-utils createrepo-c
+
+      - name: Import the signing key
+        id: gpg
+        if: env.HAS_KEY == 'true'
+        env:
+          KEY: ${{ secrets.REPO_GPG_PRIVATE_KEY }}
+          PASS: ${{ secrets.REPO_GPG_PASSPHRASE }}
+        run: |
+          set -eu
+          printf '%s\n' "$KEY" | gpg --batch --import
+          FPR=$(gpg --batch --with-colons --list-secret-keys | awk -F: '/^fpr:/ {print $10; exit}')
+          test -n "$FPR" || { echo "::error::REPO_GPG_PRIVATE_KEY holds no secret key"; exit 1; }
+          umask 077
+          printf '%s' "$PASS" > "$RUNNER_TEMP/pass"
+          echo "fpr=$FPR" >> "$GITHUB_OUTPUT"
+
+      - name: Build and sign the repositories
+        if: env.HAS_KEY == 'true'
+        env:
+          FPR: ${{ steps.gpg.outputs.fpr }}
+        run: PASSFILE="$RUNNER_TEMP/pass" bash scripts/linux-repo.sh
+
+      - name: Attach the apt index to the release
+        if: env.HAS_KEY == 'true'
+        run: gh release upload "$TAG" apt/Packages apt/Packages.gz apt/Release apt/InRelease apt/Release.gpg --clobber
+
+      - uses: actions/configure-pages@v5
+        if: env.HAS_KEY == 'true'
+
+      - uses: actions/upload-pages-artifact@v3
+        if: env.HAS_KEY == 'true'
+        with:
+          path: site
+
+      - id: deploy
+        if: env.HAS_KEY == 'true'
+        uses: actions/deploy-pages@v4
+
+  # Arch Linux: the AUR -bin package, repackaging this release's .deb. Needs
+  # an AUR account with the package registered and its SSH key in AUR_KEY.
+  aur:
+    name: Update the AUR package
+    needs: finalize
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    env:
+      TAG: ${{ github.ref_name }}
+      HAS_KEY: ${{ secrets.AUR_KEY != '' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: No AUR key, nothing to publish
+        if: env.HAS_KEY != 'true'
+        run: echo "::notice::AUR_KEY is not set, so the AUR package was not updated."
+
+      - name: Fill in the version and checksum
+        if: env.HAS_KEY == 'true'
+        run: |
+          set -eu
+          V="${TAG#v}"
+          URL="https://github.com/${{ github.repository }}/releases/download/$TAG/Universal-Video-Downloader-$V-linux-amd64.deb"
+          SUM=$(curl -fsSL "$URL" | sha256sum | cut -d' ' -f1)
+          mkdir -p aur
+          sed -e "s/@VERSION@/$V/" -e "s/@SHA256@/$SUM/" packaging/aur/PKGBUILD > aur/PKGBUILD
+          cat aur/PKGBUILD
+
+      - name: Push to the AUR
+        if: env.HAS_KEY == 'true'
+        uses: KSXGitHub/github-actions-deploy-aur@v3.0.1
+        with:
+          pkgname: universal-video-downloader-bin
+          pkgbuild: ./aur/PKGBUILD
+          commit_username: DenisHumen
+          commit_email: ${{ secrets.AUR_EMAIL || 'noreply@github.com' }}
+          ssh_private_key: ${{ secrets.AUR_KEY }}
+          commit_message: Update to ${{ github.ref_name }}
+
+  # winget: a pull request to microsoft/winget-pkgs for each release. Works
+  # only after the first version was submitted by hand (see packaging/README.md)
+  # and needs a classic token with public_repo scope in WINGET_TOKEN.
+  winget:
+    name: Submit to winget
+    needs: finalize
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: windows-latest
+    env:
+      HAS_TOKEN: ${{ secrets.WINGET_TOKEN != '' }}
+    steps:
+      - name: No winget token, nothing to submit
+        if: env.HAS_TOKEN != 'true'
+        run: echo "::notice::WINGET_TOKEN is not set, so no winget update was submitted."
+
+      - if: env.HAS_TOKEN == 'true'
+        uses: vedantmgoyal9/winget-releaser@v2
+        with:
+          identifier: DenisHumen.UniversalVideoDownloader
+          installers-regex: 'windows-x64-setup\.exe$'
+          token: ${{ secrets.WINGET_TOKEN }}

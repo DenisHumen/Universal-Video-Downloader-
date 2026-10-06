@@ -1,0 +1,23 @@
+# Maintainer: DenisHumen
+# Filled in by the release workflow: @VERSION@ and @SHA256@ come from the
+# release being published. The .deb is repackaged rather than built from
+# source, so the AUR package carries exactly the binaries every other Linux
+# download does - the pinned ffmpeg and the Electron fuses included.
+pkgname=universal-video-downloader-bin
+pkgver=@VERSION@
+pkgrel=1
+pkgdesc="Detect and download video from almost any website - a desktop app around yt-dlp and ffmpeg"
+arch=('x86_64')
+url="https://github.com/DenisHumen/Universal-Video-Downloader-"
+license=('MIT')
+depends=('gtk3' 'nss' 'alsa-lib' 'libxss' 'libxtst' 'xdg-utils' 'libnotify' 'libsecret')
+provides=('universal-video-downloader')
+conflicts=('universal-video-downloader')
+source=("https://github.com/DenisHumen/Universal-Video-Downloader-/releases/download/v${pkgver}/Universal-Video-Downloader-${pkgver}-linux-amd64.deb")
+sha256sums=('@SHA256@')
+
+package() {
+  bsdtar -xf "$srcdir"/data.tar.* -C "$pkgdir"
+  # The .deb says "deb" here; an updater reading it must not reach for dpkg on Arch.
+  printf 'pacman' > "$pkgdir/opt/Universal Video Downloader/resources/package-type"
+}

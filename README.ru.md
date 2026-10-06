@@ -79,6 +79,25 @@ Universal Video Downloader — бесплатное десктопное при�
 2. Вставьте ссылку на вкладке **скачать** (или перетащите её в любое место окна).
 3. Выберите качество и формат — приложение покажет, что вы получите на самом деле, — и нажмите «скачать». По умолчанию файлы сохраняются в системную папку *Загрузки*.
 
+### Linux: установка через apt или dnf
+
+Ubuntu, Debian, Mint:
+
+```bash
+curl -fsSL https://denishumen.github.io/Universal-Video-Downloader-/uvd.gpg | sudo tee /usr/share/keyrings/uvd.gpg > /dev/null
+echo "deb [arch=amd64 signed-by=/usr/share/keyrings/uvd.gpg] https://github.com/DenisHumen/Universal-Video-Downloader-/releases/latest/download/ ./" | sudo tee /etc/apt/sources.list.d/universal-video-downloader.list
+sudo apt update && sudo apt install universal-video-downloader
+```
+
+Fedora, RHEL, openSUSE (в openSUSE файл кладётся в `/etc/zypp/repos.d/`):
+
+```bash
+sudo curl -fsSL -o /etc/yum.repos.d/universal-video-downloader.repo https://denishumen.github.io/Universal-Video-Downloader-/universal-video-downloader.repo
+sudo dnf install universal-video-downloader
+```
+
+Обновления после этого приходят вместе с системными (`sudo apt upgrade`, `sudo dnf upgrade`). Репозитории подписаны; на Arch пакет `universal-video-downloader-bin` появится в AUR, когда будет опубликован.
+
 ### macOS: «Программа повреждена, и её не удаётся открыть»
 
 **Она не повреждена.** Сборки не подписаны — за ними нет сертификата Apple Developer за €99 в год, — а свежие версии macOS выдают эту фразу для *любого* неподписанного приложения в карантине. Звучит как битая загрузка, поэтому люди скачивают файл заново и снова видят то же сообщение.
@@ -89,7 +108,7 @@ Universal Video Downloader — бесплатное десктопное при�
 xattr -dr com.apple.quarantine "/Applications/Universal Video Downloader.app"
 ```
 
-Эта команда напечатана прямо в окне установщика, так что возвращаться сюда за ней не придётся. (Или: правый клик по приложению в «Программах» → **Открыть** → **Открыть**.) Из-за отсутствия подписи сборки для macOS не могут обновляться сами — приложение честно предлагает страницу загрузки вместо того, чтобы делать вид, что перезапустится в новую версию. Так же обновляются установки из `.deb` / `.rpm`.
+Эта команда напечатана прямо в окне установщика, так что возвращаться сюда за ней не придётся. Из-за отсутствия подписи сборки для macOS не могут обновляться сами — приложение честно предлагает страницу загрузки вместо того, чтобы делать вид, что перезапустится в новую версию. Так же обновляются установки из `.deb` / `.rpm`.
 
 ## 🧭 Использование
 
