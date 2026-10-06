@@ -19,7 +19,7 @@ import type {
   VideoFormat
 } from '@shared/types'
 
-interface RawFormat {
+export interface RawFormat {
   format_id: string
   ext?: string
   vcodec?: string
@@ -85,9 +85,31 @@ function canceled(): { ok: false; error: string; errorCode: AppErrorCode } {
   return { ok: false, error: 'Detection canceled.', errorCode: 'canceled' }
 }
 
-function formatKind(f: RawFormat): FormatKind {
-  const hasVideo = f.vcodec && f.vcodec !== 'none'
-  const hasAudio = f.acodec && f.acodec !== 'none'
+const VIDEO_EXT = /^(mp4|m4v|webm|mkv|mov|flv|ts|3gp|ogv|avi)$/i
+const AUDIO_EXT = /^(mp3|m4a|aac|opus|ogg|oga|flac|wav|weba)$/i
+
+/**
+ * What a format carries.
+ *
+ * A missing codec means "not reported", not "none". Coub's video formats and a
+ * plain direct .mp4 come with no codecs at all, and were dropped as unknown -
+ * so Coub offered audio only, and a direct link fell through to the hidden
+ * browser and lost its title. Video is inferred from the container, an HLS
+ * protocol or a frame size; audio only when both codecs are missing, so a
+ * format with a known video codec keeps being merged with the best audio.
+ */
+export function formatKind(f: RawFormat): FormatKind {
+  if (f.ext === 'mhtml') return 'unknown' // storyboards
+  const vNone = f.vcodec === 'none'
+  const aNone = f.acodec === 'none'
+  const vKnown = f.vcodec != null && !vNone
+  const aKnown = f.acodec != null && !aNone
+  const looksVideo =
+    VIDEO_EXT.test(f.ext ?? '') || Boolean(f.protocol?.startsWith('m3u8')) || Boolean(f.width || f.height)
+  const hasVideo = vKnown || (!vNone && f.vcodec == null && looksVideo)
+  const hasAudio =
+    aKnown ||
+    (!aNone && f.acodec == null && f.vcodec == null && (hasVideo || AUDIO_EXT.test(f.ext ?? '')))
   if (hasVideo && hasAudio) return 'video+audio'
   if (hasVideo) return 'video'
   if (hasAudio) return 'audio'
@@ -101,7 +123,7 @@ function resolutionLabel(f: RawFormat): string {
   return f.format_note || '—'
 }
 
-function mapFormats(formats: RawFormat[] = []): VideoFormat[] {
+export function mapFormats(formats: RawFormat[] = []): VideoFormat[] {
   return formats
     .filter((f) => {
       const kind = formatKind(f)

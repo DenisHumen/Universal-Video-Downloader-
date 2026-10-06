@@ -1,5 +1,14 @@
 import { describe, expect, it } from 'vitest'
-import { best, classify, isPlausible, rank, scoreUrl, type MediaCandidate } from './candidates'
+import {
+  best,
+  classify,
+  heightOf,
+  isPlausible,
+  PLAUSIBLE_SCORE,
+  rank,
+  scoreUrl,
+  type MediaCandidate
+} from './candidates'
 
 function candidate(url: string, source = 'raw', bonus = 0): MediaCandidate {
   const { kind, score } = scoreUrl(url, bonus)
@@ -180,5 +189,28 @@ describe('content types', () => {
       { url: 'https://cdn.test/b.mp4', kind: 'file', score: 82, source: 'network', bytes: 900_000_000 }
     ])
     expect(first.url).toBe('https://cdn.test/b.mp4')
+  })
+})
+
+/*
+  Plyr's placeholder clip outscored the real stream beside it, and equally
+  scored qualities went to whichever was captured first - the 480p on a page
+  that lists 480, 720, 1080 in order.
+*/
+describe('blank clips and quality ties', () => {
+  it('never takes Plyr’s blank placeholder', () => {
+    expect(scoreUrl('https://cdn.plyr.io/static/blank.mp4', 12).score).toBeLessThan(PLAUSIBLE_SCORE)
+  })
+
+  it('reads the height nearest the file name', () => {
+    expect(heightOf('https://cdn.test/ts/720/1/1080/y.m3u8')).toBe(1080)
+    expect(heightOf('https://cdn.test/movie_720p.mp4?quality=1080')).toBe(720)
+    expect(heightOf('https://cdn.test/movie.mp4')).toBe(0)
+  })
+
+  it('prefers the higher quality when the scores tie', () => {
+    const urls = ['https://cdn.test/movie_480p.mp4', 'https://cdn.test/movie_720p.mp4', 'https://cdn.test/movie_1080p.mp4']
+    const ranked = rank(urls.map((url) => ({ url, ...scoreUrl(url, 12), source: 'network' }) as MediaCandidate))
+    expect(ranked[0].url).toBe('https://cdn.test/movie_1080p.mp4')
   })
 })

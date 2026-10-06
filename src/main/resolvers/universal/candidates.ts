@@ -86,6 +86,9 @@ const DISQUALIFYING: { re: RegExp; penalty: number }[] = [
   { re: /\/(ads?|advert(ising)?|analytics|tracker|pixel|beacon|telemetry)[/._-]/i, penalty: 90 },
   { re: /(doubleclick|googlesyndication|adservice|adsystem|popads|exoclick|trafficjunky)/i, penalty: 90 },
   { re: /\bblob:/i, penalty: 200 },
+  // Plyr's placeholder clip: a few kilobytes of nothing, loaded on every page
+  // that uses the player, and it outscored the real stream beside it.
+  { re: /(cdn\.plyr\.io\/static\/blank\.mp4|\/blank\.(mp4|webm)(?=[?#]|$))/i, penalty: 90 },
   // One piece of a stream, never the stream. Mild, because a fragmented-MP4
   // CDN names real media this way too and 35 only demotes an mp4.
   { re: /[/._-](seg(ment)?|chunk|frag(ment)?)s?\d*(?![a-z0-9])/i, penalty: 35 }
@@ -122,8 +125,23 @@ const SOFT: { re: RegExp; penalty: number }[] = [
 const POSITIVE: { re: RegExp; bonus: number }[] = [
   { re: /(master|index|playlist|manifest)\.m3u8/i, bonus: 14 },
   { re: /\/(hls|dash|stream|video|media)\//i, bonus: 6 },
-  { re: /\b(1080|1440|2160|720)p?\b/i, bonus: 4 }
+  // Underscores count as a boundary: `movie_1080p.mp4` carries a resolution too.
+  { re: /(?:^|[\/_.-])(?:4320|2160|1440|1080|720)p?(?=[\/_.\-?#&]|$)/i, bonus: 4 }
 ]
+
+/**
+ * The height a URL names, from its last resolution segment - the one nearest
+ * the file name. Ties between equally scored candidates went to whichever was
+ * captured first, which on a page listing 480, 720, 1080 in order was the 480.
+ */
+export function heightOf(url: string): number {
+  const path = url.split(/[?#]/)[0]
+  let height = 0
+  for (const m of path.matchAll(/(?:^|[\/_.-])(4320|2160|1440|1080|720|576|480|360|240)p?(?=[\/_.-]|$)/gi)) {
+    height = Number(m[1])
+  }
+  return height
+}
 
 export function classify(url: string): { kind: MediaKind; score: number } {
   for (const { re, kind, score } of EXT_SCORE) {
@@ -193,7 +211,10 @@ export function rank(candidates: MediaCandidate[]): MediaCandidate[] {
       if (existing.bytes == null && c.bytes != null) existing.bytes = c.bytes
     }
   }
-  return [...byUrl.values()].sort((a, b) => b.score - a.score || (b.bytes ?? 0) - (a.bytes ?? 0))
+  return [...byUrl.values()].sort(
+    (a, b) =>
+      b.score - a.score || heightOf(b.url) - heightOf(a.url) || (b.bytes ?? 0) - (a.bytes ?? 0)
+  )
 }
 
 /** Best plausible candidate, or undefined. */
