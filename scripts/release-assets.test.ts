@@ -421,6 +421,26 @@ describe('the release workflow', () => {
     expect(at('gh release upload')).toBeLessThan(at('--draft=false'))
   })
 
+  // CI's pack job read the fuses and the Linux packages back, but the release
+  // build, which makes the files users get, never did: a package CI would have
+  // refused could still be published from the tag.
+  it('reads every runner’s packages back before finalize may publish them', () => {
+    const build = jobs(releaseYml).get('build') ?? ''
+    const steps = build.split(/^ {6}- /m).slice(1)
+    const step = (cmd: string): string => steps.find((s) => s.includes(cmd)) ?? ''
+    const at = (s: string): number => steps.indexOf(step(s))
+
+    expect(at('node scripts/check-fuses.mjs')).toBeGreaterThan(at('electron-builder --'))
+    expect(step('node scripts/check-fuses.mjs')).not.toMatch(/^ {8}if:/m)
+    expect(at('node scripts/check-linux-packages.mjs')).toBeGreaterThan(at('electron-builder --'))
+    expect(step('node scripts/check-linux-packages.mjs')).toContain("if: matrix.platform == 'linux'")
+    // desktop-file-validate is what check-linux-packages.mjs reads the entry with.
+    expect(step('apt-get install')).toMatch(/apt-get install -y .*\bdesktop-file-utils\b/)
+    for (const s of ['node scripts/check-fuses.mjs', 'node scripts/check-linux-packages.mjs']) {
+      expect(step(s)).not.toContain('continue-on-error')
+    }
+  })
+
   // finalize-release.mjs reads mac-x64/ and mac-arm64/.
   it('keeps each Mac runner’s latest-mac.yml under the name finalize reads', () => {
     const build = jobs(releaseYml).get('build') ?? ''

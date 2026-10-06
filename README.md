@@ -360,8 +360,10 @@ git push --follow-tags   # CI builds, checks & publishes the release
 
 While the runners work, the release is a draft: its download links return 404 and installed copies
 keep seeing the previous version. Then every file appears at once. If a runner fails, the release
-stays a draft — re-run the failed jobs, and it is published when they pass. A release that is
-already public is refused rather than silently left as it was.
+stays a draft — re-run the failed jobs, and it is published when they pass. That includes the
+checks each runner makes on what it has just built: the Electron fuses in every packed app, and
+what the `.deb` and `.rpm` install. A release that is already public is refused rather than silently
+left as it was.
 
 Run by hand from a branch, the workflow builds every platform and keeps the installers as workflow
 artifacts for a week, but publishes nothing. `npm run release` on your own machine uploads into a

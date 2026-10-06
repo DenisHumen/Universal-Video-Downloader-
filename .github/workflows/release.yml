@@ -130,11 +130,13 @@ jobs:
           node-version: 24
           cache: npm
 
+      # rpm and fakeroot build the packages; desktop-file-utils and apparmor
+      # are for check-linux-packages.mjs, which reads them back afterwards.
       - name: Install Linux packaging tools
         if: matrix.platform == 'linux'
         run: |
           sudo apt-get update
-          sudo apt-get install -y rpm fakeroot
+          sudo apt-get install -y rpm fakeroot desktop-file-utils apparmor
 
       - name: Install dependencies
         run: npm ci
@@ -170,6 +172,17 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           # No Apple/Windows signing certificates in CI — build unsigned artifacts.
           CSC_IDENTITY_AUTO_DISCOVERY: false
+
+      # The checks CI's pack job runs, on the very files this release ships.
+      # electron-builder has uploaded them by now, but only into the draft: a
+      # check that fails here fails this runner, finalize never starts, and
+      # the release stays unpublished until a passing build replaces them.
+      - name: Check Electron's fuses in the packed app
+        run: node scripts/check-fuses.mjs
+
+      - name: Check what the .deb and .rpm install
+        if: matrix.platform == 'linux'
+        run: node scripts/check-linux-packages.mjs
 
       # Both Mac runners upload a latest-mac.yml of the same name and the second
       # replaces the first, so v3.20.0's lists the Intel files only. Each keeps
