@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useId, useMemo, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { collapse, enter } from '../lib/motion'
 import { ChevronDown } from 'lucide-react'
@@ -54,6 +54,8 @@ export default function FormatSelector({
   const [quality, setQuality] = useState<QualityPreset>(initialQuality)
   const [formatId, setFormatId] = useState<string | undefined>(undefined)
   const [showAdvanced, setShowAdvanced] = useState(false)
+  // The stream table mounts only while open, so aria-controls is set only then.
+  const advancedId = useId()
 
   const videoFormats = info.formats.filter((f) => f.kind !== 'audio')
 
@@ -172,6 +174,8 @@ export default function FormatSelector({
             <div>
               <button
                 onClick={() => setShowAdvanced((v) => !v)}
+                aria-expanded={showAdvanced}
+                aria-controls={showAdvanced ? advancedId : undefined}
                 className="flex w-full items-center justify-between py-1 text-[13px] font-medium text-ink-2 transition-colors duration-fast ease-ease hover:text-ink"
               >
                 {t('format.exactStream', { count: videoFormats.length })}
@@ -181,7 +185,7 @@ export default function FormatSelector({
               </button>
               <AnimatePresence initial={false}>
                 {showAdvanced && (
-                  <motion.div {...collapse} className="overflow-hidden">
+                  <motion.div {...collapse} id={advancedId} className="overflow-hidden">
                     {/* A table, because these rows are data: one column per
                         fact, aligned down the list so resolutions and sizes can
                         actually be compared. */}

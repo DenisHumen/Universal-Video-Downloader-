@@ -1,13 +1,12 @@
-import { useEffect, useMemo, useState } from 'react'
-import { AnimatePresence, motion } from 'framer-motion'
+import { useEffect, useId, useMemo, useState } from 'react'
 import { Loader2, Plus, Trash2, X } from 'lucide-react'
-import { dialog, overlay } from '../lib/motion'
 import { useT } from '../i18n'
 import { useStore } from '../store'
 import { toast } from '../lib/toast'
 import { describeError } from '../lib/errors'
 import { STEP_LABEL } from '../lib/automationLabels'
 import { emptyTarget, pathOf, ShareForm, TelegramForm, useSecretState } from './AutomationForms'
+import Modal from './Modal'
 import {
   DEFAULT_REMOTE_PATH,
   DEFAULT_RENAME_TEMPLATE,
@@ -73,6 +72,7 @@ export default function StepEditor({
   onClose: () => void
 }): JSX.Element {
   const t = useT()
+  const titleId = useId()
   const settings = useStore((s) => s.settings)
   const saveSettings = useStore((s) => s.saveSettings)
   const targets = settings?.smbTargets ?? []
@@ -161,208 +161,199 @@ export default function StepEditor({
         : true
 
   return (
-    <AnimatePresence>
-      <motion.div
-        {...overlay}
-        className="fixed inset-0 flex items-center justify-center bg-canvas/80 p-6"
-        style={{ zIndex: 'var(--z-modal)' }}
-        onClick={onClose}
-      >
-        <motion.div
-          {...dialog}
-          role="dialog"
-          aria-modal="true"
-          className="panel flex max-h-full w-full max-w-lg flex-col overflow-hidden"
-          onClick={(e) => e.stopPropagation()}
-        >
-          <div className="flex shrink-0 items-center gap-3 border-b border-edge px-4 py-3">
-            <h2 className="h2 flex-1">{t(STEP_LABEL[step.kind])}</h2>
-            <button className="btn-icon" onClick={onClose} aria-label={t('common.close')}>
-              <X size={15} />
-            </button>
-          </div>
+    <Modal
+      onClose={onClose}
+      labelledBy={titleId}
+      className="panel flex max-h-full w-full max-w-lg flex-col overflow-hidden"
+    >
+      <div className="flex shrink-0 items-center gap-3 border-b border-edge px-4 py-3">
+        <h2 className="h2 flex-1" id={titleId}>
+          {t(STEP_LABEL[step.kind])}
+        </h2>
+        <button className="btn-icon" onClick={onClose} aria-label={t('common.close')}>
+          <X size={15} />
+        </button>
+      </div>
 
-          <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-4">
-            {step.kind === 'rename' && (
-              <>
-                <div>
-                  <p className="label mb-1.5">{t('auto.template')}</p>
+      <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-4">
+        {step.kind === 'rename' && (
+          <>
+            <div>
+              <p className="label mb-1.5">{t('auto.template')}</p>
+              <input
+                value={step.template}
+                onChange={(e) => set({ template: e.target.value })}
+                aria-label={t('auto.template')}
+                className="field mono w-full text-[13px]"
+                spellCheck={false}
+              />
+              <p className="hint mt-1">{t('auto.templateHint')}</p>
+              {/*
+                Said, not enforced. A missing episode is put right by the
+                rename itself, and a missing season is harmless for a
+                series with only one.
+              */}
+              {renameGap(step.template) === 'episode' && (
+                <p className="mt-1 max-w-[62ch] text-[12px] leading-[1.5] text-warn">
+                  {t('auto.templateNoEpisode')}
+                </p>
+              )}
+              {renameGap(step.template) === 'season' && (
+                <p className="mt-1 max-w-[62ch] text-[12px] leading-[1.5] text-warn">
+                  {t('auto.templateNoSeason')}
+                </p>
+              )}
+            </div>
+            <div>
+              <p className="label mb-1.5">{t('auto.replacements')}</p>
+              <p className="hint mb-2">{t('auto.replacementsHint')}</p>
+              {step.replacements.map((r, i) => (
+                <div key={i} className="mb-1.5 flex gap-2">
                   <input
-                    value={step.template}
-                    onChange={(e) => set({ template: e.target.value })}
-                    aria-label={t('auto.template')}
-                    className="field mono w-full text-[13px]"
-                    spellCheck={false}
+                    value={r.from}
+                    onChange={(e) => {
+                      const next = [...step.replacements]
+                      next[i] = { ...r, from: e.target.value }
+                      set({ replacements: next })
+                    }}
+                    placeholder={t('auto.replaceFrom')}
+                    aria-label={t('auto.replaceFrom')}
+                    className="field flex-1 text-[13px]"
                   />
-                  <p className="hint mt-1">{t('auto.templateHint')}</p>
-                  {/*
-                    Said, not enforced. A missing episode is put right by the
-                    rename itself, and a missing season is harmless for a
-                    series with only one.
-                  */}
-                  {renameGap(step.template) === 'episode' && (
-                    <p className="mt-1 max-w-[62ch] text-[12px] leading-[1.5] text-warn">
-                      {t('auto.templateNoEpisode')}
-                    </p>
-                  )}
-                  {renameGap(step.template) === 'season' && (
-                    <p className="mt-1 max-w-[62ch] text-[12px] leading-[1.5] text-warn">
-                      {t('auto.templateNoSeason')}
-                    </p>
-                  )}
-                </div>
-                <div>
-                  <p className="label mb-1.5">{t('auto.replacements')}</p>
-                  <p className="hint mb-2">{t('auto.replacementsHint')}</p>
-                  {step.replacements.map((r, i) => (
-                    <div key={i} className="mb-1.5 flex gap-2">
-                      <input
-                        value={r.from}
-                        onChange={(e) => {
-                          const next = [...step.replacements]
-                          next[i] = { ...r, from: e.target.value }
-                          set({ replacements: next })
-                        }}
-                        placeholder={t('auto.replaceFrom')}
-                        aria-label={t('auto.replaceFrom')}
-                        className="field flex-1 text-[13px]"
-                      />
-                      <input
-                        value={r.to}
-                        onChange={(e) => {
-                          const next = [...step.replacements]
-                          next[i] = { ...r, to: e.target.value }
-                          set({ replacements: next })
-                        }}
-                        placeholder={t('auto.replaceTo')}
-                        aria-label={t('auto.replaceTo')}
-                        className="field flex-1 text-[13px]"
-                      />
-                      <button
-                        className="btn-icon"
-                        aria-label={t('common.remove')}
-                        onClick={() =>
-                          set({ replacements: step.replacements.filter((_, j) => j !== i) })
-                        }
-                      >
-                        <Trash2 size={14} />
-                      </button>
-                    </div>
-                  ))}
+                  <input
+                    value={r.to}
+                    onChange={(e) => {
+                      const next = [...step.replacements]
+                      next[i] = { ...r, to: e.target.value }
+                      set({ replacements: next })
+                    }}
+                    placeholder={t('auto.replaceTo')}
+                    aria-label={t('auto.replaceTo')}
+                    className="field flex-1 text-[13px]"
+                  />
                   <button
-                    className="btn-quiet"
+                    className="btn-icon"
+                    aria-label={t('common.remove')}
                     onClick={() =>
-                      set({ replacements: [...step.replacements, { from: '', to: '' }] })
+                      set({ replacements: step.replacements.filter((_, j) => j !== i) })
                     }
                   >
-                    <Plus size={14} /> {t('auto.addReplacement')}
+                    <Trash2 size={14} />
                   </button>
                 </div>
-              </>
-            )}
+              ))}
+              <button
+                className="btn-quiet"
+                onClick={() =>
+                  set({ replacements: [...step.replacements, { from: '', to: '' }] })
+                }
+              >
+                <Plus size={14} /> {t('auto.addReplacement')}
+              </button>
+            </div>
+          </>
+        )}
 
-            {step.kind === 'upload' && (
-              <>
-                {targets.length > 0 && (
-                  <div>
-                    <p className="label mb-1.5">{t('auto.share')}</p>
-                    <select
-                      className="field w-full text-[13px]"
-                      aria-label={t('auto.share')}
-                      value={targetId}
-                      onChange={(e) => setTargetId(e.target.value)}
-                    >
-                      {targets.map((x) => (
-                        <option key={x.id} value={x.id}>
-                          {x.name}
-                        </option>
-                      ))}
-                      <option value={NEW_SHARE}>{t('auto.shareNew')}</option>
-                    </select>
-                  </div>
-                )}
-
-                <div className="rounded border border-edge p-3">
-                  <ShareForm
-                    target={draft}
-                    onTarget={setDraft}
-                    password={password}
-                    onPassword={setPassword}
-                    passwordStored={Boolean(secrets.smb[targetId])}
-                  />
-                </div>
-
-                <div>
-                  <p className="label mb-1.5">{t('auto.remotePath')}</p>
-                  <input
-                    value={step.remotePath}
-                    onChange={(e) => set({ remotePath: e.target.value })}
-                    aria-label={t('auto.remotePath')}
-                    className="field mono w-full text-[13px]"
-                    spellCheck={false}
-                  />
-                  <p className="hint mt-1">{t('auto.remotePathHint')}</p>
-                </div>
-
-                <label className="flex items-center gap-2.5 text-[13px] text-ink">
-                  <input
-                    type="checkbox"
-                    checked={step.deleteLocalAfter}
-                    onChange={(e) => set({ deleteLocalAfter: e.target.checked })}
-                  />
-                  {t('auto.deleteLocal')}
-                </label>
-              </>
-            )}
-
-            {step.kind === 'notify' && (
-              <>
-                <p className="hint">{t('auto.notifyHint')}</p>
-                <div className="rounded border border-edge p-3">
-                  <TelegramForm
-                    token={token}
-                    onToken={setToken}
-                    chatId={chatId}
-                    onChatId={setChatId}
-                    tokenStored={secrets.telegram}
-                  />
-                </div>
-              </>
-            )}
-
-            {preview && (
-              <div className="border-t border-edge pt-3">
-                <p className="label mb-1">{t('auto.preview')}</p>
-                <p className="mono break-all text-[12px] text-ink-2">{preview}</p>
+        {step.kind === 'upload' && (
+          <>
+            {targets.length > 0 && (
+              <div>
+                <p className="label mb-1.5">{t('auto.share')}</p>
+                <select
+                  className="field w-full text-[13px]"
+                  aria-label={t('auto.share')}
+                  value={targetId}
+                  onChange={(e) => setTargetId(e.target.value)}
+                >
+                  {targets.map((x) => (
+                    <option key={x.id} value={x.id}>
+                      {x.name}
+                    </option>
+                  ))}
+                  <option value={NEW_SHARE}>{t('auto.shareNew')}</option>
+                </select>
               </div>
             )}
 
-            <label className="flex items-center gap-2.5 border-t border-edge pt-3 text-[13px] text-ink">
+            <div className="rounded border border-edge p-3">
+              <ShareForm
+                target={draft}
+                onTarget={setDraft}
+                password={password}
+                onPassword={setPassword}
+                passwordStored={Boolean(secrets.smb[targetId])}
+              />
+            </div>
+
+            <div>
+              <p className="label mb-1.5">{t('auto.remotePath')}</p>
+              <input
+                value={step.remotePath}
+                onChange={(e) => set({ remotePath: e.target.value })}
+                aria-label={t('auto.remotePath')}
+                className="field mono w-full text-[13px]"
+                spellCheck={false}
+              />
+              <p className="hint mt-1">{t('auto.remotePathHint')}</p>
+            </div>
+
+            <label className="flex items-center gap-2.5 text-[13px] text-ink">
               <input
                 type="checkbox"
-                checked={step.enabled}
-                onChange={(e) => set({ enabled: e.target.checked })}
+                checked={step.deleteLocalAfter}
+                onChange={(e) => set({ deleteLocalAfter: e.target.checked })}
               />
-              {t('auto.stepEnabled')}
+              {t('auto.deleteLocal')}
             </label>
-          </div>
+          </>
+        )}
 
-          <div className="flex shrink-0 justify-end gap-2 border-t border-edge px-4 py-3">
-            {!isNew && (
-              <button className="btn-danger mr-auto" onClick={() => onRemove(step.id)}>
-                <Trash2 size={14} /> {t('common.remove')}
-              </button>
-            )}
-            <button className="btn-quiet" onClick={onClose}>
-              {t('common.cancel')}
-            </button>
-            <button className="btn-solid" onClick={() => void save()} disabled={!canSave || saving}>
-              {saving ? <Loader2 size={14} className="animate-spin" /> : null}
-              {t('common.save')}
-            </button>
+        {step.kind === 'notify' && (
+          <>
+            <p className="hint">{t('auto.notifyHint')}</p>
+            <div className="rounded border border-edge p-3">
+              <TelegramForm
+                token={token}
+                onToken={setToken}
+                chatId={chatId}
+                onChatId={setChatId}
+                tokenStored={secrets.telegram}
+              />
+            </div>
+          </>
+        )}
+
+        {preview && (
+          <div className="border-t border-edge pt-3">
+            <p className="label mb-1">{t('auto.preview')}</p>
+            <p className="mono break-all text-[12px] text-ink-2">{preview}</p>
           </div>
-        </motion.div>
-      </motion.div>
-    </AnimatePresence>
+        )}
+
+        <label className="flex items-center gap-2.5 border-t border-edge pt-3 text-[13px] text-ink">
+          <input
+            type="checkbox"
+            checked={step.enabled}
+            onChange={(e) => set({ enabled: e.target.checked })}
+          />
+          {t('auto.stepEnabled')}
+        </label>
+      </div>
+
+      <div className="flex shrink-0 justify-end gap-2 border-t border-edge px-4 py-3">
+        {!isNew && (
+          <button className="btn-danger mr-auto" onClick={() => onRemove(step.id)}>
+            <Trash2 size={14} /> {t('common.remove')}
+          </button>
+        )}
+        <button className="btn-quiet" onClick={onClose}>
+          {t('common.cancel')}
+        </button>
+        <button className="btn-solid" onClick={() => void save()} disabled={!canSave || saving}>
+          {saving ? <Loader2 size={14} className="animate-spin" /> : null}
+          {t('common.save')}
+        </button>
+      </div>
+    </Modal>
   )
 }

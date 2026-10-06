@@ -650,12 +650,13 @@ export default function SettingsView(): JSX.Element {
       */}
       <aside className="flex w-[190px] shrink-0 flex-col border-r border-edge">
         <h1 className="h1 shrink-0 px-4 pb-3 pt-8">{t('settings.title')}</h1>
-        <nav
-          role="tablist"
-          aria-orientation="vertical"
-          aria-label={t('settings.title')}
-          className="min-h-0 flex-1 overflow-y-auto px-2 pb-6"
-        >
+        {/*
+          Jump links into one scrolling page, so a plain navigation list:
+          there are no tab panels to switch, and role="tablist" told screen
+          readers to expect arrow keys that did nothing. aria-current marks
+          the section in view.
+        */}
+        <nav aria-label={t('settings.title')} className="min-h-0 flex-1 overflow-y-auto px-2 pb-6">
         {/*
           An underline strip, not a pill row.
           The index was styled with `.choice` at first, which is the app's
@@ -667,8 +668,7 @@ export default function SettingsView(): JSX.Element {
             <button
               key={s.id}
               onClick={() => jump(s.id)}
-              role="tab"
-              aria-selected={active === s.id}
+              aria-current={active === s.id ? 'location' : undefined}
               className={`w-full rounded px-2.5 py-1.5 text-left text-[13px] transition-colors ${
                 active === s.id ? 'bg-raise text-ink' : 'text-ink-2 hover:bg-raise/60'
               }`}

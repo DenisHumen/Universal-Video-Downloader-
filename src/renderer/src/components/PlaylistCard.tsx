@@ -202,15 +202,20 @@ export default function PlaylistCard({ info, onDone, saveDir, onSaveDirChange }:
                 max={entries.length}
                 value={rangeFrom}
                 onChange={(e) => setRangeFrom(e.target.value)}
+                // "items from" / "items to": the dash between the boxes is all a sighted user needs, and a screen reader had nothing.
+                aria-label={`${t('playlist.range')} ${t('trim.start')}`}
                 className="field mono w-[72px] px-2 text-center text-[13px]"
               />
-              <span className="text-ink-3">–</span>
+              <span className="text-ink-3" aria-hidden="true">
+                –
+              </span>
               <input
                 type="number"
                 min={1}
                 max={entries.length}
                 value={rangeTo}
                 onChange={(e) => setRangeTo(e.target.value)}
+                aria-label={`${t('playlist.range')} ${t('trim.end')}`}
                 className="field mono w-[72px] px-2 text-center text-[13px]"
               />
               <button className="btn-quiet px-3 py-1.5" onClick={selectRange}>

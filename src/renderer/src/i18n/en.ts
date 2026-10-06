@@ -37,8 +37,13 @@ export const en = {
   'nav.queue': 'queue',
   'nav.search': 'search',
   'nav.settings': 'settings',
+  'nav.label': 'sections',
 
   // ---- title bar ----
+  'window.minimize': 'minimize',
+  'window.maximize': 'maximize',
+  'window.restore': 'restore',
+  'window.close': 'close',
   'engine.ready': 'engine ready',
   'engine.downloading': 'engine {percent}%',
   'engine.checking': 'engine…',

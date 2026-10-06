@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react'
-import { Minus, X } from 'lucide-react'
 import type { AppSettings } from '@shared/types'
 import Logo from './components/Logo'
 import Toasts from './components/Toasts'
+import CaptionButtons from './components/CaptionButtons'
 import SearchView from './views/SearchView'
 import { useStore } from './store'
 import { applyAppearance } from './lib/theme'
@@ -49,8 +49,14 @@ export default function SearchApp(): JSX.Element {
     <>
       <Toasts />
 
+      {/*
+        No right padding off the Mac, so the caption buttons reach the corner.
+        They include maximise now: the window is resizable like the others,
+        and a resizable window without one only gave it to people who knew to
+        double-click the bar.
+      */}
       <header
-        className="drag-region relative flex h-12 shrink-0 items-center justify-between border-b border-edge bg-canvas pr-2"
+        className={`drag-region relative flex h-12 shrink-0 items-center justify-between border-b border-edge bg-canvas ${isMac ? 'pr-2' : ''}`}
         style={{ zIndex: 'var(--z-chrome)', paddingLeft: isMac ? 76 : 16 }}
       >
         <div className="flex items-center gap-2.5">
@@ -59,24 +65,7 @@ export default function SearchApp(): JSX.Element {
             {t('nav.search')}
           </span>
         </div>
-        {!isMac && (
-          <div className="flex items-center">
-            <button
-              className="no-drag inline-flex h-8 w-9 cursor-pointer items-center justify-center text-ink-3 transition-colors duration-fast ease-ease hover:bg-sink hover:text-ink"
-              onClick={() => window.api.minimizeWindow()}
-              aria-label="Minimize"
-            >
-              <Minus size={15} />
-            </button>
-            <button
-              className="no-drag inline-flex h-8 w-9 cursor-pointer items-center justify-center text-ink-3 transition-colors duration-fast ease-ease hover:bg-bad hover:text-white"
-              onClick={() => window.api.closeWindow()}
-              aria-label="Close"
-            >
-              <X size={15} />
-            </button>
-          </div>
-        )}
+        {!isMac && <CaptionButtons />}
       </header>
 
       <main className="min-h-0 flex-1 overflow-hidden">

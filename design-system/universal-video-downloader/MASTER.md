@@ -150,7 +150,9 @@ Tailwind: `rounded-1` · `rounded-2` · `rounded-3` · `rounded-full`.
 | `.kbd` | Keyboard key |
 | `.skeleton` | Placeholder plane; pulses in place |
 | `EmptyState` | The one "nothing here" layout: icon, heading, hint, and always a way out |
-| `TabStrip` | A tab row that scrolls with arrows, never a scrollbar |
+| `TabStrip` | A tab row that scrolls with arrows, never a scrollbar. A `<nav>` with `aria-current`, not a tab list: it switches pages and has no tab panels |
+| `CaptionButtons` | Minimise, maximise/restore, close for Windows and Linux: full bar height, 46px wide, flush to the corner, close hover in the system's `#C42B1C` |
+| `Modal` | The one dialog shell: role and name on the panel, focus in on open and back on close, Tab kept inside, Esc for the top dialog only. Every dialog is built on it |
 
 React: `components/Choice.tsx` (choice row), `components/EmptyState.tsx`, and
 `Switch` inside `SettingsView` (booleans).

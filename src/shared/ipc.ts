@@ -62,6 +62,7 @@ export const IPC = {
   evtDownloadsChanged: 'event:downloads-changed',
   evtYtdlpStatus: 'event:ytdlp-status',
   evtUpdateStatus: 'event:update-status',
+  /** Whether the receiving window is maximised, after any change: boolean. */
   evtWindowState: 'event:window-state',
   evtSearchQuery: 'event:search-query',
   evtDetectStatus: 'event:detect-status',

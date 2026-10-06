@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useId, useMemo, useRef, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { collapse, enter } from '../lib/motion'
 import {
@@ -93,6 +93,13 @@ export default function HomeView(): JSX.Element {
   const [batchOpen, setBatchOpen] = useState(false)
   const [batchText, setBatchText] = useState('')
   const [trimOpen, setTrimOpen] = useState(false)
+  /*
+    For aria-controls on the two disclosures below. Their panels mount only
+    while open, so the attribute is set only then: pointing it at an id that
+    does not exist is worse than leaving it off.
+  */
+  const batchPanelId = useId()
+  const trimPanelId = useId()
   const [section, setSection] = useState<TrimRange>({ start: 0 })
   /** Re-encode for an exact cut, or copy the stream and land on a keyframe. */
   const [precise, setPrecise] = useState(true)
@@ -434,7 +441,12 @@ export default function HomeView(): JSX.Element {
         {/* Secondary entry points. Buttons, not bare text: they do things, and
             an underlined-looking phrase is a weaker promise than a control. */}
         <div className="mt-3 flex flex-wrap items-center gap-2">
-          <button className="btn-quiet" onClick={() => setBatchOpen((v) => !v)}>
+          <button
+            className="btn-quiet"
+            onClick={() => setBatchOpen((v) => !v)}
+            aria-expanded={batchOpen}
+            aria-controls={batchOpen ? batchPanelId : undefined}
+          >
             <Layers size={15} /> {t('home.batchOpen')}
           </button>
           <button className="btn-quiet" onClick={() => window.api.openBrowser()}>
@@ -445,7 +457,7 @@ export default function HomeView(): JSX.Element {
 
       <AnimatePresence initial={false}>
         {batchOpen && (
-          <motion.div {...collapse} className="overflow-hidden">
+          <motion.div {...collapse} id={batchPanelId} className="overflow-hidden">
             <div className="well mt-4 p-4">
               <p className="label mb-1.5">{t('home.batch')}</p>
               <p className="hint mb-3">{t('home.batchHint')}</p>
@@ -689,6 +701,8 @@ export default function HomeView(): JSX.Element {
                   <div className="mt-5 border-t border-edge pt-4">
                     <button
                       onClick={() => setTrimOpen((v) => !v)}
+                      aria-expanded={trimOpen}
+                      aria-controls={trimOpen ? trimPanelId : undefined}
                       className="flex w-full items-center justify-between rounded-1 py-1 text-[13px] font-medium text-ink-2 transition-colors duration-fast ease-ease hover:text-ink"
                     >
                       <span className="flex items-center gap-2">
@@ -706,7 +720,7 @@ export default function HomeView(): JSX.Element {
                     </button>
                     <AnimatePresence initial={false}>
                       {trimOpen && (
-                        <motion.div {...collapse} className="overflow-hidden">
+                        <motion.div {...collapse} id={trimPanelId} className="overflow-hidden">
                           <div className="space-y-4 pt-4">
                             <TrimEditor
                               duration={info.duration}

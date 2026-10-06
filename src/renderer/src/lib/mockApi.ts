@@ -203,6 +203,13 @@ const browserStateListeners = new Set<BrowserStateListener>()
 const browserMediaListeners = new Set<BrowserMediaListener>()
 type ChangedListener = (change: DownloadsChanged) => void
 const changedListeners = new Set<ChangedListener>()
+type MaximizedListener = (maximized: boolean) => void
+const maximizedListeners = new Set<MaximizedListener>()
+let maximized = false
+const setMaximized = (next: boolean): void => {
+  maximized = next
+  maximizedListeners.forEach((cb) => cb(next))
+}
 
 /** Preview-only: drive a state the mock bridge would otherwise never enter. */
 declare global {
@@ -214,6 +221,8 @@ declare global {
       browserMedia: (media: BrowserMedia[]) => void
       /** Put a queue row into any state — including ones only the engine reaches. */
       queue: (patch: Partial<DownloadItem>) => DownloadItem
+      /** Maximise or restore the window the way Win+Up or Snap would, without the button. */
+      maximize: (next: boolean) => void
     }
   }
 }
@@ -248,6 +257,7 @@ export function installMockApi(): void {
       browserStateListeners.forEach((cb) => cb({ ...browserState }))
     },
     browserMedia: (list) => browserMediaListeners.forEach((cb) => cb(list)),
+    maximize: setMaximized,
     queue: (patch) => {
       const item: DownloadItem = {
         id: `mock-row-${++itemSeq}`,
@@ -409,9 +419,16 @@ export function installMockApi(): void {
     openReleasesPage: async () => undefined,
     getAppInfo: async () => appInfo,
     minimizeWindow: async () => undefined,
-    maximizeWindow: async () => false,
+    maximizeWindow: async () => {
+      setMaximized(!maximized)
+      return maximized
+    },
     closeWindow: async () => undefined,
-    isWindowMaximized: async () => false,
+    isWindowMaximized: async () => maximized,
+    onMaximizedChange: (cb) => {
+      maximizedListeners.add(cb)
+      return () => maximizedListeners.delete(cb)
+    },
     onDownloadProgress: () => () => undefined,
     onDownloadsChanged: (cb) => {
       changedListeners.add(cb)

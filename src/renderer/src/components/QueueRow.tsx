@@ -1,4 +1,4 @@
-import { memo, useState } from 'react'
+import { memo, useId, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { collapse, listItem } from '../lib/motion'
 import {
@@ -57,6 +57,8 @@ const STATE_META: Record<DownloadItem['state'], { label: TranslationKey; dot: st
 function QueueRow({ item, index, animateIn = true }: Props): JSX.Element {
   const t = useT()
   const [logOpen, setLogOpen] = useState(false)
+  // The engine output mounts only while open, so aria-controls is set only then.
+  const logId = useId()
   const [jobModal, setJobModal] = useState<JobMode | null>(null)
   const meta = STATE_META[item.state]
   const landed =
@@ -462,6 +464,8 @@ function QueueRow({ item, index, animateIn = true }: Props): JSX.Element {
             <>
               <button
                 onClick={() => setLogOpen((v) => !v)}
+                aria-expanded={logOpen}
+                aria-controls={logOpen ? logId : undefined}
                 className="mono mt-2 flex items-center gap-1 text-[11px] uppercase tracking-[0.08em] text-ink-2 transition-colors duration-fast ease-ease hover:text-ink"
               >
                 {t('queue.log')}
@@ -473,6 +477,7 @@ function QueueRow({ item, index, animateIn = true }: Props): JSX.Element {
                 {logOpen && (
                   <motion.pre
                     {...collapse}
+                    id={logId}
                     className="selectable mono mt-2 max-h-48 overflow-auto whitespace-pre-wrap break-all rounded-1 bg-sink px-3 py-2.5 text-[11px] leading-relaxed text-ink-2"
                   >
                     {item.log}

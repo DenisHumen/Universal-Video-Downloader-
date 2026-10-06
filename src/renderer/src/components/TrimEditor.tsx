@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { TrimRange } from '@shared/types'
 import { clampTime, parseClock, toClock } from '../lib/time'
+import { trimKeyTarget } from '../lib/trimKeys'
 import { useT } from '../i18n'
 
 interface Props {
@@ -145,20 +146,23 @@ export default function TrimEditor({ duration, value, onChange, hint }: Props): 
                 aria-valuenow={Math.round(seconds)}
                 aria-valuemin={0}
                 aria-valuemax={Math.round(total)}
+                // Read as a timestamp, not "4,312": nobody thinks in raw seconds.
+                aria-valuetext={toClock(seconds)}
                 tabIndex={0}
                 onPointerDown={(e) => {
                   e.stopPropagation()
                   setDragging(handle)
                 }}
                 onKeyDown={(e) => {
-                  const step = e.shiftKey ? 5 : 1
-                  if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
-                    e.preventDefault()
-                    const delta = e.key === 'ArrowLeft' ? -step : step
-                    const next = clampTime(seconds + delta, total)
-                    if (handle === 'start') onChange({ ...value, start: next })
-                    else onChange({ ...value, end: next })
-                  }
+                  const next = trimKeyTarget(e.key, e.shiftKey, handle, {
+                    start,
+                    end: end ?? total,
+                    total
+                  })
+                  if (next == null) return
+                  e.preventDefault()
+                  if (handle === 'start') onChange({ ...value, start: next })
+                  else onChange({ ...value, end: next })
                 }}
                 className="absolute top-1/2 z-10 h-[26px] w-2 -translate-x-1/2 -translate-y-1/2 cursor-ew-resize rounded-full bg-accent outline-offset-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
                 style={{ left: `${percentOf(seconds)}%` }}
