@@ -7,7 +7,7 @@ import {
   useState,
   type ReactNode
 } from 'react'
-import { Folder, Github, Loader2, RefreshCw, RotateCcw, Terminal } from 'lucide-react'
+import { Download, Folder, Github, Loader2, RefreshCw, RotateCcw, Terminal, Upload } from 'lucide-react'
 import {
   SUPPORTED_COOKIE_BROWSERS,
   THEMES,
@@ -28,6 +28,7 @@ import { useSecretState } from '../components/AutomationForms'
 import { isSafeTemplate } from '@shared/filename'
 import { normaliseRate } from '@shared/rate'
 import { isProxyValue, proxyUser } from '@shared/proxy'
+import type { BackupError, ImportCounts } from '@shared/backup'
 import { templateExample, type TemplateExampleOptions } from '../lib/templateExample'
 import { describeCliCommand } from '../lib/cliCommand'
 
@@ -41,6 +42,7 @@ type SectionId =
   | 'network'
   | 'system'
   | 'updates'
+  | 'backup'
   | 'about'
 
 const SECTIONS: { id: SectionId; label: TranslationKey }[] = [
@@ -53,6 +55,7 @@ const SECTIONS: { id: SectionId; label: TranslationKey }[] = [
   { id: 'network', label: 'settings.section.network' },
   { id: 'system', label: 'settings.section.system' },
   { id: 'updates', label: 'settings.section.updates' },
+  { id: 'backup', label: 'settings.section.backup' },
   { id: 'about', label: 'settings.section.about' }
 ]
 
@@ -503,6 +506,109 @@ function ProxySettings({
           }}
         />
       </Row>
+    </>
+  )
+}
+
+/** Why a backup was refused, as a literal key per reason so the coverage test can find each one. */
+const BACKUP_ERROR: Record<BackupError, TranslationKey> = {
+  json: 'settings.backupErrJson',
+  format: 'settings.backupErrFormat',
+  version: 'settings.backupErrVersion',
+  shape: 'settings.backupErrShape',
+  read: 'settings.backupErrRead',
+  write: 'settings.backupErrWrite'
+}
+
+/**
+ * Export and import, with what the last import did written underneath.
+ *
+ * The result stays on the page instead of going by in a toast. Its most
+ * important line - that the passwords and the bot token have to be typed in
+ * again - is one people are still reading while they scroll up to do it.
+ */
+function BackupRows(): JSX.Element {
+  const t = useT()
+  const importBackup = useStore((s) => s.importBackup)
+  const [busy, setBusy] = useState<'export' | 'import' | null>(null)
+  const [result, setResult] = useState<ImportCounts | null>(null)
+
+  const exportNow = async (): Promise<void> => {
+    setBusy('export')
+    try {
+      const outcome = await window.api.exportBackup()
+      if (outcome.ok) {
+        toast(
+          t('settings.backupExported', { watches: outcome.watches, targets: outcome.targets }),
+          'success'
+        )
+      } else if ('error' in outcome) {
+        toast(t(BACKUP_ERROR[outcome.error]), 'error')
+      }
+    } catch {
+      toast(t('settings.backupErrWrite'), 'error')
+    } finally {
+      setBusy(null)
+    }
+  }
+
+  const importNow = async (): Promise<void> => {
+    setBusy('import')
+    try {
+      const outcome = await importBackup()
+      if (outcome.ok) {
+        setResult(outcome.counts)
+        toast(t('settings.backupImported'), 'success')
+      } else if ('error' in outcome) {
+        toast(t(BACKUP_ERROR[outcome.error]), 'error')
+      }
+    } catch {
+      toast(t('settings.backupErrRead'), 'error')
+    } finally {
+      setBusy(null)
+    }
+  }
+
+  return (
+    <>
+      <Row label={t('settings.backupExport')} hint={t('settings.backupExportHint')}>
+        <button className="btn-quiet" onClick={exportNow} disabled={busy !== null}>
+          {busy === 'export' ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />}
+          {t('settings.backupExportButton')}
+        </button>
+      </Row>
+      <Row label={t('settings.backupImport')} hint={t('settings.backupImportHint')}>
+        <button className="btn-quiet" onClick={importNow} disabled={busy !== null}>
+          {busy === 'import' ? <Loader2 size={14} className="animate-spin" /> : <Upload size={14} />}
+          {t('settings.backupImportButton')}
+        </button>
+      </Row>
+      {result && (
+        <div role="status" className="border-b border-edge py-4">
+          <ul className="space-y-1 text-[13px] text-ink-2">
+            <li>
+              {result.settings
+                ? t('settings.backupResultSettings')
+                : t('settings.backupResultSettingsSame')}
+            </li>
+            <li>
+              {t('settings.backupResultWatches', {
+                added: result.watchesAdded,
+                skipped: result.watchesSkipped
+              })}
+            </li>
+            {result.watchesInvalid > 0 && (
+              <li>{t('settings.backupResultInvalid', { n: result.watchesInvalid })}</li>
+            )}
+            <li>{t('settings.backupResultTargets', { n: result.targetsAdded })}</li>
+            {result.folderKept && <li>{t('settings.backupResultFolder')}</li>}
+          </ul>
+          <p className="mt-3 text-[13px] text-warn">{t('settings.backupSecrets')}</p>
+          {result.proxyPassword && (
+            <p className="mt-1 text-[13px] text-warn">{t('settings.backupResultProxy')}</p>
+          )}
+        </div>
+      )}
     </>
   )
 }
@@ -1025,6 +1131,10 @@ export default function SettingsView(): JSX.Element {
                 {t('common.update')}
               </button>
             </Row>
+          </Group>
+
+          <Group id="backup" title={t('settings.section.backup')}>
+            <BackupRows />
           </Group>
 
           <Group id="about" title={t('settings.section.about')}>

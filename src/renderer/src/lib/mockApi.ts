@@ -245,6 +245,7 @@ import {
   type EpisodeRef,
   type Watch
 } from '@shared/automation'
+import { backupFileName, buildBackup, planImport } from '@shared/backup'
 
 const mockWatches: Watch[] = []
 
@@ -417,6 +418,70 @@ export function installMockApi(): void {
       return { ...settings }
     },
     resetSettings: async () => ({ ...settings }),
+    /*
+      The preview has no file dialog. Export says it wrote what is in memory;
+      import merges a made-up backup through the same rules main uses - from a
+      machine whose download folder is not here, behind a proxy that signs in -
+      so the result it reports and the series and share it adds can be looked
+      at without a real file.
+    */
+    exportBackup: async () => ({
+      ok: true,
+      path: `C:\\Users\\demo\\Documents\\${backupFileName(new Date())}`,
+      watches: mockWatches.length,
+      targets: settings.smbTargets.length
+    }),
+    importBackup: async () => {
+      await delay(300)
+      const sample = buildBackup({
+        settings: {
+          ...settings,
+          theme: 'day',
+          downloadDir: 'D:\\Old PC\\Videos',
+          proxy: 'http://demo@192.168.1.10:3128',
+          smbTargets: [
+            {
+              id: 'mock-nas',
+              name: 'nas',
+              host: '192.168.1.10',
+              share: 'shared',
+              path: 'video/series',
+              domain: '',
+              username: 'demo'
+            }
+          ],
+          telegramChatId: '100000000'
+        },
+        watches: [
+          {
+            id: 'mock-imported',
+            url: 'https://example.com/series/imported',
+            title: 'An imported series',
+            provider: 'yummyani',
+            translatorId: 'a',
+            translatorName: 'A dub',
+            quality: '720p',
+            enabled: true,
+            intervalMinutes: 360,
+            nextCheckAt: 0,
+            failures: 0,
+            seen: mockEpisodes(4),
+            steps: [{ id: 'd', kind: 'download', enabled: true }],
+            createdAt: Date.now()
+          }
+        ],
+        app: appInfo.version,
+        now: new Date()
+      })
+      const plan = planImport(
+        { backup: sample, invalid: 0 },
+        { settings, watches: mockWatches },
+        { now: Date.now(), newId: () => crypto.randomUUID(), exists: (path) => !path.startsWith('D:') }
+      )
+      Object.assign(settings, plan.settings)
+      mockWatches.push(...plan.watches)
+      return { ok: true, counts: plan.counts, settings: { ...settings } }
+    },
     chooseDirectory: async () => null,
     chooseCookiesFile: async () => null,
     openPath: async () => '',

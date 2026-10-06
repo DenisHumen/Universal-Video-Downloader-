@@ -48,6 +48,8 @@ import {
 } from './services/downloader'
 import { forwardQueueEvents } from './services/queue-events'
 import { getSettings, resetSettings, setSettings } from './services/settings'
+import { exportBackup, importBackup } from './services/backup'
+import type { ExportOutcome, ImportOutcome } from '@shared/backup'
 import { forgetFailures, previewReport, sendReport } from './services/report'
 import { getCliStatus, installCli } from './services/cli-install'
 import { isReportMailto } from '@shared/report'
@@ -159,9 +161,12 @@ export function registerIpc({ getWindow, openSearchWindow, onSettingsChanged }: 
   ipcMain.handle(IPC.downloadPrioritize, (_e, id: string) => prioritizeDownload(id))
 
   // ---- Settings ----
-  ipcMain.handle(IPC.settingsGet, () => getSettings())
-  ipcMain.handle(IPC.settingsSet, (event, partial: Partial<AppSettings>) => {
-    requireRenderer(event, IPC.settingsSet)
+  /*
+    The one way a change of settings takes effect, whether it came from the
+    settings screen or from an imported backup - so an import reaches the tray,
+    the watcher and the queue exactly as the switches on that screen do.
+  */
+  const changeSettings = (partial: Partial<AppSettings>): AppSettings => {
     const next = setSettings(partial)
     onSettingsChanged(next)
     // Reports off: drop the failures already kept for one, not just the offer.
@@ -173,12 +178,31 @@ export function registerIpc({ getWindow, openSearchWindow, onSettingsChanged }: 
     // A lower limit applies now, not when the next download happens to finish.
     if (partial?.keepFinished !== undefined) applyHistoryLimit()
     return next
+  }
+  ipcMain.handle(IPC.settingsGet, () => getSettings())
+  ipcMain.handle(IPC.settingsSet, (event, partial: Partial<AppSettings>) => {
+    requireRenderer(event, IPC.settingsSet)
+    return changeSettings(partial)
   })
   ipcMain.handle(IPC.settingsReset, (event) => {
     requireRenderer(event, IPC.settingsReset)
     const next = resetSettings()
     onSettingsChanged(next)
     return next
+  })
+
+  // ---- Backup ----
+  // An import rewrites the settings and the watch list, and an export writes them out.
+  ipcMain.handle(IPC.backupExport, (event): Promise<ExportOutcome> => {
+    requireRenderer(event, IPC.backupExport)
+    return exportBackup(BrowserWindow.fromWebContents(event.sender) ?? getWindow() ?? undefined)
+  })
+  ipcMain.handle(IPC.backupImport, (event): Promise<ImportOutcome> => {
+    requireRenderer(event, IPC.backupImport)
+    return importBackup(
+      BrowserWindow.fromWebContents(event.sender) ?? getWindow() ?? undefined,
+      changeSettings
+    )
   })
 
   // ---- Shell / dialogs ----
