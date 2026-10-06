@@ -230,6 +230,18 @@ file, which is a few lines of `fs` and no dependency. The `auto-launch` package
 is not worth adding for that: it is stale and its Linux half is the same few
 lines.
 
+Those few lines have two traps. `Exec` is split at spaces, and a .deb or .rpm
+installs to `/opt/Universal Video Downloader/`, so the path must be quoted by
+the spec's rules (`desktopExec` in `services/autostart.ts`). And an AppImage's
+`process.execPath` is inside a `/tmp/.mount_*` directory that is gone once it
+exits; the file itself is `process.env.APPIMAGE`, and since an update renames
+it, the entry is rewritten once every launch.
+
+A launch at login stays in the tray when the tray or background watching is on.
+Windows and Linux pass `--hidden` on the command line for that. macOS gives a
+login item no arguments and ignores `openAsHidden` from macOS 13 on, so there
+`app.getLoginItemSettings().wasOpenedAtLogin` is what says it.
+
 On macOS the Dock icon stays. `LSUIElement` would hide it permanently for
 everyone, including people who never wanted a tray-only app;
 `app.setActivationPolicy('accessory')` at runtime is the escape hatch if the

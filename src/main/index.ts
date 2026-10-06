@@ -19,7 +19,12 @@ import { checkForUpdates, initUpdater } from './services/updater'
 import { flushLog, initLog, log, setLogLevel } from './services/log'
 import { flushWatches } from './services/automation/store'
 import { startWatcher, stopWatcher } from './services/automation/watcher'
-import { autostartNeedsApplying } from './services/autostart'
+import {
+  autostartDesktopEntry,
+  autostartNeedsApplying,
+  HIDDEN_FLAG,
+  shouldStartHidden
+} from './services/autostart'
 import {
   loadHistory,
   pauseAll,
@@ -78,9 +83,12 @@ function loadIcon(name: string): Electron.NativeImage {
   return image
 }
 
-/** Shared hardening for every app window. */
-function wireWindow(win: BrowserWindow): void {
-  win.on('ready-to-show', () => win.show())
+/**
+ * Shared hardening for every app window. `showWhenReady` is false only for a
+ * main window that is meant to stay in the tray until somebody opens it.
+ */
+function wireWindow(win: BrowserWindow, showWhenReady = true): void {
+  if (showWhenReady) win.on('ready-to-show', () => win.show())
 
   // Never let the renderer navigate away from the app's own document.
   wireNavigation(win)
@@ -132,9 +140,14 @@ function loadRenderer(win: BrowserWindow, hash?: string): void {
   }
 }
 
-function createWindow(): void {
+/**
+ * Build the main window. `hidden` loads it without showing it, for a launch at
+ * login; the tray, a second launch and the dock all go through
+ * `showMainWindow`, which shows it like any window hidden to the tray.
+ */
+function createWindow(hidden = false): void {
   mainWindow = new BrowserWindow({ ...windowOptions(1220, 820), minWidth: 940, minHeight: 640 })
-  wireWindow(mainWindow)
+  wireWindow(mainWindow, !hidden)
   loadRenderer(mainWindow)
 
   mainWindow.on('close', (event) => {
@@ -207,6 +220,26 @@ export function takePending(): PendingDelivery {
 let appliedAutostart: boolean | undefined
 
 /**
+ * The arguments the Windows login item launches with. Windows matches a query
+ * against them as well as against the path, so `getLoginItemSettings` has to
+ * be given the same ones or it reports a registered item as missing.
+ */
+const LOGIN_ARGS = [HIDDEN_FLAG]
+
+/**
+ * Whether macOS launched the app as a login item. It gives login items no
+ * arguments, so this is the only way to tell; elsewhere the flag says it.
+ */
+function openedAtLogin(): boolean {
+  if (!isMac) return false
+  try {
+    return app.getLoginItemSettings({ args: LOGIN_ARGS }).wasOpenedAtLogin
+  } catch {
+    return false
+  }
+}
+
+/**
  * Start with the system, or stop doing so.
  *
  * Only meaningful in a packaged build - in development the executable is
@@ -221,25 +254,29 @@ function applyAutostart(enabled: boolean): void {
       const dir = join(app.getPath('home'), '.config', 'autostart')
       const file = join(dir, 'universal-video-downloader.desktop')
       if (enabled) {
+        /*
+          An AppImage runs from a fresh /tmp/.mount_* directory each time, gone
+          once it exits, so `execPath` is the one path that is certain not to
+          work at the next login. APPIMAGE is the file itself - the same path
+          the updater replaces.
+        */
+        const target = process.env.APPIMAGE || process.execPath
         mkdirSync(dir, { recursive: true })
-        writeFileSync(
-          file,
-          [
-            '[Desktop Entry]',
-            'Type=Application',
-            'Name=Universal Video Downloader',
-            `Exec=${process.execPath}`,
-            'X-GNOME-Autostart-enabled=true',
-            ''
-          ].join(String.fromCharCode(10)),
-          'utf-8'
-        )
+        writeFileSync(file, autostartDesktopEntry(target), 'utf-8')
       } else if (existsSync(file)) {
         rmSync(file, { force: true })
       }
       return
     }
-    app.setLoginItemSettings({ openAtLogin: enabled, openAsHidden: true })
+    /*
+      `openAsHidden` was the whole hidden-start story, and it is macOS-only and
+      ignored from macOS 13 on, so a Windows login opened the full window every
+      time. `args` puts the flag on the Windows command line instead; macOS
+      ignores it and reports a login launch through `wasOpenedAtLogin`. The
+      Run value written without the flag is replaced by this one at the next
+      launch, since the first apply of every session writes it.
+    */
+    app.setLoginItemSettings({ openAtLogin: enabled, openAsHidden: true, args: LOGIN_ARGS })
   } catch (err) {
     log.warn('app', 'Could not change the start-with-system setting', {
       why: err instanceof Error ? err.message : String(err)
@@ -525,8 +562,11 @@ if (!gotLock) {
     loadHistory()
     initUpdater()
     buildMenu()
-    createWindow()
+    const startHidden = shouldStartHidden(process.argv, getSettings(), openedAtLogin())
+    createWindow(startHidden)
     applySettings(getSettings())
+    // The tray is how a hidden window is found again. Without one, show it.
+    if (startHidden && !tray) showMainWindow()
 
     // Prepare the download engine in the background.
     ensureYtdlp().catch((err) => log.error('engine', 'Setup failed', { error: String(err) }))
@@ -568,8 +608,13 @@ if (!gotLock) {
       add a series and never have it checked, while the screen kept promising a
       next check in six hours. Watches the user paused stay paused: `tick`
       skips them. Start-with-system is applied by applySettings above.
+
+      A launch that stays in the tray is a window hidden to the tray, and
+      schedules treat it as one: background watching, when it is on, already
+      started them in applySettings, and otherwise the window starts them when
+      it is first shown.
     */
-    startWatcher()
+    if (!startHidden) startWatcher()
 
     const initialLink = linkFromArgv(process.argv)
     if (initialLink) pending.link = initialLink
