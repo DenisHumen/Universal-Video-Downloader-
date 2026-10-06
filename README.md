@@ -25,7 +25,7 @@
 Universal Video Downloader is a free desktop app for macOS, Windows and Linux that finds the video stream on almost any web page and downloads it. It is built on [yt-dlp](https://github.com/yt-dlp/yt-dlp) and ffmpeg, adds automatic stream detection for sites yt-dlp does not know, and wraps it all in an interface that tells you the truth about what it is doing — which quality you will actually get, how big the file is, and which step is running. English / Русский interface, no account, no telemetry.
 
 <div align="center">
-  <img src="docs/screenshots/detected.png" alt="A detected video, with the quality it will actually download" width="92%" />
+  <img src="docs/assets/preview.gif" alt="A tour of the app: home, a detected video, the queue, search, watching a series, settings and the day theme" width="92%" />
 </div>
 
 ## ✨ Features
@@ -57,6 +57,10 @@ Universal Video Downloader is a free desktop app for macOS, Windows and Linux th
   <tr>
     <td><img src="docs/screenshots/search.png" alt="Title search across services" /><p align="center"><b>Search</b> — by title, across services</p></td>
     <td><img src="docs/screenshots/settings.png" alt="Settings" /><p align="center"><b>Settings</b></p></td>
+  </tr>
+  <tr>
+    <td><img src="docs/screenshots/detected.png" alt="A detected video, with the quality it will actually download" /><p align="center"><b>Detected</b> — the quality you will actually get</p></td>
+    <td><img src="docs/screenshots/watch.png" alt="Watching a series" /><p align="center"><b>Watch</b> — every new episode downloaded, renamed, sent to a share</p></td>
   </tr>
   <tr>
     <td colspan="2"><img src="docs/screenshots/detected-day.png" alt="The same screen in the day theme" /><p align="center"><b>Day theme</b> — designed on its own, not an inverted copy of the night one</p></td>

@@ -37,8 +37,8 @@ const wait = (ms) => new Promise((r) => setTimeout(r, ms))
 
 /**
  * The shots, in the order the README tells the story: what you paste into,
- * what comes back, what the queue looks like while it works, and the two
- * screens that answer "can it do X".
+ * what comes back, what the queue looks like while it works, then the screens
+ * that answer "can it do X": search, watching a series, settings.
  */
 const SHOTS = [
   {
@@ -64,6 +64,23 @@ const SHOTS = [
     setup: `
       await window.__uvdShot.view('search');
       await window.__uvdShot.search('big buck bunny');
+    `
+  },
+  {
+    name: 'watch',
+    setup: `
+      await window.api.autoAdd({
+        url: 'https://example.com/catalog/item/series', title: 'Frieren: Beyond Journey’s End',
+        provider: 'yummyani', translatorId: 'a', translatorName: 'AniLibria', quality: '1080p',
+        enabled: true, intervalMinutes: 360, nextCheckAt: Date.now() + 2 * 3600e3, failures: 0, seen: [],
+        steps: [
+          { id: 'd', kind: 'download', enabled: true },
+          { id: 'r', kind: 'rename', enabled: true, template: '{title} - S{season2}E{episode2}', replacements: [] },
+          { id: 'u', kind: 'upload', enabled: true, targetId: 't', remotePath: '{title}', createDirs: true, deleteLocalAfter: true },
+          { id: 'n', kind: 'notify', enabled: true }
+        ]
+      });
+      await window.__uvdShot.view('automation');
     `
   },
   {
