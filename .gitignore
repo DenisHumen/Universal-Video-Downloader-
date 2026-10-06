@@ -34,3 +34,6 @@ Thumbs.db
 
 # Misc
 *.tsbuildinfo
+
+# Local tooling: agent and editor launch settings belong to each machine
+.claude/
