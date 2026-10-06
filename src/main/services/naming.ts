@@ -187,3 +187,39 @@ export function shouldTakeOwnName(
   )
   return !ours
 }
+
+/** States in which an entry has an engine running, or a resolve about to start one. */
+const RUNNING: readonly DownloadItem['state'][] = ['detecting', 'downloading', 'processing']
+
+const isDownload = (item: DownloadItem): boolean => !item.kind || item.kind === 'download'
+
+/**
+ * Whether `item` has to stay queued until another download, running now, is
+ * done - because it would write the same file.
+ *
+ * The template names a file after the video, not after what was asked of it,
+ * so the same link at best and at 720p comes out under one name, and nobody
+ * can say what that name is until the engine has started. One after the other
+ * that is handled: the second finds the first one's file "already downloaded"
+ * and `shouldTakeOwnName` sends it after a copy of its own. At the same time,
+ * both engines append to `Name.f140.m4a.part` with `--continue` and then race
+ * to merge into `Name.mp4`. So the second one waits, and only it: the rest of
+ * the queue goes on around it.
+ *
+ * Recognised by the link, which is all there is before the engine runs. A
+ * different section, or a copy number already taken, means a different name
+ * and no wait. Two different links to one video are not caught.
+ */
+export function waitsForNamesake(item: DownloadItem, all: readonly DownloadItem[]): boolean {
+  if (!isDownload(item)) return false
+  const link = item.sourceUrl || item.url
+  const tail = sectionSuffix(item.range) + (item.copySuffix ?? '')
+  return all.some(
+    (other) =>
+      other.id !== item.id &&
+      isDownload(other) &&
+      RUNNING.includes(other.state) &&
+      (other.sourceUrl || other.url) === link &&
+      sectionSuffix(other.range) + (other.copySuffix ?? '') === tail
+  )
+}

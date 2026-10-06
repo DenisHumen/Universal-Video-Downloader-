@@ -7,6 +7,7 @@ import {
   sectionSuffix,
   sectionTime,
   shouldTakeOwnName,
+  waitsForNamesake,
   withNameSuffix,
   type StemChoice
 } from './naming'
@@ -204,5 +205,54 @@ describe('shouldTakeOwnName', () => {
 
   it('leaves a request that narrows nothing alone', () => {
     expect(shouldTakeOwnName(entry({ quality: undefined }), FILE, [])).toBe(false)
+  })
+})
+
+describe('waitsForNamesake', () => {
+  const queued = (overrides: Partial<DownloadItem> = {}): DownloadItem =>
+    entry({ state: 'queued', quality: '720', ...overrides })
+
+  it('holds the same link at another quality while the first is running', () => {
+    // Both engines appended to "Talk [1].f140.m4a.part" and raced to merge into "Talk [1].mp4".
+    for (const state of ['detecting', 'downloading', 'processing'] as const) {
+      expect(waitsForNamesake(queued(), [entry({ id: 'best', state })])).toBe(true)
+    }
+  })
+
+  it('lets it start once the first is no longer running', () => {
+    // The sequential case is shouldTakeOwnName's: the second run finds the file and takes " (2)".
+    for (const state of ['queued', 'paused', 'completed', 'error', 'canceled'] as const) {
+      expect(waitsForNamesake(queued(), [entry({ id: 'best', state })])).toBe(false)
+    }
+  })
+
+  it('does not wait for itself', () => {
+    expect(waitsForNamesake(queued({ id: 'best' }), [entry({ id: 'best' })])).toBe(false)
+  })
+
+  it('does not hold a different link', () => {
+    const other = entry({ id: 'other', url: 'https://site.test/watch/2', sourceUrl: 'https://site.test/watch/2' })
+    expect(waitsForNamesake(queued(), [other])).toBe(false)
+  })
+
+  it('goes by the link that was queued, not the one it resolved to', () => {
+    const resolved = entry({ id: 'best', url: 'https://cdn.test/1.m3u8' })
+    expect(waitsForNamesake(queued(), [resolved])).toBe(true)
+  })
+
+  it('does not hold another section, which has a name of its own', () => {
+    const clip = entry({ id: 'clip', range: { start: 0, end: 2 } })
+    expect(waitsForNamesake(queued(), [clip])).toBe(false)
+    expect(waitsForNamesake(queued({ range: { start: 0, end: 2 } }), [clip])).toBe(true)
+  })
+
+  it('does not hold an entry already numbered apart', () => {
+    expect(waitsForNamesake(queued({ copySuffix: ' (2)' }), [entry({ id: 'best' })])).toBe(false)
+    expect(waitsForNamesake(queued(), [entry({ id: 'best', copySuffix: ' (2)' })])).toBe(false)
+  })
+
+  it('leaves trim and convert jobs out, which name their own files', () => {
+    expect(waitsForNamesake(queued({ kind: 'trim' }), [entry({ id: 'best' })])).toBe(false)
+    expect(waitsForNamesake(queued(), [entry({ id: 'job', kind: 'convert' })])).toBe(false)
   })
 })

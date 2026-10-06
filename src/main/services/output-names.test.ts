@@ -146,6 +146,40 @@ describe('a name another download already has', () => {
   })
 })
 
+describe('the same link at two qualities', () => {
+  it('runs one after the other, so the second gets a name of its own instead of sharing a .part', async () => {
+    // Both started at once under one name: two engines appending to "Talk [v4].f140.m4a.part".
+    const dir = mkdtempSync(join(tmpdir(), 'uvd-names-'))
+    const link = (args: string[]): string => args[args.length - 1]
+    let sameLinkRuns = 0
+    script = (args) => {
+      if (!link(args).endsWith('v4')) return { stdout: [], hang: true }
+      sameLinkRuns++
+      if (sameLinkRuns === 1) return { stdout: [wrote(args, 'v4')], hang: true }
+      return { stdout: [sameLinkRuns === 2 ? skipped(args, 'v4') : wrote(args, 'v4')] }
+    }
+    const best = await startDownload(request('v4', { outputDir: dir }))
+    const hd = await startDownload(request('v4', { outputDir: dir, quality: '720' }))
+    const other = await startDownload(request('v5', { outputDir: dir }))
+
+    // The 720p waits its turn; a different link queued behind it takes the free slot.
+    expect(find(hd.id)?.state).toBe('queued')
+    expect(find(other.id)?.state).not.toBe('queued')
+    await vi.waitFor(() => expect(runs).toHaveLength(2))
+    expect(runs.map((run) => link(run.args))).toEqual([best.url, other.url])
+
+    await vi.waitFor(() => expect(find(best.id)?.log).toContain('Destination'))
+    runs[0].close(0)
+    await vi.waitFor(() => expect(find(hd.id)?.state).toBe('completed'))
+    expect(runs).toHaveLength(4)
+    expect(find(best.id)?.filepath).toBe(join(dir, 'Talk [v4].mp4'))
+    expect(find(hd.id)?.filepath).toBe(join(dir, 'Talk [v4] (2).mp4'))
+
+    runs[1].close(0)
+    await vi.waitFor(() => expect(find(other.id)?.state).toBe('completed'))
+  })
+})
+
 describe('streams captured from one page', () => {
   it('get names of their own, and keep them across pause and resume', async () => {
     resolveUrl.mockImplementation(async (url: string) => ({

@@ -26,6 +26,7 @@ import {
   samePath,
   sectionSuffix,
   shouldTakeOwnName,
+  waitsForNamesake,
   withNameSuffix
 } from './naming'
 import { killTree } from './process'
@@ -832,7 +833,13 @@ function pump(): void {
   for (const item of pending) {
     if (activeCount() >= limit) break
     if (item.kind && item.kind !== 'download') void runMediaJob(item)
-    else void runDownload(item)
+    /*
+      Against the live list, not the snapshot: `runDownload` marks its item
+      'detecting' before its first await, so a namesake started earlier in this
+      same loop already counts. A held item stays queued, and whatever ends the
+      namesake's run pumps the queue again.
+    */
+    else if (!waitsForNamesake(item, [...items.values()])) void runDownload(item)
   }
 }
 
