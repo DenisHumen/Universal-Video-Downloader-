@@ -16,6 +16,9 @@ import { join } from 'path'
 import type { YtDlpStatus } from '@shared/types'
 import { groupSpawnOptions } from './process'
 import { log } from './log'
+import { proxyEnv } from './options'
+import { getSettings } from './settings'
+import { proxyUrl, withProxyAuth } from './proxy-auth'
 
 export const ytdlpEvents = new EventEmitter()
 
@@ -67,13 +70,15 @@ function engineTmpDir(): string {
 /**
  * Spawn options shared by every yt-dlp invocation. On Windows we redirect the
  * child's TEMP/TMP to an ASCII path so the PyInstaller bootloader can extract.
+ * The proxy travels here too, so it reaches every invocation - the self-update
+ * included, which never had it - and never the command line.
  */
 export function ytdlpSpawnOptions(): {
   windowsHide: boolean
   env: NodeJS.ProcessEnv
   detached?: boolean
 } {
-  const env: NodeJS.ProcessEnv = { ...process.env }
+  const env = proxyEnv({ ...process.env }, proxyUrl(getSettings()))
   /*
     These two do not make the engine speak UTF-8, whatever they look like.
 
@@ -128,7 +133,7 @@ function headerValue(value: string | string[] | undefined): string {
  */
 function fetchToFile(url: string, tmp: string): Promise<void> {
   return new Promise((resolve, reject) => {
-    const request = net.request({ url, redirect: 'follow' })
+    const request = withProxyAuth(net.request({ url, redirect: 'follow' }), url)
     request.on('response', (response) => {
       const status = response.statusCode
       if (status >= 400) {

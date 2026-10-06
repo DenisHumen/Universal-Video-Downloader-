@@ -1,7 +1,7 @@
-import { session } from 'electron'
+import { session, type Session } from 'electron'
 import { log } from './log'
 import { browsingSession } from '../resolvers/universal/capture'
-import { createProxyApplier } from './proxy-queue'
+import { createProxyApplier, type ProxyTarget } from './proxy-queue'
 import type { AppSettings } from '@shared/types'
 
 /**
@@ -25,23 +25,49 @@ import type { AppSettings } from '@shared/types'
  * user's real address, which yt-dlp then fetched through the proxy's - and a
  * CDN that binds its token to the address answers that with 403.
  *
- * An empty setting means "the system's own", which is what a fresh Electron
- * session already does.
+ * Chromium is given the address in a form it understands (see
+ * `chromiumProxy`), without the credentials; `proxy-auth.ts` answers the
+ * proxy's 407 with them. An empty setting means "the system's own", which is
+ * what a fresh Electron session already does.
  */
+function target(name: string, get: () => Session): ProxyTarget {
+  return {
+    name,
+    setProxy: (config) => get().setProxy(config),
+    resolveProxy: (url) => get().resolveProxy(url)
+  }
+}
+
 const apply = createProxyApplier(
-  () => [
-    { name: 'default', setProxy: (config) => session.defaultSession.setProxy(config) },
-    { name: 'browsing', setProxy: (config) => browsingSession().setProxy(config) }
-  ],
+  () => [target('default', () => session.defaultSession), target('browsing', browsingSession)],
   {
-    applied: (rules) =>
-      log.info(
+    applied: (plan, resolved) => {
+      if (plan.caveat === 'socksAuth') {
+        log.warn(
+          'network',
+          'Chromium cannot sign in to a SOCKS proxy, so own requests and the built-in browser use' +
+            ' the system network. Downloads still go through the proxy.'
+        )
+      } else if (plan.rules) {
+        log.info('network', 'Own requests and the built-in browser now go through the proxy', {
+          via: resolved,
+          note:
+            plan.caveat === 'socks4a'
+              ? 'socks4a is applied as socks4 here, so site names are resolved on this computer'
+              : undefined
+        })
+      } else {
+        log.info('network', 'Own requests and the built-in browser use the system network')
+      }
+    },
+    failed: (name, why) => log.warn('network', 'Could not apply the proxy', { session: name, why }),
+    refused: (name, resolved) =>
+      log.warn(
         'network',
-        rules
-          ? 'Own requests and the built-in browser now go through the proxy'
-          : 'Own requests and the built-in browser use the system network'
-      ),
-    failed: (target, why) => log.warn('network', 'Could not apply the proxy', { session: target, why })
+        'Chromium did not take the proxy address, so own requests use the system network.' +
+          ' Downloads still go through the proxy.',
+        { session: name, resolved: resolved || 'nothing' }
+      )
   }
 )
 

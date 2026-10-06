@@ -134,10 +134,14 @@ const api = {
   autoTestTelegram: (token: string, chatId: string): Promise<string> =>
     ipcRenderer.invoke(IPC.autoTestTelegram, token, chatId),
   /** One way. There is no channel that reads a secret back. */
-  autoSetSecret: (kind: 'smb' | 'telegram', id: string, value: string): Promise<void> =>
+  autoSetSecret: (kind: 'smb' | 'telegram' | 'proxy', id: string, value: string): Promise<void> =>
     ipcRenderer.invoke(IPC.autoSetSecret, kind, id, value),
-  autoSecretState: (): Promise<{ telegram: boolean; smb: Record<string, boolean>; persists: boolean }> =>
-    ipcRenderer.invoke(IPC.autoSecretState),
+  autoSecretState: (): Promise<{
+    telegram: boolean
+    smb: Record<string, boolean>
+    proxy: boolean
+    persists: boolean
+  }> => ipcRenderer.invoke(IPC.autoSecretState),
   getLogPath: (): Promise<string> => ipcRenderer.invoke(IPC.logPath),
   onAutomationChanged: (cb: () => void): (() => void) => {
     const handler = (): void => cb()

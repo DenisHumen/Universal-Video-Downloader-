@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { isSafeTemplate, migrate } from './settings'
+import { isSafeTemplate, liftProxyPassword, migrate, type ProxyPasswordStore } from './settings'
 
 /*
   `migrate` runs on the first launch after every update, for every existing
@@ -144,5 +144,75 @@ describe('migrate, for shares saved by an older version', () => {
   it('leaves settings without any shares untouched', () => {
     expect(migrate({ theme: 'day' }).smbTargets).toBeUndefined()
     expect(migrate({ smbTargets: [] }).smbTargets).toEqual([])
+  })
+})
+
+/*
+  The proxy setting held its password in plain text: in settings.json, which
+  people attach to bug reports, and on every engine command line. It moves to
+  the secret store on the first read of this version and on every save.
+*/
+describe('liftProxyPassword', () => {
+  function store(persists = true): ProxyPasswordStore & { kept: string[]; forgotten: number } {
+    const box = {
+      kept: [] as string[],
+      forgotten: 0,
+      keep: (password: string): boolean => {
+        if (!persists) return false
+        box.kept.push(password)
+        return true
+      },
+      forget: (): void => {
+        box.forgotten++
+      }
+    }
+    return box
+  }
+
+  it('moves the password of a stored proxy to the secret store and keeps the user', () => {
+    const box = store()
+    const next = liftProxyPassword(migrate({ proxy: 'http://user:p%40ss@host:8080' }), box)
+    expect(box.kept).toEqual(['p@ss'])
+    expect(next.proxy).toBe('http://user@host:8080')
+  })
+
+  it('catches a password pasted into the field, bare address included', () => {
+    const box = store()
+    expect(liftProxyPassword({ proxy: 'user:secret@proxy.example.com:3128' }, box).proxy).toBe(
+      'user@proxy.example.com:3128'
+    )
+    expect(box.kept).toEqual(['secret'])
+  })
+
+  it('leaves a proxy without a password exactly as it was', () => {
+    const box = store()
+    const settings = { proxy: 'http://user@192.168.1.10:8080' }
+    expect(liftProxyPassword(settings, box)).toBe(settings)
+    expect(box.kept).toEqual([])
+    expect(box.forgotten).toBe(0)
+  })
+
+  it('keeps the password in the address when there is nowhere it would survive a restart', () => {
+    // Moving it to memory would turn every download away after the next launch.
+    const box = store(false)
+    const settings = { proxy: 'http://user:pass@192.168.1.10:8080' }
+    expect(liftProxyPassword(settings, box)).toBe(settings)
+  })
+
+  it('forgets the stored password once the address has no user', () => {
+    // It is never sent without one, and a leftover would follow the next user typed.
+    const box = store()
+    expect(liftProxyPassword({ proxy: 'http://192.168.1.10:8080' }, box).proxy).toBe(
+      'http://192.168.1.10:8080'
+    )
+    expect(liftProxyPassword({ proxy: '' }, box).proxy).toBe('')
+    expect(box.forgotten).toBe(2)
+  })
+
+  it('passes settings without a proxy field through, as a partial save has none', () => {
+    const box = store()
+    const partial = migrate({ theme: 'day' })
+    expect(liftProxyPassword(partial, box)).toBe(partial)
+    expect(box.forgotten).toBe(0)
   })
 })

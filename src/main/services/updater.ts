@@ -3,6 +3,7 @@ import { EventEmitter } from 'events'
 import pkg from 'electron-updater'
 import { isNewerVersion } from '@shared/version'
 import type { UpdateStatus } from '@shared/types'
+import { withProxyAuth } from './proxy-auth'
 
 const { autoUpdater } = pkg
 
@@ -102,7 +103,7 @@ interface GhRelease {
 
 function fetchJson(url: string): Promise<GhRelease> {
   return new Promise((resolve, reject) => {
-    const req = net.request({ url, redirect: 'follow' })
+    const req = withProxyAuth(net.request({ url, redirect: 'follow' }), url)
     req.setHeader('Accept', 'application/vnd.github+json')
     req.setHeader('User-Agent', 'UniversalVideoDownloader')
     const timer = setTimeout(() => {

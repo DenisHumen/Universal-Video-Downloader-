@@ -1,7 +1,6 @@
 import { spawn } from 'child_process'
 import { ytdlpBinaryPath, ytdlpSpawnOptions, engineUnavailable } from './ytdlp'
 import { killTree } from './process'
-import { getSettings } from './settings'
 import { classifyYtdlpError } from './options'
 import { searchYummyani } from '../resolvers'
 import { SEARCH_ALL_SERVICES } from '@shared/types'
@@ -51,7 +50,6 @@ function thumbnailOf(entry: FlatEntry, service: SearchService): string | undefin
 
 /** Run one engine search (prefix- or URL-based) and map the flat entries. */
 function ytdlpSearch(target: string, service: SearchService, limit: number): Promise<SearchResponse> {
-  const settings = getSettings()
   const args = [
     '-J',
     '--flat-playlist',
@@ -61,9 +59,8 @@ function ytdlpSearch(target: string, service: SearchService, limit: number): Pro
     '--encoding',
     'utf-8'
   ]
-  // Proxy matters for reachability; cookies are skipped — extracting them per
-  // search would slow every roundtrip for no benefit.
-  if (settings.proxy) args.push('--proxy', settings.proxy)
+  // The proxy arrives through the spawn environment; cookies are skipped -
+  // extracting them per search would slow every roundtrip for no benefit.
   // The target is always prefixed today; `--` keeps it that way whatever changes.
   args.push('--playlist-end', String(Math.max(1, Math.min(30, limit))), '--', target)
 

@@ -4,15 +4,15 @@ import { join } from 'path'
 import { log } from './log'
 
 /**
- * The passwords and tokens the automation needs, kept apart from everything
- * else.
+ * The passwords and tokens the automation and the proxy need, kept apart from
+ * everything else.
  *
- * An SMB password and a Telegram bot token are not settings. They live in their
- * own file, encrypted with the key the operating system holds for this app —
- * Keychain on macOS, DPAPI on Windows, the desktop keyring on Linux — so
- * settings.json and watches.json stay ordinary readable JSON that a user can
- * inspect, copy between machines, and attach to a bug report without handing
- * over their credentials at the same time.
+ * An SMB password, a Telegram bot token and a proxy password are not settings.
+ * They live in their own file, encrypted with the key the operating system
+ * holds for this app — Keychain on macOS, DPAPI on Windows, the desktop keyring
+ * on Linux — so settings.json and watches.json stay ordinary readable JSON that
+ * a user can inspect, copy between machines, and attach to a bug report without
+ * handing over their credentials at the same time.
  *
  * The renderer is never told a value. It is told whether one is set, which is
  * all a settings screen needs to draw the difference between "not configured"
@@ -65,9 +65,9 @@ function load(): Record<string, string> {
   return cache
 }
 
-/** Written through a temp file, like every other store here. */
-function persist(): void {
-  if (!cache) return
+/** Written through a temp file, like every other store here. True once it is on disk. */
+function persist(): boolean {
+  if (!cache) return false
   try {
     const dir = app.getPath('userData')
     if (!existsSync(dir)) mkdirSync(dir, { recursive: true })
@@ -75,17 +75,23 @@ function persist(): void {
     const tmp = `${target}.tmp`
     writeFileSync(tmp, JSON.stringify(cache), 'utf-8')
     renameSync(tmp, target)
+    return true
   } catch (err) {
     log.error('secrets', 'Could not save the secret store', {
       why: err instanceof Error ? err.message : String(err)
     })
+    return false
   }
 }
 
-export function setSecret(key: string, value: string): void {
+/**
+ * True when the value is on disk and will still be there after a restart - which
+ * is what a caller about to drop its own copy needs to know first.
+ */
+export function setSecret(key: string, value: string): boolean {
   if (!value) {
     deleteSecret(key)
-    return
+    return true
   }
   if (!available()) {
     volatile.set(key, value)
@@ -97,11 +103,11 @@ export function setSecret(key: string, value: string): void {
           ' They are deliberately not written to disk in clear text.'
       )
     }
-    return
+    return false
   }
   const store = load()
   store[key] = safeStorage.encryptString(value).toString('base64')
-  persist()
+  return persist()
 }
 
 export function getSecret(key: string): string | undefined {
@@ -151,5 +157,6 @@ export function secretsPersist(): boolean {
 /** Key names, in one place so a typo cannot quietly lose a password. */
 export const SECRET = {
   smbPassword: (targetId: string): string => `smb.${targetId}.password`,
-  telegramToken: (): string => 'telegram.token'
+  telegramToken: (): string => 'telegram.token',
+  proxyPassword: (): string => 'proxy.password'
 }

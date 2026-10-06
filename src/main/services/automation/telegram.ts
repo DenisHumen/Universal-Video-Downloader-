@@ -1,6 +1,7 @@
 import { net } from 'electron'
 import { describeNetError } from '../../resolvers/neterror'
 import { log } from '../log'
+import { withProxyAuth } from '../proxy-auth'
 
 /**
  * Telling the user an episode arrived.
@@ -70,7 +71,11 @@ const unreachable = (err: unknown): TelegramError =>
 function call(token: string, method: string, body: Record<string, unknown>): Promise<Reply> {
   return new Promise((resolve, reject) => {
     const payload = JSON.stringify(body)
-    const request = net.request({ method: 'POST', url: `${API}/bot${token}/${method}` })
+    // The address carries the token; the error may name the host, never that.
+    const request = withProxyAuth(
+      net.request({ method: 'POST', url: `${API}/bot${token}/${method}` }),
+      API
+    )
     request.setHeader('Content-Type', 'application/json')
 
     const timer = setTimeout(() => {

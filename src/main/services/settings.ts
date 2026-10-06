@@ -5,7 +5,9 @@ import { LEGACY_THEMES, THEMES, type AppSettings, type ThemeId } from '@shared/t
 import { isSafeTemplate } from '@shared/filename'
 import { normaliseRate } from '@shared/rate'
 import { normaliseSmbTarget } from '@shared/automation'
+import { proxyUser, splitProxyPassword } from '@shared/proxy'
 import { log } from './log'
+import { deleteSecret, SECRET, secretsPersist, setSecret } from './secrets'
 
 export { isSafeTemplate }
 
@@ -114,6 +116,49 @@ export function migrate(raw: Record<string, unknown>): Partial<AppSettings> {
   return next
 }
 
+/** Where `liftProxyPassword` puts what it takes out. */
+export interface ProxyPasswordStore {
+  /** True once the password will still be there after a restart. */
+  keep(password: string): boolean
+  forget(): void
+}
+
+/**
+ * The proxy's password leaves the setting for the secret store.
+ *
+ * Run on the settings as read from disk and on every save, so a password that
+ * was always in settings.json moves on the first launch of this version, and
+ * one pasted as `http://user:pass@host` later moves before it is written. The
+ * address keeps the user name, which is what says the password is needed.
+ *
+ * Only once the store has it for good. With no key store (Linux without a
+ * keyring) it would last until the app closed, after which the proxy would
+ * turn away every download - so there it stays in the address, as it always
+ * has. And an address with no user name forgets the stored password: it is
+ * never sent without one, and a leftover would follow the next user typed.
+ */
+export function liftProxyPassword<T extends Partial<Pick<AppSettings, 'proxy'>>>(
+  settings: T,
+  store: ProxyPasswordStore
+): T {
+  if (typeof settings.proxy !== 'string') return settings
+  const { proxy, password } = splitProxyPassword(settings.proxy)
+  if (!proxyUser(proxy)) store.forget()
+  else if (password && !store.keep(password)) return settings
+  return proxy === settings.proxy ? settings : { ...settings, proxy }
+}
+
+const proxyPasswordStore: ProxyPasswordStore = {
+  keep: (password) => {
+    try {
+      return secretsPersist() && setSecret(SECRET.proxyPassword(), password)
+    } catch {
+      return false
+    }
+  },
+  forget: () => deleteSecret(SECRET.proxyPassword())
+}
+
 
 let cache: AppSettings | null = null
 
@@ -136,7 +181,12 @@ export function getSettings(): AppSettings {
     const file = SETTINGS_FILE()
     if (existsSync(file)) {
       const parsed = JSON.parse(readFileSync(file, 'utf-8')) as Record<string, unknown>
-      cache = { ...defaults(), ...migrate(parsed) }
+      const read = { ...defaults(), ...migrate(parsed) }
+      cache = liftProxyPassword(read, proxyPasswordStore)
+      if (cache.proxy !== read.proxy) {
+        persist(cache)
+        log.info('settings', 'The proxy password moved from settings.json to the secret store')
+      }
     } else {
       cache = defaults()
       persist(cache)
@@ -201,13 +251,17 @@ export function flushSettings(): void {
 }
 
 export function setSettings(partial: Partial<AppSettings>): AppSettings {
-  const next = { ...getSettings(), ...migrate(partial as Record<string, unknown>) }
+  const next = liftProxyPassword(
+    { ...getSettings(), ...migrate(partial as Record<string, unknown>) },
+    proxyPasswordStore
+  )
   cache = next
   persist(next)
   return next
 }
 
 export function resetSettings(): AppSettings {
+  proxyPasswordStore.forget()
   cache = defaults()
   persist(cache)
   return cache

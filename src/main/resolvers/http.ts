@@ -1,5 +1,6 @@
 import { net } from 'electron'
-import { describeNetError, REQUEST_TIMED_OUT } from './neterror'
+import { describeNetError, describeProxyRefusal, REQUEST_TIMED_OUT } from './neterror'
+import { withProxyAuth } from '../services/proxy-auth'
 
 /** A recent desktop Chrome UA — many sites gate on this. */
 export const UA =
@@ -40,7 +41,7 @@ function request(
     }, timeout)
 
     try {
-      req = net.request({ url, method, redirect: 'follow' })
+      req = withProxyAuth(net.request({ url, method, redirect: 'follow' }), url)
     } catch (err) {
       finish(() => reject(err instanceof Error ? err : new Error(String(err))))
       return
@@ -56,6 +57,10 @@ function request(
 
     req.on('response', (response) => {
       const status = response.statusCode ?? 0
+      if (status === 407) {
+        finish(() => reject(describeProxyRefusal(url)))
+        return
+      }
       if (status >= 400) {
         finish(() => reject(new Error(`HTTP ${status}`)))
         return
@@ -116,7 +121,7 @@ export function fetchBinary(
     }, timeout)
 
     try {
-      req = net.request({ url, method: 'GET', redirect: 'follow' })
+      req = withProxyAuth(net.request({ url, method: 'GET', redirect: 'follow' }), url)
     } catch (err) {
       finish(() => reject(err instanceof Error ? err : new Error(String(err))))
       return
@@ -128,6 +133,10 @@ export function fetchBinary(
 
     req.on('response', (response) => {
       const status = response.statusCode ?? 0
+      if (status === 407) {
+        finish(() => reject(describeProxyRefusal(url)))
+        return
+      }
       if (status >= 400) {
         finish(() => reject(new Error(`HTTP ${status}`)))
         return

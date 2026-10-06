@@ -261,6 +261,11 @@ export const en = {
   'settings.proxyPlaceholder': 'http://host:port (optional)',
   'settings.proxyInvalid':
     'that doesn’t look like a proxy address — try host:port or http://host:port. until it does, the previous setting stays in effect.',
+  'settings.proxyPassword': 'proxy password',
+  'settings.proxyPasswordHint':
+    'kept encrypted by your operating system, never in a settings file. take the user name out of the address to forget it.',
+  'settings.proxyPasswordNoUser':
+    'for a proxy that asks for a password, put the user name in the address: http://user@host:port',
 
   'settings.notifications': 'desktop notifications',
   'settings.notificationsHint': 'tell me when a download finishes',

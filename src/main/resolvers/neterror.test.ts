@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { describeNetError, REQUEST_TIMED_OUT, unreachableCode } from './neterror'
+import { describeNetError, describeProxyRefusal, REQUEST_TIMED_OUT, unreachableCode } from './neterror'
+import { classifyYtdlpError } from '../services/options'
 
 /*
   A toast once read `net::ERR_CONNECTION_REFUSED` and nothing else: no host, no
@@ -85,5 +86,51 @@ describe('unreachableCode', () => {
     expect(unreachableCode(new Error('HTTP 403'))).toBeUndefined()
     expect(unreachableCode(new Error('HTTP 503'))).toBeUndefined()
     expect(unreachableCode(undefined)).toBeUndefined()
+  })
+})
+
+/*
+  An authenticated or socks5h proxy failed every one of the app's own requests
+  with ERR_NO_SUPPORTED_PROXIES, which fell through to "a network error
+  occurred" and "check your connection" - on a connection that was fine.
+*/
+describe('describeNetError for the proxy setting', () => {
+  const url = 'https://api.telegram.org/bot/sendMessage'
+
+  it('points an unusable proxy address at the setting', () => {
+    const out = describeNetError(new Error('net::ERR_NO_SUPPORTED_PROXIES'), url).message
+    expect(out).toBe(
+      'Could not reach api.telegram.org: the proxy address is not in a form the app can use for its own requests. Check the proxy in Settings → Network. (ERR_NO_SUPPORTED_PROXIES)'
+    )
+    expect(classifyYtdlpError(out, true).code).toBe('network')
+  })
+
+  it('says a SOCKS proxy turned the connection away', () => {
+    const out = describeNetError(new Error('net::ERR_SOCKS_CONNECTION_FAILED'), url).message
+    expect(out).toContain('the SOCKS proxy did not let the connection through')
+    expect(out).toContain('Settings → Network')
+    expect(classifyYtdlpError(out, true).code).toBe('network')
+  })
+
+  it('points the other proxy failures at the setting too', () => {
+    expect(describeNetError(new Error('net::ERR_PROXY_CONNECTION_FAILED'), url).message).toContain(
+      'Check the proxy in Settings → Network.'
+    )
+  })
+})
+
+describe('describeProxyRefusal', () => {
+  it('turns a 407 into a sentence the home screen translates as a network failure', () => {
+    const out = describeProxyRefusal('https://old.yummyani.me/catalog').message
+    expect(out).toBe(
+      'Could not reach old.yummyani.me: the proxy did not accept the user name and password. Check the proxy in Settings → Network. (HTTP 407)'
+    )
+    expect(classifyYtdlpError(out, true).code).toBe('network')
+  })
+
+  it('says so when the proxy wants credentials the app does not hold', () => {
+    const out = describeProxyRefusal('https://old.yummyani.me/catalog', true).message
+    expect(out).toContain('the proxy asks for a user name and password')
+    expect(classifyYtdlpError(out, true).code).toBe('network')
   })
 })

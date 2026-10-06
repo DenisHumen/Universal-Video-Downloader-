@@ -7,7 +7,8 @@ import {
   headerArgs,
   humanizeYtdlpError,
   isTransientError,
-  stalledConnecting
+  stalledConnecting,
+  proxyEnv
 } from './options'
 
 function settings(overrides: Partial<AppSettings> = {}): AppSettings {
@@ -56,8 +57,8 @@ describe('accessArgs', () => {
     expect(accessArgs(settings())).toEqual([])
   })
 
-  it('passes the proxy through', () => {
-    expect(accessArgs(settings({ proxy: 'http://p:8080' }))).toEqual(['--proxy', 'http://p:8080'])
+  it('leaves the proxy off the command line, where any process could read its password', () => {
+    expect(accessArgs(settings({ proxy: 'http://user:pass@192.168.1.10:8080' }))).toEqual([])
   })
 
   it('prefers an explicit cookies file over the browser', () => {
@@ -70,6 +71,56 @@ describe('accessArgs', () => {
       '--cookies-from-browser',
       'firefox'
     ])
+  })
+})
+
+/*
+  `--proxy http://user:pass@host` sat on every engine process's command line,
+  readable from the process list by anything running on the machine. The
+  engine takes the same address from its environment instead.
+*/
+describe('proxyEnv', () => {
+  const base = { PATH: '/usr/bin', LANG: 'C' }
+
+  it('passes the proxy through, password included, to yt-dlp and to its ffmpeg', () => {
+    const env = proxyEnv(base, 'http://user:p%40ss@192.168.1.10:8080')
+    for (const key of ['HTTP_PROXY', 'HTTPS_PROXY', 'http_proxy', 'https_proxy']) {
+      expect(env[key]).toBe('http://user:p%40ss@192.168.1.10:8080')
+    }
+    expect(env.PATH).toBe('/usr/bin')
+    expect(env.ALL_PROXY).toBeUndefined()
+  })
+
+  it('adds ALL_PROXY for a SOCKS proxy', () => {
+    const env = proxyEnv(base, 'socks5h://192.168.1.10:1080')
+    expect(env.HTTPS_PROXY).toBe('socks5h://192.168.1.10:1080')
+    expect(env.ALL_PROXY).toBe('socks5h://192.168.1.10:1080')
+    expect(env.all_proxy).toBe('socks5h://192.168.1.10:1080')
+  })
+
+  it('gives a bare host:port a scheme, which ffmpeg needs', () => {
+    expect(proxyEnv(base, '192.168.1.10:8080').http_proxy).toBe('http://192.168.1.10:8080')
+  })
+
+  it('wins over proxy variables the app inherited, as the flag did', () => {
+    // NO_PROXY was never consulted while --proxy was given.
+    const inherited = {
+      ...base,
+      Https_Proxy: 'http://192.168.1.99:3128',
+      no_proxy: '*',
+      ALL_PROXY: 'socks5://192.168.1.99:1080'
+    }
+    const env = proxyEnv(inherited, 'http://192.168.1.10:8080')
+    expect(env.Https_Proxy).toBeUndefined()
+    expect(env.no_proxy).toBeUndefined()
+    expect(env.ALL_PROXY).toBeUndefined()
+    expect(env.HTTPS_PROXY).toBe('http://192.168.1.10:8080')
+  })
+
+  it('leaves the environment alone with no proxy set, so the system one still applies', () => {
+    const inherited = { ...base, HTTPS_PROXY: 'http://192.168.1.99:3128' }
+    expect(proxyEnv(inherited, '')).toEqual(inherited)
+    expect(proxyEnv(inherited, '  ')).toEqual(inherited)
   })
 })
 

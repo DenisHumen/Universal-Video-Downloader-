@@ -254,6 +254,11 @@ export const ru: Dictionary = {
   'settings.proxyPlaceholder': 'http://host:port (необязательно)',
   'settings.proxyInvalid':
     'это не похоже на адрес прокси — попробуйте host:port или http://host:port. пока адрес не исправлен, действует прежняя настройка.',
+  'settings.proxyPassword': 'пароль прокси',
+  'settings.proxyPasswordHint':
+    'хранится зашифрованным средствами системы, не в файле настроек. чтобы забыть его, уберите имя пользователя из адреса.',
+  'settings.proxyPasswordNoUser':
+    'если прокси просит пароль, укажите в адресе имя пользователя: http://user@host:port',
 
   'settings.notifications': 'уведомления',
   'settings.notificationsHint': 'сообщать о завершении загрузки',

@@ -23,9 +23,10 @@ import { toast } from '../lib/toast'
 import Choice from '../components/Choice'
 import ConfirmDialog from '../components/ConfirmDialog'
 import AutomationSettings from '../components/AutomationSettings'
+import { useSecretState } from '../components/AutomationForms'
 import { isSafeTemplate } from '@shared/filename'
 import { normaliseRate } from '@shared/rate'
-import { isProxyValue } from '@shared/proxy'
+import { isProxyValue, proxyUser } from '@shared/proxy'
 
 type SectionId =
   | 'appearance'
@@ -302,27 +303,38 @@ function SpeedLimitField({
  * without the shape of a proxy address is not committed at all. It stays in the
  * field, marked, with a line saying why, and the previous setting stays in
  * effect - rather than being silently put back the way the template is.
+ *
+ * A password typed into the address does not stay on screen. The app moves it
+ * to the secret store and answers with the address without it, which the field
+ * then shows - also when only the password changed, and the address it gets
+ * back is the one it already had.
  */
 function ProxyField({
   value,
   onCommit,
+  onDraft,
   placeholder
 }: {
   value: string
-  onCommit: (v: string) => void
+  onCommit: (v: string) => Promise<void>
+  onDraft: (v: string) => void
   placeholder?: string
 }): JSX.Element {
   const t = useT()
   const labelledBy = useContext(RowLabelId)
   const hintId = useId()
   const [draft, setDraft] = useState(value)
+  const [saved, setSaved] = useState(0)
 
   // Follow the store when it changes underneath us — a reset, most obviously.
-  useEffect(() => setDraft(value), [value])
+  useEffect(() => setDraft(value), [value, saved])
+  useEffect(() => onDraft(draft), [draft, onDraft])
 
   const commit = (text: string): void => {
     const next = text.trim()
-    if (next !== value && isProxyValue(next)) onCommit(next)
+    if (next !== value && isProxyValue(next)) {
+      void onCommit(next).then(() => setSaved((n) => n + 1))
+    }
   }
 
   // The cleanup below is created once, so it reads the latest draft from here.
@@ -356,6 +368,111 @@ function ProxyField({
           {t('settings.proxyInvalid')}
         </p>
       )}
+    </>
+  )
+}
+
+/**
+ * The proxy's password, in a box of its own that never shows it.
+ *
+ * Like a share's password: the screen is told whether one is stored, never
+ * what it is, and an empty box leaves the stored one alone. Saved on blur and
+ * Enter like the address above, and when the screen goes away mid-typing.
+ */
+function ProxyPasswordField({
+  enabled,
+  stored,
+  onSave
+}: {
+  enabled: boolean
+  stored: boolean
+  onSave: (password: string) => Promise<void>
+}): JSX.Element {
+  const t = useT()
+  const labelledBy = useContext(RowLabelId)
+  const [draft, setDraft] = useState('')
+
+  const save = (text: string): void => {
+    if (!text || !enabled) return
+    setDraft('')
+    void onSave(text)
+  }
+
+  const latest = useRef({ draft, save })
+  latest.current = { draft, save }
+  useEffect(() => () => latest.current.save(latest.current.draft), [])
+
+  return (
+    <input
+      type="password"
+      value={draft}
+      onChange={(e) => setDraft(e.target.value)}
+      onBlur={() => save(draft)}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter') save(draft)
+      }}
+      disabled={!enabled}
+      placeholder={stored ? t('auto.secretKept') : ''}
+      aria-labelledby={labelledBy}
+      autoComplete="new-password"
+      className="field mono text-[13px] disabled:cursor-not-allowed disabled:opacity-40"
+      spellCheck={false}
+    />
+  )
+}
+
+/**
+ * The address and its password, which only make sense together.
+ *
+ * The password is only ever sent with a user name, so the box opens as soon
+ * as the address being typed has one - from the draft, not the saved value,
+ * or the click that leaves the address would land on a box still disabled.
+ */
+function ProxySettings({
+  value,
+  onCommit
+}: {
+  value: string
+  onCommit: (v: string) => Promise<void>
+}): JSX.Element {
+  const t = useT()
+  const secrets = useSecretState()
+  const [draft, setDraft] = useState(value)
+  const hasUser = Boolean(proxyUser(isProxyValue(draft) ? draft : value))
+
+  // A reset forgets the password along with the address; so does dropping the user.
+  useEffect(secrets.refresh, [value, secrets.refresh])
+
+  const hint = !hasUser
+    ? t('settings.proxyPasswordNoUser')
+    : secrets.persists
+      ? t('settings.proxyPasswordHint')
+      : t('settings.secretsVolatile')
+
+  return (
+    <>
+      <Row label={t('settings.proxy')} stack>
+        <ProxyField
+          value={value}
+          onCommit={async (v) => {
+            await onCommit(v)
+            // A password pasted into the address is stored by now.
+            secrets.refresh()
+          }}
+          onDraft={setDraft}
+          placeholder={t('settings.proxyPlaceholder')}
+        />
+      </Row>
+      <Row label={t('settings.proxyPassword')} hint={hint} stack>
+        <ProxyPasswordField
+          enabled={hasUser}
+          stored={secrets.proxy}
+          onSave={async (password) => {
+            await window.api.autoSetSecret('proxy', '', password)
+            secrets.refresh()
+          }}
+        />
+      </Row>
     </>
   )
 }
@@ -735,13 +852,7 @@ export default function SettingsView(): JSX.Element {
           </Group>
 
           <Group id="network" title={t('settings.section.network')}>
-            <Row label={t('settings.proxy')} stack>
-              <ProxyField
-                value={settings.proxy}
-                onCommit={(v) => set('proxy', v)}
-                placeholder={t('settings.proxyPlaceholder')}
-              />
-            </Row>
+            <ProxySettings value={settings.proxy} onCommit={(v) => save({ proxy: v })} />
           </Group>
 
           <Group id="system" title={t('settings.section.system')}>

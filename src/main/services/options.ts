@@ -1,20 +1,55 @@
 import type { AppErrorCode, AppSettings } from '@shared/types'
 
 /**
- * Engine arguments that control how restricted sites are accessed: proxy and
- * cookies. Cookies (from an installed browser or a cookies.txt file) let the
- * engine pass age-verification / login / region gates that many sites — adult
- * sites in particular — put in front of their videos.
+ * Engine arguments that control how restricted sites are accessed: cookies.
+ * Cookies (from an installed browser or a cookies.txt file) let the engine pass
+ * age-verification / login / region gates that many sites — adult sites in
+ * particular — put in front of their videos. The proxy is not an argument any
+ * more; see `proxyEnv`.
  */
 export function accessArgs(settings: AppSettings): string[] {
   const args: string[] = []
-  if (settings.proxy) args.push('--proxy', settings.proxy)
   if (settings.cookiesFile) {
     args.push('--cookies', settings.cookiesFile)
   } else if (settings.cookiesFromBrowser) {
     args.push('--cookies-from-browser', settings.cookiesFromBrowser)
   }
   return args
+}
+
+const PROXY_VARIABLE = /^(https?|all|no)_proxy$/i
+
+/**
+ * The proxy for the engine, in its environment rather than on its command line.
+ *
+ * `--proxy` put the whole address on argv, password included, where any other
+ * program on the machine can read it from the process list while a download
+ * runs. Without the flag yt-dlp takes the proxy from the environment (urllib's
+ * `getproxies`) and treats it exactly as it would the flag's. The lowercase
+ * names are for the ffmpeg it runs for section cuts and some HLS/DASH
+ * downloads, which reads only those, and only an `http://` address.
+ *
+ * Whatever proxy variables the app inherited go first. The setting used to win
+ * over them by being a flag, and it still wins: a stale HTTPS_PROXY must not
+ * send half the traffic somewhere else, and NO_PROXY was never consulted while
+ * the flag was given. With no proxy set, nothing changes - the engine finds the
+ * system's own, as it always did.
+ */
+export function proxyEnv(env: NodeJS.ProcessEnv, proxy: string): NodeJS.ProcessEnv {
+  const value = proxy.trim()
+  if (!value) return env
+  const next: NodeJS.ProcessEnv = {}
+  for (const [key, setting] of Object.entries(env)) {
+    if (!PROXY_VARIABLE.test(key)) next[key] = setting
+  }
+  // yt-dlp reads a bare host:port as HTTP; ffmpeg ignores it.
+  const url = /^[a-z][a-z0-9+.-]*:\/\//i.test(value) ? value : `http://${value}`
+  for (const key of ['HTTP_PROXY', 'HTTPS_PROXY', 'http_proxy', 'https_proxy']) next[key] = url
+  if (/^socks/i.test(url)) {
+    next.ALL_PROXY = url
+    next.all_proxy = url
+  }
+  return next
 }
 
 /** `--add-header` pairs for streams that only work with specific headers. */

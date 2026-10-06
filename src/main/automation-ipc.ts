@@ -39,7 +39,8 @@ import {
  * In its own file rather than in `ipc.ts` because it is a dozen channels that
  * belong together, and because one rule applies to all of them: a secret never
  * travels back. The renderer may set a password and may ask whether one is
- * stored; it may not read one.
+ * stored; it may not read one. The proxy's password goes through the same two
+ * channels, so there is one place that rule is kept.
  */
 
 /** What the "add a watch" screen can be given, with nothing unserialisable. */
@@ -187,14 +188,30 @@ export function registerAutomationIpc(): void {
   )
 
   /** One way only. There is deliberately no channel that returns a secret. */
-  ipcMain.handle(IPC.autoSetSecret, (_e, kind: 'smb' | 'telegram', id: string, value: string) => {
-    setSecret(kind === 'smb' ? SECRET.smbPassword(id) : SECRET.telegramToken(), value)
-  })
+  ipcMain.handle(
+    IPC.autoSetSecret,
+    (_e, kind: 'smb' | 'telegram' | 'proxy', id: string, value: string) => {
+      /*
+        A new proxy password needs nothing more: Chromium caches only
+        credentials that worked, and asks again - reading the new one - once
+        they stop working. Clearing its auth cache here froze the app after a
+        refused password.
+      */
+      const key =
+        kind === 'smb'
+          ? SECRET.smbPassword(id)
+          : kind === 'proxy'
+            ? SECRET.proxyPassword()
+            : SECRET.telegramToken()
+      setSecret(key, value)
+    }
+  )
 
   ipcMain.handle(
     IPC.autoSecretState,
-    (): { telegram: boolean; smb: Record<string, boolean>; persists: boolean } => ({
+    (): { telegram: boolean; smb: Record<string, boolean>; proxy: boolean; persists: boolean } => ({
       telegram: hasSecret(SECRET.telegramToken()),
+      proxy: hasSecret(SECRET.proxyPassword()),
       smb: Object.fromEntries(
         getSettings().smbTargets.map((t) => [t.id, hasSecret(SECRET.smbPassword(t.id))])
       ),

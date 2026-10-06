@@ -48,12 +48,14 @@ export const emptyTarget = (): SmbTarget => ({
 export function useSecretState(): {
   telegram: boolean
   smb: Record<string, boolean>
+  proxy: boolean
   persists: boolean
   refresh: () => void
 } {
   const [state, setState] = useState({
     telegram: false,
     smb: {} as Record<string, boolean>,
+    proxy: false,
     persists: true
   })
   const refresh = useCallback(() => {

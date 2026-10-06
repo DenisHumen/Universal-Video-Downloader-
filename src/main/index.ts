@@ -14,6 +14,7 @@ import { IPC } from '@shared/ipc'
 import { registerIpc } from './ipc'
 import { flushSettings, getSettings } from './services/settings'
 import { applyProxy } from './services/proxy'
+import { answerProxyLoginsForPages } from './services/proxy-auth'
 import { ensureYtdlp, refreshEngineIfDue } from './services/ytdlp'
 import { checkForUpdates, initUpdater } from './services/updater'
 import { flushLog, initLog, log, setLogLevel } from './services/log'
@@ -546,6 +547,7 @@ if (!gotLock) {
 
     // Before any request is made: the proxy the user set applies to our own too.
     void applyProxy(getSettings())
+    answerProxyLoginsForPages()
 
     if (process.platform === 'win32') {
       app.setAppUserModelId('com.denishumen.universalvideodownloader')
