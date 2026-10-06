@@ -89,7 +89,7 @@ Copy the app into **Applications**, then run this once:
 xattr -dr com.apple.quarantine "/Applications/Universal Video Downloader.app"
 ```
 
-The command is printed on the install window itself, so you don't have to come back here for it. (Or: right-click the app in Applications → **Open** → **Open**.) Because they're unsigned, macOS builds also can't install updates in place — the app offers you the download page instead of pretending it can restart into a new version. The same manual path is used for `.deb` / `.rpm` installs.
+The command is printed on the install window itself, so you don't have to come back here for it. Because they're unsigned, macOS builds also can't install updates in place — the app offers you the download page instead of pretending it can restart into a new version. The same manual path is used for `.deb` / `.rpm` installs.
 
 ## 🧭 Usage
 
