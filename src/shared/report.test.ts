@@ -570,7 +570,8 @@ describe('postReport', () => {
     expect(init.headers).toEqual({
       'Content-Type': 'application/json',
       Accept: 'application/json',
-      Referer: REPORT_TARGET.formUrl
+      // Origin only: a cross-site Referer with a path is blocked by Chromium before it leaves.
+      Referer: 'https://github.com/'
     })
     const body = JSON.parse(init.body)
     expect(body).toEqual(formSubmitBody(report))
@@ -621,7 +622,7 @@ describe('postReport', () => {
     const offline: FetchLike = async () => {
       throw new TypeError('fetch failed')
     }
-    expect(await postReport(report, offline)).toEqual({ ok: false, reason: 'network' })
+    expect(await postReport(report, offline)).toMatchObject({ ok: false, reason: 'network' })
   })
 
   it('gives up on a relay that never answers', async () => {
@@ -629,6 +630,6 @@ describe('postReport', () => {
       new Promise((_resolve, reject) => {
         init.signal?.addEventListener('abort', () => reject(new Error('aborted')))
       })
-    expect(await postReport(report, hang, 20)).toEqual({ ok: false, reason: 'network' })
+    expect(await postReport(report, hang, 20)).toMatchObject({ ok: false, reason: 'network' })
   })
 })

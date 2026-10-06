@@ -9,6 +9,7 @@ import {
   postReport,
   type BuiltReport,
   type DetectTrace,
+  type FetchLike,
   type FailureContext,
   type ReportEnv,
   type ReportPreview,
@@ -276,7 +277,7 @@ export async function sendReport(id: string): Promise<SendOutcome> {
     log.warn('report', 'Error report not sent: the hourly or daily limit is reached')
     return { ok: false, reason: 'rateLimited' }
   }
-  const outcome = await postReport(report, (url, init) => net.fetch(url, init))
+  const outcome = await postReport(report, requestFetch)
   // Never the contents — the log is exactly the kind of file people attach to things.
   if (outcome.ok) {
     log.info('report', 'Error report sent')
@@ -288,3 +289,36 @@ export async function sendReport(id: string): Promise<SendOutcome> {
   log.warn('report', 'Error report not sent', { why: outcome.reason, relay: outcome.detail })
   return { ok: false, reason: outcome.reason }
 }
+
+/**
+ * The relay's request through `net.request`, not `net.fetch`.
+ *
+ * FormSubmit refuses a submission with no Referer, and `net.fetch` refuses to
+ * send one it did not set itself: the request fails at once with
+ * ERR_BLOCKED_BY_CLIENT, before it leaves the machine. v3.22.0 shipped that,
+ * so every report fell through to "open in mail app". `net.request` lets a
+ * caller set any header - the resolvers rely on it for theirs - and follows
+ * the same session proxy.
+ */
+const requestFetch: FetchLike = (url, init) =>
+  new Promise((resolve, reject) => {
+    const req = net.request({ url, method: init.method })
+    for (const [name, value] of Object.entries(init.headers)) req.setHeader(name, value)
+    init.signal?.addEventListener('abort', () => {
+      req.abort()
+      reject(new Error('aborted'))
+    })
+    req.on('response', (response) => {
+      const chunks: Buffer[] = []
+      response.on('data', (chunk: Buffer) => chunks.push(chunk))
+      response.on('end', () => {
+        const text = Buffer.concat(chunks).toString('utf-8')
+        const status = response.statusCode ?? 0
+        resolve({ ok: status >= 200 && status < 300, status, json: async () => JSON.parse(text) })
+      })
+      response.on('error', reject)
+    })
+    req.on('error', reject)
+    req.write(init.body)
+    req.end()
+  })

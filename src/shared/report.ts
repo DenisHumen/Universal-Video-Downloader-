@@ -589,12 +589,12 @@ export type FetchLike = (
 /**
  * Post a report and say plainly whether it arrived.
  *
- * `fetch` is passed in: main hands over Electron's `net.fetch`, which follows
+ * `fetch` is passed in: main hands over a `net.request` adapter, which follows
  * the session proxy like the rest of the app's own requests, and the tests
  * hand over a stub so nothing is ever sent from a test run.
  *
- * The Referer is set by hand because nothing else would set it: `net.fetch`
- * copies the headers it is given and has no page of its own to refer from.
+ * The Referer is set by hand because nothing else would set it, and through
+ * `net.request` because `net.fetch` blocks a hand-set Referer outright.
  */
 export async function postReport(
   report: BuiltReport,
@@ -609,7 +609,10 @@ export async function postReport(
       headers: {
         'Content-Type': 'application/json',
         Accept: 'application/json',
-        Referer: REPORT_TARGET.formUrl
+        // Origin only. Chromium refuses a cross-site Referer that carries a path -
+        // net::ERR_BLOCKED_BY_CLIENT before anything is sent - and FormSubmit
+        // only needs to see that the submission comes from a web page.
+        Referer: new URL(REPORT_TARGET.formUrl).origin + '/'
       },
       body: JSON.stringify(formSubmitBody(report)),
       signal: controller.signal
@@ -629,8 +632,9 @@ export async function postReport(
     const message = typeof reply?.message === 'string' ? reply.message.slice(0, 300) : ''
     const reason = /activat/i.test(message) ? 'notActivated' : 'rejected'
     return message ? { ok: false, reason, detail: message } : { ok: false, reason }
-  } catch {
-    return { ok: false, reason: 'network' }
+  } catch (err) {
+    // Why it never arrived, for the log: a blocked header and a dead network read the same otherwise.
+    return { ok: false, reason: 'network', detail: err instanceof Error ? err.message : String(err) }
   } finally {
     clearTimeout(timer)
   }
