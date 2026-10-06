@@ -3,7 +3,10 @@ import { ytdlpBinaryPath, ytdlpSpawnOptions, engineUnavailable } from './ytdlp'
 import { killTree } from './process'
 import { classifyYtdlpError } from './options'
 import { searchYummyani } from '../resolvers'
-import { SEARCH_ALL_SERVICES } from '@shared/types'
+import { unreachableCode } from '../resolvers/neterror'
+import { searchBilibili, searchDailymotion, searchNiconico } from './search-apis'
+import { getSettings } from './settings'
+import { ADULT_SEARCH_SERVICES, allowedSearchServices, SEARCH_ALL_SERVICES } from '@shared/types'
 import { isAbsoluteUrl } from '@shared/urls'
 import type { SearchResponse, SearchResult, SearchScope, SearchService } from '@shared/types'
 
@@ -27,15 +30,26 @@ interface FlatPlaylist {
 /** Services searched through the engine's `<prefix>N:query` search extractors. */
 const PREFIX: Partial<Record<SearchService, string>> = {
   youtube: 'ytsearch',
-  soundcloud: 'scsearch',
-  bilibili: 'bilisearch',
-  niconico: 'nicosearch'
+  soundcloud: 'scsearch'
 }
 
 /** Services searched by handing the engine a site search-results URL. */
 const URL_SEARCH: Partial<Record<SearchService, (q: string) => string>> = {
-  pornhub: (q) => `https://www.pornhub.com/video/search?search=${encodeURIComponent(q)}`,
-  dailymotion: (q) => `https://www.dailymotion.com/search/${encodeURIComponent(q)}/videos`
+  pornhub: (q) => `https://www.pornhub.com/video/search?search=${encodeURIComponent(q)}`
+}
+
+/**
+ * Services searched through the site's own API, without the engine.
+ *
+ * Each answers with a whole response rather than a bare list, because
+ * Bilibili has a failure of its own to report: an anti-bot refusal that is
+ * neither "nothing found" nor a network error.
+ */
+const API_SEARCH: Partial<Record<SearchService, (q: string, cap: number) => Promise<SearchResponse>>> = {
+  yummyani: async (q, cap) => ({ ok: true, results: await searchYummyani(q, cap) }),
+  dailymotion: async (q, cap) => ({ ok: true, results: await searchDailymotion(q, cap) }),
+  niconico: async (q, cap) => ({ ok: true, results: await searchNiconico(q, cap) }),
+  bilibili: searchBilibili
 }
 
 function thumbnailOf(entry: FlatEntry, service: SearchService): string | undefined {
@@ -123,11 +137,19 @@ function ytdlpSearch(target: string, service: SearchService, limit: number): Pro
 /** Search one service by title. */
 async function searchOne(query: string, service: SearchService, limit: number): Promise<SearchResponse> {
   const cap = Math.max(1, Math.min(30, limit))
-  if (service === 'yummyani') {
+  const api = API_SEARCH[service]
+  if (api) {
     try {
-      return { ok: true, results: await searchYummyani(query, cap) }
+      return await api(query, cap)
     } catch (err) {
-      return { ok: false, error: err instanceof Error ? err.message : 'Anime search failed.' }
+      // An answer that is not the JSON asked for says nothing useful in its own words.
+      if (err instanceof SyntaxError) return { ok: false, error: 'Could not parse search results.' }
+      return {
+        ok: false,
+        error: err instanceof Error ? err.message : 'Search failed.',
+        // A host that cannot be reached is said in the user's language.
+        errorCode: unreachableCode(err)
+      }
     }
   }
   const prefix = PREFIX[service]
@@ -166,6 +188,19 @@ export async function searchVideos(
 ): Promise<SearchResponse> {
   const q = query.trim()
   if (!q) return { ok: false, error: 'Empty search query.' }
+  /*
+    Hiding the pill is the window's half of the setting; this is the half that
+    holds. The separate search window reads the settings once when it opens,
+    so it can still offer a service that was switched off since.
+  */
+  const showAdult = getSettings().showAdultServices
+  if (scope !== 'all' && !showAdult && ADULT_SEARCH_SERVICES.includes(scope)) {
+    return {
+      ok: false,
+      error: 'Adult sites are turned off for search. Turn them on in Settings → Detection.',
+      errorCode: 'adultHidden'
+    }
+  }
   const engineFailure = await engineUnavailable()
   if (engineFailure) return engineFailure
 
@@ -173,7 +208,8 @@ export async function searchVideos(
 
   // In 'all' mode the limit applies per service, so the grid stays balanced.
   const perService = Math.max(3, Math.min(12, limit))
-  const settled = await Promise.all(SEARCH_ALL_SERVICES.map((s) => searchOne(q, s, perService)))
+  const services = allowedSearchServices(SEARCH_ALL_SERVICES, showAdult)
+  const settled = await Promise.all(services.map((s) => searchOne(q, s, perService)))
   const successes = settled.filter((r) => r.ok && r.results?.length).map((r) => r.results!)
   if (!successes.length) {
     const firstFailure = settled.find((r) => !r.ok)

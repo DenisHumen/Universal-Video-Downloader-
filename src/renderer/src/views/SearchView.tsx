@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { dialog, enter, overlay, staggerChild, staggerParent } from '../lib/motion'
-import { Check, Download, ExternalLink, Loader2, Search, SearchX, X } from 'lucide-react'
+import { Check, Download, Loader2, RotateCw, Search, SearchX, X } from 'lucide-react'
 import type {
   AppErrorCode,
   AppSettings,
@@ -11,6 +11,7 @@ import type {
   SearchScope,
   SearchService
 } from '@shared/types'
+import { ADULT_SEARCH_SERVICES, allowedSearchServices } from '@shared/types'
 import StreamingCard from '../components/StreamingCard'
 import Thumbnail from '../components/Thumbnail'
 import Choice from '../components/Choice'
@@ -45,16 +46,30 @@ interface Props {
  * the pills directly under the field says what they are — a filter on the thing
  * above — and gives the results the full width.
  */
-const SERVICES: { value: SearchScope; label: string }[] = [
-  { value: 'all', label: 'all' },
-  { value: 'youtube', label: 'youtube' },
-  { value: 'soundcloud', label: 'soundcloud' },
-  { value: 'dailymotion', label: 'dailymotion' },
-  { value: 'yummyani', label: 'anime' },
-  { value: 'bilibili', label: 'bilibili' },
-  { value: 'niconico', label: 'niconico' },
-  { value: 'pornhub', label: 'pornhub' }
+const SERVICES: SearchScope[] = [
+  'all',
+  'youtube',
+  'soundcloud',
+  'dailymotion',
+  'yummyani',
+  'bilibili',
+  'niconico',
+  'pornhub'
 ]
+
+/**
+ * What a service pill says.
+ *
+ * Brand names stay as they are in every language; the two pills that are
+ * words, not brands, are translated. "anime" used to be written into the list
+ * above as a literal, so the Russian window showed one English pill among
+ * translated ones, and the idle screen named it in English too.
+ */
+function serviceLabel(s: SearchScope, t: TranslateFn): string {
+  if (s === 'all') return t('search.allServices')
+  if (s === 'yummyani') return t('search.anime')
+  return s
+}
 
 // Services whose results carry real thumbnails + a probe-able quality.
 const PROBE_SERVICES: SearchService[] = ['youtube', 'pornhub', 'dailymotion']
@@ -214,6 +229,22 @@ export default function SearchView({ settings, embedded = false }: Props): JSX.E
     if (results || status === 'error') void search(undefined, s)
   }
 
+  const showAdult = settings?.showAdultServices ?? false
+  const services = allowedSearchServices(SERVICES, showAdult)
+
+  /*
+    The setting switched off while an adult service was in use: its pill is
+    about to vanish, so the scope falls back to everything rather than to a
+    selection nothing on screen shows, and the tiles it already put in the grid
+    go with it.
+  */
+  useEffect(() => {
+    if (showAdult) return
+    setResults((prev) => prev && prev.filter((r) => !ADULT_SEARCH_SERVICES.includes(r.service)))
+    if (service !== 'all' && ADULT_SEARCH_SERVICES.includes(service)) changeService('all')
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [showAdult])
+
   // Regular video/audio: queue straight to the downloads list.
   const download = async (r: SearchResult): Promise<void> => {
     const probe = probes[r.url]
@@ -251,16 +282,20 @@ export default function SearchView({ settings, embedded = false }: Props): JSX.E
     }
   }
 
-  const activeLabel =
-    service === 'all' ? t('search.allServices') : (SERVICES.find((s) => s.value === service)?.label ?? '')
+  const activeLabel = serviceLabel(service, t)
 
   return (
     <div className="flex h-full flex-col">
       <div className="mx-auto w-full max-w-[1080px] shrink-0 px-6 pt-10">
         <h1 className="h1">{t('search.title')}</h1>
         <p className="lead mt-2">{t('search.hint')}</p>
+        {/*
+          The label names the field; the placeholder inside it says what to
+          type. Both used to be the same sentence, and an aria-label on the
+          input repeated it a third time over the label it already had.
+        */}
         <label className="label mb-2 mt-7 block" htmlFor="uvd-search">
-          {t('search.placeholder')}
+          {t('search.label')}
         </label>
         <div className="field flex items-center gap-1.5 rounded-3 p-2">
           <Search size={18} className="ml-2 shrink-0 text-ink-3" />
@@ -271,7 +306,6 @@ export default function SearchView({ settings, embedded = false }: Props): JSX.E
             onChange={(e) => setQuery(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && search()}
             placeholder={t('search.placeholder')}
-            aria-label={t('search.placeholder')}
             className="no-drag min-w-0 flex-1 bg-transparent px-1.5 py-2 text-[16px] text-ink outline-none placeholder:text-ink-3"
             spellCheck={false}
             autoComplete="off"
@@ -292,10 +326,7 @@ export default function SearchView({ settings, embedded = false }: Props): JSX.E
             label={t('search.services')}
             value={service}
             onChange={(v) => changeService(v as SearchScope)}
-            options={SERVICES.map((s) => ({
-              value: s.value,
-              label: s.value === 'all' ? t('search.allServices') : s.label
-            }))}
+            options={services.map((s) => ({ value: s, label: serviceLabel(s, t) }))}
           />
           {results && (
             <span className="mono ml-auto shrink-0 text-[12px] text-ink-2">
@@ -343,6 +374,14 @@ export default function SearchView({ settings, embedded = false }: Props): JSX.E
               <p className="selectable mt-2 break-words text-[13px] leading-relaxed text-ink-2">
                 {errorText(t, { error, errorCode })}
               </p>
+              {/*
+                Most failures here are a network blip or a rate limit, which
+                the same search gets past a moment later. The button above
+                does the same, but the eye is down here, on the message.
+              */}
+              <button className="btn-quiet mt-3" onClick={() => search()} disabled={!query.trim()}>
+                <RotateCw size={14} /> {t('common.retry')}
+              </button>
             </motion.div>
           )}
 
@@ -352,6 +391,14 @@ export default function SearchView({ settings, embedded = false }: Props): JSX.E
                 icon={<SearchX size={24} />}
                 title={t('search.nothing')}
                 hint={t('search.nothingHint')}
+                action={
+                  // One service had nothing; the others may well have it.
+                  service !== 'all' ? (
+                    <button className="btn-quiet" onClick={() => changeService('all')}>
+                      {t('search.tryAll')}
+                    </button>
+                  ) : undefined
+                }
               />
             </motion.div>
           )}
@@ -385,10 +432,15 @@ export default function SearchView({ settings, embedded = false }: Props): JSX.E
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
             >
+              {/*
+                Nothing is running yet. This said "searching all services" -
+                a search that never ends - with the lead's sentence under it
+                for the second time on the screen.
+              */}
               <EmptyState
                 icon={<Search size={24} />}
-                title={t('search.searching', { service: activeLabel })}
-                hint={t('search.hint')}
+                title={t('search.idle', { service: activeLabel })}
+                hint={t('search.idleHint')}
               />
             </motion.div>
           )}
@@ -492,9 +544,18 @@ function ResultTile({
 
   return (
     <motion.div variants={staggerChild} className="group flex flex-col">
+      {/*
+        The thumbnail is the way to the site. A second, icon-only "open in
+        browser" sat beside the download button and did exactly this; it went,
+        so the one action the row is for has the row to itself. The thumbnail
+        never downloads: a stray click on a picture must not queue anything.
+        It is named for what it does, since its contents are a picture and a
+        couple of badges.
+      */}
       <button
         className="relative block aspect-video w-full cursor-pointer overflow-hidden rounded-2 bg-sink text-left"
         title={t('common.openInBrowser')}
+        aria-label={`${t('common.openInBrowser')}: ${result.title}`}
         onClick={() => window.api.openExternal(result.url)}
       >
         <Thumbnail
@@ -537,13 +598,6 @@ function ResultTile({
             <Download size={13} />
           )}
           {added ? t('search.queued') : isAnime ? t('search.episodes') : t('common.download')}
-        </button>
-        <button
-          className="btn-icon"
-          title={t('common.openInBrowser')} aria-label={t('common.openInBrowser')}
-          onClick={() => window.api.openExternal(result.url)}
-        >
-          <ExternalLink size={14} />
         </button>
       </div>
     </motion.div>

@@ -10,6 +10,7 @@ import type {
   UpdateStatus,
   YtDlpStatus
 } from '@shared/types'
+import { allowedSearchServices, SEARCH_ALL_SERVICES } from '@shared/types'
 
 /**
  * Browser-only stand-in for the preload bridge so the renderer can be opened
@@ -46,6 +47,7 @@ const settings: AppSettings = {
   clipboardWatch: false,
   trayEnabled: false,
   universalFallback: true,
+  showAdultServices: false,
   preferCompatible: true,
   automationEnabled: false,
   autostart: false,
@@ -134,9 +136,10 @@ function fakeInfo(url: string): MediaInfo {
 }
 
 function fakeResults(query: string, scope: string): SearchResult[] {
+  // The same choice main makes, so the preview never shows what the setting hides.
   const services =
     scope === 'all'
-      ? (['youtube', 'soundcloud', 'dailymotion', 'yummyani', 'pornhub'] as const)
+      ? allowedSearchServices(SEARCH_ALL_SERVICES, settings.showAdultServices)
       : ([scope] as unknown as readonly SearchResult['service'][])
   return Array.from({ length: scope === 'all' ? 12 : 9 }, (_, i) => {
     const service = services[i % services.length]

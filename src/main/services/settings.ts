@@ -80,6 +80,7 @@ function defaults(): AppSettings {
     clipboardWatch: false,
     trayEnabled: false,
     universalFallback: true,
+    showAdultServices: false,
     proxy: '',
     cookiesFromBrowser: '',
     cookiesFile: '',

@@ -841,6 +841,9 @@ export default function SettingsView(): JSX.Element {
             <Row label={t('settings.universal')} hint={t('settings.universalHint')}>
               <Switch value={settings.universalFallback} onChange={(v) => set('universalFallback', v)} />
             </Row>
+            <Row label={t('settings.adultServices')} hint={t('settings.adultServicesHint')}>
+              <Switch value={settings.showAdultServices} onChange={(v) => set('showAdultServices', v)} />
+            </Row>
           </Group>
 
           <Group id="automation" title={t('settings.section.automation')}>
