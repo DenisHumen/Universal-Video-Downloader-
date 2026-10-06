@@ -36,9 +36,9 @@ On first run the app fetches the yt-dlp engine binary (~30 MB) by itself, and ke
 
 ### macOS: “the app is damaged and can’t be opened”
 
-**It isn’t.** These builds are unsigned — there is no €99/year Apple Developer certificate behind
-them — and on recent macOS, Gatekeeper reports *any* quarantined unsigned app with that sentence.
-It sounds like a corrupt download, so people re-download it and see it again.
+**It isn’t.** There is no €99/year Apple Developer certificate behind these builds, so macOS
+quarantines them, and on recent macOS Gatekeeper reports a quarantined app without one with that
+sentence. It sounds like a corrupt download, so people re-download it and see it again.
 
 Copy the app into **Applications**, then run this once:
 
@@ -47,9 +47,8 @@ xattr -dr com.apple.quarantine "/Applications/Universal Video Downloader.app"
 ```
 
 The command is printed on the install window itself, so you don't have to come back here for it.
-(Or: right-click the app in Applications → **Open** → **Open**.) Because they're unsigned, macOS
-builds also can't install updates in place — the app offers you the download page instead of
-pretending it can restart into a new version.
+Without that certificate, macOS builds also can't install updates in place — the app offers you
+the download page instead of pretending it can restart into a new version.
 
 ### Ubuntu 24.04 and newer: take the `.deb`
 

@@ -1,9 +1,10 @@
 <!--
   The macOS install window.
 
-  Unsigned builds are quarantined by Gatekeeper, and on recent macOS that shows
-  up as "the app is damaged and can't be opened" — a sentence that sounds like a
-  corrupted download and sends people back to the Releases page to try again.
+  Builds without a paid Apple developer certificate are quarantined by
+  Gatekeeper, and on recent macOS that can show up as "the app is damaged and
+  can't be opened" — a sentence that sounds like a corrupted download and sends
+  people back to the Releases page to try again.
   The fix is one command, and the only moment we are guaranteed to have the
   user's attention is this window: it opens by itself, before the app has ever
   been launched, which is exactly the point at which the in-app notice cannot
@@ -46,7 +47,7 @@
 
   <text x="40" y="400" fill="#a8a8b2"
     font-family="Inter, -apple-system, BlinkMacSystemFont, Helvetica, Arial, sans-serif"
-    font-size="12">It isn’t. The build is unsigned, so Gatekeeper quarantines it.</text>
+    font-size="12">It isn’t. The build has no paid Apple certificate, so Gatekeeper quarantines it.</text>
   <text x="40" y="418" fill="#a8a8b2"
     font-family="Inter, -apple-system, BlinkMacSystemFont, Helvetica, Arial, sans-serif"
     font-size="12">Copy the app across first, then run this once in Terminal:</text>
@@ -56,7 +57,10 @@
     font-family="JetBrains Mono, SFMono-Regular, Menlo, Consolas, monospace"
     font-size="11.5">xattr -dr com.apple.quarantine "/Applications/Universal Video Downloader.app"</text>
 
-  <text x="330" y="494" text-anchor="middle" fill="#65656e"
-    font-family="Inter, -apple-system, BlinkMacSystemFont, Helvetica, Arial, sans-serif"
-    font-size="11">Or: right-click the app in Applications → Open → Open.</text>
+  <!--
+    There used to be a line here: right-click the app → Open → Open. That only
+    ever got past "unidentified developer" on an Intel Mac; it does nothing for
+    "damaged", which is what an Apple silicon Mac says, and macOS 15 removed it
+    altogether.
+  -->
 </svg>

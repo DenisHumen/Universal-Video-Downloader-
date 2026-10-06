@@ -76,12 +76,12 @@ await render(48, join(runtimeDir, 'tray-dark@3x.png'), trayDarkSvg)
 /*
  * The macOS install window.
  *
- * Gatekeeper quarantines unsigned builds and reports that as "the app is
- * damaged", which reads like a bad download rather than a policy — so people
- * re-download it, get the same message, and give up. The fix is one command,
- * and this window is the only place we are certain to be read: it opens by
- * itself, before the app has ever run, which is exactly when the notice inside
- * the app cannot help because the app cannot start.
+ * Gatekeeper quarantines builds without a paid Apple certificate and can report
+ * that as "the app is damaged", which reads like a bad download rather than a
+ * policy — so people re-download it, get the same message, and give up. The
+ * fix is one command, and this window is the only place we are certain to be
+ * read: it opens by itself, before the app has ever run, which is exactly when
+ * the notice inside the app cannot help because the app cannot start.
  *
  * Two files, because macOS picks the @2x variant on a Retina display and
  * upscaling the 1x one turns the command into mush.

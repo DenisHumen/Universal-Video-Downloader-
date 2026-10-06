@@ -299,13 +299,18 @@ jobs:
             echo "The SHA-256 of every file is in [SHA256SUMS]($BASE/SHA256SUMS):"
             echo '`sha256sum --check --ignore-missing SHA256SUMS` in the folder you downloaded to.'
             echo
+            # The same command as the README, MacNotice and the DMG background
+            # (scripts/mac-instructions.test.ts holds them together). It used
+            # to be `xattr -cr`, which also wipes every other attribute on
+            # every file in the bundle; only the quarantine flag is in the way.
             echo "### If macOS says the app is damaged"
             echo
             echo "It is not damaged. The app is not signed with a paid Apple developer"
-            echo "certificate, so macOS quarantines it. Run this once, in Terminal:"
+            echo "certificate, so macOS quarantines it. Copy it into Applications, then"
+            echo "run this once, in Terminal:"
             echo
             echo '```'
-            echo 'xattr -cr "/Applications/Universal Video Downloader.app"'
+            echo 'xattr -dr com.apple.quarantine "/Applications/Universal Video Downloader.app"'
             echo '```'
             echo
             echo "### What changed"
