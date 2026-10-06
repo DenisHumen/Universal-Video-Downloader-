@@ -37,3 +37,6 @@ Thumbs.db
 
 # Local tooling: agent and editor launch settings belong to each machine
 .claude/
+
+# /brag video work (the finished video is copied into docs/assets)
+brag-output*/

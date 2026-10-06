@@ -13,6 +13,8 @@
  * anyone hand-cropping a window at 3am and forgetting to redo it next release.
  *
  * Pass `--url` to point at a different server, and `--theme night|day|both`.
+ * `--scale=2` renders at twice the pixel density (for video, where a shot gets
+ * zoomed into), and `--out=<dir>` writes somewhere other than docs/screenshots.
  */
 import { app, BrowserWindow } from 'electron'
 import { mkdirSync, writeFileSync } from 'fs'
@@ -21,7 +23,6 @@ import { fileURLToPath } from 'url'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const root = resolve(__dirname, '..')
-const outDir = join(root, 'docs', 'screenshots')
 
 const arg = (name, fallback) => {
   const hit = process.argv.find((a) => a.startsWith(`--${name}=`))
@@ -30,6 +31,10 @@ const arg = (name, fallback) => {
 
 const BASE = arg('url', 'http://localhost:5174')
 const THEME = arg('theme', 'night')
+const outDir = resolve(root, arg('out', join('docs', 'screenshots')))
+const SCALE = Number(arg('scale', '1')) || 1
+// Must be set before the app is ready; the window keeps its CSS size either way.
+if (SCALE !== 1) app.commandLine.appendSwitch('force-device-scale-factor', String(SCALE))
 const WIDTH = 1280
 const HEIGHT = 860
 
