@@ -14,7 +14,7 @@ const date = (at: number): string => new Date(at).toISOString().slice(0, 10)
 describe('describeCheck', () => {
   it('says when the watch was busy rather than claiming a check', () => {
     expect(describeCheck({ busy: true }, en, date)).toEqual({
-      text: 'already on it - still checking or downloading',
+      text: 'already on it — still checking or downloading',
       kind: 'info'
     })
   })
@@ -49,7 +49,7 @@ describe('describeCheck', () => {
 
   it('tells a paused watch what it found and how to get it', () => {
     expect(describeCheck({ fresh: 2, queued: 0, paused: true }, en, date)).toEqual({
-      text: 'paused - found 2 new; resume to download them',
+      text: 'paused — found 2 new; resume to download them',
       kind: 'info'
     })
   })

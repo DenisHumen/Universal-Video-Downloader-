@@ -33,7 +33,7 @@ export default class ErrorBoundary extends Component<Props, State> {
     return (
       <div className="flex h-full flex-col items-center justify-center gap-5 px-8 text-center">
         <div>
-          <p className="label mb-2 text-bad">error</p>
+          <p className="label mb-2 text-bad">{translate(language, 'stamp.error')}</p>
           <p className="text-[15px] font-medium text-ink">{translate(language, 'error.title')}</p>
           <p className="mono selectable mx-auto mt-2 max-w-md break-words text-[12px] leading-relaxed text-ink-2">
             {this.state.error.message}

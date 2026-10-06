@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { CalendarClock, Film, Loader2, Radar, X } from 'lucide-react'
 import { dialog, overlay } from '../lib/motion'
-import { resolveLanguage, useT } from '../i18n'
+import { resolveLanguage, useT, useTp } from '../i18n'
 import { toast } from '../lib/toast'
 import { describeError } from '../lib/errors'
 import { releaseDate, releaseText } from '../lib/release'
@@ -39,6 +39,7 @@ export default function AddWatchDialog({
   onAdded: (id: string) => void
 }): JSX.Element {
   const t = useT()
+  const tp = useTp()
   const locale = useStore((s) =>
     resolveLanguage(s.settings?.language ?? 'auto', s.appInfo?.locale ?? 'en')
   )
@@ -212,7 +213,7 @@ export default function AddWatchDialog({
                     <p className="hint mt-1">
                       {offer.upcoming
                         ? releaseText(offer.upcoming.releaseAt, t)
-                        : t('auto.dubCount', { n: String(offer.translators.length) })}
+                        : tp('auto.dubCount', offer.translators.length)}
                     </p>
                   </div>
                 </div>
@@ -267,7 +268,7 @@ export default function AddWatchDialog({
                   >
                     {offer.translators.map((x) => (
                       <option key={x.id} value={x.id}>
-                        {x.name} — {t('auto.nEpisodes', { n: String(x.episodes) })}
+                        {x.name} — {tp('auto.nEpisodes', x.episodes)}
                         {x.premium ? ' ★' : ''}
                       </option>
                     ))}

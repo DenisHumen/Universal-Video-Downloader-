@@ -1,4 +1,5 @@
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it } from 'vitest'
+import { useI18n } from '../i18n'
 import {
   formatBytes,
   formatCount,
@@ -8,6 +9,8 @@ import {
   isProbablyUrl,
   splitPath
 } from './format'
+
+afterEach(() => useI18n.setState({ language: 'en' }))
 
 describe('formatBytes', () => {
   it('shows a dash for missing or nonsensical sizes', () => {
@@ -22,6 +25,24 @@ describe('formatBytes', () => {
     expect(formatBytes(5 * 1024 * 1024)).toBe('5.0 MB')
     expect(formatBytes(20 * 1024 * 1024 * 1024)).toBe('20 GB')
   })
+
+  it('keeps four digits whole rather than grouping them', () => {
+    expect(formatBytes(1023 * 1024)).toBe('1023 KB')
+  })
+
+  // A Russian queue used to show English unit letters and a decimal point.
+  it('writes Russian units with a decimal comma', () => {
+    expect(formatBytes(512, 'ru')).toBe('512 Б')
+    expect(formatBytes(1536, 'ru')).toBe('1,5 КБ')
+    expect(formatBytes(1.5 * 1024 * 1024, 'ru')).toBe('1,5 МБ')
+    expect(formatBytes(20 * 1024 ** 3, 'ru')).toBe('20 ГБ')
+    expect(formatBytes(2 * 1024 ** 4, 'ru')).toBe('2,0 ТБ')
+  })
+
+  it('follows the interface language when none is given', () => {
+    useI18n.setState({ language: 'ru' })
+    expect(formatBytes(1536)).toBe('1,5 КБ')
+  })
 })
 
 describe('formatSpeed', () => {
@@ -30,8 +51,9 @@ describe('formatSpeed', () => {
     expect(formatSpeed(0)).toBe('')
   })
 
-  it('appends /s', () => {
+  it('appends per second', () => {
     expect(formatSpeed(1536)).toBe('1.5 KB/s')
+    expect(formatSpeed(1536, 'ru')).toBe('1,5 КБ/с')
   })
 })
 
@@ -64,6 +86,18 @@ describe('formatEta', () => {
     expect(formatEta(90)).toBe('1m 30s')
     expect(formatEta(3700)).toBe('1h 1m')
   })
+
+  // "осталось 1m 35s" — where "m" reads as metres.
+  it('writes Russian units in Russian', () => {
+    expect(formatEta(45, 'ru')).toBe('45 с')
+    expect(formatEta(95, 'ru')).toBe('1 мин 35 с')
+    expect(formatEta(3700, 'ru')).toBe('1 ч 1 мин')
+  })
+
+  it('rounds before splitting, so the seconds never reach sixty', () => {
+    expect(formatEta(119.7)).toBe('2m 0s')
+    expect(formatEta(59.6)).toBe('1m 0s')
+  })
 })
 
 describe('formatCount', () => {
@@ -71,6 +105,16 @@ describe('formatCount', () => {
     expect(formatCount(999)).toBe('999')
     expect(formatCount(1500)).toBe('1.5K')
     expect(formatCount(1_234_567)).toBe('1.2M')
+  })
+
+  it('goes on to billions instead of a four-digit million', () => {
+    expect(formatCount(1_500_000_000)).toBe('1.5B')
+  })
+
+  it('abbreviates the way Russian does', () => {
+    expect(formatCount(999, 'ru')).toBe('999')
+    expect(formatCount(1500, 'ru')).toBe('1,5 тыс.')
+    expect(formatCount(1_234_567, 'ru')).toBe('1,2 млн')
   })
 })
 

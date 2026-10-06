@@ -1,18 +1,60 @@
-export function formatBytes(bytes?: number): string {
+import { translate, useI18n, type Language, type TranslationKey } from '../i18n'
+
+/*
+  Sizes, speeds, times left and view counts are read in the interface's
+  language, like every other word on the row. They used to be English
+  whatever the setting: a Russian queue said "осталось 1m 35s", where "m"
+  reads as metres, and wrote "1.5 MB" with a point where Russian writes a
+  comma.
+
+  Each helper takes the language as its last argument and, left out, uses the
+  active one — the same non-reactive read t() makes. Every component that
+  shows these figures already subscribes to the language through useT, so it
+  renders again when the language changes and the read is current.
+*/
+const activeLanguage = (): Language => useI18n.getState().language
+
+const BYTE_UNITS: TranslationKey[] = ['bytes.B', 'bytes.KB', 'bytes.MB', 'bytes.GB', 'bytes.TB']
+
+// Building a formatter is far dearer than using one, and a busy queue formats
+// a few figures per row on every progress tick.
+const decimals = new Map<string, Intl.NumberFormat>()
+
+/** `value` with exactly `digits` decimals, separated the way `language` writes them. */
+function decimal(value: number, digits: number, language: Language): string {
+  const id = `${language}:${digits}`
+  let format = decimals.get(id)
+  if (!format) {
+    // No grouping: the next unit takes over at 1024, so grouping could only
+    // ever split 1000–1023, and "1,023 KB" reads as a fraction in half the
+    // world.
+    format = new Intl.NumberFormat(language, {
+      minimumFractionDigits: digits,
+      maximumFractionDigits: digits,
+      useGrouping: false
+    })
+    decimals.set(id, format)
+  }
+  return format.format(value)
+}
+
+export function formatBytes(bytes?: number, language: Language = activeLanguage()): string {
   if (bytes == null || !Number.isFinite(bytes) || bytes <= 0) return '—'
-  const units = ['B', 'KB', 'MB', 'GB', 'TB']
   let value = bytes
   let i = 0
-  while (value >= 1024 && i < units.length - 1) {
+  while (value >= 1024 && i < BYTE_UNITS.length - 1) {
     value /= 1024
     i++
   }
-  return `${value.toFixed(value >= 10 || i === 0 ? 0 : 1)} ${units[i]}`
+  // One decimal below ten, always shown — "5.0 MB", not "5 MB" — so a running
+  // download's figure keeps its width instead of twitching each time it
+  // crosses a whole number.
+  return `${decimal(value, value >= 10 || i === 0 ? 0 : 1, language)} ${translate(language, BYTE_UNITS[i])}`
 }
 
-export function formatSpeed(bytesPerSecond?: number): string {
+export function formatSpeed(bytesPerSecond?: number, language: Language = activeLanguage()): string {
   if (!bytesPerSecond || bytesPerSecond <= 0) return ''
-  return `${formatBytes(bytesPerSecond)}/s`
+  return `${formatBytes(bytesPerSecond, language)}${translate(language, 'speed.perSecond')}`
 }
 
 export function formatDuration(seconds?: number): string {
@@ -26,28 +68,37 @@ export function formatDuration(seconds?: number): string {
 }
 
 /**
- * How long is left, as a bare duration.
+ * How long is left, as a bare duration in the interface's language: `1m 35s`,
+ * `1 мин 35 с`.
  *
- * The word "left" is not in here on purpose: it used to be, hard-coded in
- * English, which meant a queue running in Russian said `1m 30s left`. Units
- * are symbols and read the same either way; the sentence around them is the
- * caller's job, and the caller has the dictionary.
+ * The word "left" is not in here on purpose: the sentence around the duration
+ * is the caller's (`queue.eta`), and so is its word order. The units used to
+ * be English symbols on the assumption that they read the same everywhere,
+ * which they don't — "m" is metres to a Russian reader.
+ *
+ * The total is rounded before it is split, so 119.7 seconds is `2m 0s`, not
+ * `1m 60s`.
  */
-export function formatEta(seconds?: number): string {
+export function formatEta(seconds?: number, language: Language = activeLanguage()): string {
   if (seconds == null || !Number.isFinite(seconds) || seconds <= 0) return ''
-  if (seconds < 60) return `${Math.round(seconds)}s`
-  const m = Math.floor(seconds / 60)
-  const s = Math.round(seconds % 60)
-  if (m < 60) return `${m}m ${s}s`
-  const h = Math.floor(m / 60)
-  return `${h}h ${m % 60}m`
+  const total = Math.round(seconds)
+  if (total < 60) return translate(language, 'time.eta.s', { s: total })
+  const m = Math.floor(total / 60)
+  if (m < 60) return translate(language, 'time.eta.m', { m, s: total % 60 })
+  return translate(language, 'time.eta.h', { h: Math.floor(m / 60), m: m % 60 })
 }
 
-export function formatCount(n?: number): string {
+const compacts = new Map<Language, Intl.NumberFormat>()
+
+/** A view count the way the language abbreviates it: `1.2M`, `1,2 млн`. */
+export function formatCount(n?: number, language: Language = activeLanguage()): string {
   if (n == null) return ''
-  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`
-  if (n >= 1_000) return `${(n / 1_000).toFixed(1)}K`
-  return String(n)
+  let format = compacts.get(language)
+  if (!format) {
+    format = new Intl.NumberFormat(language, { notation: 'compact', maximumFractionDigits: 1 })
+    compacts.set(language, format)
+  }
+  return format.format(n)
 }
 
 /**

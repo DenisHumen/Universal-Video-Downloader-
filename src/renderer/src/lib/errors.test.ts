@@ -1,6 +1,8 @@
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it } from 'vitest'
 import { describeError, errorReport, errorText } from './errors'
-import { translate, type TranslateFn } from '../i18n'
+import { translate, useI18n, type TranslateFn } from '../i18n'
+
+afterEach(() => useI18n.setState({ language: 'en' }))
 
 /*
   The share test button once showed "Error invoking remote method
@@ -33,8 +35,15 @@ describe('describeError', () => {
 
   it('copes with things that are not errors at all', () => {
     expect(describeError('plain text')).toBe('plain text')
-    expect(describeError(undefined)).toBe('Something went wrong.')
-    expect(describeError('')).toBe('Something went wrong.')
+    expect(describeError(undefined)).toBe('something went wrong')
+    expect(describeError('')).toBe('something went wrong')
+  })
+
+  // The wordless throw was the last toast still hard-coded in English.
+  it('falls back to "something went wrong" in the interface language', () => {
+    useI18n.setState({ language: 'ru' })
+    expect(describeError(undefined)).toBe('что-то пошло не так')
+    expect(describeError(new Error(''))).toBe('что-то пошло не так')
   })
 
   // A plain `throw new Error()` in main arrives as "...': Error: <sentence>",
