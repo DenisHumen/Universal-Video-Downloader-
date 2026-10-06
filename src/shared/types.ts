@@ -337,6 +337,11 @@ export interface DownloadItem {
   errorCode?: AppErrorCode
   /** The failure looks like an access gate and cookies aren't set up yet. */
   cookieHint?: boolean
+  /**
+   * The failure main kept for an error report, when it is one worth offering.
+   * Memory only — it means nothing after a restart, or once the item is retried.
+   */
+  reportId?: string
   referer?: string
   createdAt: number
   finishedAt?: number
@@ -454,6 +459,11 @@ export interface AppSettings {
   cookiesFromBrowser: string
   /** Optional path to a Netscape-format cookies.txt file (takes precedence over the browser). */
   cookiesFile: string
+  /**
+   * Offer to send the developer a report when a link fails. 'ask' still asks
+   * every time — there is deliberately no setting that sends on its own.
+   */
+  errorReports: 'ask' | 'off'
 }
 
 export const SUPPORTED_COOKIE_BROWSERS = [
@@ -508,6 +518,8 @@ export interface DetectResult {
   error?: string
   errorCode?: AppErrorCode
   cookieHint?: boolean
+  /** A failure main kept for an error report; see `DownloadItem.reportId`. */
+  reportId?: string
 }
 
 // ---- Built-in browser ----

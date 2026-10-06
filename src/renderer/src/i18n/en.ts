@@ -267,6 +267,9 @@ export const en = {
   'settings.clipboardWatchHint': 'offer to download links you copy in other apps',
   'settings.tray': 'keep running in the tray',
   'settings.trayHint': 'closing the window keeps downloads going',
+  'settings.errorReports': 'offer to send error reports to the developer',
+  'settings.errorReportsHint':
+    'when a link fails or a site isn’t supported yet, ask whether to send the details so it can be fixed. nothing is sent without your click.',
 
   'settings.autoUpdate': 'automatic app updates',
   'settings.autoUpdateHint': 'check on launch and notify',
@@ -285,6 +288,24 @@ export const en = {
   'settings.resetConfirm': 'reset every setting?',
   'settings.resetConfirmBody':
     'your download folder, cookies, proxy and every other choice on this page go back to how they started. downloads already finished are not touched.',
+
+  // ---- error reports ----
+  'report.stamp': 'report',
+  'report.unsupported': 'this site isn’t supported yet — send the link to the developer so it can be added?',
+  'report.generic': 'something went wrong — send a report to the developer?',
+  'report.send': 'send',
+  'report.notNow': 'not now',
+  'report.details': 'what will be sent',
+  'report.privacy':
+    'the link, the error and version numbers go to the developer. cookies, passwords and your user name stay here.',
+  'report.sending': 'sending…',
+  'report.sent': 'sent — thank you',
+  'report.failed': 'the report couldn’t be sent. you can still send it from your mail app, or copy it.',
+  'report.limit': 'that’s a lot of reports for now — send this one from your mail app, or try later.',
+  'report.gone': 'this report is no longer available.',
+  'report.mail': 'open in mail app',
+  'report.copy': 'copy report',
+  'report.open': 'report the problem',
 
   // ---- update banner ----
   'update.available': 'version {version} is available',

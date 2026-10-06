@@ -45,6 +45,8 @@ import {
 } from './services/downloader'
 import { forwardQueueEvents } from './services/queue-events'
 import { getSettings, resetSettings, setSettings } from './services/settings'
+import { forgetFailures, previewReport, sendReport } from './services/report'
+import { isReportMailto } from '@shared/report'
 import { ensureYtdlp, getYtdlpStatus, updateYtdlp, ytdlpEvents } from './services/ytdlp'
 import { takePending } from './index'
 import { registerAutomationIpc } from './automation-ipc'
@@ -148,6 +150,8 @@ export function registerIpc({ getWindow, openSearchWindow, onSettingsChanged }: 
     requireRenderer(event, IPC.settingsSet)
     const next = setSettings(partial)
     onSettingsChanged(next)
+    // Reports off: drop the failures already kept for one, not just the offer.
+    if (next.errorReports === 'off') forgetFailures()
     // The concurrency limit is read when the queue is pumped, and nothing
     // pumped it on a settings change — so raising it did nothing visible until
     // something happened to finish.
@@ -189,7 +193,8 @@ export function registerIpc({ getWindow, openSearchWindow, onSettingsChanged }: 
   ipcMain.handle(IPC.showInFolder, (_e, path: string) => shell.showItemInFolder(path))
   ipcMain.handle(IPC.openExternal, (event, url: string) => {
     requireRenderer(event, IPC.openExternal)
-    if (!/^https?:\/\//i.test(url)) return Promise.resolve()
+    // Web pages, plus the one mailto an error report falls back to.
+    if (!/^https?:\/\//i.test(url) && !isReportMailto(url)) return Promise.resolve()
     return shell.openExternal(url)
   })
   ipcMain.handle(IPC.clipboardRead, () => {
@@ -213,6 +218,11 @@ export function registerIpc({ getWindow, openSearchWindow, onSettingsChanged }: 
 
   // Whatever main tried to hand the window before it was listening.
   ipcMain.handle(IPC.takePending, () => takePending())
+
+  // ---- Error reports ----
+  // Both take an id main handed out; the window never supplies report contents.
+  ipcMain.handle(IPC.reportPreview, (_e, id: string) => previewReport(id))
+  ipcMain.handle(IPC.reportSend, (_e, id: string) => sendReport(id))
 
   registerAutomationIpc()
 

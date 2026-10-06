@@ -1,4 +1,5 @@
 import type { AddedWatch, CheckSummary, RetryAnswer, Run, SmbTarget, Watch } from '@shared/automation'
+import type { ReportPreview, SendOutcome } from '@shared/report'
 import type { SeriesOffer } from '../main/automation-ipc'
 import { contextBridge, ipcRenderer } from 'electron'
 import { IPC } from '@shared/ipc'
@@ -111,6 +112,10 @@ const api = {
   ensureYtdlp: (): Promise<YtDlpStatus> => ipcRenderer.invoke(IPC.ytdlpEnsure),
   updateYtdlp: (): Promise<string | undefined> => ipcRenderer.invoke(IPC.ytdlpUpdate),
   takePending: (): Promise<PendingDelivery> => ipcRenderer.invoke(IPC.takePending),
+
+  // Error reports — by id; null when main no longer holds that failure.
+  reportPreview: (id: string): Promise<ReportPreview | null> => ipcRenderer.invoke(IPC.reportPreview, id),
+  reportSend: (id: string): Promise<SendOutcome> => ipcRenderer.invoke(IPC.reportSend, id),
 
   // ---- Automation ----
   autoDescribe: (url: string): Promise<SeriesOffer> => ipcRenderer.invoke(IPC.autoDescribe, url),

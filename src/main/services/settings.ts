@@ -11,8 +11,12 @@ export { isSafeTemplate }
 
 const SETTINGS_FILE = (): string => join(app.getPath('userData'), 'settings.json')
 
-/** Kept out of `defaults()` so `migrate` stays free of Electron, and testable. */
-const DEFAULT_TEMPLATE = '%(title)s [%(id)s].%(ext)s'
+/**
+ * Kept out of `defaults()` so `migrate` stays free of Electron, and testable.
+ * Exported so an error report can say whether the template was changed
+ * without saying what to.
+ */
+export const DEFAULT_TEMPLATE = '%(title)s [%(id)s].%(ext)s'
 
 function defaults(): AppSettings {
   return {
@@ -49,7 +53,8 @@ function defaults(): AppSettings {
     universalFallback: true,
     proxy: '',
     cookiesFromBrowser: '',
-    cookiesFile: ''
+    cookiesFile: '',
+    errorReports: 'ask'
   }
 }
 
@@ -95,6 +100,16 @@ export function migrate(raw: Record<string, unknown>): Partial<AppSettings> {
   if (next.speedLimit !== undefined) {
     next.speedLimit =
       typeof next.speedLimit === 'string' ? (normaliseRate(next.speedLimit) ?? '') : ''
+  }
+
+  /*
+    Only a value that is present and wrong is repaired. A file from before the
+    setting existed simply lacks the key and gets the default from `defaults()`
+    — and this also runs on every partial save, where filling the key in would
+    switch reports back on each time any other setting changed.
+  */
+  if ('errorReports' in next && next.errorReports !== 'ask' && next.errorReports !== 'off') {
+    next.errorReports = 'ask'
   }
   return next
 }

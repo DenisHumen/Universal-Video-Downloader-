@@ -8,6 +8,7 @@ import { directUrlFor } from '../resolvers/universal/direct'
 function settings(overrides: Partial<AppSettings> = {}): AppSettings {
   return {
     downloadDir: '/tmp',
+    errorReports: 'ask',
     concurrentDownloads: 3,
     defaultMode: 'video',
     defaultQuality: 'best',

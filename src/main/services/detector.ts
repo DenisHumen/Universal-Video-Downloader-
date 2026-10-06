@@ -6,6 +6,8 @@ import { accessArgs, classifyYtdlpError, hasCookies, headerArgs, stalledConnecti
 import { resolveUniversal, resolveUrl, type ResolvedUrl } from '../resolvers'
 import { unreachableCode } from '../resolvers/neterror'
 import { isAbsoluteUrl, looksLikeCollection, normalizeUrl } from '@shared/urls'
+import { reportDetectFailure, type DetectVerdict } from './report'
+import type { DetectTrace } from '@shared/report'
 import type {
   AppErrorCode,
   DetectResult,
@@ -182,6 +184,12 @@ export async function detect(
   if (!isAbsoluteUrl(url)) {
     return { ok: false, error: 'This is not a link the app can open.', errorCode: 'notALink' }
   }
+  /*
+    What this run tried, for the error report if it ends in one. Filled in only
+    from what the steps below learn anyway: a report describes the attempt that
+    failed, it never re-runs anything to describe itself.
+  */
+  const trace: DetectTrace = {}
 
   onStage('resolving')
   let resolved: ResolvedUrl
@@ -189,7 +197,9 @@ export async function detect(
     resolved = await resolveUrl(url, { signal })
   } catch (err) {
     if (signal?.aborted) return canceled()
-    return errorResult(err)
+    trace.resolverThrew = true
+    const raw = err instanceof Error ? err.message : String(err)
+    return reportDetectFailure({ ...errorResult(err), raw }, url, trace)
   }
   /*
     A cancel during the resolve stage - seconds long on resolver-backed sites -
@@ -199,6 +209,7 @@ export async function detect(
     given up on it.
   */
   if (signal?.aborted) return canceled()
+  trace.resolver = resolved.extractor
 
   // A streaming site (translator/episode/quality selection) — present its picker.
   if (resolved.streaming) {
@@ -209,7 +220,11 @@ export async function detect(
   if (resolved.isPlaylist) {
     const entries = resolved.entries || []
     if (!entries.length) {
-      return { ok: false, error: 'No videos found on this page.', errorCode: 'emptyPage' }
+      return reportDetectFailure(
+        { ok: false, error: 'No videos found on this page.', errorCode: 'emptyPage' },
+        url,
+        trace
+      )
     }
     return {
       ok: true,
@@ -229,6 +244,7 @@ export async function detect(
   }
 
   const wasRewritten = resolved.url !== url.trim()
+  if (wasRewritten) trace.resolvedUrl = resolved.url
 
   // Collections (playlists, channels, sets) expand into a pickable list.
   if (!wasRewritten && looksLikeCollection(url)) {
@@ -256,11 +272,16 @@ export async function detect(
   // The engine gave up. Fall back to universal detection: scrape the page, and
   // if that isn't enough, open it in a hidden browser and watch for the stream.
   if (!wasRewritten && !signal?.aborted) {
+    const tried = { browserAllowed: settings.universalFallback, stages: [] as string[] }
+    trace.universal = tried
     let universal: ResolvedUrl | null = null
     try {
       universal = await resolveUniversal(url, {
         allowBrowser: settings.universalFallback,
-        onStage: (stage) => onStage(stage),
+        onStage: (stage) => {
+          tried.stages.push(stage)
+          onStage(stage)
+        },
         signal
       })
     } catch (err) {
@@ -317,7 +338,7 @@ export async function detect(
   }
 
   onStage('done')
-  return probe
+  return reportDetectFailure(probe, url, trace)
 }
 
 /** A minimal MediaInfo for a stream we found but the engine couldn't describe. */
@@ -348,7 +369,8 @@ function syntheticInfo(pageUrl: string, resolved: ResolvedUrl): MediaInfo {
 
 type JsonProbe =
   | { ok: true; raw: RawInfo }
-  | { ok: false; error: string; errorCode?: AppErrorCode; cookieHint?: boolean }
+  /** `output` is what the engine printed, kept for the error report. */
+  | { ok: false; error: string; errorCode?: AppErrorCode; cookieHint?: boolean; output?: string }
 
 function spawnJson(args: string[], signal: AbortSignal | undefined, timeoutMs: number): Promise<JsonProbe> {
   return new Promise((resolve) => {
@@ -403,12 +425,12 @@ function spawnJson(args: string[], signal: AbortSignal | undefined, timeoutMs: n
     child.stderr.setEncoding('utf8')
     child.stdout.on('data', (d: string) => (stdout += d))
     child.stderr.on('data', (d: string) => (stderr += d))
-    child.on('error', (err) => done({ ok: false, error: err.message }))
+    child.on('error', (err) => done({ ok: false, error: err.message, output: err.message }))
     child.on('close', (code) => {
       if (code !== 0 || !stdout.trim()) {
         const reason = stderr.trim() || 'Could not detect any media at this URL.'
         const { code: errorCode, message, cookieHint } = classifyYtdlpError(reason, hasCookies(settings))
-        done({ ok: false, error: message, errorCode, cookieHint })
+        done({ ok: false, error: message, errorCode, cookieHint, output: stderr || undefined })
         return
       }
       try {
@@ -486,7 +508,7 @@ async function probeCollection(url: string, signal?: AbortSignal): Promise<Media
   }
 }
 
-async function probeWithEngine(resolved: ResolvedUrl, signal?: AbortSignal): Promise<DetectResult> {
+async function probeWithEngine(resolved: ResolvedUrl, signal?: AbortSignal): Promise<DetectVerdict> {
   const settings = getSettings()
   const args = [
     '-J',
@@ -510,7 +532,8 @@ async function probeWithEngine(resolved: ResolvedUrl, signal?: AbortSignal): Pro
       ok: false,
       error: result.error,
       errorCode: result.errorCode,
-      cookieHint: result.cookieHint
+      cookieHint: result.cookieHint,
+      output: result.output
     }
   }
 
@@ -519,10 +542,17 @@ async function probeWithEngine(resolved: ResolvedUrl, signal?: AbortSignal): Pro
   const primary = isPlaylist && raw.entries && raw.entries.length ? raw.entries[0] : raw
   const formats = mapFormats(primary.formats)
   if (!formats.length) {
+    // The engine did answer, so the interesting part is what it offered instead.
+    const offered = (primary.formats ?? []).map((f) => `${f.format_id} ${f.ext ?? '?'} ${f.protocol ?? ''}`)
     return {
       ok: false,
       error: 'No downloadable formats were found at this link.',
-      errorCode: 'noFormats'
+      errorCode: 'noFormats',
+      extractor: raw.extractor_key || raw.extractor,
+      title: raw.title || primary.title,
+      output: offered.length
+        ? `engine listed ${offered.length} formats, none usable:\n${offered.slice(0, 60).join('\n')}`
+        : 'engine listed no formats at all'
     }
   }
 

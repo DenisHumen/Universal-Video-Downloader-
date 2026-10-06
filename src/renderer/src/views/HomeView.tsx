@@ -43,6 +43,7 @@ import TrimEditor from '../components/TrimEditor'
 import CapabilitiesPanel from '../components/CapabilitiesPanel'
 import Choice from '../components/Choice'
 import Thumbnail from '../components/Thumbnail'
+import ReportPrompt from '../components/ReportPrompt'
 
 type Status = 'idle' | 'detecting' | 'error'
 
@@ -81,6 +82,8 @@ export default function HomeView(): JSX.Element {
   const [error, setError] = useState('')
   const [errorCode, setErrorCode] = useState<AppErrorCode | undefined>()
   const [cookieHint, setCookieHint] = useState(false)
+  /** The failed link main kept for an error report — the field may be edited since. */
+  const [reported, setReported] = useState<{ id: string; url: string } | null>(null)
   const [selection, setSelection] = useState<Selection>({ mode: 'video', quality: 'best' })
   const [starting, setStarting] = useState(false)
   const [batchOpen, setBatchOpen] = useState(false)
@@ -159,6 +162,7 @@ export default function HomeView(): JSX.Element {
     setError('')
     setErrorCode(undefined)
     setCookieHint(false)
+    setReported(null)
     setInfo(null)
     // Same reasoning as SearchView: the engine can refuse to install, and a
     // rejected invoke would otherwise leave the card in its skeleton.
@@ -186,6 +190,7 @@ export default function HomeView(): JSX.Element {
       setError(res.error || t('home.errorTitle'))
       setErrorCode(res.errorCode)
       setCookieHint(Boolean(res.cookieHint) || needsCookiesOften(target))
+      setReported(res.reportId ? { id: res.reportId, url: target } : null)
       setStatus('error')
     }
   }
@@ -201,6 +206,7 @@ export default function HomeView(): JSX.Element {
     setError('')
     setErrorCode(undefined)
     setCookieHint(false)
+    setReported(null)
     setStatus('idle')
     setUrl('')
   }
@@ -510,6 +516,16 @@ export default function HomeView(): JSX.Element {
                   </button>
                 </div>
                 <p className="hint mt-3">{t('browser.openHint')}</p>
+                {/* Keyed by the failure, so a retry that fails again asks afresh. */}
+                {reported && (
+                  <ReportPrompt
+                    key={reported.id}
+                    reportId={reported.id}
+                    stage="detect"
+                    url={reported.url}
+                    errorCode={errorCode}
+                  />
+                )}
               </div>
             </motion.div>
           )}

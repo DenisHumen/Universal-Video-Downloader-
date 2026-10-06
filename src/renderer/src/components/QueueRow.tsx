@@ -23,6 +23,7 @@ import { useT, type TranslationKey } from '../i18n'
 import { toast } from '../lib/toast'
 import MediaJobModal, { type JobMode } from './MediaJobModal'
 import Thumbnail from './Thumbnail'
+import ReportPrompt, { useReportOffer } from './ReportPrompt'
 
 interface Props {
   item: DownloadItem
@@ -138,6 +139,22 @@ function QueueRow({ item, index, animateIn = true }: Props): JSX.Element {
   */
   const sourceLink = item.sourceUrl || item.url
   const hasWebLink = item.kind !== 'trim' && item.kind !== 'convert' && /^https?:\/\//i.test(sourceLink)
+
+  /*
+    A failed row offers a report behind one small toggle rather than with the
+    whole card open: a queue of twenty failures should read as twenty rows, not
+    twenty questions.
+  */
+  const failure = {
+    reportId: item.state === 'error' ? item.reportId : undefined,
+    stage: 'download' as const,
+    url: item.kind === 'trim' || item.kind === 'convert' ? (item.sourcePath ?? item.url) : sourceLink,
+    errorCode: item.errorCode
+  }
+  const canReport = useReportOffer(failure)
+  // Open for one failure: a retry that fails again starts closed, like any new failure.
+  const [reportOpenFor, setReportOpenFor] = useState<string | null>(null)
+  const reportOpen = Boolean(failure.reportId) && reportOpenFor === failure.reportId
 
   const copyLink = async (): Promise<void> => {
     try {
@@ -439,6 +456,20 @@ function QueueRow({ item, index, animateIn = true }: Props): JSX.Element {
               </AnimatePresence>
             </>
           )}
+          {canReport && (
+            <button
+              onClick={() => setReportOpenFor(reportOpen ? null : (failure.reportId ?? null))}
+              aria-expanded={reportOpen}
+              className="mono mt-2 flex items-center gap-1 text-[11px] uppercase tracking-[0.08em] text-accent-ink transition-colors duration-fast ease-ease hover:text-ink"
+            >
+              {t('report.open')}
+              <motion.span animate={{ rotate: reportOpen ? 180 : 0 }} transition={{ duration: 0.16 }}>
+                <ChevronDown size={12} />
+              </motion.span>
+            </button>
+          )}
+          {/* Stays mounted once answered, so it can say how sending went. */}
+          {reportOpen && <ReportPrompt key={failure.reportId} {...failure} />}
         </div>
       )}
 

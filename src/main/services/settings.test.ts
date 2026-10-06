@@ -42,6 +42,13 @@ describe('migrate', () => {
     expect(migrate(raw)).toMatchObject(raw)
   })
 
+  it('repairs an error-report choice it does not recognise, and only that', () => {
+    expect(migrate({ errorReports: 'always' }).errorReports).toBe('ask')
+    expect(migrate({ errorReports: 'off' }).errorReports).toBe('off')
+    // A partial save of some other setting must not switch reports back on.
+    expect('errorReports' in migrate({ theme: 'day' })).toBe(false)
+  })
+
   it('replaces a filename template that would write outside the folder', () => {
     expect(migrate({ filenameTemplate: '../../evil.%(ext)s' }).filenameTemplate).toBe(
       '%(title)s [%(id)s].%(ext)s'

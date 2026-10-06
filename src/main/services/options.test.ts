@@ -46,6 +46,7 @@ function settings(overrides: Partial<AppSettings> = {}): AppSettings {
     proxy: '',
     cookiesFromBrowser: '',
     cookiesFile: '',
+    errorReports: 'ask',
     ...overrides
   }
 }
@@ -255,6 +256,59 @@ describe('classifyYtdlpError', () => {
       'unavailable'
     )
     expect(classifyYtdlpError('ERROR: HTTP Error 404: Not Found', false).code).toBe('unavailable')
+  })
+
+  /*
+    The access rules matched bare letter runs anywhere in the line, link
+    included: `age` in "page", `geo` in "geology", `log in` in "login-free". An
+    unsupported site was then filed as age-restricted, region-locked or behind
+    a login - none of which is worth an error report, so the one failure the
+    report exists for never offered one.
+  */
+  it('calls an unsupported URL unsupported, whatever the URL says', () => {
+    for (const url of [
+      'https://example.com/page/12',
+      'https://images.example.org/v/1',
+      'https://example.com/video/geology-101',
+      'https://example.com/login-free/video',
+      'https://example.com/region/account/403'
+    ]) {
+      expect(classifyYtdlpError(`ERROR: Unsupported URL: ${url}`, false).code).toBe('noFormats')
+    }
+  })
+
+  it('does not read "webpage" as an age gate', () => {
+    expect(
+      classifyYtdlpError('ERROR: [generic] Unable to download webpage: HTTP Error 403: Forbidden', false).code
+    ).toBe('forbidden')
+    expect(
+      classifyYtdlpError('ERROR: [generic] Unable to download webpage: The read operation timed out', false).code
+    ).toBe('timeout')
+    expect(
+      classifyYtdlpError(
+        'ERROR: [generic] Unable to download webpage: <urlopen error [Errno 11001] getaddrinfo failed>',
+        false
+      ).code
+    ).toBe('network')
+  })
+
+  it('ignores the video id the engine quotes', () => {
+    expect(classifyYtdlpError('ERROR: [generic] geology-101: Unable to extract video data', false).code).toBe(
+      'noFormats'
+    )
+  })
+
+  it('still recognises the real gates by their words', () => {
+    const code = (raw: string): string | undefined => classifyYtdlpError(raw, false).code
+    expect(code('ERROR: [youtube] dQw4w9WgXcQ: Sign in to confirm your age. This video may be inappropriate')).toBe(
+      'ageRestricted'
+    )
+    expect(code('ERROR: [site] 1: This video is age-restricted')).toBe('ageRestricted')
+    expect(code('ERROR: [site] 1: Login required to view this video')).toBe('signIn')
+    expect(code('ERROR: [site] 1: Join this channel to get access to members-only content')).toBe('signIn')
+    expect(code('ERROR: [site] 1: This video is not available from your location due to geo restriction')).toBe('geo')
+    expect(code('ERROR: [youtube] x: The uploader has not made this video available in your country')).toBe('geo')
+    expect(code('ERROR: [site] 1: This video is not available in your region')).toBe('geo')
   })
 })
 
