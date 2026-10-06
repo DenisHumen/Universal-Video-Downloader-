@@ -1,4 +1,4 @@
-import { app, net } from 'electron'
+import { app, net, powerMonitor } from 'electron'
 import { EventEmitter } from 'events'
 import { spawn, execFileSync } from 'child_process'
 import {
@@ -19,6 +19,18 @@ import { log } from './log'
 import { proxyEnv } from './options'
 import { getSettings } from './settings'
 import { proxyUrl, withProxyAuth } from './proxy-auth'
+import {
+  afterFailure,
+  afterSuccess,
+  parseRefreshState,
+  refreshDue,
+  REFRESH_LAUNCH_DELAY,
+  REFRESH_RESUME_DELAY,
+  REFRESH_TICK,
+  retryDelay,
+  runRefresh,
+  type RefreshState
+} from './engine-refresh'
 
 export const ytdlpEvents = new EventEmitter()
 
@@ -315,6 +327,31 @@ export class EngineBusyError extends Error {
 }
 
 let updating: Promise<string | undefined> | null = null
+/** The scheduled refresh while it runs; resolves to whether it brought the engine up to date. */
+let refreshing: Promise<boolean> | null = null
+
+/** The self-update keeps the same path and is fast when already current. */
+async function selfUpdate(): Promise<number> {
+  return (await spawnYtdlp(['-U'])).code
+}
+
+/**
+ * A new binary over the old one, and proof that it starts.
+ *
+ * The same check `ensureYtdlp` makes after its first download, ad-hoc re-sign
+ * included. If the new file still will not run, the old one is already gone,
+ * so the cached "engine is ready" answer is dropped: the next detection or
+ * download then installs it again through `ensureYtdlp`, which reports a
+ * failure where the user can see it.
+ */
+async function freshCopy(): Promise<void> {
+  await downloadBinary()
+  if (await getVersion()) return
+  repairMacSignature(ytdlpBinaryPath())
+  if (await getVersion()) return
+  ensurePromise = null
+  throw new Error('The download engine was installed but failed to start on this system.')
+}
 
 /**
  * Force update the engine to the latest release.
@@ -334,20 +371,34 @@ export async function updateYtdlp(isBusy: () => boolean = () => false): Promise<
   if (updating) return updating
 
   updating = (async () => {
+    /*
+      The scheduled refresh may be replacing the file right now, and two at
+      once would race over one path. Wait for it, and if it worked there is
+      nothing left to do. If it did not, run our own: a failure must reach the
+      person who pressed the button, not be swallowed the way the background
+      one's is.
+    */
+    if (refreshing && (await refreshing)) {
+      const version = await getVersion()
+      emit({ state: 'ready', version, message: 'Ready' })
+      return version
+    }
     emit({ state: 'checking', message: 'Updating download engine…' })
     try {
-      // The self-update keeps the same path and is fast when up to date.
-      const { code } = await spawnYtdlp(['-U'])
-      if (code !== 0) {
-        // Fall back to a fresh download.
-        await downloadBinary()
-      }
+      const outcome = await runRefresh({ selfUpdate, download: freshCopy, isBusy })
+      if (outcome.kind === 'busy') throw new EngineBusyError()
+      if (outcome.kind === 'failed') throw new Error(outcome.error)
       markRefreshed()
       const version = await getVersion()
       emit({ state: 'ready', version, message: 'Ready' })
-      log.info('engine', 'Updated', { version, via: code === 0 ? 'self-update' : 'fresh download' })
+      log.info('engine', 'Updated', { version, via: outcome.via })
       return version
     } catch (err) {
+      if (err instanceof EngineBusyError) {
+        // Nothing was replaced, so the engine the new download runs from is still a working one.
+        emit({ state: 'ready', version: await getVersion(), message: 'Ready' })
+        throw err
+      }
       const message = err instanceof Error ? err.message : String(err)
       emit({ state: 'error', message })
       log.warn('engine', 'Update failed', { error: message })
@@ -362,27 +413,28 @@ export async function updateYtdlp(isBusy: () => boolean = () => false): Promise<
   }
 }
 
-const REFRESH_INTERVAL = 24 * 60 * 60 * 1000
-
 function stateFile(): string {
   return join(app.getPath('userData'), 'engine.json')
 }
 
-function lastRefresh(): number {
+function readRefreshState(): RefreshState {
   try {
-    const raw = JSON.parse(readFileSync(stateFile(), 'utf-8')) as { lastRefresh?: number }
-    return typeof raw.lastRefresh === 'number' ? raw.lastRefresh : 0
+    return parseRefreshState(JSON.parse(readFileSync(stateFile(), 'utf-8')))
   } catch {
-    return 0
+    return parseRefreshState(undefined)
+  }
+}
+
+function writeRefreshState(state: RefreshState): void {
+  try {
+    writeFileSync(stateFile(), JSON.stringify(state), 'utf-8')
+  } catch {
+    /* the cadence is an optimisation, not a correctness requirement */
   }
 }
 
 function markRefreshed(): void {
-  try {
-    writeFileSync(stateFile(), JSON.stringify({ lastRefresh: Date.now() }), 'utf-8')
-  } catch {
-    /* the cadence is an optimisation, not a correctness requirement */
-  }
+  writeRefreshState(afterSuccess(Date.now()))
 }
 
 /**
@@ -398,22 +450,99 @@ function markRefreshed(): void {
  * The timestamp lives on disk, and `isBusy` lets the caller say when the engine
  * is being used. Sites change their players constantly, so a stale engine is a
  * real failure mode — but never at the cost of a running download.
+ *
+ * Only a refresh that happened is written down as one. The timestamp used to be
+ * stamped whatever `-U` answered, so an attempt refused by GitHub or made with
+ * no network counted as the day's refresh. A failure now leaves it alone and
+ * backs off for a few hours instead (see `retryDelay`), and this path never
+ * reports an error on the engine card: the engine that was there still works,
+ * and the next attempt is already scheduled.
  */
 export async function refreshEngineIfDue(isBusy: () => boolean): Promise<void> {
-  if (Date.now() - lastRefresh() < REFRESH_INTERVAL) return
+  // One at a time, and never beside the button in Settings: both replace one file.
+  if (updating || refreshing) return
+  const state = readRefreshState()
+  if (!refreshDue(state, Date.now())) return
+  /*
+    Offline, the attempt can only fail. A "no" from `isOnline` is reliable, so
+    nothing is tried and nothing is counted against the next attempt; the next
+    tick, or waking up, asks again.
+  */
+  if (!net.isOnline()) return
   if (isBusy()) {
-    log.info('engine', 'Daily refresh skipped; a download is using the engine')
+    log.info('engine', 'Daily refresh put off; a download is using the engine')
     return
   }
   if (!existsSync(ytdlpBinaryPath())) return
+
+  refreshing = refreshNow(state, isBusy)
   try {
-    const { code } = await spawnYtdlp(['-U'])
-    markRefreshed()
-    const version = await getVersion()
-    if (version) emit({ state: 'ready', version, message: 'Ready' })
-    if (code === 0) log.info('engine', 'Daily refresh done', { version })
-    else log.warn('engine', 'Daily refresh failed', { code, version })
-  } catch {
-    /* best-effort */
+    await refreshing
+  } finally {
+    refreshing = null
   }
+}
+
+async function refreshNow(state: RefreshState, isBusy: () => boolean): Promise<boolean> {
+  /*
+    What the engine card showed before. A fallback download reports its
+    progress there, and one that fails must not leave the card saying
+    "downloading" for the rest of the session.
+  */
+  const before = currentStatus
+  try {
+    const outcome = await runRefresh({ selfUpdate, download: freshCopy, isBusy })
+    if (outcome.kind === 'done') {
+      markRefreshed()
+      const version = await getVersion()
+      if (version) emit({ state: 'ready', version, message: 'Ready' })
+      else if (currentStatus !== before) emit(before)
+      log.info('engine', 'Daily refresh done', { version, via: outcome.via })
+      return true
+    }
+    if (currentStatus !== before) emit(before)
+    if (outcome.kind === 'busy') {
+      log.info('engine', 'Daily refresh put off; a download started while it ran', {
+        code: outcome.code
+      })
+      return false
+    }
+    const online = net.isOnline()
+    const next = afterFailure(state, Date.now(), online)
+    writeRefreshState(next)
+    log.warn('engine', 'Daily refresh failed', {
+      code: outcome.code,
+      error: outcome.error,
+      retryInHours: online ? retryDelay(next.failures) / 3_600_000 : undefined
+    })
+    return false
+  } catch (err) {
+    if (currentStatus !== before) emit(before)
+    log.warn('engine', 'Daily refresh failed', { error: err instanceof Error ? err.message : String(err) })
+    return false
+  }
+}
+
+let refreshScheduled = false
+
+/**
+ * Keep the engine fresh for as long as the app runs, not only at launch.
+ *
+ * The refresh used to be tried once, thirty seconds in. An app that starts at
+ * login and lives in the tray could go days without another attempt, and that
+ * one attempt was usually skipped because the downloads resumed at launch were
+ * still using the engine. The hourly tick is cheap - the 24-hour gate is a
+ * timestamp on disk - and survives sleep, since it compares against the wall
+ * clock rather than counting down. Waking up asks too, after a pause for the
+ * network to come back.
+ */
+export function scheduleEngineRefresh(isBusy: () => boolean): void {
+  if (refreshScheduled) return
+  refreshScheduled = true
+  const tick = (): void => {
+    refreshEngineIfDue(isBusy).catch(() => undefined)
+  }
+  setTimeout(tick, REFRESH_LAUNCH_DELAY)
+  setInterval(tick, REFRESH_TICK)
+  powerMonitor.on('resume', () => setTimeout(tick, REFRESH_RESUME_DELAY))
 }

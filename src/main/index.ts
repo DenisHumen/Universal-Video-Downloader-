@@ -15,7 +15,7 @@ import { registerIpc } from './ipc'
 import { flushSettings, getSettings } from './services/settings'
 import { applyProxy } from './services/proxy'
 import { answerProxyLoginsForPages } from './services/proxy-auth'
-import { ensureYtdlp, refreshEngineIfDue } from './services/ytdlp'
+import { ensureYtdlp, scheduleEngineRefresh } from './services/ytdlp'
 import { checkForUpdates, initUpdater } from './services/updater'
 import { flushLog, initLog, log, setLogLevel } from './services/log'
 import { flushWatches } from './services/automation/store'
@@ -611,9 +611,11 @@ if (cliArgs) {
       Refresh the download engine once a day, well after the window is up and
       only while nothing is using it. Sites change their players constantly, so
       a stale engine is a real failure mode — but swapping the binary out from
-      under a running transfer is a worse one.
+      under a running transfer is a worse one. Asked hourly and on waking, so a
+      refresh put off by a busy engine or a dead network is not lost until the
+      next launch.
     */
-    setTimeout(() => void refreshEngineIfDue(isEngineBusy), 30_000)
+    scheduleEngineRefresh(isEngineBusy)
 
     /*
       Schedules run whenever the app is open. This used to wait for background
