@@ -138,6 +138,7 @@ export type AppErrorCode =
   | 'unsupportedPlayer'
   | 'notOnYummyAnime'
   | 'engineMissing'
+  | 'adultHidden'
 
 export type DownloadState =
   | 'queued'
@@ -486,6 +487,8 @@ export interface AppSettings {
    * This is what makes sites without a dedicated resolver work.
    */
   universalFallback: boolean
+  /** Offer adult sites (`ADULT_SEARCH_SERVICES`) in title search. Off by default. */
+  showAdultServices: boolean
   proxy: string
   /** Read cookies from this installed browser (e.g. 'chrome', 'firefox', 'safari'). Empty = off. */
   cookiesFromBrowser: string
@@ -615,7 +618,16 @@ export interface DetectStatus {
 
 // ---- Title search ----
 
-/** Services searchable by title (each verified to return real results). */
+/**
+ * Services searchable by title.
+ *
+ * YouTube, SoundCloud and Pornhub are searched through the engine; anime,
+ * Dailymotion, Niconico and Bilibili through the sites' own JSON APIs, because
+ * the engine's search returned nothing for the last three. This used to say
+ * every service was verified to return real results while three of them
+ * answered every query with "nothing found" - `search-apis.test.ts` now pins
+ * the answer shapes, and its live checks can be run by hand.
+ */
 export type SearchService =
   | 'youtube'
   | 'soundcloud'
@@ -646,6 +658,21 @@ export const SEARCH_ALL_SERVICES: readonly SearchService[] = [
   'yummyani',
   'pornhub'
 ] as const
+
+/**
+ * Services whose results are adult content.
+ *
+ * They sat in the default pill row and in every "all services" search, for
+ * everyone, so a search for a cartoon could put explicit thumbnails on the
+ * screen of someone who had never asked for them. They are now opt-in, with
+ * `AppSettings.showAdultServices`.
+ */
+export const ADULT_SEARCH_SERVICES: readonly SearchService[] = ['pornhub'] as const
+
+/** The services in `list` the user's adult-content choice allows. */
+export function allowedSearchServices<T extends SearchScope>(list: readonly T[], showAdult: boolean): T[] {
+  return showAdult ? [...list] : list.filter((s) => !ADULT_SEARCH_SERVICES.includes(s as SearchService))
+}
 
 /** What the user searches: one service, or all of them in parallel. */
 export type SearchScope = SearchService | 'all'

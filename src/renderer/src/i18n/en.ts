@@ -179,12 +179,15 @@ export const en = {
   'search.title': 'search across every service',
   'search.hint': 'videos, music & anime — type a title and press enter',
   'search.placeholder': 'search videos, music & anime by title',
+  'search.label': 'title',
   'search.services': 'services',
   'search.allServices': 'all services',
-  'search.searching': 'searching {service}',
+  'search.idle': 'search {service}',
+  'search.idleHint': 'e.g. lofi hip hop, naruto 1',
   'search.results': '{count} results',
   'search.nothing': 'nothing found',
   'search.nothingHint': 'try different keywords',
+  'search.tryAll': 'search all services',
   'search.failed': 'search failed',
   'search.episodes': 'episodes',
   'search.queued': 'queued',
@@ -259,6 +262,8 @@ export const en = {
   'settings.universal': 'universal detection',
   'settings.universalHint':
     'when the engine doesn’t know a site, open the page in a hidden browser window and capture the video stream from it. this is what makes unsupported sites work — turn it off if you prefer the app to never load remote pages.',
+  'settings.adultServices': 'adult sites in search',
+  'settings.adultServicesHint': 'show Pornhub among the search services and include it when you search all of them.',
 
   'settings.cookies': 'use cookies from browser',
   'settings.cookiesHint':
@@ -487,6 +492,7 @@ export const en = {
   'err.unsupportedPlayer': 'this kind of Kodik player is not supported yet.',
   'err.notOnYummyAnime': 'this title isn’t on YummyAnime, which is where Shikimori links are downloaded from.',
   'err.engineMissing': 'the download engine couldn’t be installed — check your connection and try again.',
+  'err.adultHidden': 'adult sites are turned off for search. you can turn them on in settings → detection.',
   'err.cookieHint': 'try switching on browser cookies in settings → access.',
   'common.save': 'save',
   'common.saved': 'saved',

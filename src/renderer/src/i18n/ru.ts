@@ -172,12 +172,15 @@ export const ru: Dictionary = {
   'search.title': 'поиск по всем сервисам',
   'search.hint': 'видео, музыка и аниме — введите название и нажмите enter',
   'search.placeholder': 'поиск видео, музыки и аниме по названию',
+  'search.label': 'название',
   'search.services': 'сервисы',
   'search.allServices': 'все сервисы',
-  'search.searching': 'ищу: {service}',
+  'search.idle': 'поиск: {service}',
+  'search.idleHint': 'например: lofi hip hop, naruto 1',
   'search.results': 'результатов: {count}',
   'search.nothing': 'ничего не найдено',
   'search.nothingHint': 'попробуйте другие слова',
+  'search.tryAll': 'искать во всех сервисах',
   'search.failed': 'поиск не удался',
   'search.episodes': 'серии',
   'search.queued': 'в очереди',
@@ -252,6 +255,8 @@ export const ru: Dictionary = {
   'settings.universal': 'универсальное определение',
   'settings.universalHint':
     'если движок не знает сайт — открыть страницу в скрытом окне браузера и перехватить поток. именно это заставляет работать сайты без отдельной поддержки; выключите, если не хотите, чтобы приложение само загружало страницы.',
+  'settings.adultServices': 'сайты для взрослых в поиске',
+  'settings.adultServicesHint': 'показывать Pornhub среди сервисов поиска и искать на нём, когда выбраны все сервисы.',
 
   'settings.cookies': 'брать cookies из браузера',
   'settings.cookiesHint':
@@ -474,6 +479,7 @@ export const ru: Dictionary = {
   'err.unsupportedPlayer': 'такой плеер Kodik пока не поддерживается.',
   'err.notOnYummyAnime': 'этого тайтла нет на YummyAnime — а видео по ссылкам с Shikimori приложение берёт именно оттуда.',
   'err.engineMissing': 'не удалось установить движок загрузок — проверьте подключение и попробуйте снова.',
+  'err.adultHidden': 'сайты для взрослых в поиске выключены. включить их можно в настройках → определение.',
   'err.cookieHint': 'попробуйте включить cookies браузера в настройках → доступ.',
   'common.save': 'сохранить',
   'common.saved': 'сохранено',

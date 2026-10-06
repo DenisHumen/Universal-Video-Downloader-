@@ -26,6 +26,25 @@ export default function SearchApp(): JSX.Element {
     })()
   }, [])
 
+  /*
+    Read again whenever the window comes forward. It used to read the settings
+    once, when it opened, so a change made in the main window meanwhile - the
+    theme, the language, adult sites switched off for search - never reached
+    it, and it went on offering a service main would now refuse.
+  */
+  useEffect(() => {
+    const refresh = (): void => {
+      void window.api.getSettings().then((next) => {
+        const info = useStore.getState().appInfo
+        if (info) applyAppearance(next, info.locale)
+        setSettings(next)
+        useStore.setState({ settings: next })
+      })
+    }
+    window.addEventListener('focus', refresh)
+    return () => window.removeEventListener('focus', refresh)
+  }, [])
+
   return (
     <>
       <Toasts />

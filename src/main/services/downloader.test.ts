@@ -35,6 +35,7 @@ function settings(overrides: Partial<AppSettings> = {}): AppSettings {
     clipboardWatch: false,
     trayEnabled: false,
     universalFallback: true,
+    showAdultServices: false,
     preferCompatible: true,
     automationEnabled: false,
     autostart: false,
