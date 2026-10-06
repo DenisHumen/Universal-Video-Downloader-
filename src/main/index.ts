@@ -15,8 +15,8 @@ import { registerIpc } from './ipc'
 import { flushSettings, getSettings } from './services/settings'
 import { applyProxy } from './services/proxy'
 import { answerProxyLoginsForPages } from './services/proxy-auth'
-import { ensureYtdlp, refreshEngineIfDue } from './services/ytdlp'
-import { checkForUpdates, initUpdater } from './services/updater'
+import { ensureYtdlp, scheduleEngineRefresh } from './services/ytdlp'
+import { initUpdater, scheduleUpdateChecks } from './services/updater'
 import { flushLog, initLog, log, setLogLevel } from './services/log'
 import { flushWatches } from './services/automation/store'
 import { startWatcher, stopWatcher } from './services/automation/watcher'
@@ -600,20 +600,23 @@ if (cliArgs) {
         .catch(() => undefined)
     }
 
-    // Check for app updates a few seconds after launch.
-    setTimeout(() => {
-      if (getSettings().autoUpdate && app.isPackaged) {
-        checkForUpdates().catch(() => undefined)
-      }
-    }, 5000)
+    /*
+      Check for app updates a few seconds after launch and every few hours
+      after that, for as long as the app runs - it may live in the tray for
+      days. The setting is read on every tick, so switching it off takes effect
+      at once.
+    */
+    scheduleUpdateChecks(() => getSettings().autoUpdate && app.isPackaged)
 
     /*
       Refresh the download engine once a day, well after the window is up and
       only while nothing is using it. Sites change their players constantly, so
       a stale engine is a real failure mode — but swapping the binary out from
-      under a running transfer is a worse one.
+      under a running transfer is a worse one. Asked hourly and on waking, so a
+      refresh put off by a busy engine or a dead network is not lost until the
+      next launch.
     */
-    setTimeout(() => void refreshEngineIfDue(isEngineBusy), 30_000)
+    scheduleEngineRefresh(isEngineBusy)
 
     /*
       Schedules run whenever the app is open. This used to wait for background

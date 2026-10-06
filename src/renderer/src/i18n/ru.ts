@@ -324,7 +324,7 @@ export const ru: Dictionary = {
   // ---- update banner ----
   'update.available': 'доступна версия {version}',
   'update.availableHint': 'можно скачать и установить',
-  'update.availableManualHint': 'откроется страница загрузки в браузере',
+  'update.availableManualHint': 'загрузка откроется в браузере',
   'update.downloading': 'скачиваю обновление…',
   'update.ready': 'обновление {version} готово',
   'update.readyHint': 'приложение перезапустится, чтобы применить его',

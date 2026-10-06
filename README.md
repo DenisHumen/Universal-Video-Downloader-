@@ -72,7 +72,7 @@ Both repositories are signed, and updates arrive with the rest of the system (`s
 xattr -dr com.apple.quarantine "/Applications/Universal Video Downloader.app"
 ```
 
-The same command is printed in the install window. Unsigned apps can't replace themselves, so on a Mac the app offers you the new version's download page instead of updating in place.
+The same command is printed in the install window. Unsigned apps can't replace themselves, so on a Mac the app hands you the new version's disk image for your processor instead of updating in place.
 
 ## Download from the terminal
 
@@ -175,7 +175,7 @@ Checks run on a schedule with back-off on failures (15 minutes at the shortest);
 | **access & cookies** | Cookies from Chrome, Firefox, Edge, Safari, Brave, Chromium, Opera, Vivaldi, or a `cookies.txt` |
 | **network** | A proxy for the engine and for the app's own requests |
 | **system** | Notifications, clipboard watcher, tray icon |
-| **updates** | Automatic updates |
+| **updates** | Automatic update checks, every six hours while the app runs: Windows and the AppImage install the new version, macOS and the `.deb` / `.rpm` open its download |
 
 Settings, history and watches live in the per-user application data folder; the log (`uvd.log`) sits beside them, with secrets and signed links redacted before anything is written.
 
