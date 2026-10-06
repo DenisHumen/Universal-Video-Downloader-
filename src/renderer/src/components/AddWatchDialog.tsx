@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
-import { CalendarClock, Film, Loader2, X } from 'lucide-react'
+import { CalendarClock, Film, Loader2, Radar, X } from 'lucide-react'
 import { dialog, overlay } from '../lib/motion'
 import { resolveLanguage, useT } from '../i18n'
 import { toast } from '../lib/toast'
@@ -8,6 +8,14 @@ import { describeError } from '../lib/errors'
 import { releaseDate, releaseText } from '../lib/release'
 import { useStore } from '../store'
 import Thumbnail from './Thumbnail'
+import {
+  exactDuplicate,
+  inheritedSeen,
+  MAX_PER_CHECK,
+  newEpisodes,
+  watchingAlready,
+  type Watch
+} from '@shared/automation'
 import type { SeriesOffer } from '../../../main/automation-ipc'
 import type { WatchIntent } from '../store'
 
@@ -40,13 +48,21 @@ export default function AddWatchDialog({
   const [translatorId, setTranslatorId] = useState('')
   const [quality, setQuality] = useState('720p')
   const [saving, setSaving] = useState(false)
+  /** Whether the episodes already out are fetched too. On by default: it is what every watch did before it was asked. */
+  const [backfill, setBackfill] = useState(true)
+  /** What is watched already, read alongside the series so a duplicate can be pointed out before it is made. */
+  const [watches, setWatches] = useState<Watch[]>([])
 
   const look = async (keep?: WatchIntent): Promise<void> => {
     const target = (keep?.url ?? url).trim()
     if (!target) return
     setLooking(true)
     try {
-      const found = await window.api.autoDescribe(target)
+      const [found, list] = await Promise.all([
+        window.api.autoDescribe(target),
+        window.api.autoList().catch((): Watch[] => [])
+      ])
+      setWatches(list)
       setOffer(found)
       /*
         What was chosen on the home screen is honoured when it exists here,
@@ -73,6 +89,24 @@ export default function AddWatchDialog({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
+  const dub = offer?.translators.find((x) => x.id === translatorId)
+  const series = offer && {
+    provider: offer.provider,
+    url: offer.url,
+    translatorId: offer.upcoming ? '' : translatorId
+  }
+  const already = series && watchingAlready(watches, series)
+  /** Same series, dub and quality: main would refuse it, so the button does too. */
+  const copy =
+    series && exactDuplicate(watches, { ...series, quality, pending: Boolean(offer?.upcoming) })
+  /*
+    What "also download" would fetch: the dub's episodes, less any that a
+    watch already following it has handled - those are not news to a second
+    watch either, and main leaves them out whatever the box says.
+  */
+  const backlog =
+    series && dub ? newEpisodes(inheritedSeen(watches, { ...series, seen: [] }), dub.list) : []
+
   const add = async (): Promise<void> => {
     if (!offer) return
     setSaving(true)
@@ -96,14 +130,19 @@ export default function AddWatchDialog({
         nextCheckAt: 0,
         failures: 0,
         /*
-          Everything already out is marked as seen. Somebody adding a series
-          part-way through a season wants the next episode, not a sudden queue
-          of twenty they already have — and the ones they do want are a normal
-          download away.
+          The back catalogue is the checkbox's to decide. Ticked - the default,
+          and what every watch did before there was a choice - nothing counts
+          as seen, and the first check fetches what is out, a check's worth at
+          a time. Unticked, everything out now is marked seen and only what
+          comes next is fetched: somebody adding a series part-way through a
+          season may well have the rest. Nothing is out for an upcoming title,
+          so there is nothing to mark.
         */
-        seen: [],
+        seen: offer.upcoming || backfill ? [] : dub?.list ?? [],
         steps: [{ id: crypto.randomUUID(), kind: 'download', enabled: true }]
       })
+      // Only when the list read with the series was out of date; the button is off for a known copy.
+      if (created.existing) toast(t('auto.alreadyWatching'), 'info')
       onAdded(created.id)
     } catch (err) {
       toast(describeError(err), 'error')
@@ -174,6 +213,30 @@ export default function AddWatchDialog({
                   </div>
                 </div>
 
+                {/*
+                  Pointed out, not forbidden: a second watch at another quality
+                  or for another share is a fair thing to want. Only an exact
+                  copy, which could do nothing but fetch every episode twice,
+                  cannot be added.
+                */}
+                {already && (
+                  <div className="well flex gap-3 p-3">
+                    <Radar size={16} className="mt-0.5 shrink-0 text-ink-2" />
+                    <div className="min-w-0 flex-1">
+                      <p className="text-[13px] text-ink">{t('auto.alreadyWatching')}</p>
+                      <p className="hint mt-1">
+                        {copy ? t('auto.alreadySameQuality') : t('auto.alreadyHint')}
+                      </p>
+                    </div>
+                    <button
+                      className="btn shrink-0 self-start"
+                      onClick={() => onAdded((copy || already).id)}
+                    >
+                      {t('auto.openExisting')}
+                    </button>
+                  </div>
+                )}
+
                 {offer.upcoming && (
                   <div className="well flex gap-3 p-3">
                     <CalendarClock size={16} className="mt-0.5 shrink-0 text-ink-2" />
@@ -208,6 +271,24 @@ export default function AddWatchDialog({
                   <p className="hint mt-1.5">{t('auto.dubHint')}</p>
                 </div>
 
+                {!offer.upcoming && backlog.length > 0 && (
+                  <div>
+                    <label className="flex items-center gap-2.5 text-[13px] text-ink">
+                      <input
+                        type="checkbox"
+                        checked={backfill}
+                        onChange={(e) => setBackfill(e.target.checked)}
+                      />
+                      {t('auto.backfill', { n: String(backlog.length) })}
+                    </label>
+                    <p className="hint mt-1.5">
+                      {backfill && backlog.length > MAX_PER_CHECK
+                        ? t('auto.backfillBatches', { n: String(MAX_PER_CHECK) })
+                        : t('auto.backfillHint')}
+                    </p>
+                  </div>
+                )}
+
                 <div>
                   <p className="label mb-2">{t('common.quality')}</p>
                   <select
@@ -231,9 +312,13 @@ export default function AddWatchDialog({
             <button className="btn" onClick={onClose}>
               {t('common.cancel')}
             </button>
-            <button className="btn-solid" onClick={() => void add()} disabled={!offer || saving}>
+            <button
+              className="btn-solid"
+              onClick={() => void add()}
+              disabled={!offer || saving || Boolean(copy)}
+            >
               {saving ? <Loader2 size={14} className="animate-spin" /> : null}
-              {t('auto.startWatching')}
+              {already ? t('auto.addAnyway') : t('auto.startWatching')}
             </button>
           </div>
         </motion.div>

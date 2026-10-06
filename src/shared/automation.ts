@@ -6,9 +6,12 @@
  * will produce before anything is downloaded.
  */
 
+import { normalizeUrl } from './urls'
+
 export type StepKind = 'download' | 'rename' | 'upload' | 'notify'
 export type StepState = 'pending' | 'running' | 'done' | 'failed' | 'skipped'
-export type RunState = 'running' | 'done' | 'failed'
+/** `skipped`: somebody cancelled or removed the episode's download in the queue, or stopped the watch. */
+export type RunState = 'running' | 'done' | 'failed' | 'skipped'
 
 /** One find-and-replace applied to the title before it reaches a template. */
 export interface Replacement {
@@ -50,6 +53,27 @@ export interface NotifyStep {
 }
 
 export type PipelineStep = DownloadStep | RenameStep | UploadStep | NotifyStep
+
+/**
+ * The order steps run in, whatever order they were added in.
+ *
+ * The pipeline has always run them in this order, but the screen drew a
+ * watch's steps - and listed each episode's in its history - in the order they
+ * were added, so a chain built as "notify, then upload" read as if the message
+ * went out before the file had arrived.
+ */
+export const STEP_ORDER: readonly StepKind[] = ['download', 'rename', 'upload', 'notify']
+
+/** A kind this build does not know - a file from a newer one - goes last rather than first. */
+function stepRank(kind: StepKind): number {
+  const rank = STEP_ORDER.indexOf(kind)
+  return rank < 0 ? STEP_ORDER.length : rank
+}
+
+/** For `sort`, and only ever on a copy: steps, or a run's record of them, in the order they run. */
+export function byStepOrder(a: { kind: StepKind }, b: { kind: StepKind }): number {
+  return stepRank(a.kind) - stepRank(b.kind)
+}
 
 /**
  * A remote share. Lives in settings rather than in a watch, because one server
@@ -119,6 +143,26 @@ export interface Watch {
   pending?: boolean
   /** When the site expects the release, in milliseconds. Absent when it does not say. */
   releaseAt?: number
+  /**
+   * Why the last episode failed somewhere along the chain, and when.
+   *
+   * Separate from `lastError`, which only a check writes and the next good check
+   * clears. A check that finds nothing new does not mean the chain works again,
+   * so only an episode that gets all the way through clears this - a retry of
+   * the failed one included - and so does the user, by editing the steps,
+   * pausing or resuming, or dismissing it.
+   */
+  lastRunError?: string
+  lastRunFailedAt?: number
+  /**
+   * Failed goes so far at each episode not yet given up on, by `episodeKey`.
+   *
+   * A failed episode is left out of `seen`, so the next check - at the watch's
+   * own pace, never sooner - finds it again and has another go; the
+   * `MAX_ATTEMPTS`th failure gives up and marks it handled. No entry means the
+   * episode has never failed, or has been settled since.
+   */
+  attempts?: Record<string, number>
 }
 
 export interface RunStep {
@@ -146,6 +190,39 @@ export interface Run {
   startedAt: number
   finishedAt?: number
 }
+
+/**
+ * What one look at a series' page turned up, for the "check now" button.
+ *
+ * Answered as soon as the page has been read, not once every episode it found
+ * has been downloaded and sent on: the button used to spin for as long as the
+ * whole backlog took, and then said only "checked" - including when it had
+ * checked nothing at all because the watch was already busy.
+ */
+export type CheckSummary =
+  /** Already being checked, or still working through what the last check found. */
+  | { busy: true }
+  | { error: string }
+  | { notOut: true; releaseAt?: number }
+  /** `queued` is what went to the queue: nothing while paused, at most a check's worth otherwise. */
+  | { fresh: number; queued: number; paused: boolean }
+
+/**
+ * What the "try again" button on a failed or skipped episode gets back.
+ *
+ * Answered as soon as the episode is on its way, like "check now"; the run
+ * itself reaches the screen through the usual broadcasts. Busy while the
+ * schedule is working on the same watch, so the two cannot fetch one episode
+ * side by side. Paused while the watch is, the way "check now" finds but does
+ * not fetch: the pause would only cancel the download the moment it was queued.
+ */
+export type RetryAnswer = { started: true } | { busy: true } | { paused: true } | { error: string }
+
+/**
+ * What adding a watch answers: the watch it made, or - asked for an exact copy
+ * of one that exists - that one, marked `existing`, with nothing added.
+ */
+export type AddedWatch = Watch & { existing?: true }
 
 // ---------------------------------------------------------------------------
 // Templates
@@ -225,6 +302,9 @@ export function fillTemplate(
   )
 }
 
+/** The longest a name `safeSegment` lets through, extension aside. */
+const NAME_LIMIT = 180
+
 /**
  * Characters no filesystem we support will accept in a name, plus the ones SMB
  * refuses. Applied after the template is filled, because the title is the part
@@ -235,19 +315,76 @@ export function safeSegment(name: string): string {
     .replace(/[<>:"/\\|?*]+/g, ' ')
     .replace(/\s+/g, ' ')
     .replace(/^[. ]+|[. ]+$/g, '')
-    .slice(0, 180)
+    .slice(0, NAME_LIMIT)
 }
 
-/** Build the filename for one episode, ready to use. */
+/** What a new rename step starts with, and what one that fills to nothing falls back to. */
+export const DEFAULT_RENAME_TEMPLATE = '{title} - S{season2}E{episode2}'
+
+/** Put after a template that does not name the episode. */
+const EPISODE_SUFFIX = ' - S{season2}E{episode2}'
+
+/*
+  Exact tokens only. `{Episode}` is not one - the template leaves it in the
+  name as text - so a looser match would wave through a template that still
+  gives every episode the same name.
+*/
+const EPISODE_TOKEN = /\{episode2?\}/
+const SEASON_TOKEN = /\{season2?\}/
+
+/**
+ * Build the filename for one episode, ready to use.
+ *
+ * Always one that tells episodes apart. A template without the episode in it -
+ * `{title}`, say - named every episode the same, and since both the rename and
+ * the upload replace a file already there (that is what lets a re-run replace
+ * its own), each new episode quietly deleted the one before, locally and on the
+ * share. The number is added here rather than demanded by the editor, so the
+ * watches saved before this are covered as well.
+ */
 export function renameFor(
   step: RenameStep,
   values: TemplateValues,
   now?: Date
 ): string {
   const title = applyReplacements(values.title, step.replacements)
-  const stem = safeSegment(fillTemplate(step.template, { ...values, title }, now))
+  const fill = (template: string): string => {
+    /*
+      The title gives way, not the episode. Cutting the finished name at the
+      limit took the number off the end of a long enough title - a Russian
+      name and a romaji one side by side - and every episode came out alike
+      even though the template named it. Cleaning only ever shortens, so a
+      name that fits before it fits after.
+    */
+    const uses = template.split('{title}').length - 1
+    const rest = fillTemplate(template, { ...values, title: '' }, now).length
+    const room = uses ? Math.max(0, Math.floor((NAME_LIMIT - rest) / uses)) : title.length
+    return safeSegment(fillTemplate(template, { ...values, title: title.slice(0, room) }, now))
+  }
+  let stem = fill(step.template)
+  if (!EPISODE_TOKEN.test(step.template)) {
+    // Cut the stem, not the number, when the whole name would be too long.
+    const suffix = fillTemplate(EPISODE_SUFFIX, values, now)
+    stem = stem
+      ? safeSegment(stem.slice(0, NAME_LIMIT - suffix.length) + suffix)
+      : fill(DEFAULT_RENAME_TEMPLATE)
+  }
   const ext = values.ext ? `.${values.ext.replace(/^\./, '')}` : ''
   return `${stem || 'episode'}${ext}`
+}
+
+/**
+ * What a rename template leaves out that keeps episodes apart, for the editor
+ * to point out. Without the episode, `renameFor` adds it. Without the season,
+ * nothing does: a single-season series is fine as it is, but in one with
+ * several, E01 of the second season lands on E01 of the first. A blank
+ * template has nothing to say - it uses the default, and the preview shows it.
+ */
+export function renameGap(template: string): 'episode' | 'season' | undefined {
+  if (!template.trim()) return undefined
+  if (!EPISODE_TOKEN.test(template)) return 'episode'
+  if (!SEASON_TOKEN.test(template)) return 'season'
+  return undefined
 }
 
 /**
@@ -286,6 +423,161 @@ export function newEpisodes(seen: EpisodeRef[], available: EpisodeRef[]): Episod
   return available
     .filter((ref) => !handled.has(episodeKey(ref)))
     .sort((a, b) => a.season - b.season || a.episode - b.episode)
+}
+
+/**
+ * A watch may enqueue at most this many episodes from one check.
+ *
+ * A detection bug spends bandwidth and disk while nobody is watching, and the
+ * shape it would take is "the site renumbered and now everything looks new".
+ * A first check of a finished series legitimately finds a whole season, so this
+ * is not a small number — but it is a number. Shared so the "add a watch"
+ * screen can say a long back catalogue arrives in batches of it.
+ */
+export const MAX_PER_CHECK = 25
+
+// ---------------------------------------------------------------------------
+// The same series twice
+// ---------------------------------------------------------------------------
+
+/** What tells the series and dub one watch follows from another's. */
+export type WatchIdentity = Pick<Watch, 'provider' | 'url' | 'translatorId'>
+
+/**
+ * Whether two watches follow the same series in the same dub.
+ *
+ * Compared through `normalizeUrl`, so a link pasted with a tracking parameter
+ * or a trailing slash and the one the home screen hands over count as one. A
+ * watch still waiting for a release has no dub yet (`''`), so it matches only
+ * another that is waiting for the same title.
+ */
+export function sameDub(a: WatchIdentity, b: WatchIdentity): boolean {
+  return (
+    a.provider === b.provider &&
+    a.translatorId === b.translatorId &&
+    normalizeUrl(a.url) === normalizeUrl(b.url)
+  )
+}
+
+/** The watch already following this series in this dub, if there is one. */
+export function watchingAlready(watches: Watch[], series: WatchIdentity): Watch | undefined {
+  return watches.find((w) => sameDub(w, series))
+}
+
+/**
+ * The watch a new one would be an exact copy of: same series, dub and quality.
+ *
+ * Such a copy has no purpose and does harm. Both ask the queue for the same
+ * file, whose duplicate check hands them one row; the first rename moves the
+ * file, and the second run fails because it is not where it should be. When
+ * the checks do not overlap, every episode is fetched, uploaded and announced
+ * twice. A waiting watch is never one: there is no dub yet to compare.
+ */
+export function exactDuplicate(
+  watches: Watch[],
+  candidate: WatchIdentity & Pick<Watch, 'quality' | 'pending'>
+): Watch | undefined {
+  if (candidate.pending) return undefined
+  return watches.find((w) => !w.pending && w.quality === candidate.quality && sameDub(w, candidate))
+}
+
+/**
+ * What a new watch starts out having seen: its own list, and everything the
+ * watches already following this series in this dub have handled.
+ *
+ * A second watch on a series - at another quality, for another share - is
+ * deliberate, but the episodes the first one delivered are not news to it.
+ * Starting from nothing, its first check fetched a whole check's worth of them
+ * again.
+ */
+export function inheritedSeen(
+  watches: Watch[],
+  candidate: WatchIdentity & Pick<Watch, 'seen'>
+): EpisodeRef[] {
+  const out = [...candidate.seen]
+  const have = new Set(out.map(episodeKey))
+  for (const w of watches) {
+    if (!sameDub(w, candidate)) continue
+    for (const ref of w.seen) {
+      const key = episodeKey(ref)
+      if (have.has(key)) continue
+      have.add(key)
+      out.push(ref)
+    }
+  }
+  return out
+}
+
+// ---------------------------------------------------------------------------
+// Trying an episode again
+// ---------------------------------------------------------------------------
+
+/**
+ * Goes an episode gets before it is given up on: one per check, never closer.
+ *
+ * Every failure used to mark the episode handled on the spot, so a NAS that was
+ * asleep, a password changed that afternoon or one queue hiccup lost that
+ * episode for good. Retrying for ever is the opposite fault - a file the site
+ * keeps broken would be fetched unattended at every check for as long as it
+ * stays broken. Three checks at the watch's own interval rides out a night of
+ * the first kind and gives up on the second.
+ */
+export const MAX_ATTEMPTS = 3
+
+/**
+ * How one go at an episode ended, for deciding what it leaves on the watch.
+ *
+ * `skipped` is a person's decision - the download cancelled or removed in the
+ * queue - and is as final as success. `stopped` is the watch being paused or
+ * removed mid-run, which settles nothing: a paused watch fetches that episode
+ * again once it is resumed.
+ */
+export type EpisodeOutcome = 'done' | 'failed' | 'skipped' | 'stopped'
+
+function isSeen(watch: Watch, ref: EpisodeRef): boolean {
+  const key = episodeKey(ref)
+  return watch.seen.some((s) => episodeKey(s) === key)
+}
+
+/** Failed goes so far at this episode. */
+export function attemptsAt(watch: Watch, ref: EpisodeRef): number {
+  return watch.attempts?.[episodeKey(ref)] ?? 0
+}
+
+/**
+ * Whether a failure now would be the one that gives up.
+ *
+ * Also true for an episode already handled, which only "try again" can reach:
+ * nothing will try it on a schedule afterwards, so its failure is the last word.
+ */
+export function isFinalAttempt(watch: Watch, ref: EpisodeRef): boolean {
+  return isSeen(watch, ref) || attemptsAt(watch, ref) + 1 >= MAX_ATTEMPTS
+}
+
+/**
+ * What one go at an episode changes on its watch, if anything.
+ *
+ * Handled means added to `seen` - once, however many times it is retried by
+ * hand - with its count dropped. A failure short of the cap only counts, so the
+ * next check finds the episode again.
+ */
+export function settleEpisode(
+  watch: Watch,
+  ref: EpisodeRef,
+  outcome: EpisodeOutcome
+): Partial<Watch> | undefined {
+  if (outcome === 'stopped') return undefined
+  const key = episodeKey(ref)
+  const { [key]: count = 0, ...others } = watch.attempts ?? {}
+  const rest = Object.keys(others).length ? others : undefined
+
+  if (outcome === 'failed' && !isSeen(watch, ref) && count + 1 < MAX_ATTEMPTS) {
+    return { attempts: { ...others, [key]: count + 1 } }
+  }
+  return {
+    seen: isSeen(watch, ref) ? watch.seen : [...watch.seen, ref],
+    attempts: rest
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -341,6 +633,16 @@ function withoutTheSeasonFolder(step: PipelineStep): PipelineStep {
   return { ...step, remotePath: DEFAULT_REMOTE_PATH }
 }
 
+/** Counts that are counts. Anything else in the map is a corrupt file, and forgetting it costs one extra try. */
+function cleanAttempts(raw: unknown): Record<string, number> | undefined {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return undefined
+  const out: Record<string, number> = {}
+  for (const [key, n] of Object.entries(raw)) {
+    if (typeof n === 'number' && Number.isInteger(n) && n > 0) out[key] = n
+  }
+  return Object.keys(out).length ? out : undefined
+}
+
 export function migrateWatches(raw: unknown): StoredWatches {
   const source = (raw ?? {}) as Partial<StoredWatches>
   const watches: Watch[] = []
@@ -362,9 +664,12 @@ export function migrateWatches(raw: unknown): StoredWatches {
           : 360,
       nextCheckAt: Number(candidate.nextCheckAt) || 0,
       seen: Array.isArray(candidate.seen) ? candidate.seen : [],
+      attempts: cleanAttempts(candidate.attempts),
+      // In the order they run, so a chain saved in the order it was built reads right everywhere.
       steps: candidate.steps
         .filter((step) => step && typeof step.kind === 'string')
-        .map(withoutTheSeasonFolder),
+        .map(withoutTheSeasonFolder)
+        .sort(byStepOrder),
       createdAt: Number(candidate.createdAt) || 0
     })
   }
@@ -378,6 +683,51 @@ export function migrateWatches(raw: unknown): StoredWatches {
   }
 
   return { watches, runs }
+}
+
+/** What a step that was under way when the app went says. */
+export const INTERRUPTED_NOTE = 'Interrupted when the app closed.'
+
+/**
+ * End a run the file says is still going.
+ *
+ * Read from disk, "running" can only mean a process that has gone: the list is
+ * loaded once per launch, before this one has started anything. Left alone,
+ * such a run read "running" in the history for good, beside the real run the
+ * next check started for the same episode. It ends when its last step did -
+ * not now, or it would look as if it had taken days.
+ */
+export function endInterruptedRun(run: Run): Run {
+  if (run.state !== 'running') return run
+  const last = Math.max(
+    Number(run.startedAt) || 0,
+    ...(run.steps ?? []).map((s) => s.finishedAt ?? s.startedAt ?? 0)
+  )
+  return {
+    ...run,
+    state: 'failed',
+    finishedAt: run.finishedAt ?? last,
+    steps: (run.steps ?? []).map(
+      (s): RunStep => (s.state === 'running' ? { ...s, state: 'failed', message: INTERRUPTED_NOTE } : s)
+    )
+  }
+}
+
+/** Every interrupted run ended, and how many there were - so the store knows to write the file back. */
+export function endInterruptedRuns(runs: Record<string, Run[]>): {
+  runs: Record<string, Run[]>
+  ended: number
+} {
+  let ended = 0
+  const out: Record<string, Run[]> = {}
+  for (const [watchId, list] of Object.entries(runs)) {
+    out[watchId] = list.map((run) => {
+      const next = endInterruptedRun(run)
+      if (next !== run) ended++
+      return next
+    })
+  }
+  return { runs: out, ended }
 }
 
 // ---------------------------------------------------------------------------
@@ -522,4 +872,39 @@ export function upcomingDelayMinutes(
 /** Whole days until a release, rounded up - "in 3 d" until the last day begins. */
 export function daysUntil(releaseAt: number, now: number): number {
   return Math.max(0, Math.ceil((releaseAt - now) / 86_400_000))
+}
+
+// ---------------------------------------------------------------------------
+// Something is wrong
+// ---------------------------------------------------------------------------
+
+/**
+ * What is wrong with a watch, if anything.
+ *
+ * A check that failed comes first, because until the page can be read again no
+ * episode is going anywhere. Then an episode that failed on its way through the
+ * chain - which used to be visible only in that watch's history, so a watch
+ * whose every upload was being refused after a password change read as healthy
+ * in the list and drew no mark on the tab.
+ */
+export function watchTrouble(watch: Watch): string | undefined {
+  return watch.lastError || watch.lastRunError || undefined
+}
+
+/** Whether a watch counts towards the mark on the tab. A paused one is not anyone's emergency. */
+export function watchFailing(watch: Watch): boolean {
+  return watch.enabled && Boolean(watchTrouble(watch))
+}
+
+/**
+ * A change from the screen, with the episode failure it settles cleared.
+ *
+ * Editing the steps is how somebody fixes a chain, and pausing or resuming is
+ * how they say they have seen it; either way the old failure is no longer news.
+ * A patch that names `lastRunError` at all is the dismiss button, and can only
+ * ever clear it - the screen has no business writing a failure of its own.
+ */
+export function settleRunError(patch: Partial<Watch>): Partial<Watch> {
+  if (!('steps' in patch || 'enabled' in patch || 'lastRunError' in patch)) return patch
+  return { ...patch, lastRunError: undefined, lastRunFailedAt: undefined }
 }

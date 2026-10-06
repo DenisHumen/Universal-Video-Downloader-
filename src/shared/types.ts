@@ -322,6 +322,11 @@ export interface DownloadItem {
    * to belong to a different download's file. See naming.ts.
    */
   copySuffix?: string
+  /**
+   * Where an automated episode was uploaded, as `share/folder/name`. With no
+   * `filepath`, the local copy was deleted afterwards and this is the only copy.
+   */
+  remotePath?: string
   outputDir: string
   error?: string
   /** Machine-readable reason, so the UI can say it in the user's language. */

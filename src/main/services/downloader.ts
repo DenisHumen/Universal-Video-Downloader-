@@ -199,6 +199,28 @@ export function listDownloads(): DownloadItem[] {
     .map(publicItem)
 }
 
+/** One queue item as it stands now, for something waiting on it that may have missed its events. */
+export function getDownload(id: string): DownloadItem | undefined {
+  const item = items.get(id)
+  return item ? publicItem(item) : undefined
+}
+
+/**
+ * Say where a finished item's file went after something else moved it.
+ *
+ * For the automation, which renames an episode after the queue is done with it
+ * and may delete it once it is on a share. The row kept pointing at the name
+ * the download landed under, so Play and Show in folder did nothing for every
+ * automated episode. A field set to `undefined` is sent as such, so the screen
+ * drops the old path too. An item somebody removed in the meantime stays gone.
+ */
+export function relocateItem(id: string, patch: { filepath?: string; remotePath?: string }): void {
+  const item = items.get(id)
+  if (!item) return
+  Object.assign(item, patch)
+  emitUpdated(item)
+}
+
 function emitUpdated(item: DownloadItem): void {
   /*
     Nothing to say about an item that is gone.

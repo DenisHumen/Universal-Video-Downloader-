@@ -8,6 +8,7 @@ import type {
   YtDlpStatus
 } from '@shared/types'
 import { normalizeUrl } from '@shared/urls'
+import { watchFailing } from '@shared/automation'
 import type { AppInfo } from '../../preload/index'
 import { applyDownloadsChanged } from './lib/downloads'
 import { applyAppearance } from './lib/theme'
@@ -18,6 +19,8 @@ export interface WatchIntent {
   url: string
   translatorId?: string
   quality?: string
+  /** The series is watched already: show that watch rather than offer to add another. */
+  watchId?: string
 }
 
 const VIEWS: ViewId[] = ['home', 'search', 'downloads', 'automation', 'settings']
@@ -170,6 +173,13 @@ async function runInit(set: SetState, get: GetState): Promise<void> {
   */
   window.api.onAutomationChanged(() => void get().refreshWatchAlerts())
   void get().refreshWatchAlerts()
+  /*
+    And again whenever the window comes back - from the tray, from behind
+    another app. Main now says when the schedule changes something, but a
+    window that was hidden at the time is the one place a missed message
+    would leave a stale mark, and one small refetch on focus is cheap.
+  */
+  window.addEventListener('focus', () => void get().refreshWatchAlerts())
   window.api.onNavigate((view) => {
     if (isViewId(view)) set({ view })
   })
@@ -255,7 +265,7 @@ export const useStore = create<AppState>((set, get) => ({
   },
   refreshWatchAlerts: async () => {
     const watches = await window.api.autoList()
-    set({ watchAlerts: watches.filter((w) => w.enabled && Boolean(w.lastError)).length })
+    set({ watchAlerts: watches.filter(watchFailing).length })
   },
   takePendingQuery: () => {
     const query = get().pendingQuery

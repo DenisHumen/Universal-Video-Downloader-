@@ -10,8 +10,10 @@ import { STEP_LABEL } from '../lib/automationLabels'
 import { emptyTarget, pathOf, ShareForm, TelegramForm, useSecretState } from './AutomationForms'
 import {
   DEFAULT_REMOTE_PATH,
+  DEFAULT_RENAME_TEMPLATE,
   remoteDirFor,
   renameFor,
+  renameGap,
   type PipelineStep,
   type SmbTarget,
   type StepKind
@@ -41,7 +43,7 @@ const NEW_SHARE = '__new__'
 const blank = (kind: StepKind): PipelineStep => {
   const id = crypto.randomUUID()
   if (kind === 'rename') {
-    return { id, kind, enabled: true, template: '{title} - S{season2}E{episode2}', replacements: [] }
+    return { id, kind, enabled: true, template: DEFAULT_RENAME_TEMPLATE, replacements: [] }
   }
   if (kind === 'upload') {
     return {
@@ -193,6 +195,21 @@ export default function StepEditor({
                     spellCheck={false}
                   />
                   <p className="hint mt-1">{t('auto.templateHint')}</p>
+                  {/*
+                    Said, not enforced. A missing episode is put right by the
+                    rename itself, and a missing season is harmless for a
+                    series with only one.
+                  */}
+                  {renameGap(step.template) === 'episode' && (
+                    <p className="mt-1 max-w-[62ch] text-[12px] leading-[1.5] text-warn">
+                      {t('auto.templateNoEpisode')}
+                    </p>
+                  )}
+                  {renameGap(step.template) === 'season' && (
+                    <p className="mt-1 max-w-[62ch] text-[12px] leading-[1.5] text-warn">
+                      {t('auto.templateNoSeason')}
+                    </p>
+                  )}
                 </div>
                 <div>
                   <p className="label mb-1.5">{t('auto.replacements')}</p>

@@ -58,6 +58,8 @@ function QueueRow({ item, index, animateIn = true }: Props): JSX.Element {
   const [logOpen, setLogOpen] = useState(false)
   const [jobModal, setJobModal] = useState<JobMode | null>(null)
   const meta = STATE_META[item.state]
+  const landed =
+    item.filepath ?? (item.remotePath ? t('queue.onShare', { path: item.remotePath }) : undefined)
   const jobKindLabel =
     item.kind === 'trim' ? t('job.trim') : item.kind === 'convert' ? t('job.convert') : null
   const active =
@@ -304,7 +306,12 @@ function QueueRow({ item, index, animateIn = true }: Props): JSX.Element {
                 className="btn-icon-bare"
                 title={t('common.play')}
                 aria-label={t('common.play')}
-                onClick={() => window.api.openPath(item.filepath!)}
+                onClick={() =>
+                  // The OS answers with an error rather than throwing; the click used to do nothing.
+                  void window.api.openPath(item.filepath!).then((why) => {
+                    if (why) toast(t('queue.openFailed'), 'error')
+                  })
+                }
               >
                 <Play size={15} />
               </button>
@@ -394,16 +401,20 @@ function QueueRow({ item, index, animateIn = true }: Props): JSX.Element {
         </div>
       </div>
 
-      {/* Outcome: the path it landed at, or why it didn't. */}
+      {/*
+        Outcome: the path it landed at, or why it didn't. An automated episode
+        whose local copy was deleted once it was on the share has only the
+        share's path left; the buttons that need a local file are gone already.
+      */}
       {(item.state === 'completed' || item.state === 'error') && (
         <div className="pb-3 pl-[124px] pr-1">
           <p
             className={`selectable truncate text-[12px] ${
               item.state === 'error' ? 'text-bad' : 'mono text-ink-3'
             }`}
-            title={item.state === 'error' ? errorText(t, item) : item.filepath}
+            title={item.state === 'error' ? errorText(t, item) : landed}
           >
-            {item.state === 'error' ? errorText(t, item) : item.filepath}
+            {item.state === 'error' ? errorText(t, item) : landed}
           </p>
           {item.log && (
             <>

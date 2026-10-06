@@ -1,4 +1,4 @@
-import type { Run, SmbTarget, Watch } from '@shared/automation'
+import type { AddedWatch, CheckSummary, RetryAnswer, Run, SmbTarget, Watch } from '@shared/automation'
 import type { SeriesOffer } from '../main/automation-ipc'
 import { contextBridge, ipcRenderer } from 'electron'
 import { IPC } from '@shared/ipc'
@@ -116,12 +116,13 @@ const api = {
   autoDescribe: (url: string): Promise<SeriesOffer> => ipcRenderer.invoke(IPC.autoDescribe, url),
   autoList: (): Promise<Watch[]> => ipcRenderer.invoke(IPC.autoList),
   autoRuns: (watchId: string): Promise<Run[]> => ipcRenderer.invoke(IPC.autoRuns, watchId),
-  autoAdd: (watch: Omit<Watch, 'id' | 'createdAt'>): Promise<Watch> =>
+  autoAdd: (watch: Omit<Watch, 'id' | 'createdAt'>): Promise<AddedWatch> =>
     ipcRenderer.invoke(IPC.autoAdd, watch),
   autoUpdate: (id: string, patch: Partial<Watch>): Promise<Watch | undefined> =>
     ipcRenderer.invoke(IPC.autoUpdate, id, patch),
   autoRemove: (id: string): Promise<void> => ipcRenderer.invoke(IPC.autoRemove, id),
-  autoCheckNow: (id: string): Promise<void> => ipcRenderer.invoke(IPC.autoCheckNow, id),
+  autoCheckNow: (id: string): Promise<CheckSummary> => ipcRenderer.invoke(IPC.autoCheckNow, id),
+  autoRetryRun: (runId: string): Promise<RetryAnswer> => ipcRenderer.invoke(IPC.autoRetryRun, runId),
   autoTestSmb: (target: SmbTarget, password: string): Promise<string> =>
     ipcRenderer.invoke(IPC.autoTestSmb, target, password),
   autoTestTelegram: (token: string, chatId: string): Promise<string> =>

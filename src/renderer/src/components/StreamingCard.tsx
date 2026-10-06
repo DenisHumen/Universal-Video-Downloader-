@@ -1,6 +1,7 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Loader2, Radar } from 'lucide-react'
 import type { MediaInfo, QualityPreset } from '@shared/types'
+import { watchingAlready, type Watch } from '@shared/automation'
 import Choice, { type ChoiceOption } from './Choice'
 import Thumbnail from './Thumbnail'
 import { heightLabel, initialQuality } from '../lib/quality'
@@ -63,6 +64,28 @@ export default function StreamingCard({ info, onDone }: Props): JSX.Element {
   const [selected, setSelected] = useState<Record<number, number[]>>({})
   const [quality, setQuality] = useState<QualityPreset>(initialQuality(settings, heights[0] || 0))
   const [busy, setBusy] = useState(false)
+
+  /*
+    What is watched already, so following a series a second time from here
+    leads to the watch it has rather than to a duplicate that fetches, uploads
+    and announces every episode twice.
+  */
+  const [watches, setWatches] = useState<Watch[]>([])
+  useEffect(() => {
+    let live = true
+    window.api
+      .autoList()
+      .then((list) => live && setWatches(list))
+      .catch(() => undefined)
+    return () => {
+      live = false
+    }
+  }, [])
+  const followed = watchingAlready(watches, {
+    provider: s.provider,
+    url: info.webpageUrl,
+    translatorId
+  })
 
   const translatorName = s.translators.find((tr) => tr.id === translatorId)?.name || ''
   const seasonsForT = s.episodesByTranslator?.[translatorId] ?? s.seasons
@@ -270,9 +293,11 @@ export default function StreamingCard({ info, onDone }: Props): JSX.Element {
             */}
             <button
               className="btn-quiet w-full"
-              onClick={() => requestWatch({ url: info.webpageUrl, translatorId, quality })}
+              onClick={() =>
+                requestWatch({ url: info.webpageUrl, translatorId, quality, watchId: followed?.id })
+              }
             >
-              <Radar size={14} /> {t('streaming.follow')}
+              <Radar size={14} /> {followed ? t('streaming.watching') : t('streaming.follow')}
             </button>
           </>
         ) : (

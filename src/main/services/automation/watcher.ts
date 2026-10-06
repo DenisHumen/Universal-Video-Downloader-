@@ -1,10 +1,23 @@
-import { powerMonitor } from 'electron'
+import { net, powerMonitor } from 'electron'
 import { log } from '../log'
+import { backoffMinutes, settleFailedCheck } from './backoff'
 import { checkWatch } from './detect'
-import { markHandled, runEpisode } from './pipeline'
-import { getWatch, listWatches, updateWatch } from './store'
-import { createTicker } from './ticker'
-import { upcomingDelayMinutes, type Watch } from '@shared/automation'
+import { alertChannel, recordOutcome, runEpisode } from './pipeline'
+import { findRun, getWatch, listWatches, updateWatch } from './store'
+import { composeCheckFailure, sendNotification } from './telegram'
+import {
+  attemptsAt,
+  episodeKey,
+  isFinalAttempt,
+  MAX_ATTEMPTS,
+  MAX_PER_CHECK,
+  upcomingDelayMinutes,
+  type CheckSummary,
+  type EpisodeRef,
+  type RetryAnswer,
+  type Run,
+  type Watch
+} from '@shared/automation'
 
 /**
  * Deciding when to look, and looking.
@@ -19,26 +32,40 @@ import { upcomingDelayMinutes, type Watch } from '@shared/automation'
 /** How often to look at the list. Not how often a watch is checked. */
 const TICK_MS = 60_000
 
-/** Checks running at once, so fifty watches do not arrive at a site together. */
+/**
+ * Pages being read at once, so fifty watches do not arrive at a site together.
+ *
+ * Only the reading. The slot used to be held until every episode a check found
+ * had been downloaded and uploaded, so two series working through a backlog -
+ * or two automated downloads paused and forgotten - stopped every other series
+ * being checked for hours, or until a restart. Downloads already have the
+ * queue's own limit.
+ */
 const CONCURRENCY = 2
 
-/** Nothing may ask a site more often than this, whatever the watch says. */
-const MIN_INTERVAL_MINUTES = 15
-
-/** How much a failing watch backs off, and how far it is allowed to go. */
-const BACKOFF = [1, 2, 4, 8, 12]
+/*
+  How long after waking, and after launch, before the first look. Wi-Fi takes a
+  while to come back after sleep, and a check that runs before it does can only
+  fail; the app may also be starting at login, alongside everything else that
+  wants the network first.
+*/
+const RESUME_DELAY_MS = 45_000
+const LAUNCH_DELAY_MS = 30_000
 
 /**
- * A watch may enqueue at most this many episodes from one check.
+ * Failed checks in a row before anybody is told.
  *
- * A detection bug spends bandwidth and disk while nobody is watching, and the
- * shape it would take is "the site renumbered and now everything looks new".
- * A first check of a finished series legitimately finds a whole season, so this
- * is not a small number — but it is a number.
+ * One is a site having a bad minute and two can be a short outage; three, with
+ * the backoff in between, is hours of a page that cannot be read. Compared for
+ * equality, not "at least": the count only climbs during a streak and a good
+ * check resets it, so this is one message per streak rather than one per
+ * backoff step for as long as the site stays broken.
  */
-const MAX_PER_CHECK = 25
+const REPORT_AFTER_FAILURES = 3
 
+let timer: NodeJS.Timeout | null = null
 let running = 0
+/** Watches being checked, or still working through what their check found. */
 const inFlight = new Set<string>()
 
 function jitter(): number {
@@ -48,16 +75,27 @@ function jitter(): number {
 
 /** When this watch should next be looked at. */
 export function nextDue(watch: Watch, at = Date.now()): number {
-  const minutes = Math.max(MIN_INTERVAL_MINUTES, watch.intervalMinutes)
-  const factor = BACKOFF[Math.min(watch.failures, BACKOFF.length - 1)] ?? 1
-  return at + minutes * factor * 60_000 + jitter()
+  return at + backoffMinutes(watch.intervalMinutes, watch.failures) * 60_000 + jitter()
 }
 
-async function checkOne(watch: Watch): Promise<void> {
-  inFlight.add(watch.id)
-  running++
+/** What reading a page left to do. */
+interface Found {
+  summary: CheckSummary
+  todo: EpisodeRef[]
+  title: string
+}
+
+/**
+ * Read one watch's page and record what it said.
+ *
+ * Every outcome, failure included, is written to the watch here, and nothing
+ * is thrown: what is left for the caller is the episodes to fetch. `read` is
+ * called the moment the site has answered, either way.
+ */
+async function look(watch: Watch, manual: boolean, read: () => void): Promise<Found> {
+  const nothing = (summary: CheckSummary): Found => ({ summary, todo: [], title: watch.title })
   try {
-    const result = await checkWatch(watch)
+    const result = await checkWatch(watch).finally(read)
 
     if (result.notOut) {
       const releaseAt = result.notOut.releaseAt
@@ -71,11 +109,22 @@ async function checkOne(watch: Watch): Promise<void> {
         failures: 0,
         nextCheckAt: Date.now() + wait * 60_000 + jitter()
       })
-      return
+      return nothing({ notOut: true, releaseAt })
     }
 
-    // Out at last: from here on this is an ordinary watch on the dub it adopted.
+    /*
+      Out at last: from here on this is an ordinary watch on the dub it
+      adopted. Or the dub it followed moved to a new id; `fresh` is already
+      worked out against the new one.
+    */
     if (result.adopt) {
+      if (!watch.pending) {
+        log.info('watcher', 'The translation this watch follows moved; following it there', {
+          id: watch.id.slice(0, 8),
+          series: result.title,
+          dub: result.adopt.translatorName
+        })
+      }
       updateWatch(watch.id, {
         translatorId: result.adopt.translatorId,
         translatorName: result.adopt.translatorName,
@@ -95,8 +144,6 @@ async function checkOne(watch: Watch): Promise<void> {
       nextCheckAt: nextDue({ ...watch, failures: 0 })
     })
 
-    if (!result.fresh.length) return
-
     const todo = result.fresh.slice(0, MAX_PER_CHECK)
     if (todo.length < result.fresh.length) {
       log.warn(
@@ -107,40 +154,161 @@ async function checkOne(watch: Watch): Promise<void> {
       )
     }
 
-    for (const ref of todo) {
-      /*
-        Re-read: the user may have disabled or deleted the watch mid-run, or
-        stopped schedules altogether by closing the window with background
-        watching off. Whatever is left is still new next time and is picked up
-        then; nothing here has been marked as handled.
-      */
-      const live = getWatch(watch.id)
-      if (!live || !live.enabled || !ticker.running()) break
-      await runEpisode(live, ref, result.title)
-      markHandled(getWatch(watch.id) ?? live, ref)
+    // Paused or deleted while the page was being read: found, but not fetched.
+    const paused = !getWatch(watch.id)?.enabled
+    return {
+      summary: { fresh: result.fresh.length, queued: paused ? 0 : todo.length, paused },
+      todo: paused ? [] : todo,
+      title: result.title
     }
   } catch (err) {
     const why = err instanceof Error ? err.message : String(err)
-    const failures = watch.failures + 1
-    updateWatch(watch.id, {
-      lastCheckedAt: Date.now(),
-      lastError: why,
-      failures,
-      nextCheckAt: nextDue({ ...watch, failures })
+    const { kind, patch } = settleFailedCheck(watch, {
+      why,
+      online: net.isOnline(),
+      manual,
+      now: Date.now(),
+      jitter: jitter()
     })
-    log.warn('watcher', `Check failed: ${why}`, {
-      id: watch.id.slice(0, 8),
-      series: watch.title,
-      attempt: failures
-    })
-  } finally {
-    running--
-    inFlight.delete(watch.id)
+    updateWatch(watch.id, patch)
+    const tags = { id: watch.id.slice(0, 8), series: watch.title }
+
+    if (kind === 'offline') {
+      log.info('watcher', `Check failed while offline; trying again shortly: ${why}`, tags)
+      return nothing({ error: why })
+    }
+    if (kind === 'manual') {
+      log.warn('watcher', `Check failed: ${why}`, { ...tags, by: 'check now' })
+      return nothing({ error: why })
+    }
+
+    const failures = patch.failures ?? watch.failures
+    log.warn('watcher', `Check failed: ${why}`, { ...tags, attempt: failures })
+
+    /*
+      A page that has stopped parsing used to fail silently for weeks: the only
+      symptom of a check that finds nothing is the absence of news. After the
+      bookkeeping, and with its own catch, so a Telegram that is down cannot
+      undo the backoff. Re-read first, because a watch deleted or paused while
+      it was being checked is nobody's news.
+    */
+    const current = getWatch(watch.id)
+    if (failures === REPORT_AFTER_FAILURES && current?.enabled) {
+      const channel = alertChannel(current)
+      if (channel) {
+        await sendNotification(
+          channel.token,
+          channel.chatId,
+          composeCheckFailure(current.title, failures, why)
+        ).catch(() => undefined)
+      }
+    }
+    return nothing({ error: why })
   }
+}
+
+/**
+ * Take what a check found through the chain, one episode after another.
+ *
+ * Not all at once: the re-read before each episode is how pausing or deleting
+ * a watch stops a backlog part-way, and a first check that finds a whole
+ * season should not land on the queue in one go.
+ */
+async function drain(watchId: string, todo: EpisodeRef[], title: string): Promise<void> {
+  for (const ref of todo) {
+    // Re-read: the user may have disabled or deleted the watch mid-run.
+    const live = getWatch(watchId)
+    if (!live || !live.enabled) break
+    await attempt(live, ref, title)
+  }
+}
+
+/**
+ * One go at one episode, and what it leaves on the watch.
+ *
+ * A failure short of the cap leaves the episode unhandled, so the next check -
+ * at the watch's own interval, never in a loop - finds it again and the
+ * pipeline picks up where this go stopped.
+ */
+async function attempt(watch: Watch, ref: EpisodeRef, title: string, previous?: Run): Promise<void> {
+  const tries = attemptsAt(watch, ref) + 1
+  const final = isFinalAttempt(watch, ref)
+  const outcome = await runEpisode(watch, ref, title, { final, attempt: tries, previous })
+  recordOutcome(watch.id, ref, outcome)
+  if (outcome === 'failed') {
+    log.info(
+      'watcher',
+      final
+        ? `Gave up on ${episodeKey(ref)} after ${tries} attempt(s)`
+        : `Will try ${episodeKey(ref)} again at the next check (attempt ${tries} of ${MAX_ATTEMPTS})`,
+      { id: watch.id.slice(0, 8), series: title }
+    )
+  }
+}
+
+/**
+ * Check one watch, then work through whatever it found.
+ *
+ * Two answers. `checked` comes as soon as the page has been read and recorded,
+ * and is what "check now" waits for. `done` comes once every episode found has
+ * been through the chain and its outcome written down, and the watch stays in
+ * flight until then: let it go any sooner and the next tick reads the page
+ * again, finds the same episodes not yet marked, and queues them a second time.
+ *
+ * The concurrency slot is the other way round: held for the reading alone, and
+ * given back exactly once whichever way that ends - a second release would let
+ * a third check through for good.
+ */
+function checkOne(
+  watch: Watch,
+  manual = false
+): { checked: Promise<CheckSummary>; done: Promise<void> } {
+  let answer: (summary: CheckSummary) => void = () => undefined
+  const checked = new Promise<CheckSummary>((resolve) => (answer = resolve))
+
+  inFlight.add(watch.id)
+  running++
+  let slotHeld = true
+  const releaseSlot = (): void => {
+    if (!slotHeld) return
+    slotHeld = false
+    running--
+    // Whoever was waiting for the slot can start now, not at the next tick a minute away.
+    if (timer) setImmediate(tick)
+  }
+
+  const done = (async (): Promise<void> => {
+    try {
+      const found = await look(watch, manual, releaseSlot)
+      answer(found.summary)
+      await drain(watch.id, found.todo, found.title)
+    } catch (err) {
+      // The page was read, so this is not a failed check and the backoff is not touched.
+      const why = err instanceof Error ? err.message : String(err)
+      log.warn('watcher', `Stopped part-way through new episodes: ${why}`, {
+        id: watch.id.slice(0, 8),
+        series: watch.title
+      })
+    } finally {
+      releaseSlot()
+      inFlight.delete(watch.id)
+      // Whatever happened above, "check now" must not be left waiting for ever.
+      answer({ error: 'The check stopped without an answer.' })
+    }
+  })()
+
+  return { checked, done }
 }
 
 /** Look at the list and start whatever is due. */
 export function tick(): void {
+  /*
+    Offline, every check would fail and be rescheduled for nothing. A "no" from
+    `isOnline` is reliable, so nothing starts; a "yes" only means an interface
+    is up, which is why a failed check is still examined for an offline cause.
+  */
+  if (!net.isOnline()) return
+
   const now = Date.now()
   const due = listWatches()
     .filter((w) => w.enabled && !inFlight.has(w.id) && (w.nextCheckAt || 0) <= now)
@@ -148,46 +316,103 @@ export function tick(): void {
 
   for (const watch of due) {
     if (running >= CONCURRENCY) break
-    void checkOne(watch)
+    void checkOne(watch).done
   }
 }
 
-/** Check one watch now, whatever its schedule says. For the "check now" button. */
-export async function checkNow(watchId: string): Promise<void> {
+/**
+ * Check one watch now, whatever its schedule says. For the "check now" button.
+ *
+ * Answers once the page has been read; anything it found goes on downloading
+ * afterwards. A watch that is already in flight says so straight away - it
+ * used to return at once without checking anything, and the screen said
+ * "checked" all the same.
+ */
+export async function checkNow(watchId: string): Promise<CheckSummary> {
   const watch = getWatch(watchId)
-  if (!watch || inFlight.has(watchId)) return
-  await checkOne(watch)
-}
-
-/*
-  Waking up looks immediately rather than waiting out the rest of a tick. A
-  machine that has been asleep is exactly the machine whose watches are all
-  overdue. The early tick is five seconds in: nothing is due in the first
-  moments of a launch that is not already late.
-*/
-const ticker = createTicker({
-  tick,
-  everyMs: TICK_MS,
-  firstAfterMs: 5_000,
-  wake: powerMonitor,
-  onWake: () => log.info('watcher', 'Woke up; checking what is overdue')
-})
-
-/** Start looking at schedules. Calling it while already running does nothing. */
-export function startWatcher(): void {
-  if (!ticker.start()) return
-  log.info('watcher', `Watching ${listWatches().filter((w) => w.enabled).length} series`)
+  if (!watch) return { error: 'This series is no longer being watched.' }
+  if (inFlight.has(watchId)) return { busy: true }
+  return checkOne(watch, true).checked
 }
 
 /**
- * Stop looking at schedules. A check already under way finishes the episode
- * it is on and goes no further; see the loop in `checkOne`.
+ * Have another go at an episode that failed or was skipped. For "try again".
+ *
+ * There was no way back for a failed episode short of downloading and uploading
+ * it by hand - including after fixing the password that made it fail. This goes
+ * through the same chain as the schedule, picking up where the run stopped, and
+ * the new run takes that one's place in the history.
+ *
+ * The watch is held in flight for the length of it, as a check would hold it,
+ * and a watch already in flight is refused: the schedule and the button must
+ * not fetch the same episode side by side.
+ *
+ * So is a paused one. The download step treats a paused watch as one stopped
+ * mid-run, so the retry queued the episode, cancelled it at once and put a
+ * skipped run in place of the failed one - while the screen said it was trying.
  */
-export function stopWatcher(): void {
-  if (ticker.stop()) log.info('watcher', 'Stopped')
+export function retryRun(runId: string): RetryAnswer {
+  const run = findRun(runId)
+  if (!run) return { error: 'That episode is no longer in the history.' }
+  const watch = getWatch(run.watchId)
+  if (!watch) return { error: 'This series is no longer being watched.' }
+  if (run.state !== 'failed' && run.state !== 'skipped') {
+    return { error: 'Only an episode that failed or was skipped can be tried again.' }
+  }
+  if (inFlight.has(watch.id)) return { busy: true }
+  if (!watch.enabled) return { paused: true }
+
+  inFlight.add(watch.id)
+  const ref: EpisodeRef = { season: run.season, episode: run.episode }
+  void attempt(watch, ref, watch.title || run.title, run)
+    .catch((err) => {
+      log.warn('watcher', `Trying ${episodeKey(ref)} again stopped part-way: ${String(err)}`, {
+        id: watch.id.slice(0, 8)
+      })
+    })
+    .finally(() => inFlight.delete(watch.id))
+  return { started: true }
 }
 
-/** True while anything is being checked or downloaded on a schedule. */
+/** A delayed tick that finds the watcher stopped does nothing. */
+function tickIfRunning(): void {
+  if (timer) tick()
+}
+
+/*
+  Waking up should look soon rather than waiting out the rest of a tick - a
+  machine that has been asleep is exactly the machine whose watches are all
+  overdue - but not at once. Checked straight away, every overdue watch failed
+  before the network was back and was pushed out by a whole backoff step.
+*/
+function onResume(): void {
+  log.info('watcher', 'Woke up; checking what is overdue once the network is back')
+  setTimeout(tickIfRunning, RESUME_DELAY_MS)
+}
+
+export function startWatcher(): void {
+  if (timer) return
+  timer = setInterval(tick, TICK_MS)
+  powerMonitor.on('resume', onResume)
+
+  // Nothing is due in the first moments of a launch that is not already late.
+  setTimeout(tickIfRunning, LAUNCH_DELAY_MS)
+  log.info('watcher', `Watching ${listWatches().filter((w) => w.enabled).length} series`)
+}
+
+export function stopWatcher(): void {
+  if (timer) clearInterval(timer)
+  timer = null
+  powerMonitor.off('resume', onResume)
+}
+
+/**
+ * True while anything is being checked or downloaded on a schedule.
+ *
+ * Not a keep-awake signal, tempting as it looks: whatever asked would have to
+ * ask again when a check ends, and nothing tells it to. An episode holds the
+ * machine itself, from the end of its download until it is delivered.
+ */
 export function watcherBusy(): boolean {
-  return running > 0
+  return inFlight.size > 0
 }

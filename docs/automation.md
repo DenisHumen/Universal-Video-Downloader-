@@ -55,6 +55,16 @@ spread. This is the single most important finding for the design:
 > user who picked a dub with 2 episodes that 6 more are "new", and produce six
 > failed downloads for episodes that do not exist for their choice.
 
+The same holds when the chosen dub is not in the map at all. Falling back to
+`seasons` for a missing id was this mistake by another road: a dub whose player
+moved read the default dub's list, queued every episode it had not seen under
+the dead id, failed them all, and the watch looked healthy. A dub that is gone
+now fails the check ("no longer listed"), so the watch backs off and shows its
+error. A dub id is its player's address, so the same dub moved to a new player
+comes back under a new id with the same name; when exactly one dub has that
+name, the watch follows it there and logs the switch. None, or several, is the
+error.
+
 **A specific episode resolves to a real stream.** `uvd-yummy://<tid>/<ep>/<q>`
 returned a playable CDN URL with the right Referer for both the newest and the
 first episode.
@@ -125,6 +135,7 @@ Watch
   intervalMinutes, nextCheckAt       absolute wall-clock, not an elapsed timer
   lastCheckedAt, lastError, failures backoff state
   seen: EpisodeKey[]                 "s1e4" — pairs, not a high-water mark
+  attempts: { [EpisodeKey]: n }      failed goes at episodes not yet given up on (§8)
   steps: PipelineStep[]
   createdAt
 ```
@@ -146,9 +157,9 @@ PipelineStep = DownloadStep | RenameStep | UploadStep | NotifyStep
   UploadStep     targetId, remotePath, createDirs, deleteLocalAfter
   NotifyStep     (uses the Telegram settings; per-step on/off only)
 
-Run                                  one per detected episode
+Run                                  one per detected episode; a retry replaces it
   id, watchId, season, episode, title
-  state    running | done | failed
+  state    running | done | failed | skipped
   steps[]  { kind, state, message, startedAt, finishedAt }
   downloadId                         links to the existing queue item
   filepath, remotePath
@@ -255,8 +266,44 @@ A run is a small state machine over its steps. Rules:
   the internal `uvd-*://` URL and follows that item. Pause, cancel, retry,
   concurrency limits, partial-file cleanup and history all keep working exactly
   as they do today, because it is the same queue — there is no second downloader.
-- A failed step stops that run and is recorded. Other watches are unaffected.
-- A run that fails is retried on the next check, not in a tight loop.
+- A failed step stops that run and is recorded. Other watches, and the next
+  episode of the same watch, are unaffected.
+- **A failed episode gets three checks, never a tight loop.** It is left out of
+  `seen` and its count goes into `attempts`, so the next check — at the watch's
+  own interval — finds it again. The third failure gives up and marks it
+  handled. Up to 3.20 every run marked its episode handled whether it worked
+  or not, so one failed download, one upload refused while a
+  NAS slept, or a password changed that afternoon lost that episode for good;
+  retrying for ever is the opposite fault, since a file the site keeps broken
+  would be fetched unattended at every check.
+- **A retry resumes; it does not restart.** It takes the episode's last run as
+  its starting point and replaces that run in the history. A downloaded file
+  still on disk is used again, and an upload that went through is not repeated,
+  so a retry after a refused upload does not download the episode a second time
+  and leave a second copy beside the first. `filepath` and `remotePath` are
+  written to the run the moment they exist, so this survives a restart too.
+- **One Telegram message per episode that fails** — for the go that gives up,
+  saying nothing will try it again. The list, its red dot and the tab mark show
+  every failure as it happens.
+- **Stopped on purpose is not a failure.** A download cancelled or removed in
+  the queue ends its run as `skipped` and marks the episode handled: trying it
+  again at the next check would undo what somebody just did. Pausing or
+  removing a watch cancels the download its current episode is waiting on and
+  ends that run quietly, as `skipped`, without marking anything handled — a
+  paused watch fetches the episode again once it is resumed. A run already past
+  its download finishes.
+- **"Try again"** on a failed or skipped run in the history goes through the
+  same chain and the same resume, by hand. It is refused while the watch is
+  being checked or is working through episodes, and holds the watch the same
+  way while it runs, so the schedule and the button never fetch one episode
+  side by side. It is refused while the watch is paused, too, and says so:
+  the pause would cancel the download the moment it was queued.
+- **A run cannot stay "running" across a restart.** The watch list is loaded
+  once per launch, before anything runs, so a run the file still calls running
+  belonged to a process that has gone. On load it becomes `failed`, ends when
+  its last step was heard from (not now, or it would look as if it took days),
+  and the step it was on says it was interrupted. The episode was never marked
+  handled, so the next check picks it up again.
 - Everything is logged (§10).
 
 ## 9. SMB

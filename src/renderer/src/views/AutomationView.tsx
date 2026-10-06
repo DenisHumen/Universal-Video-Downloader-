@@ -11,14 +11,16 @@ import {
   Plus,
   Radar,
   RefreshCw,
+  RotateCcw,
   Send,
   Trash2,
   X
 } from 'lucide-react'
 import { enter } from '../lib/motion'
 import { useStore } from '../store'
-import { resolveLanguage, useT, type TranslateFn } from '../i18n'
+import { resolveLanguage, useT, type TranslateFn, type TranslationKey } from '../i18n'
 import { toast } from '../lib/toast'
+import { describeCheck } from '../lib/checkSummary'
 import Thumbnail from '../components/Thumbnail'
 import EmptyState from '../components/EmptyState'
 import { span, type SpanUnit } from '../lib/span'
@@ -29,12 +31,18 @@ import AddWatchDialog from '../components/AddWatchDialog'
 import StepEditor from '../components/StepEditor'
 import { RUN_LABEL, STEP_LABEL } from '../lib/automationLabels'
 import {
+  attemptsAt,
+  byStepOrder,
+  MAX_ATTEMPTS,
+  STEP_ORDER,
   upcomingDelayMinutes,
+  watchFailing,
   type PipelineStep,
   type Run,
   type StepKind,
   type Watch
 } from '@shared/automation'
+import type { DownloadItem } from '@shared/types'
 
 /**
  * Watching series, and what happens when one produces an episode.
@@ -51,8 +59,8 @@ const STEP_ICON: Record<StepKind, JSX.Element> = {
   notify: <Send size={15} />
 }
 
-/** Steps a watch can gain, in the order they would run. */
-const ADDABLE: StepKind[] = ['rename', 'upload', 'notify']
+/** Steps a watch can gain, in the order they would run. Derived, so the two lists cannot drift apart. */
+const ADDABLE: StepKind[] = STEP_ORDER.filter((k) => k !== 'download')
 
 /*
   Units are looked up, never written: the first version said "in 2 h" in a
@@ -84,6 +92,70 @@ function relative(at: number | undefined, t: TranslateFn): string {
   return delta > 0 ? `${t('auto.in')} ${text}` : `${text} ${t('auto.ago')}`
 }
 
+/**
+ * How long ago something happened.
+ *
+ * Not `relative`, whose first minute reads "any moment" - right for a check
+ * that is due, wrong for a run that has just started or an episode that has
+ * just failed, both of which now turn up on screen the moment they happen.
+ */
+function ago(at: number, t: TranslateFn): string {
+  const mins = Math.round((Date.now() - at) / 60_000)
+  return mins < 1 ? t('auto.justNow') : `${spanText(mins, t)} ${t('auto.ago')}`
+}
+
+/*
+  How often the screen redraws on its own. Every time it shows is relative to
+  now, and with nothing to redraw it, "in 5 min" sat there for an hour while
+  the view stayed open. Half a minute keeps a minute-grained clock honest.
+*/
+const CLOCK_MS = 30_000
+
+/*
+  How far the queue item a running episode drives has got. Literals for the
+  dictionary check; the finished states are absent because by then the run
+  has moved past its download step.
+*/
+const QUEUE_LABEL: Partial<Record<DownloadItem['state'], TranslationKey>> = {
+  queued: 'state.queued',
+  detecting: 'state.detecting',
+  downloading: 'state.downloading',
+  processing: 'state.processing'
+}
+
+/**
+ * The queue row behind a running episode, and the way to it.
+ *
+ * A run whose download was paused - by hand, or by "pause all" - used to read
+ * "running" here for as long as anybody cared to look, with nothing to say the
+ * reason was a paused row on another screen. Its own component so a download's
+ * progress redraws this line rather than the whole screen.
+ */
+function QueueLink({ id }: { id: string }): JSX.Element | null {
+  const t = useT()
+  const item = useStore((s) => s.downloads.find((d) => d.id === id))
+  const setView = useStore((s) => s.setView)
+  if (!item) return null
+  const paused = item.state === 'paused'
+  const label = QUEUE_LABEL[item.state]
+  const percent = item.state === 'downloading' ? ` · ${Math.round(item.percent || 0)}%` : ''
+  const text = paused ? t('auto.runQueuePaused') : label ? `${t(label)}${percent}` : ''
+  // Finished: the run is past its download step, or about to say why not.
+  if (!text) return null
+  return (
+    <div className="mt-1.5 flex items-center gap-2">
+      <span
+        className={`mono min-w-0 flex-1 truncate text-[11px] ${paused ? 'text-warn' : 'text-ink-2'}`}
+      >
+        {text}
+      </span>
+      <button className="btn-quiet px-3 py-1 text-[12px]" onClick={() => setView('downloads')}>
+        {t('auto.showInQueue')}
+      </button>
+    </div>
+  )
+}
+
 export default function AutomationView(): JSX.Element {
   const t = useT()
   const [watches, setWatches] = useState<Watch[]>([])
@@ -93,17 +165,28 @@ export default function AutomationView(): JSX.Element {
   const [adding, setAdding] = useState<boolean | WatchIntent>(false)
   const [editing, setEditing] = useState<PipelineStep | StepKind | null>(null)
   const [confirmRemove, setConfirmRemove] = useState(false)
-  const [checking, setChecking] = useState(false)
+  /*
+    Per watch, not one flag for the screen: with a single boolean, picking
+    another series while one was being checked showed its button spinning and
+    disabled too.
+  */
+  const [checking, setChecking] = useState<ReadonlySet<string>>(new Set())
+  /** The list has been read once, so an empty one means nothing is watched rather than not yet known. */
+  const [loaded, setLoaded] = useState(false)
   const settings = useStore((s) => s.settings)
   const takePendingWatch = useStore((s) => s.takePendingWatch)
   const locale = useStore((s) =>
     resolveLanguage(s.settings?.language ?? 'auto', s.appInfo?.locale ?? 'en')
   )
 
-  // A series handed over from the home screen opens the dialog already filled in.
+  /*
+    A series handed over from the home screen opens the dialog already filled
+    in - or, when it is watched already, opens that watch.
+  */
   useEffect(() => {
     const intent = takePendingWatch()
-    if (intent) setAdding(intent)
+    if (intent?.watchId) setSelectedId(intent.watchId)
+    else if (intent) setAdding(intent)
   }, [takePendingWatch])
 
   const selected = useMemo(
@@ -114,13 +197,22 @@ export default function AutomationView(): JSX.Element {
   const refresh = useCallback(async (): Promise<void> => {
     const list = await window.api.autoList()
     setWatches(list)
+    setLoaded(true)
     setSelectedId((current) => current ?? list[0]?.id ?? null)
+    // The mark on the tab reads the same list; keep the two from disagreeing.
+    void useStore.getState().refreshWatchAlerts()
   }, [])
 
   useEffect(() => {
     void refresh()
     return window.api.onAutomationChanged(() => void refresh())
   }, [refresh])
+
+  const [, setClock] = useState(0)
+  useEffect(() => {
+    const timer = setInterval(() => setClock((n) => n + 1), CLOCK_MS)
+    return () => clearInterval(timer)
+  }, [])
 
   useEffect(() => {
     if (!selectedId) {
@@ -142,15 +234,39 @@ export default function AutomationView(): JSX.Element {
 
   const checkNow = async (): Promise<void> => {
     if (!selected) return
-    setChecking(true)
+    const id = selected.id
+    setChecking((current) => new Set(current).add(id))
     try {
-      await window.api.autoCheckNow(selected.id)
+      const summary = await window.api.autoCheckNow(id)
       await refresh()
-      const after = await window.api.autoList()
-      const w = after.find((x) => x.id === selected.id)
-      toast(w?.lastError ? w.lastError : t('auto.checked'), w?.lastError ? 'error' : 'success')
+      const { text, kind } = describeCheck(summary, t, (at) => releaseDate(at, locale))
+      toast(text, kind)
+    } catch (err) {
+      toast(err instanceof Error ? err.message : String(err), 'error')
     } finally {
-      setChecking(false)
+      setChecking((current) => {
+        const next = new Set(current)
+        next.delete(id)
+        return next
+      })
+    }
+  }
+
+  /*
+    A failed episode had no way back short of fetching and uploading it by
+    hand - not even after fixing the password that made it fail. Answers at
+    once; the new run replaces this one in the list as it goes.
+  */
+  const retry = async (run: Run): Promise<void> => {
+    try {
+      const answer = await window.api.autoRetryRun(run.id)
+      await refresh()
+      if ('started' in answer) toast(t('auto.retryStarted'), 'success')
+      else if ('busy' in answer) toast(t('auto.checkBusy'), 'info')
+      else if ('paused' in answer) toast(t('auto.retryPaused'), 'info')
+      else toast(answer.error, 'error')
+    } catch (err) {
+      toast(err instanceof Error ? err.message : String(err), 'error')
     }
   }
 
@@ -159,7 +275,7 @@ export default function AutomationView(): JSX.Element {
     const exists = selected.steps.some((s) => s.id === step.id)
     const steps = exists
       ? selected.steps.map((s) => (s.id === step.id ? step : s))
-      : [...selected.steps, step]
+      : [...selected.steps, step].sort(byStepOrder)
     await patch({ steps })
     setEditing(null)
   }
@@ -172,21 +288,27 @@ export default function AutomationView(): JSX.Element {
 
   const missing = ADDABLE.filter((k) => !selected?.steps.some((s) => s.kind === k))
 
+  /*
+    Nothing watched: the screen's title and the one way to add something. The
+    list beside it used to stay, an empty third of the window with a second
+    "add" button at the top of it.
+  */
+  const empty = loaded && watches.length === 0
+
   return (
     <div className="flex h-full min-h-0">
       {/* ---- the list ---- */}
-      <aside className="flex w-[300px] shrink-0 flex-col border-r border-edge">
-        <div className="flex items-center gap-2 border-b border-edge px-3 py-2.5">
-          <h1 className="label flex-1">{t('auto.title')}</h1>
-          <button className="btn-solid px-2.5 py-1.5" onClick={() => setAdding(true)}>
-            <Plus size={14} /> {t('auto.add')}
-          </button>
-        </div>
+      {!empty && (
+        <aside className="flex w-[300px] shrink-0 flex-col border-r border-edge">
+          <div className="flex items-center gap-2 border-b border-edge px-3 pb-3 pt-8">
+            <h1 className="h1 min-w-0 flex-1 truncate">{t('auto.title')}</h1>
+            <button className="btn-solid px-2.5 py-1.5" onClick={() => setAdding(true)}>
+              <Plus size={14} /> {t('auto.add')}
+            </button>
+          </div>
 
-        <div className="min-h-0 flex-1 overflow-y-auto">
-          {watches.length === 0
-            ? null
-            : watches.map((w) => (
+          <div className="min-h-0 flex-1 overflow-y-auto">
+            {watches.map((w) => (
               <button
                 key={w.id}
                 onClick={() => setSelectedId(w.id)}
@@ -201,25 +323,30 @@ export default function AutomationView(): JSX.Element {
                   fallback={<Film size={14} className="text-ink-3" />}
                 />
                 <span className="min-w-0 flex-1">
-                  <span className="block truncate text-[13px] text-ink">{w.title}</span>
+                  <span className="block truncate text-[13px] text-ink" title={w.title}>
+                    {w.title}
+                  </span>
                   <span className="mono block truncate text-[11px] text-ink-2">
                     {w.enabled
                       ? w.lastError
                         ? t('auto.failing')
-                        : w.pending
-                          ? releaseText(w.releaseAt, t)
-                          : relative(w.nextCheckAt, t)
+                        : w.lastRunError
+                          ? t('auto.runFailing')
+                          : w.pending
+                            ? releaseText(w.releaseAt, t)
+                            : relative(w.nextCheckAt, t)
                       : t('auto.paused')}
                   </span>
                 </span>
                 {!w.enabled && <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-ink-3" />}
-                {w.enabled && w.lastError && (
+                {watchFailing(w) && (
                   <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-bad" />
                 )}
               </button>
             ))}
-        </div>
-      </aside>
+          </div>
+        </aside>
+      )}
 
       {/* ---- the selected series ---- */}
       <motion.section
@@ -229,18 +356,23 @@ export default function AutomationView(): JSX.Element {
         transition={enter}
         className="min-h-0 flex-1 overflow-y-auto"
       >
-        {watches.length === 0 ? (
-          <EmptyState
-            icon={<Radar size={22} />}
-            title={t('auto.empty')}
-            hint={t('auto.emptyHint')}
-            action={
-              <button className="btn-solid" onClick={() => setAdding(true)}>
-                <Plus size={14} /> {t('auto.add')}
-              </button>
-            }
-          />
-        ) : !selected ? (
+        {empty ? (
+          <div className="mx-auto flex h-full w-full max-w-[860px] flex-col px-6 pb-8 pt-10">
+            <h1 className="h1">{t('auto.title')}</h1>
+            <div className="min-h-0 flex-1">
+              <EmptyState
+                icon={<Radar size={22} />}
+                title={t('auto.empty')}
+                hint={t('auto.emptyHint')}
+                action={
+                  <button className="btn-solid" onClick={() => setAdding(true)}>
+                    <Plus size={14} /> {t('auto.add')}
+                  </button>
+                }
+              />
+            </div>
+          </div>
+        ) : !loaded ? null : !selected ? (
           <div className="flex h-full items-center justify-center">
             <p className="hint">{t('auto.pickOne')}</p>
           </div>
@@ -254,7 +386,9 @@ export default function AutomationView(): JSX.Element {
                 fallback={<Film size={20} className="text-ink-3" />}
               />
               <div className="min-w-0 flex-1">
-                <h2 className="h2 truncate">{selected.title}</h2>
+                <h2 className="h2 truncate" title={selected.title}>
+                  {selected.title}
+                </h2>
                 <p className="hint mt-1 truncate">
                   {[selected.translatorName, selected.quality].filter(Boolean).join(' · ')}
                 </p>
@@ -285,6 +419,32 @@ export default function AutomationView(): JSX.Element {
                 {selected.lastError && (
                   <p className="hint mt-1 text-bad">{selected.lastError}</p>
                 )}
+                {/*
+                  Only an episode that gets all the way through clears this, and
+                  one that has been given up on never will, so it can be put
+                  away by hand once it has been seen.
+                */}
+                {selected.lastRunError && (
+                  <div className="mt-1 flex items-start gap-1">
+                    <p className="hint min-w-0 flex-1 text-bad">
+                      {selected.lastRunFailedAt
+                        ? t('auto.runFailedAt', { when: ago(selected.lastRunFailedAt, t) })
+                        : t('auto.runFailing')}
+                      {': '}
+                      {selected.lastRunError}
+                    </p>
+                    <button
+                      className="btn-icon-bare -my-1 h-7 w-7"
+                      aria-label={t('auto.dismissRunError')}
+                      title={t('auto.dismissRunError')}
+                      onClick={() =>
+                        void patch({ lastRunError: undefined, lastRunFailedAt: undefined })
+                      }
+                    >
+                      <X size={13} />
+                    </button>
+                  </div>
+                )}
               </div>
             </header>
 
@@ -292,8 +452,12 @@ export default function AutomationView(): JSX.Element {
               <button className="btn" onClick={() => void patch({ enabled: !selected.enabled })}>
                 {selected.enabled ? t('auto.pause') : t('auto.resume')}
               </button>
-              <button className="btn" onClick={() => void checkNow()} disabled={checking}>
-                {checking ? (
+              <button
+                className="btn"
+                onClick={() => void checkNow()}
+                disabled={checking.has(selected.id)}
+              >
+                {checking.has(selected.id) ? (
                   <Loader2 size={14} className="animate-spin" />
                 ) : (
                   <RefreshCw size={14} />
@@ -326,8 +490,10 @@ export default function AutomationView(): JSX.Element {
                 <span className="hint">{t('auto.always')}</span>
               </div>
 
+              {/* In the order they run, which a watch saved before this need not be stored in. */}
               {selected.steps
                 .filter((s) => s.kind !== 'download')
+                .sort(byStepOrder)
                 .map((step) => (
                   <button
                     key={step.id}
@@ -391,11 +557,12 @@ export default function AutomationView(): JSX.Element {
                         {t(RUN_LABEL[run.state])}
                       </span>
                       <span className="mono ml-auto text-[11px] text-ink-3">
-                        {relative(run.startedAt, t)}
+                        {ago(run.startedAt, t)}
                       </span>
                     </div>
                     <div className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5">
-                      {run.steps.map((s, i) => (
+                      {/* A copy: runs recorded before steps were kept in order are shown in it too. */}
+                      {[...run.steps].sort(byStepOrder).map((s, i) => (
                         <span
                           key={i}
                           className={`mono text-[11px] ${
@@ -408,10 +575,35 @@ export default function AutomationView(): JSX.Element {
                           title={s.message}
                         >
                           {t(STEP_LABEL[s.kind])}
-                          {s.state === 'failed' && s.message ? `: ${s.message}` : ''}
+                          {(s.state === 'failed' || (run.state === 'skipped' && s.state === 'skipped')) &&
+                          s.message
+                            ? `: ${s.message}`
+                            : ''}
                         </span>
                       ))}
                     </div>
+                    {run.state === 'running' && run.downloadId && (
+                      <QueueLink id={run.downloadId} />
+                    )}
+                    {(run.state === 'failed' || run.state === 'skipped') && (
+                      <div className="mt-1.5 flex items-center gap-2">
+                        <span className="mono min-w-0 flex-1 truncate text-[11px] text-ink-2">
+                          {/* Counted on the watch only while the schedule still means to try again. */}
+                          {run.state === 'failed' && attemptsAt(selected, run) > 0
+                            ? t('auto.runWillRetry', {
+                                n: attemptsAt(selected, run),
+                                max: MAX_ATTEMPTS
+                              })
+                            : ''}
+                        </span>
+                        <button
+                          className="btn-quiet px-3 py-1 text-[12px]"
+                          onClick={() => void retry(run)}
+                        >
+                          <RotateCcw size={12} /> {t('auto.retryRun')}
+                        </button>
+                      </div>
+                    )}
                   </li>
                 ))}
               </ul>
