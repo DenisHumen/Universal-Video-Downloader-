@@ -13,13 +13,29 @@ export class NotReleasedError extends Error {
   readonly thumbnail?: string
   /** When the site expects it, in milliseconds. Absent when it does not say. */
   readonly releaseAt?: number
+  /**
+   * The site a watch on it should be filed under, and the heights to offer
+   * for it. Both default to YummyAnime's, the first site to say "not
+   * yet": a watch keeps the provider it was made with, so one filed under the
+   * wrong site would build that site's addresses for every episode it found.
+   */
+  readonly provider?: string
+  readonly qualities?: string[]
 
-  constructor(details: { title: string; thumbnail?: string; releaseAt?: number }) {
+  constructor(details: {
+    title: string
+    thumbnail?: string
+    releaseAt?: number
+    provider?: string
+    qualities?: string[]
+  }) {
     super('This title has not been released yet.')
     this.name = 'NotReleasedError'
     this.title = details.title
     this.thumbnail = details.thumbnail
     this.releaseAt = details.releaseAt
+    this.provider = details.provider
+    this.qualities = details.qualities
   }
 }
 

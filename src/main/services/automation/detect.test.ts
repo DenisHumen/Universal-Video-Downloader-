@@ -1,7 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { Watch } from '@shared/automation'
 import type { StreamingInfo } from '@shared/types'
-import { checkWatch, episodesForTranslator } from './detect'
+import { NotReleasedError } from '../../resolvers/upcoming'
+import { checkWatch, describeSeries, episodesForTranslator } from './detect'
 
 /*
   A watch whose dub disappeared from the page used to read the default dub's
@@ -124,5 +125,34 @@ describe('checkWatch, when the followed dub is not on the page', () => {
     const result = await checkWatch(watch({ translatorId: 'B', translatorName: 'Dub B' }))
     expect(result.adopt).toBeUndefined()
     expect(result.fresh).toEqual([{ season: 1, episode: 3 }])
+  })
+})
+
+/*
+  "Not out yet" was always YummyAnime's to say, and the watch it offered was
+  filed under YummyAnime. AniLiberty says it too now, and a watch keeps the
+  provider it was made with: filed under the wrong one, every episode it found
+  once the release came out would be queued as a YummyAnime address.
+*/
+describe('describeSeries on a title that is not out yet', () => {
+  beforeEach(() => {
+    h.resolveUrl.mockReset()
+  })
+
+  it('files the watch under the site that said so, with that site’s heights', async () => {
+    h.resolveUrl.mockRejectedValue(
+      new NotReleasedError({ title: 'Upcoming', provider: 'aniliberty', qualities: ['480p', '720p', '1080p'] })
+    )
+    const offer = await describeSeries('https://aniliberty.top/anime/releases/release/upcoming')
+    expect(offer.provider).toBe('aniliberty')
+    expect(offer.qualities).toEqual(['480p', '720p', '1080p'])
+    expect(offer.upcoming).toEqual({ releaseAt: undefined })
+  })
+
+  it('keeps YummyAnime’s provider and heights when the error names none', async () => {
+    h.resolveUrl.mockRejectedValue(new NotReleasedError({ title: 'Upcoming', releaseAt: 1000 }))
+    const offer = await describeSeries('https://yummyani.me/catalog/item/upcoming')
+    expect(offer.provider).toBe('yummyani')
+    expect(offer.qualities).toEqual(['360p', '480p', '720p'])
   })
 })

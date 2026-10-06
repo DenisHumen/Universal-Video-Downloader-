@@ -85,7 +85,7 @@ export interface StreamSeason {
 
 /** Rich info for streaming sites that need translator/episode/quality selection. */
 export interface StreamingInfo {
-  provider: 'rezka' | 'yummyani' | 'kodik'
+  provider: 'rezka' | 'yummyani' | 'kodik' | 'aniliberty'
   host: string
   id: string
   title: string
