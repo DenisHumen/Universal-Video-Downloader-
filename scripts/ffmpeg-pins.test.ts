@@ -3,6 +3,7 @@ import { tmpdir } from 'os'
 import { join } from 'path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import afterPack from './after-pack.mjs'
+import { SENTINEL, fuseProblems } from './electron-fuses.mjs'
 import {
   NONFREE_MARKER,
   PINNED,
@@ -223,19 +224,34 @@ describe('missingNotices', () => {
   })
 })
 
+/** Enough of an Electron binary for its fuses: the wire Electron 33 ships, in some code. */
+const electronBinary = (): Buffer =>
+  Buffer.concat([
+    Buffer.alloc(1024, 0xcc),
+    Buffer.from(SENTINEL, 'latin1'),
+    Buffer.from([1, 8]),
+    Buffer.from('10110001', 'latin1'),
+    Buffer.alloc(1024, 0xcc)
+  ])
+
 describe('after-pack', () => {
   // The hook electron-builder runs on every packed app before its installer is
   // built. This packs a Mac one by hand: an arm64 Mach-O header is all the
-  // architecture check reads, and the notice checks read the rest.
+  // architecture check reads, the notice checks read the rest, and the fuses
+  // live in Electron Framework. codesign is a stand-in that records its calls.
   const product = 'Universal Video Downloader'
   let appOutDir = ''
+  let app = ''
   let resources = ''
   let ffmpeg = ''
+  let framework = ''
+  let run = vi.fn()
 
   beforeEach(() => {
     vi.spyOn(console, 'log').mockImplementation(() => {})
     appOutDir = mkdtempSync(join(tmpdir(), 'uvd-afterpack-'))
-    resources = join(appOutDir, `${product}.app`, 'Contents', 'Resources')
+    app = join(appOutDir, `${product}.app`)
+    resources = join(app, 'Contents', 'Resources')
     const unpacked = join(resources, 'app.asar.unpacked', 'node_modules', 'ffmpeg-static')
     mkdirSync(unpacked, { recursive: true })
     ffmpeg = join(unpacked, 'ffmpeg')
@@ -243,6 +259,11 @@ describe('after-pack', () => {
     writeFileSync(`${ffmpeg}.README`, ffmpegReadme('darwin-arm64', PINNED['darwin-arm64']))
     writeFileSync(`${ffmpeg}.LICENSE`, GPL3)
     writeFileSync(join(resources, 'THIRD_PARTY_NOTICES.txt'), NOTICES)
+    const frameworkDir = join(app, 'Contents', 'Frameworks', 'Electron Framework.framework')
+    mkdirSync(frameworkDir, { recursive: true })
+    framework = join(frameworkDir, 'Electron Framework')
+    writeFileSync(framework, electronBinary())
+    run = vi.fn()
   })
 
   afterEach(() => {
@@ -256,22 +277,76 @@ describe('after-pack', () => {
     writeFileSync(ffmpeg, Buffer.concat([head, fakeBinary(extra)]))
   }
 
-  const pack = () =>
-    afterPack({
-      appOutDir,
-      electronPlatformName: 'darwin',
-      arch: 3,
-      packager: { appInfo: { productFilename: product } }
-    })
+  const pack = (host: { platform?: string; env?: Record<string, string> } = {}) =>
+    afterPack(
+      {
+        appOutDir,
+        electronPlatformName: 'darwin',
+        arch: 3,
+        packager: { appInfo: { productFilename: product } }
+      },
+      { platform: 'darwin', env: {}, run, ...host }
+    )
 
   it('passes an app whose ffmpeg is redistributable and described', async () => {
     await expect(pack()).resolves.toBeUndefined()
   })
 
+  // ELECTRON_RUN_AS_NODE, NODE_OPTIONS, --inspect and a loose resources/app
+  // all worked against every release up to v3.20.0.
+  it('flips the fuses in Electron Framework', async () => {
+    await pack()
+    expect(fuseProblems(readFileSync(framework))).toEqual([])
+  })
+
+  // An Apple silicon binary whose signature no longer matches is killed at
+  // launch, so the seal has to come after the fuses, and has to verify.
+  it('then seals the app ad hoc and verifies the seal', async () => {
+    let flippedWhenSigned = false
+    run.mockImplementation((_cmd: string, args: string[]) => {
+      if (args[0] === '--force') flippedWhenSigned = fuseProblems(readFileSync(framework)).length === 0
+    })
+    await pack()
+    expect(run.mock.calls.map(([cmd, args]) => [cmd, args])).toEqual([
+      ['codesign', ['--force', '--deep', '--sign', '-', '--timestamp=none', app]],
+      ['codesign', ['--verify', '--deep', '--strict', '--verbose=2', app]]
+    ])
+    expect(flippedWhenSigned).toBe(true)
+  })
+
+  it('fails the build when the seal does not verify', async () => {
+    run.mockImplementation((_cmd: string, args: string[]) => {
+      if (args[0] === '--verify') throw new Error('a sealed resource is missing or invalid')
+    })
+    await expect(pack()).rejects.toThrow(/sealed resource is missing/)
+  })
+
+  // electron-builder signs with the real identity right after the hook.
+  it('leaves signing to electron-builder when a certificate is given', async () => {
+    await pack({ env: { CSC_LINK: 'file:///example/developer-id.p12' } })
+    expect(run).not.toHaveBeenCalled()
+    expect(fuseProblems(readFileSync(framework))).toEqual([])
+  })
+
+  // Without codesign the flipped framework could not be sealed again.
+  it('refuses to pack a Mac app anywhere but on a Mac, before changing it', async () => {
+    const before = readFileSync(framework)
+    await expect(pack({ platform: 'linux' })).rejects.toThrow(/has to be packed on macOS/)
+    expect(readFileSync(framework).equals(before)).toBe(true)
+  })
+
+  it('fails when Electron Framework carries no fuse wire', async () => {
+    writeFileSync(framework, Buffer.alloc(4096, 0xcc))
+    await expect(pack()).rejects.toThrow(/cannot flip Electron's fuses[\s\S]*no fuse wire/)
+    expect(run).not.toHaveBeenCalled()
+  })
+
   // The guard that would have stopped every v3.20.0 Linux package.
-  it('fails on a planted nonfree marker', async () => {
+  it('fails on a planted nonfree marker, without flipping or signing anything', async () => {
     plant(`License: ${NONFREE_MARKER}`)
     await expect(pack()).rejects.toThrow(/nonfree build/)
+    expect(readFileSync(framework).equals(electronBinary())).toBe(true)
+    expect(run).not.toHaveBeenCalled()
   })
 
   // A package built without fetch-ffmpeg still carries ffmpeg-static's README.
@@ -283,5 +358,54 @@ describe('after-pack', () => {
   it('fails without THIRD_PARTY_NOTICES.txt in the resources', async () => {
     rmSync(join(resources, 'THIRD_PARTY_NOTICES.txt'))
     await expect(pack()).rejects.toThrow(/THIRD_PARTY_NOTICES\.txt is missing/)
+  })
+})
+
+describe('after-pack on Windows', () => {
+  // electron-builder renames electron.exe after the product; that file holds
+  // the wire, and nothing on Windows is signed.
+  const product = 'Universal Video Downloader'
+  let appOutDir = ''
+  let exe = ''
+
+  beforeEach(() => {
+    vi.spyOn(console, 'log').mockImplementation(() => {})
+    appOutDir = mkdtempSync(join(tmpdir(), 'uvd-afterpack-win-'))
+    const resources = join(appOutDir, 'resources')
+    const unpacked = join(resources, 'app.asar.unpacked', 'node_modules', 'ffmpeg-static')
+    mkdirSync(unpacked, { recursive: true })
+    // 'MZ', a pointer at 0x3c to 'PE\0\0', then Machine 0x8664: an x64 PE.
+    const head = Buffer.alloc(0x100)
+    head.write('MZ', 0, 'latin1')
+    head.writeUInt32LE(0x80, 0x3c)
+    head.write('PE\0\0', 0x80, 'latin1')
+    head.writeUInt16LE(0x8664, 0x84)
+    const ffmpeg = join(unpacked, 'ffmpeg.exe')
+    writeFileSync(ffmpeg, Buffer.concat([head, fakeBinary()]))
+    writeFileSync(`${ffmpeg}.README`, ffmpegReadme('win32-x64', PINNED['win32-x64']))
+    writeFileSync(`${ffmpeg}.LICENSE`, GPL3)
+    writeFileSync(join(resources, 'THIRD_PARTY_NOTICES.txt'), NOTICES)
+    exe = join(appOutDir, `${product}.exe`)
+    writeFileSync(exe, electronBinary())
+  })
+
+  afterEach(() => {
+    vi.restoreAllMocks()
+    rmSync(appOutDir, { recursive: true, force: true })
+  })
+
+  it('flips the fuses in the executable and signs nothing', async () => {
+    const run = vi.fn()
+    await afterPack(
+      {
+        appOutDir,
+        electronPlatformName: 'win32',
+        arch: 1,
+        packager: { appInfo: { productFilename: product } }
+      },
+      { platform: 'win32', env: {}, run }
+    )
+    expect(fuseProblems(readFileSync(exe))).toEqual([])
+    expect(run).not.toHaveBeenCalled()
   })
 })

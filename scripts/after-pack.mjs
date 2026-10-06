@@ -21,19 +21,32 @@
  * platform's binary sat a README for 6.1.1 naming the wrong source. Both rules
  * are in scripts/ffmpeg-pins.mjs.
  *
+ * Last, once everything is checked, it flips Electron's fuses so no other
+ * program can run code as this app (scripts/electron-fuses.mjs says how it
+ * could), and on a Mac seals the app with an ad-hoc signature: the fuses live
+ * in Electron Framework, and an Apple silicon binary whose signature no longer
+ * matches its bytes is killed the moment it starts.
+ *
  * electron-builder calls this once per packed target, before the installer is
  * built, so throwing here stops the artifact from ever being published.
  */
-import { existsSync, readdirSync, readFileSync } from 'fs'
+import { execFileSync } from 'child_process'
+import { existsSync, readdirSync, readFileSync, writeFileSync } from 'fs'
 import { basename, join } from 'path'
 import { archOf } from './check-ffmpeg-arch.mjs'
+import { flipFuses, fuseBinaryPath, fuseProblems } from './electron-fuses.mjs'
 import { noticeProblems, thirdPartyProblems } from './ffmpeg-pins.mjs'
 import { iconProblems, profileProblem } from './linux-package.mjs'
 
 /** electron-builder's Arch enum, which arrives as a number. */
 const ARCH_NAME = { 0: 'ia32', 1: 'x64', 2: 'armv7l', 3: 'arm64', 4: 'universal' }
 
-export default async function afterPack(context) {
+/**
+ * electron-builder passes only the context. `host` is the machine doing the
+ * packing, and exists so the tests can pack a Mac app without a Mac.
+ */
+export default async function afterPack(context, host = {}) {
+  const { platform = process.platform, run = execFileSync, env = process.env } = host
   const { appOutDir, electronPlatformName, arch } = context
   const target = ARCH_NAME[arch] ?? String(arch)
 
@@ -77,6 +90,91 @@ export default async function afterPack(context) {
 
   checkNotices(binary, resources)
   if (electronPlatformName === 'linux') checkLinux(context)
+
+  if (electronPlatformName === 'darwin' && platform !== 'darwin') {
+    throw new Error(
+      `after-pack: a Mac app has to be packed on macOS.\n` +
+        `  Flipping its fuses changes Electron Framework, and only codesign can give it\n` +
+        `  a signature that matches again; without one an Apple silicon Mac kills it at launch.`
+    )
+  }
+  const electron = fuseBinaryPath(electronPlatformName, appOutDir, {
+    productFilename: product,
+    executableName: context.packager.executableName
+  })
+  flipShippedFuses(electron)
+  if (electronPlatformName === 'darwin' && !env.CSC_LINK) {
+    sealMacApp(join(appOutDir, `${product}.app`), run)
+  }
+  // Read back from disk, after codesign has rewritten the binary on a Mac.
+  checkFuses(electron)
+}
+
+/**
+ * Switch off what lets another program run code as this app. It rewrites the
+ * Electron binary, which is why it comes after every check.
+ */
+function flipShippedFuses(file) {
+  if (!existsSync(file)) {
+    throw new Error(`after-pack: there is no Electron binary at ${file} to flip the fuses in.`)
+  }
+  const buf = readFileSync(file)
+  try {
+    flipFuses(buf)
+  } catch (err) {
+    throw new Error(
+      `after-pack: cannot flip Electron's fuses in ${file}:\n` +
+        err.message
+          .split('\n')
+          .map((p) => `    ${p}`)
+          .join('\n') +
+        `\n  Without them ELECTRON_RUN_AS_NODE, NODE_OPTIONS and --inspect stay open to any` +
+        `\n  program on the machine; the format is described in scripts/electron-fuses.mjs.`
+    )
+  }
+  writeFileSync(file, buf)
+}
+
+function checkFuses(file) {
+  const problems = fuseProblems(readFileSync(file))
+  if (problems.length > 0) {
+    throw new Error(
+      `after-pack: Electron's fuses are not as they should be in ${file}:\n` +
+        problems.map((p) => `    ${p}`).join('\n')
+    )
+  }
+  console.log(`  • Electron fuses: RunAsNode, NODE_OPTIONS and --inspect off, app.asar only`)
+}
+
+/**
+ * Seal the Mac app with an ad-hoc signature, and refuse it unless the seal
+ * verifies.
+ *
+ * There is no Developer ID in CI, so electron-builder signs nothing, and
+ * v3.20.0 shipped without a _CodeSignature anywhere in the bundle. Its Electron
+ * Framework is also no longer the file Electron signed once the fuses are
+ * flipped. `--deep` signs the helper apps and frameworks inside it as well;
+ * the bundled ffmpeg keeps the signature it came with and is sealed in as a
+ * resource of the app.
+ *
+ * No hardened runtime: with an ad-hoc signature it would also need
+ * `--entitlements build/entitlements.mac.plist`, whose
+ * disable-library-validation is what lets Electron Framework load under it.
+ * With CSC_LINK set this is skipped, because electron-builder then signs right
+ * after this hook with the real identity, the hardened runtime and the
+ * entitlements.
+ *
+ * Whether a quarantined Mac on macOS 15 now offers Open Anyway instead of
+ * "damaged" has not been tried on a real machine yet, so what users are told
+ * (README, the release notes, MacNotice, the DMG background) still says xattr.
+ */
+function sealMacApp(app, run) {
+  run('codesign', ['--force', '--deep', '--sign', '-', '--timestamp=none', app], {
+    stdio: 'inherit'
+  })
+  // Throws on a seal that does not verify, which fails the build rather than ship it.
+  run('codesign', ['--verify', '--deep', '--strict', '--verbose=2', app], { stdio: 'inherit' })
+  console.log(`  • ${basename(app)} is sealed with an ad-hoc signature that verifies`)
 }
 
 /**

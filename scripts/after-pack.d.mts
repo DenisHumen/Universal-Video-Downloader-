@@ -10,4 +10,10 @@ export interface AfterPackContext {
     buildResourcesDir?: string
   }
 }
-export default function afterPack(context: AfterPackContext): Promise<void>
+// The machine doing the packing; electron-builder never passes it.
+export interface AfterPackHost {
+  platform?: string
+  run?: (command: string, args: string[], options?: object) => unknown
+  env?: Record<string, string | undefined>
+}
+export default function afterPack(context: AfterPackContext, host?: AfterPackHost): Promise<void>

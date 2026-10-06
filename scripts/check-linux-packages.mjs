@@ -15,12 +15,15 @@
  *    StartupWMClass that matches the window, or the dock grows a second icon;
  *  - the ffmpeg must be one we may redistribute, with its README, its GPLv3
  *    text and THIRD_PARTY_NOTICES.txt installed beside the app - a repository
- *    that carries the package carries this obligation too.
+ *    that carries the package carries this obligation too;
+ *  - the executable it installs must have Electron's fuses flipped, so no
+ *    other program can start it as Node or inject code into it.
  *
- * The rules live in scripts/linux-package.mjs and scripts/ffmpeg-pins.mjs, with
- * tests; this only gets the packages open. Linux only. Needs dpkg-deb, rpm and
- * desktop-file-validate, and uses apparmor_parser too when it is there, to
- * read the profile exactly the way the postinst will:
+ * The rules live in scripts/linux-package.mjs, scripts/ffmpeg-pins.mjs and
+ * scripts/electron-fuses.mjs, with tests; this only gets the packages open.
+ * Linux only. Needs dpkg-deb, rpm and desktop-file-validate, and uses
+ * apparmor_parser too when it is there, to read the profile exactly the way
+ * the postinst will:
  *
  *   node scripts/check-linux-packages.mjs                 # release/<version>/*.{deb,rpm}
  *   node scripts/check-linux-packages.mjs some.deb x.rpm  # particular files
@@ -29,6 +32,7 @@ import { execFileSync } from 'child_process'
 import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync } from 'fs'
 import { tmpdir } from 'os'
 import { join, relative } from 'path'
+import { fuseProblems } from './electron-fuses.mjs'
 import { missingNotices, noticeProblems, thirdPartyProblems } from './ffmpeg-pins.mjs'
 import {
   desktopEntryProblems,
@@ -93,6 +97,12 @@ function checkDeb(file) {
           problems.push(`apparmor_parser rejects the profile: ${why}`)
         }
       }
+    }
+
+    // layoutProblems has already said so if it is missing.
+    const electron = join(root, 'opt', product, executable)
+    if (existsSync(electron)) {
+      for (const p of fuseProblems(readFileSync(electron))) problems.push(`Electron fuses: ${p}`)
     }
 
     const resources = join(root, 'opt', product, 'resources')

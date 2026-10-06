@@ -88,6 +88,11 @@ jobs:
       - run: npx --no-install electron-builder --dir ${{ matrix.args }}
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: false
+      # after-pack flips Electron's fuses and, on a Mac, seals the app; this
+      # reads the fuses back from what electron-builder left once it was done
+      # (on Windows it rewrites the executable with rcedit after the hook).
+      - name: Check Electron's fuses in the packed app
+        run: node scripts/check-fuses.mjs
 
       # The .deb and .rpm themselves, not only the unpacked app. The AppArmor
       # profile, the hicolor icons and the desktop entry are all written by
