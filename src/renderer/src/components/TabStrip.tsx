@@ -50,12 +50,6 @@ export default function TabStrip({ children, label, className }: Props): JSX.Ele
     return changed
   }, [])
 
-  /*
-    Scroll a tab fully into view: the one that was just selected, or the one
-    Tab just moved to. Keyboard focus used to land on a tab half hidden behind
-    the arrow, and the arrows themselves are out of the tab order on purpose,
-    so the only way to see the rest of it was the mouse.
-  */
   /** Bring a tab fully into view; true when that moved an arrow. */
   const scrollTo = useCallback(
     (item: Element): boolean => {
@@ -75,6 +69,12 @@ export default function TabStrip({ children, label, className }: Props): JSX.Ele
   )
   /** The tab just revealed, until the arrows have settled around it; see the layout effect below. */
   const settling = useRef<Element | null>(null)
+  /*
+    Scroll a tab fully into view: the one that was just selected, or the one
+    Tab just moved to. Keyboard focus used to land on a tab half hidden behind
+    the arrow, and the arrows themselves are out of the tab order on purpose,
+    so the only way to see the rest of it was the mouse.
+  */
   const reveal = useCallback(
     (target: EventTarget | null) => {
       const el = ref.current
