@@ -1,8 +1,15 @@
 import { app } from 'electron'
 import { EventEmitter } from 'events'
-import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { log } from '../log'
+import {
+  failure,
+  isRecord,
+  noteRefusedWrite,
+  ReadFailure,
+  readJsonStore,
+  writeJsonAtomic
+} from '../json-store'
 import {
   endInterruptedRuns,
   episodeKey,
@@ -18,8 +25,9 @@ import {
  * The watches, and what has happened to them.
  *
  * Same discipline as `settings.ts` and the download history, for the same
- * reasons: written through a temp file and a rename so a crash mid-write cannot
- * leave an unreadable file, debounced so editing a field does not rewrite the
+ * reasons: written through json-store so a crash mid-write cannot leave an
+ * unreadable file and a damaged one is recovered from its backup rather than
+ * replaced with nothing, debounced so editing a field does not rewrite the
  * disk on every keystroke, and read through a migration that tolerates a file
  * from an older build.
  *
@@ -48,48 +56,96 @@ const changed = (): void => {
 
 let state: StoredWatches | null = null
 
+/**
+ * watches.json is there but could not be read. The list then starts empty in
+ * memory, nothing is saved over the file, and whatever this session adds is
+ * folded into it once a read succeeds. See json-store.ts.
+ */
+const unread = new ReadFailure()
+
 const empty = (): StoredWatches => ({ watches: [], runs: {} })
 
-function read(): StoredWatches {
-  if (state) return state
+/**
+ * What the file holds, with what this session added while it could not be read.
+ *
+ * Only additions are possible: the watches in the file were never loaded, so
+ * nothing could have changed them. A run is kept once, by id, and the history
+ * stays within the usual length.
+ */
+export function mergeWatches(stored: StoredWatches, interim: StoredWatches): StoredWatches {
+  const known = new Set(stored.watches.map((w) => w.id))
+  const runs = { ...stored.runs }
+  for (const [watchId, list] of Object.entries(interim.runs)) {
+    const have = runs[watchId] ?? []
+    const ids = new Set(have.map((r) => r.id))
+    runs[watchId] = [...have, ...list.filter((r) => !ids.has(r.id))].slice(-MAX_RUNS)
+  }
+  return {
+    watches: [...stored.watches, ...interim.watches.filter((w) => !known.has(w.id))],
+    runs
+  }
+}
+
+/**
+ * Read watches.json into `state`.
+ *
+ * 'dirty' when what is now in memory ought to be saved; 'unreadable' when the
+ * file is there but could not be read, and must not be written over.
+ */
+function load(): 'clean' | 'dirty' | 'unreadable' {
   try {
-    const file = FILE()
-    const loaded = existsSync(file)
-      ? migrateWatches(JSON.parse(readFileSync(file, 'utf-8')))
-      : empty()
+    const read = readJsonStore(FILE(), 'watcher', isRecord)
+    if (read.status === 'unreadable') {
+      unread.set()
+      state = state ?? empty()
+      return 'unreadable'
+    }
+    const interim = unread.active ? state : null
+    unread.clear()
+    const loaded = read.status === 'ok' ? migrateWatches(read.data) : empty()
     /*
       Here rather than when the watcher starts, so it happens whether or not
       automation is on, and before anything this launch adds a run of its own
-      that could be mistaken for one the last launch left behind.
+      that could be mistaken for one the last launch left behind. On a late
+      read, before this session's runs are folded in, for the same reason.
     */
     const { runs, ended } = endInterruptedRuns(loaded.runs)
-    state = { ...loaded, runs }
-    if (ended) {
-      log.info('watcher', `Marked ${ended} run(s) the last session left unfinished as failed`)
-      persist()
-    }
+    state = interim ? mergeWatches({ ...loaded, runs }, interim) : { ...loaded, runs }
+    if (ended) log.info('watcher', `Marked ${ended} run(s) the last session left unfinished as failed`)
+    if (interim) changed()
+    const fresh = read.status !== 'ok' || read.recovered
+    return ended || interim || fresh ? 'dirty' : 'clean'
   } catch (err) {
-    log.error('watcher', 'Could not read the watch list; starting with an empty one', {
-      why: err instanceof Error ? err.message : String(err)
-    })
-    state = empty()
+    /*
+      Not a damaged file - json-store deals with those - but one this build
+      could not make sense of. Starting empty and saving that would destroy the
+      list, so it is treated like a file that could not be read.
+    */
+    if (!unread.active) {
+      log.error('watcher', 'Could not read the watch list; not saving over it', failure(err))
+    }
+    unread.set()
+    state = state ?? empty()
+    return 'unreadable'
   }
-  return state
+}
+
+function read(): StoredWatches {
+  if ((!state || unread.due()) && load() === 'dirty') persist()
+  return state!
 }
 
 function writeNow(): void {
   if (!state) return
   try {
-    const dir = app.getPath('userData')
-    if (!existsSync(dir)) mkdirSync(dir, { recursive: true })
-    const target = FILE()
-    const tmp = `${target}.tmp`
-    writeFileSync(tmp, JSON.stringify(state, null, 2), 'utf-8')
-    renameSync(tmp, target)
+    // One more look first: whatever kept the file from being read may be gone.
+    if (unread.active && load() === 'unreadable') {
+      noteRefusedWrite(FILE(), 'watcher')
+      return
+    }
+    writeJsonAtomic(FILE(), state, { indent: 2 })
   } catch (err) {
-    log.error('watcher', 'Could not save the watch list', {
-      why: err instanceof Error ? err.message : String(err)
-    })
+    log.error('watcher', 'Could not save the watch list', failure(err))
   }
 }
 

@@ -756,6 +756,17 @@ export default function SettingsView(): JSX.Element {
             <Row label={t('settings.resumeOnLaunch')} hint={t('settings.resumeOnLaunchHint')}>
               <Switch value={settings.resumeOnLaunch} onChange={(v) => set('resumeOnLaunch', v)} />
             </Row>
+            <Row label={t('settings.keepFinished')} hint={t('settings.keepFinishedHint')} stack>
+              <Choice
+                label={t('settings.keepFinished')}
+                value={String(settings.keepFinished ?? 0)}
+                onChange={(v) => set('keepFinished', Number(v))}
+                options={['0', '50', '100', '500', '1000'].map((n) => ({
+                  value: n,
+                  label: n === '0' ? t('settings.keepFinished.all') : n
+                }))}
+              />
+            </Row>
             <Row label={t('settings.speedLimit')} hint={t('settings.speedLimitHint')}>
               <SpeedLimitField
                 value={settings.speedLimit}

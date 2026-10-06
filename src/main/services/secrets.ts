@@ -1,7 +1,14 @@
 import { app, safeStorage } from 'electron'
-import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { log } from './log'
+import {
+  failure,
+  isRecord,
+  noteRefusedWrite,
+  ReadFailure,
+  readJsonStore,
+  writeJsonAtomic
+} from './json-store'
 
 /**
  * The passwords and tokens the automation and the proxy need, kept apart from
@@ -44,42 +51,52 @@ function available(): boolean {
   }
 }
 
+/** secrets.dat is there but could not be read: when to look again. */
+const unread = new ReadFailure()
+
 function load(): Record<string, string> {
   if (cache) return cache
+  // Every settings screen asks about several secrets; one slow failed read is enough.
+  if (unread.active && !unread.due()) return {}
   try {
-    const file = FILE()
-    cache = existsSync(file)
-      ? (JSON.parse(readFileSync(file, 'utf-8')) as Record<string, string>)
-      : {}
-  } catch (err) {
     /*
       A corrupt secret file must not take the app down with it, and must not be
       silently replaced either — the user is about to be asked for a password
       they thought they had already given, and deserves the reason in the log.
+      json-store keeps the damaged file aside and says so. There is no backup to
+      recover from: one would only hold more sealed blobs, and a password is
+      cheaper to type again than a second copy of every one is to keep around.
     */
-    log.error('secrets', 'Could not read the secret store; treating it as empty', {
-      why: err instanceof Error ? err.message : String(err)
-    })
-    cache = {}
+    const read = readJsonStore(FILE(), 'secrets', isRecord)
+    if (read.status === 'unreadable') {
+      /*
+        There but locked. Not cached, so a later call reads again; and with no
+        cache, `persist` refuses - a password saved now would be written over
+        every other one in a file that is very probably fine.
+      */
+      unread.set()
+      return {}
+    }
+    unread.clear()
+    cache = read.status === 'ok' ? (read.data as Record<string, string>) : {}
+  } catch (err) {
+    log.error('secrets', 'Could not read the secret store; treating it as empty', failure(err))
+    return {}
   }
   return cache
 }
 
-/** Written through a temp file, like every other store here. True once it is on disk. */
+/** Written through json-store, like every other store here. True once it is on disk. */
 function persist(): boolean {
-  if (!cache) return false
+  if (!cache) {
+    noteRefusedWrite(FILE(), 'secrets')
+    return false
+  }
   try {
-    const dir = app.getPath('userData')
-    if (!existsSync(dir)) mkdirSync(dir, { recursive: true })
-    const target = FILE()
-    const tmp = `${target}.tmp`
-    writeFileSync(tmp, JSON.stringify(cache), 'utf-8')
-    renameSync(tmp, target)
+    writeJsonAtomic(FILE(), cache, { backup: false })
     return true
   } catch (err) {
-    log.error('secrets', 'Could not save the secret store', {
-      why: err instanceof Error ? err.message : String(err)
-    })
+    log.error('secrets', 'Could not save the secret store', failure(err))
     return false
   }
 }

@@ -223,6 +223,10 @@ export const en = {
   'settings.resumeOnLaunch': 'resume interrupted downloads',
   'settings.resumeOnLaunchHint':
     'when the app is closed mid-download, pick it back up on the next launch. downloads you paused yourself stay paused.',
+  'settings.keepFinished': 'finished downloads in the list',
+  'settings.keepFinishedHint':
+    'the oldest finished ones leave the list by themselves once there are more. the files stay where they are, and failed downloads stay until you clear them.',
+  'settings.keepFinished.all': 'all',
   'settings.speedLimit': 'speed limit',
   'settings.speedLimitHint': 'e.g. 2M or 500K — leave empty for unlimited',
   'settings.speedLimitInvalid': 'use a number with K, M or G, e.g. 2M',

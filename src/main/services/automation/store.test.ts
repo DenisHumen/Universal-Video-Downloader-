@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import type { Run, Watch } from '@shared/automation'
-import { addRun, addWatch, removeWatch, updateRun, updateWatch, watchEvents } from './store'
+import { MAX_RUNS, type Run, type Watch } from '@shared/automation'
+import { addRun, addWatch, mergeWatches, removeWatch, updateRun, updateWatch, watchEvents } from './store'
 
 /*
   The schedule writes to the watch list with nobody pressing anything, and
@@ -84,5 +84,36 @@ describe('watchEvents', () => {
     updateWatch('no-such-watch', { failures: 3 })
     removeWatch('no-such-watch')
     expect(heard).toBe(0)
+  })
+})
+
+/*
+  watches.json could not be read when the app started, so the list began
+  empty in memory and nothing was saved over the file. Once it can be read,
+  what the session added goes in beside what the file held.
+*/
+describe('mergeWatches', () => {
+  it('keeps every stored watch and adds the ones this session made', () => {
+    const stored = { watches: [watch('kept')], runs: { kept: [run('k1', 'kept')] } }
+    const interim = { watches: [watch('new')], runs: { new: [run('n1', 'new')] } }
+    const merged = mergeWatches(stored, interim)
+    expect(merged.watches.map((w) => w.id)).toEqual(['kept', 'new'])
+    expect(merged.runs.kept.map((r) => r.id)).toEqual(['k1'])
+    expect(merged.runs.new.map((r) => r.id)).toEqual(['n1'])
+  })
+
+  it('does not double a watch or a run that is already in the file', () => {
+    const stored = { watches: [watch('a')], runs: { a: [run('r1', 'a')] } }
+    const interim = { watches: [watch('a')], runs: { a: [run('r1', 'a'), run('r2', 'a')] } }
+    const merged = mergeWatches(stored, interim)
+    expect(merged.watches).toHaveLength(1)
+    expect(merged.runs.a.map((r) => r.id)).toEqual(['r1', 'r2'])
+  })
+
+  it('keeps the run history to its usual length', () => {
+    const many = Array.from({ length: MAX_RUNS }, (_, n) => run(`old-${n}`, 'a'))
+    const merged = mergeWatches({ watches: [], runs: { a: many } }, { watches: [], runs: { a: [run('new', 'a')] } })
+    expect(merged.runs.a).toHaveLength(MAX_RUNS)
+    expect(merged.runs.a[merged.runs.a.length - 1].id).toBe('new')
   })
 })
