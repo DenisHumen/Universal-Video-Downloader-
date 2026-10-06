@@ -38,6 +38,8 @@ import { startClipboardWatch, stopClipboardWatch } from './services/clipboard'
 import { rendererIndex, wireNavigation } from './services/navigation'
 import { currentLanguage, mt, type MainLanguage } from './services/locale'
 import type { AppSettings, PendingDelivery } from '@shared/types'
+import { cliArgvFrom } from './cli/format'
+import { startCli } from './cli/run'
 
 const isMac = process.platform === 'darwin'
 let mainWindow: BrowserWindow | null = null
@@ -527,8 +529,17 @@ function linkFromArgv(argv: string[]): string | undefined {
   return argv.find((arg) => /^https?:\/\//i.test(arg))
 }
 
-const gotLock = app.requestSingleInstanceLock()
-if (!gotLock) {
+/*
+  `uvd <link>` in a terminal starts this same binary with `--cli`. That run
+  has no window, and must not take the single-instance lock: holding it would
+  stop the app from opening, and asking for it would hand the link to an open
+  window instead of downloading it here.
+*/
+const cliArgs = cliArgvFrom(process.argv)
+const gotLock = cliArgs ? false : app.requestSingleInstanceLock()
+if (cliArgs) {
+  startCli(cliArgs)
+} else if (!gotLock) {
   app.quit()
 } else {
   app.on('second-instance', (_event, argv) => {

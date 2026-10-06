@@ -17,6 +17,11 @@ files:
   - '!docs{,/**/*}'
   - '!design-system{,/**/*}'
   - '!.claude{,/**/*}'
+  # The Russian README, the AUR recipe and /brag's video project are the
+  # repository's, not the app's; all three were landing in app.asar.
+  - '!README.ru.md'
+  - '!packaging{,/**/*}'
+  - '!brag-output*{,/**/*}'
   - '!{vitest.config.ts,vite.preview.config.ts}'
   - '!electron.vite.config.{js,ts,mjs,cjs}'
   - '!{.eslintignore,.eslintrc.cjs,.prettierignore,.prettierrc.yaml,dev-app-update.yml,CHANGELOG.md,README.md,THIRD_PARTY_NOTICES.txt}'
@@ -73,6 +78,11 @@ mac:
   target:
     - target: dmg
     - target: zip
+  # `uvd <link>` in a terminal. A disk image cannot touch the PATH, so the
+  # README gives the one command that links it into /usr/local/bin.
+  extraResources:
+    - from: build/uvd
+      to: bin/uvd
   extendInfo:
     NSCameraUsageDescription: This app does not use the camera.
     NSMicrophoneUsageDescription: This app does not use the microphone.
@@ -135,6 +145,9 @@ linux:
   extraResources:
     - from: build/linux/apparmor-profile
       to: apparmor-profile
+    # `uvd <link>` in a terminal; the deb and rpm link it to /usr/bin/uvd.
+    - from: build/uvd
+      to: bin/uvd
   target:
     - target: AppImage
       arch:

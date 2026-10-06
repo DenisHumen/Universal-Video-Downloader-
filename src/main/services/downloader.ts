@@ -58,9 +58,9 @@ import type {
 
 export const downloadEvents = new EventEmitter()
 
-const PROGRESS_PREFIX = '@@UVD@@'
+export const PROGRESS_PREFIX = '@@UVD@@'
 /** Post-processing progress, on its own channel so the parser can tell them apart. */
-const POSTPROCESS_PREFIX = '@@UVDPP@@'
+export const POSTPROCESS_PREFIX = '@@UVDPP@@'
 /** Automatic retries for transient network failures before we bother the user. */
 const AUTO_RETRIES = 2
 const LOG_TAIL_CHARS = 4000
@@ -335,7 +335,7 @@ export function siteFolder(item: Pick<DownloadItem, 'extractor' | 'sourceUrl' | 
 }
 
 /** Where this item's file goes, without touching the disk. */
-function plannedDir(item: DownloadItem, settings: AppSettings): string {
+export function plannedDir(item: DownloadItem, settings: AppSettings): string {
   const site = settings.createSubfolders
     ? join(item.outputDir, siteFolder(item) || 'other')
     : item.outputDir
@@ -583,25 +583,38 @@ export function buildArgs(
 
 const ALREADY_DOWNLOADED = /\[download\]\s*(.+?) has already been downloaded/
 
-function parseFinalPath(line: string, item: DownloadItem): void {
-  const candidates: { re: RegExp; priority: number }[] = [
-    { re: /\[Merger\] Merging formats into "(.+?)"/, priority: 6 },
-    { re: /\[ExtractAudio\] Destination:\s*(.+?)\s*$/, priority: 6 },
-    { re: /\[SponsorBlock\].*?to "(.+?)"/, priority: 5 },
-    { re: ALREADY_DOWNLOADED, priority: 4 },
-    { re: /\[Metadata\] .*?to "(.+?)"/, priority: 3 },
-    { re: /\[download\] Destination:\s*(.+?)\s*$/, priority: 2 }
-  ]
-  for (const { re, priority } of candidates) {
+const FINAL_PATH_RULES: { re: RegExp; priority: number }[] = [
+  { re: /\[Merger\] Merging formats into "(.+?)"/, priority: 6 },
+  { re: /\[ExtractAudio\] Destination:\s*(.+?)\s*$/, priority: 6 },
+  { re: /\[SponsorBlock\].*?to "(.+?)"/, priority: 5 },
+  { re: ALREADY_DOWNLOADED, priority: 4 },
+  { re: /\[Metadata\] .*?to "(.+?)"/, priority: 3 },
+  { re: /\[download\] Destination:\s*(.+?)\s*$/, priority: 2 }
+]
+
+/**
+ * The file a line of engine output names as where the download ends up, and
+ * how much to trust it: the merger's output outranks the first stream's
+ * destination. Pure, so the queue and the command line read paths the same way.
+ */
+export function finalPathCandidate(
+  line: string
+): { path: string; priority: number; alreadyDownloaded: boolean } | null {
+  for (const { re, priority } of FINAL_PATH_RULES) {
     const m = line.match(re)
-    if (m && m[1]) {
-      const current = finalPaths.get(item.id)
-      if (!current || priority >= current.priority) {
-        finalPaths.set(item.id, { path: m[1].trim(), priority })
-      }
-      if (re === ALREADY_DOWNLOADED) alreadyOnDisk.set(item.id, m[1].trim())
-    }
+    if (m && m[1]) return { path: m[1].trim(), priority, alreadyDownloaded: re === ALREADY_DOWNLOADED }
   }
+  return null
+}
+
+function parseFinalPath(line: string, item: DownloadItem): void {
+  const found = finalPathCandidate(line)
+  if (!found) return
+  const current = finalPaths.get(item.id)
+  if (!current || found.priority >= current.priority) {
+    finalPaths.set(item.id, { path: found.path, priority: found.priority })
+  }
+  if (found.alreadyDownloaded) alreadyOnDisk.set(item.id, found.path)
 }
 
 /** What the engine can name a finished download, after the stem we gave it. */

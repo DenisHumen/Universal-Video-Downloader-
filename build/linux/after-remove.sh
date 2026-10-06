@@ -21,6 +21,11 @@ else
     rm -f '/usr/bin/${executable}'
 fi
 
+# Only our own link: a uvd from somewhere else is not ours to delete.
+if [ "$(readlink /usr/bin/uvd 2>/dev/null)" = '/opt/${sanitizedProductName}/resources/bin/uvd' ]; then
+    rm -f /usr/bin/uvd
+fi
+
 profile_target='/etc/apparmor.d/${executable}'
 if [ -f "$profile_target" ]; then
     # Unload it first, or the kernel keeps it until the next reboot.

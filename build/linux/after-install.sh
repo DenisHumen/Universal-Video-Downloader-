@@ -26,6 +26,11 @@ else
     ln -sf '/opt/${sanitizedProductName}/${executable}' '/usr/bin/${executable}'
 fi
 
+# The terminal command: `uvd <link>` downloads without opening a window. The
+# script is build/uvd; it finds the app from where this link points.
+chmod 0755 '/opt/${sanitizedProductName}/resources/bin/uvd' || true
+ln -sf '/opt/${sanitizedProductName}/resources/bin/uvd' '/usr/bin/uvd'
+
 if hash update-mime-database 2>/dev/null; then
     update-mime-database /usr/share/mime || true
 fi

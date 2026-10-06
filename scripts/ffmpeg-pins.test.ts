@@ -259,6 +259,8 @@ describe('after-pack', () => {
     writeFileSync(`${ffmpeg}.README`, ffmpegReadme('darwin-arm64', PINNED['darwin-arm64']))
     writeFileSync(`${ffmpeg}.LICENSE`, GPL3)
     writeFileSync(join(resources, 'THIRD_PARTY_NOTICES.txt'), NOTICES)
+    mkdirSync(join(resources, 'bin'))
+    writeFileSync(join(resources, 'bin', 'uvd'), readFileSync('build/uvd'))
     const frameworkDir = join(app, 'Contents', 'Frameworks', 'Electron Framework.framework')
     mkdirSync(frameworkDir, { recursive: true })
     framework = join(frameworkDir, 'Electron Framework')

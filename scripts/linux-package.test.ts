@@ -99,8 +99,17 @@ describe('the package scripts', () => {
     expect(scriptProblems(stockPostinst, stockPostrm, executable)).toEqual([
       'the install script never loads an AppArmor profile',
       'the install script does not install /etc/apparmor.d/universal-video-downloader',
-      'the remove script does not leave upgrades alone'
+      'the remove script does not leave upgrades alone',
+      'the install script does not put uvd on the PATH',
+      'the remove script leaves /usr/bin/uvd behind'
     ])
+  })
+
+  it('put the uvd command on the PATH, and take only their own link away again', () => {
+    const postinst = fillMacros(postinstSource, macros)
+    const postrm = fillMacros(postrmSource, macros)
+    expect(postinst).toContain(`ln -sf '/opt/${productName}/resources/bin/uvd' '/usr/bin/uvd'`)
+    expect(postrm).toContain(`= '/opt/${productName}/resources/bin/uvd' ]`)
   })
 
   it('fill macros the way FpmTarget does, refusing unknown ones', () => {
@@ -234,6 +243,7 @@ describe('a built package', () => {
     `${prefix}opt/${product}/${executable}`,
     `${prefix}opt/${product}/chrome-sandbox`,
     `${prefix}opt/${product}/resources/apparmor-profile`,
+    `${prefix}opt/${product}/resources/bin/uvd`,
     `${prefix}usr/share/applications/${executable}.desktop`,
     ...sizes.map((n) => `${prefix}usr/share/icons/hicolor/${n}x${n}/apps/${executable}.png`)
   ]

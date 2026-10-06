@@ -20,4 +20,9 @@ package() {
   bsdtar -xf "$srcdir"/data.tar.* -C "$pkgdir"
   # The .deb says "deb" here; an updater reading it must not reach for dpkg on Arch.
   printf 'pacman' > "$pkgdir/opt/Universal Video Downloader/resources/package-type"
+  # The .deb makes these links in its install script, which pacman never runs.
+  install -dm755 "$pkgdir/usr/bin"
+  ln -s "/opt/Universal Video Downloader/universal-video-downloader" "$pkgdir/usr/bin/universal-video-downloader"
+  ln -s "/opt/Universal Video Downloader/resources/bin/uvd" "$pkgdir/usr/bin/uvd"
+  chmod 755 "$pkgdir/opt/Universal Video Downloader/resources/bin/uvd"
 }

@@ -1,0 +1,46 @@
+#!/bin/sh
+#
+# uvd - download a video from the terminal with Universal Video Downloader.
+#
+#   uvd https://www.youtube.com/watch?v=jNQXAC9IVRw
+#
+# This only finds the app and starts it with --cli; the download itself is the
+# app's own code (src/main/cli), with its engine, ffmpeg and settings. It lives
+# in the app's Resources/bin and is usually reached through a symlink - the
+# Linux packages put one at /usr/bin/uvd - so it follows links to find home.
+
+self=$0
+while [ -L "$self" ]; do
+    target=$(readlink "$self")
+    case $target in
+        /*) self=$target ;;
+        *) self=$(dirname "$self")/$target ;;
+    esac
+done
+here=$(cd "$(dirname "$self")" && pwd)
+
+case $(uname -s) in
+    Darwin)
+        # .app/Contents/Resources/bin/uvd -> .app/Contents/MacOS/<the one executable>
+        app=
+        for candidate in "$here/../../MacOS/"*; do
+            [ -f "$candidate" ] && [ -x "$candidate" ] && app=$candidate && break
+        done
+        ;;
+    *)
+        # /opt/Universal Video Downloader/resources/bin/uvd -> /opt/Universal Video Downloader/universal-video-downloader
+        app="$here/../../universal-video-downloader"
+        ;;
+esac
+
+if [ -z "$app" ] || [ ! -x "$app" ]; then
+    echo "uvd: cannot find Universal Video Downloader next to $here" >&2
+    exit 1
+fi
+
+# Without a display (an SSH session, a server) Chromium cannot start its usual
+# window system at all, even for a run that never opens a window.
+if [ "$(uname -s)" != Darwin ] && [ -z "$DISPLAY" ] && [ -z "$WAYLAND_DISPLAY" ]; then
+    exec "$app" --ozone-platform=headless --cli "$@"
+fi
+exec "$app" --cli "$@"

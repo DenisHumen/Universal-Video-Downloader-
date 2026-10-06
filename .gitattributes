@@ -5,3 +5,5 @@ build/linux/* text eol=lf
 # Read by bash and makepkg on Linux runners, for the same reason.
 *.sh text eol=lf
 packaging/aur/PKGBUILD text eol=lf
+# The terminal command, run by /bin/sh on Linux and macOS.
+build/uvd text eol=lf

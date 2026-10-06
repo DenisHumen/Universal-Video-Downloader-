@@ -31,7 +31,7 @@
  * built, so throwing here stops the artifact from ever being published.
  */
 import { execFileSync } from 'child_process'
-import { existsSync, readdirSync, readFileSync, writeFileSync } from 'fs'
+import { chmodSync, existsSync, readdirSync, readFileSync, writeFileSync } from 'fs'
 import { basename, join } from 'path'
 import { archOf } from './check-ffmpeg-arch.mjs'
 import { flipFuses, fuseBinaryPath, fuseProblems } from './electron-fuses.mjs'
@@ -89,6 +89,7 @@ export default async function afterPack(context, host = {}) {
   console.log(`  • bundled ffmpeg is ${arches.join(', ')} — correct for ${target}`)
 
   checkNotices(binary, resources)
+  if (electronPlatformName !== 'win32') prepareCliWrapper(resources)
   if (electronPlatformName === 'linux') checkLinux(context)
 
   if (electronPlatformName === 'darwin' && platform !== 'darwin') {
@@ -108,6 +109,26 @@ export default async function afterPack(context, host = {}) {
   }
   // Read back from disk, after codesign has rewritten the binary on a Mac.
   checkFuses(electron)
+}
+
+/**
+ * The `uvd` terminal command (build/uvd): there, runnable, and with Unix line
+ * endings - a carriage return after `#!/bin/sh` fails every run with "bad
+ * interpreter". Before the Mac seal, so the signature covers the final mode.
+ */
+function prepareCliWrapper(resources) {
+  const file = join(resources, 'bin', 'uvd')
+  if (!existsSync(file)) {
+    throw new Error(
+      `after-pack: ${file} is missing.\n` +
+        `  It is the uvd terminal command, build/uvd, copied in by extraResources.`
+    )
+  }
+  if (!readFileSync(file, 'utf8').startsWith('#!/bin/sh\n')) {
+    throw new Error(`after-pack: ${file} must start with #!/bin/sh and use Unix line endings.`)
+  }
+  chmodSync(file, 0o755)
+  console.log(`  • the uvd terminal command is in place`)
 }
 
 /**

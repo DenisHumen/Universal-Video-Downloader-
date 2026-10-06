@@ -231,7 +231,7 @@ export function layoutProblems(paths) {
   if (!product) return ['nothing is installed under /opt']
   const problems = []
   const listed = new Set(paths.map((p) => p.replace(/^\//, '')))
-  for (const file of [executable, 'chrome-sandbox', 'resources/apparmor-profile']) {
+  for (const file of [executable, 'chrome-sandbox', 'resources/apparmor-profile', 'resources/bin/uvd']) {
     if (!listed.has(`opt/${product}/${file}`)) problems.push(`/opt/${product}/${file} is missing`)
   }
   const sizes = hicolorSizes(paths, executable)
@@ -258,6 +258,10 @@ export function scriptProblems(postinst, postrm, executable) {
     problems.push('a script still holds an unfilled macro')
   if (!postrm.includes('remove|purge|0)'))
     problems.push('the remove script does not leave upgrades alone')
+  // `uvd <link>` in a terminal: build/uvd, linked onto the PATH by the install script.
+  if (!/ln -sf '[^']*\/resources\/bin\/uvd' '\/usr\/bin\/uvd'/.test(postinst))
+    problems.push('the install script does not put uvd on the PATH')
+  if (!postrm.includes('/usr/bin/uvd')) problems.push('the remove script leaves /usr/bin/uvd behind')
   return problems
 }
 
