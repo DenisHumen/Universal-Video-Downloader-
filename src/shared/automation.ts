@@ -273,6 +273,9 @@ export function fillTemplate(
   )
 }
 
+/** The longest a name `safeSegment` lets through, extension aside. */
+const NAME_LIMIT = 180
+
 /**
  * Characters no filesystem we support will accept in a name, plus the ones SMB
  * refuses. Applied after the template is filled, because the title is the part
@@ -283,7 +286,7 @@ export function safeSegment(name: string): string {
     .replace(/[<>:"/\\|?*]+/g, ' ')
     .replace(/\s+/g, ' ')
     .replace(/^[. ]+|[. ]+$/g, '')
-    .slice(0, 180)
+    .slice(0, NAME_LIMIT)
 }
 
 /** What a new rename step starts with, and what one that fills to nothing falls back to. */
@@ -316,14 +319,25 @@ export function renameFor(
   now?: Date
 ): string {
   const title = applyReplacements(values.title, step.replacements)
-  const fill = (template: string): string =>
-    safeSegment(fillTemplate(template, { ...values, title }, now))
+  const fill = (template: string): string => {
+    /*
+      The title gives way, not the episode. Cutting the finished name at the
+      limit took the number off the end of a long enough title - a Russian
+      name and a romaji one side by side - and every episode came out alike
+      even though the template named it. Cleaning only ever shortens, so a
+      name that fits before it fits after.
+    */
+    const uses = template.split('{title}').length - 1
+    const rest = fillTemplate(template, { ...values, title: '' }, now).length
+    const room = uses ? Math.max(0, Math.floor((NAME_LIMIT - rest) / uses)) : title.length
+    return safeSegment(fillTemplate(template, { ...values, title: title.slice(0, room) }, now))
+  }
   let stem = fill(step.template)
   if (!EPISODE_TOKEN.test(step.template)) {
     // Cut the stem, not the number, when the whole name would be too long.
     const suffix = fillTemplate(EPISODE_SUFFIX, values, now)
     stem = stem
-      ? safeSegment(stem.slice(0, 180 - suffix.length) + suffix)
+      ? safeSegment(stem.slice(0, NAME_LIMIT - suffix.length) + suffix)
       : fill(DEFAULT_RENAME_TEMPLATE)
   }
   const ext = values.ext ? `.${values.ext.replace(/^\./, '')}` : ''

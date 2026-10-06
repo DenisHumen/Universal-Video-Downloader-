@@ -415,7 +415,13 @@ export function stopWatcher(): void {
   powerMonitor.off('resume', onResume)
 }
 
-/** True while anything is being checked or downloaded on a schedule. */
+/**
+ * True while anything is being checked or downloaded on a schedule.
+ *
+ * Not a keep-awake signal, tempting as it looks: whatever asked would have to
+ * ask again when a check ends, and nothing tells it to. An episode holds the
+ * machine itself, from the end of its download until it is delivered.
+ */
 export function watcherBusy(): boolean {
   return inFlight.size > 0
 }

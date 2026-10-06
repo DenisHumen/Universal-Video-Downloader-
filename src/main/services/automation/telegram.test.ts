@@ -135,6 +135,31 @@ describe('sending', () => {
     expect(h.urls).toHaveLength(2)
   })
 
+  // A poster Telegram could not fetch must not cost the news that the episode arrived.
+  it('sends the text alone when Telegram cannot use the poster', async () => {
+    h.answers = [
+      { ok: false, error_code: 400, description: 'Bad Request: failed to get HTTP URL content' },
+      { ok: true }
+    ]
+    const sent = telegram.sendNotification(TOKEN, '100000000', 'hello', 'https://example.com/poster.jpg')
+
+    await vi.advanceTimersByTimeAsync(5000)
+    await sent
+    expect(h.urls.map((url) => url.split('/').pop())).toEqual(['sendPhoto', 'sendMessage'])
+  })
+
+  // The plain message would be refused the same way; trying it only doubles the noise.
+  it('does not fall back for a bot the chat has blocked', async () => {
+    h.answers = [{ ok: false, error_code: 403, description: 'Forbidden: bot was blocked by the user' }]
+    const sent = telegram
+      .sendNotification(TOKEN, '100000000', 'hello', 'https://example.com/poster.jpg')
+      .catch((err: unknown) => err)
+
+    await vi.advanceTimersByTimeAsync(5000)
+    expect(((await sent) as { kind: string }).kind).toBe('chat')
+    expect(h.urls).toHaveLength(1)
+  })
+
   it('does not fall back to the text alone when the photo was rate-limited', async () => {
     h.answers = [tooMany(1), tooMany(1), { ok: true }]
     const sent = telegram

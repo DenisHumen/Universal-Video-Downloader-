@@ -219,6 +219,11 @@ export async function sendNotification(
       /*
         Nothing to do with the poster: a broken setup, or a chat that has
         already been waited out once, refuses the plain message just the same.
+
+        A timeout does fall back, unlike everywhere else, though the photo may
+        yet arrive. Telegram fetches the poster from the site before it
+        answers, so a slow or unreachable poster host is the likeliest reason
+        for the wait - and the text arriving twice beats it not arriving.
       */
       if (err instanceof TelegramError && err.kind !== 'network' && err.kind !== 'unknown') throw err
       log.warn('notify', 'The poster could not be sent; sending the text alone', {

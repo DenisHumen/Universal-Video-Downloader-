@@ -157,6 +157,24 @@ describe('renameFor', () => {
       expect(out.length).toBeLessThanOrEqual(180 + '.mkv'.length)
     })
 
+    /*
+      The default template names the episode, so nothing was added - and the
+      finished name was cut at the cap, which took the number off the end of a
+      long enough title. A Russian name and a romaji one side by side get there.
+    */
+    it('keeps the number of a template that names it when a long title has to be cut', () => {
+      const long = { ...values, title: 'x'.repeat(400) }
+      const [first, second] = [1, 2].map((episode) =>
+        renameFor(step(), { ...long, episode }, AT)
+      )
+      expect(first).toMatch(/ - S01E01[.]mkv$/)
+      expect(second).toMatch(/ - S01E02[.]mkv$/)
+      expect(first.length).toBeLessThanOrEqual(180 + '.mkv'.length)
+      // A title used twice gives way twice over, not just the once.
+      const twice = renameFor(step({ template: '{title} {title} E{episode2}' }), long, AT)
+      expect(twice).toMatch(/ E09[.]mkv$/)
+    })
+
     it('leaves a template that already names the episode exactly as written', () => {
       expect(names('{title} E{episode2}')[1]).toBe('Табакошка E02.mkv')
       expect(names('{episode}. {title}')[1]).toBe('2. Табакошка.mkv')
