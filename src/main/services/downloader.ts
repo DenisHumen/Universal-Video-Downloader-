@@ -1,7 +1,7 @@
 import { app } from 'electron'
 import { EventEmitter } from 'events'
 import { spawn, ChildProcess, type ChildProcessWithoutNullStreams } from 'child_process'
-import { existsSync, mkdirSync, readFileSync, writeFileSync, readdirSync, rmSync, renameSync, statSync } from 'fs'
+import { existsSync, mkdirSync, readdirSync, rmSync, statSync } from 'fs'
 import { basename, dirname, join } from 'path'
 import { randomUUID } from 'crypto'
 import { ytdlpBinaryPath, ensureYtdlp, ytdlpSpawnOptions } from './ytdlp'
@@ -19,6 +19,8 @@ import {
 } from './ffmpeg'
 import { getSettings } from './settings'
 import { log } from './log'
+import { failure, noteRefusedWrite, ReadFailure, readJsonStore, writeJsonAtomic } from './json-store'
+import { finishedBeyond, forHistory, isFinished, isHistoryEntry } from './history'
 import { downloadFields } from './log-fields'
 import { accessArgs, classifyYtdlpError, hasCookies, headerArgs, isTransientError } from './options'
 import { IN_FLIGHT_STATES, isSameDownload } from './dedupe'
@@ -129,28 +131,61 @@ function num(value: string | undefined): number | undefined {
   return Number.isFinite(n) ? n : undefined
 }
 
+/**
+ * history.json is there but could not be read. Saving now would replace the
+ * queue the user had with this session's few rows, so saves wait until a read
+ * succeeds and the two have been put together. See json-store.ts.
+ */
+const historyUnread = new ReadFailure()
+
+/**
+ * Read history.json into the queue.
+ *
+ * Returns false when the file is there but could not be read. `announce` is for
+ * a late read, after the window already has its list: the rows it brings back
+ * are new to the window and have to be sent to it.
+ *
+ * They go out as 'restored', not 'updated'. Every 'updated' passes through the
+ * desktop notifications, which announce any finished or failed row they have
+ * not announced yet - and no restored row has been announced in this session.
+ * A history of three hundred rows that a scanner had held at launch popped
+ * three hundred "Download finished" toasts the moment it could be read, quite
+ * possibly while the app was quitting. These rows finished in another session;
+ * the window needs them, the notifications do not.
+ */
+function readHistory(announce: boolean): boolean {
+  const read = readJsonStore(historyFile(), 'history', Array.isArray)
+  if (read.status === 'unreadable') {
+    historyUnread.set()
+    return false
+  }
+  historyUnread.clear()
+  if (read.status !== 'ok') return true
+  for (const item of read.data as unknown[]) {
+    // An id this session already has is this session's row, and newer.
+    if (!isHistoryEntry(item) || items.has(item.id)) continue
+    // Anything still in flight in the file was cut short — either the app was
+    // killed before it could tidy up, or the shutdown path already parked it
+    // and this is a no-op. Same rule either way; see resume.ts.
+    markInterrupted(item)
+    item.attempts = 0
+    // The failure it pointed at lived in the previous run's memory.
+    item.reportId = undefined
+    items.set(item.id, item)
+    if (announce) downloadEvents.emit('restored', publicItem(item))
+  }
+  return true
+}
+
 export function loadHistory(): void {
   try {
-    const file = historyFile()
-    if (!existsSync(file)) return
-    const arr = JSON.parse(readFileSync(file, 'utf-8')) as DownloadItem[]
-    for (const item of arr) {
-      // Anything still in flight in the file was cut short — either the app was
-      // killed before it could tidy up, or the shutdown path already parked it
-      // and this is a no-op. Same rule either way; see resume.ts.
-      markInterrupted(item)
-      item.attempts = 0
-      // The failure it pointed at lived in the previous run's memory.
-      item.reportId = undefined
-      items.set(item.id, item)
-    }
+    if (readHistory(false)) applyHistoryLimit()
   } catch (err) {
     /*
       The queue the user had is gone for this session, and a packaged build
-      has no console: the log is the only place that can say why - a disk or
-      permissions error, or a history.json that no longer parses.
+      has no console: the log is the only place that can say why.
     */
-    log.error('history', 'Load failed', { error: String(err) })
+    log.error('history', 'Load failed', failure(err))
   }
 }
 
@@ -160,21 +195,34 @@ function scheduleSave(): void {
   saveTimer = setTimeout(flushHistory, 400)
 }
 
-/** Persist atomically — a half-written history.json would lose the whole queue. */
-export function flushHistory(): void {
+/**
+ * Persist atomically — a half-written history.json would lose the whole queue.
+ *
+ * Compact, not indented: nobody reads this file, and the indentation alone was
+ * about a fifth of its size and of the time spent writing it. A completed
+ * row's log is trimmed to its last lines on the way to disk (see history.ts).
+ * Synchronous on purpose: it runs on the way out too, where nothing would wait
+ * for an asynchronous write to land.
+ *
+ * `retryNow` is for that last save, which is the last chance to read a file
+ * that could not be read before, however recently that was tried.
+ */
+export function flushHistory(retryNow = false): void {
   if (saveTimer) {
     clearTimeout(saveTimer)
     saveTimer = null
   }
   try {
-    const dir = app.getPath('userData')
-    if (!existsSync(dir)) mkdirSync(dir, { recursive: true })
-    const target = historyFile()
-    const tmp = `${target}.tmp`
-    writeFileSync(tmp, JSON.stringify([...items.values()].map(publicItem), null, 2), 'utf-8')
-    renameSync(tmp, target)
+    if (historyUnread.active) {
+      if (!(retryNow || historyUnread.due()) || !readHistory(true)) {
+        noteRefusedWrite(historyFile(), 'history')
+        return
+      }
+      applyHistoryLimit()
+    }
+    writeJsonAtomic(historyFile(), [...items.values()].map((item) => forHistory(publicItem(item))))
   } catch (err) {
-    log.error('history', 'Save failed', { error: String(err) })
+    log.error('history', 'Save failed', failure(err))
   }
 }
 
@@ -239,6 +287,14 @@ function emitUpdated(item: DownloadItem): void {
   */
   if (!items.has(item.id)) return
   downloadEvents.emit('updated', publicItem(item))
+  /*
+    Here, as a row finishes, and not in flushHistory: a save happens after any
+    change at all, and rows disappearing on a progress tick's save would be the
+    queue changing under the user for no reason they could see. After the
+    'updated', so anything waiting on this row hears that it finished first;
+    being the newest finished row, it is never the one dropped.
+  */
+  if (isFinished(item.state)) applyHistoryLimit()
   scheduleSave()
 }
 
@@ -1653,6 +1709,10 @@ export function cancelDownload(id: string): void {
   abortResolve(id)
   const proc = procs.get(id)
   item.state = 'canceled'
+  // When it stopped, not when it was queued: the keep-finished limit drops the
+  // oldest finished rows first, and a download queued last week and cancelled
+  // just now would otherwise vanish the moment it was cancelled.
+  item.finishedAt = Date.now()
   resetProgress(item)
   item.speed = undefined
   item.eta = undefined
@@ -1748,16 +1808,34 @@ export function clearFailed(): void {
 
 function clearWhere(match: (item: DownloadItem) => boolean): void {
   for (const [id, item] of items) {
-    if (match(item)) {
-      clearRetry(id)
-      forgetProgress(id)
-      items.delete(id)
-      finalPaths.delete(id)
-      // Per-item 'removed' events. The automation pipeline needs each one;
-      // ipc.ts folds them into a single message for the window.
-      downloadEvents.emit('removed', id)
-    }
+    if (match(item)) forgetItem(id)
   }
+  scheduleSave()
+}
+
+/** Take a row with no process behind it out of the queue, and say so. */
+function forgetItem(id: string): void {
+  clearRetry(id)
+  forgetProgress(id)
+  items.delete(id)
+  finalPaths.delete(id)
+  // Per-item 'removed' events. The automation pipeline needs each one;
+  // ipc.ts folds them into a single message for the window.
+  downloadEvents.emit('removed', id)
+}
+
+/**
+ * Drop the oldest finished rows beyond what the user chose to keep.
+ *
+ * Off unless they chose a number. The files stay where they are - this is the
+ * list, not the downloads - and the rows go exactly as "clear finished" would
+ * take them, one 'removed' each. Run on load, as a row finishes, and when the
+ * setting changes, so a new, lower limit applies at once.
+ */
+export function applyHistoryLimit(): void {
+  const beyond = finishedBeyond(items.values(), getSettings().keepFinished)
+  if (!beyond.length) return
+  for (const id of beyond) forgetItem(id)
   scheduleSave()
 }
 
@@ -1844,5 +1922,5 @@ export function shutdownDownloads(): void {
   */
   for (const item of items.values()) markInterrupted(item)
   procs.clear()
-  flushHistory()
+  flushHistory(true)
 }

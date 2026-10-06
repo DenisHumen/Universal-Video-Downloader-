@@ -6,7 +6,10 @@ export interface QueueEventSink {
   /** One coalesced batch of updated and removed entries. */
   changed: (batch: DownloadsChanged) => void
   progress: (progress: DownloadProgress) => void
-  /** Desktop notifications. Called for every update, before any coalescing. */
+  /**
+   * Desktop notifications. Called for every update, before any coalescing, and
+   * never for a row read back from history.json, which finished in another session.
+   */
   notify: (item: DownloadItem) => void
   /** An entry left the queue, so whatever was remembered about it can go. */
   forget: (id: string) => void
@@ -64,13 +67,23 @@ export function forwardQueueEvents(
     defer(flush)
   }
 
-  const onUpdated = (item: DownloadItem): void => {
-    sink.notify(item)
-    // Last event wins, exactly as if each had been delivered on its own.
+  // Last event wins, exactly as if each had been delivered on its own.
+  const enqueue = (item: DownloadItem): void => {
     removed.delete(item.id)
     updated.set(item.id, item)
     schedule()
   }
+  const onUpdated = (item: DownloadItem): void => {
+    sink.notify(item)
+    enqueue(item)
+  }
+  /*
+    A row history.json gave back late, once a lock on it cleared. New to the
+    window, so it rides in the batch like any new row; old news to the person,
+    so it skips the notifications, which would otherwise announce every finished
+    and failed row in the file at once.
+  */
+  const onRestored = (item: DownloadItem): void => enqueue(item)
   const onRemoved = (id: string): void => {
     sink.forget(id)
     updated.delete(id)
@@ -84,10 +97,12 @@ export function forwardQueueEvents(
   }
 
   events.on('updated', onUpdated)
+  events.on('restored', onRestored)
   events.on('removed', onRemoved)
   events.on('progress', onProgress)
   return () => {
     events.off('updated', onUpdated)
+    events.off('restored', onRestored)
     events.off('removed', onRemoved)
     events.off('progress', onProgress)
   }

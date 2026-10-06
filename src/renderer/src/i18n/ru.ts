@@ -216,6 +216,10 @@ export const ru: Dictionary = {
   'settings.resumeOnLaunch': 'продолжать прерванные загрузки',
   'settings.resumeOnLaunchHint':
     'если приложение закрыли во время загрузки — продолжить её при следующем запуске. то, что вы поставили на паузу сами, останется на паузе.',
+  'settings.keepFinished': 'завершённые загрузки в списке',
+  'settings.keepFinishedHint':
+    'когда их становится больше, самые старые завершённые сами уходят из списка. файлы остаются на месте, а неудачные загрузки — пока вы их не уберёте.',
+  'settings.keepFinished.all': 'все',
   'settings.speedLimit': 'ограничение скорости',
   'settings.speedLimitHint': 'например 2M или 500K — пусто = без ограничений',
   'settings.speedLimitInvalid': 'укажите число с K, M или G, например 2M',

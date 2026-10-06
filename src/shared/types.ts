@@ -473,6 +473,12 @@ export interface AppSettings {
   autoUpdate: boolean
   /** Pick interrupted downloads back up when the app starts. */
   resumeOnLaunch: boolean
+  /**
+   * How many finished downloads the queue keeps, oldest dropped first. 0 keeps
+   * them all. Counts what "clear finished" clears - completed and cancelled -
+   * so a failure stays until somebody has looked at it.
+   */
+  keepFinished: number
   theme: ThemeId
   language: LanguageId
   /** Show a desktop notification when a download finishes. */

@@ -34,6 +34,7 @@ function settings(overrides: Partial<AppSettings> = {}): AppSettings {
     playlistFolder: true,
     autoUpdate: true,
     resumeOnLaunch: true,
+    keepFinished: 0,
     theme: 'night',
     language: 'auto',
     notifications: true,

@@ -27,6 +27,7 @@ import { registerBrowserIpc } from './services/browser'
 import { acquireAwake, releaseAwake } from './services/awake'
 import { mt } from './services/locale'
 import {
+  applyHistoryLimit,
   cancelDownload,
   clearFinished,
   clearFailed,
@@ -168,6 +169,8 @@ export function registerIpc({ getWindow, openSearchWindow, onSettingsChanged }: 
     // pumped it on a settings change — so raising it did nothing visible until
     // something happened to finish.
     kickQueue()
+    // A lower limit applies now, not when the next download happens to finish.
+    if (partial?.keepFinished !== undefined) applyHistoryLimit()
     return next
   })
   ipcMain.handle(IPC.settingsReset, (event) => {

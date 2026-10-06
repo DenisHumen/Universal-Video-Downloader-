@@ -39,8 +39,11 @@ describe('relocateItem', () => {
     downloader.loadHistory()
   })
 
-  afterEach(() => {
+  afterEach(async () => {
     downloader.flushHistory()
+    // Loading history reads the settings, whose first read schedules a save into this folder.
+    const { flushSettings } = await import('./settings')
+    flushSettings()
     rmSync(h.dir, { recursive: true, force: true })
   })
 

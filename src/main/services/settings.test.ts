@@ -73,6 +73,29 @@ describe('migrate', () => {
     // setSettings runs every partial through here; most of them are about something else.
     expect('speedLimit' in migrate({ theme: 'day' })).toBe(false)
   })
+
+  it('reads a finished-row limit it cannot make sense of as no limit at all', () => {
+    // A bad value must never start deleting history.
+    expect(migrate({ keepFinished: 'lots' }).keepFinished).toBe(0)
+    expect(migrate({ keepFinished: -3 }).keepFinished).toBe(0)
+    expect(migrate({ keepFinished: null }).keepFinished).toBe(0)
+    expect(migrate({ keepFinished: 0 }).keepFinished).toBe(0)
+  })
+
+  it('holds a finished-row limit to a sane range', () => {
+    expect(migrate({ keepFinished: 3 }).keepFinished).toBe(10)
+    expect(migrate({ keepFinished: 500 }).keepFinished).toBe(500)
+    expect(migrate({ keepFinished: 99999 }).keepFinished).toBe(10000)
+    expect('keepFinished' in migrate({ theme: 'day' })).toBe(false)
+  })
+
+  // Normalising `null` threw, and a throw here reset every other setting too.
+  it('drops a share entry that is not a share at all', () => {
+    const share = { id: 's', name: 'NAS', host: 'nas', share: 'media', path: '', domain: '', username: '' }
+    const targets = migrate({ smbTargets: [null, 'nas', share] }).smbTargets
+    expect(targets).toHaveLength(1)
+    expect(targets?.[0]).toMatchObject({ id: 's', host: 'nas' })
+  })
 })
 
 describe('isSafeTemplate', () => {
