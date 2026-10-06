@@ -133,6 +133,30 @@ describe('forwardQueueEvents', () => {
     expect(only.kind === 'changed' && only.batch.updated.map((i) => i.state)).toEqual(['queued'])
   })
 
+  /*
+    Rows history.json gives back once a lock on it clears finished in another
+    session. Announcing them popped a toast for every finished and failed row
+    in the file at once.
+  */
+  it('sends rows read back late from history without a notification', () => {
+    const h = harness()
+    h.events.emit('restored', item('old', { state: 'completed' }))
+    h.events.emit('restored', item('broken', { state: 'error' }))
+    h.events.emit('restored', item('dropped', { state: 'completed' }))
+    h.events.emit('removed', 'dropped')
+    expect(h.notified).toEqual([])
+    h.runDeferred()
+    expect(h.sent).toEqual([
+      {
+        kind: 'changed',
+        batch: {
+          updated: [item('old', { state: 'completed' }), item('broken', { state: 'error' })],
+          removed: ['dropped']
+        }
+      }
+    ])
+  })
+
   it('forgets a removed entry as it goes, not when the batch leaves', () => {
     const h = harness()
     h.events.emit('removed', 'a')

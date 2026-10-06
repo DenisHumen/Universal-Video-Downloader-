@@ -2,7 +2,8 @@ import { mkdtempSync, readdirSync, rmSync, statSync, writeFileSync } from 'fs'
 import { tmpdir } from 'os'
 import { join } from 'path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import type { DownloadItem } from '@shared/types'
+import type { DownloadItem, DownloadsChanged } from '@shared/types'
+import { forwardQueueEvents } from './queue-events'
 
 /*
   The download history on disk, through the real downloader: how it is written,
@@ -132,7 +133,7 @@ describe('history.json', () => {
   })
 
   it('is never written over while it cannot be read, and nothing in it is lost', async () => {
-    await start([row('from-last-week')])
+    await start([row('from-last-week'), row('failed-last-week', { state: 'error' })])
     const before = await peek(history)
     const touched = statSync(history).mtimeMs
 
@@ -144,13 +145,39 @@ describe('history.json', () => {
     expect(await peek(history)).toBe(before)
     expect(statSync(history).mtimeMs).toBe(touched)
 
-    // The lock lets go: the next save reads first, and the row comes back.
+    /*
+      The lock lets go: the next save reads first, and the rows come back - to
+      the window, through the same forwarding the app uses, and not as a toast
+      for each, since they finished or failed in another session.
+    */
     h.busy = ''
-    const heard: string[] = []
-    downloader.downloadEvents.on('updated', (i: DownloadItem) => heard.push(i.id))
+    const batches: DownloadsChanged[] = []
+    const notified: string[] = []
+    let deferred: (() => void) | undefined
+    forwardQueueEvents(
+      downloader.downloadEvents,
+      {
+        changed: (batch) => batches.push(batch),
+        progress: () => undefined,
+        notify: (i) => notified.push(i.id),
+        forget: () => undefined,
+        syncOs: () => undefined
+      },
+      (flush) => {
+        deferred = flush
+      }
+    )
     downloader.flushHistory(true)
-    expect(heard).toEqual(['from-last-week'])
-    expect((JSON.parse(await peek(history)) as DownloadItem[]).map((i) => i.id)).toEqual(['from-last-week'])
+    deferred?.()
+    expect(notified).toEqual([])
+    expect(batches.flatMap((b) => b.updated.map((i) => i.id)).sort()).toEqual([
+      'failed-last-week',
+      'from-last-week'
+    ])
+    expect((JSON.parse(await peek(history)) as DownloadItem[]).map((i) => i.id).sort()).toEqual([
+      'failed-last-week',
+      'from-last-week'
+    ])
   })
 
   it('comes back from its backup when the file was left damaged', async () => {

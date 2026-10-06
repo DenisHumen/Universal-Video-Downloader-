@@ -143,7 +143,15 @@ const historyUnread = new ReadFailure()
  *
  * Returns false when the file is there but could not be read. `announce` is for
  * a late read, after the window already has its list: the rows it brings back
- * are new to the window and have to be sent like any other new row.
+ * are new to the window and have to be sent to it.
+ *
+ * They go out as 'restored', not 'updated'. Every 'updated' passes through the
+ * desktop notifications, which announce any finished or failed row they have
+ * not announced yet - and no restored row has been announced in this session.
+ * A history of three hundred rows that a scanner had held at launch popped
+ * three hundred "Download finished" toasts the moment it could be read, quite
+ * possibly while the app was quitting. These rows finished in another session;
+ * the window needs them, the notifications do not.
  */
 function readHistory(announce: boolean): boolean {
   const read = readJsonStore(historyFile(), 'history', Array.isArray)
@@ -164,7 +172,7 @@ function readHistory(announce: boolean): boolean {
     // The failure it pointed at lived in the previous run's memory.
     item.reportId = undefined
     items.set(item.id, item)
-    if (announce) downloadEvents.emit('updated', publicItem(item))
+    if (announce) downloadEvents.emit('restored', publicItem(item))
   }
   return true
 }
