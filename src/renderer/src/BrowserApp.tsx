@@ -4,20 +4,18 @@ import {
   ArrowLeft,
   ArrowRight,
   Check,
-  Copy,
   Crosshair,
   Download,
   ExternalLink,
   Loader2,
-  Minus,
   RotateCw,
-  Square,
   Trash2,
   X
 } from 'lucide-react'
 import type { BrowserMedia, BrowserState } from '@shared/types'
 import Toasts from './components/Toasts'
 import Logo from './components/Logo'
+import CaptionButtons from './components/CaptionButtons'
 import { enter } from './lib/motion'
 import { toast } from './lib/toast'
 import { formatBytes } from './lib/format'
@@ -49,9 +47,6 @@ export default function BrowserApp(): JSX.Element {
   const [editing, setEditing] = useState(false)
   const [queued, setQueued] = useState<Set<string>>(new Set())
   const [isMac, setIsMac] = useState(false)
-  // The main window tracks this; here the glyph was pinned to "maximize" for
-  // the life of the window, so a maximised browser still offered to maximise.
-  const [maximized, setMaximized] = useState(false)
   const stageRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -59,7 +54,6 @@ export default function BrowserApp(): JSX.Element {
       const [settings, info] = await Promise.all([window.api.getSettings(), window.api.getAppInfo()])
       applyAppearance(settings, info.locale)
       setIsMac(info.platform === 'darwin')
-      setMaximized(await window.api.isWindowMaximized())
     })()
     const offState = window.api.onBrowserState(setState)
     const offMedia = window.api.onBrowserMedia(setMedia)
@@ -136,9 +130,13 @@ export default function BrowserApp(): JSX.Element {
     <>
       <Toasts />
 
-      {/* Chrome and navigation share one 48px rule, same as the main window. */}
+      {/*
+        Chrome and navigation share one 48px rule, same as the main window, and
+        off the Mac it has no right padding so the caption buttons reach the
+        corner.
+      */}
       <header
-        className="drag-region relative flex h-12 shrink-0 items-center gap-2 border-b border-edge bg-canvas pr-2"
+        className={`drag-region relative flex h-12 shrink-0 items-center gap-2 border-b border-edge bg-canvas ${isMac ? 'pr-2' : ''}`}
         style={{ zIndex: 'var(--z-chrome)', paddingLeft: isMac ? 76 : 12 }}
       >
         <div className="flex shrink-0 items-center gap-2.5 pr-1">
@@ -206,31 +204,7 @@ export default function BrowserApp(): JSX.Element {
           <ExternalLink size={14} />
         </button>
 
-        {!isMac && (
-          <div className="ml-1 flex shrink-0 items-center">
-            <button
-              className="no-drag inline-flex h-8 w-9 cursor-pointer items-center justify-center text-ink-3 transition-colors duration-fast ease-ease hover:bg-sink hover:text-ink"
-              onClick={() => window.api.minimizeWindow()}
-              aria-label="Minimize"
-            >
-              <Minus size={15} />
-            </button>
-            <button
-              className="no-drag inline-flex h-8 w-9 cursor-pointer items-center justify-center text-ink-3 transition-colors duration-fast ease-ease hover:bg-sink hover:text-ink"
-              onClick={async () => setMaximized(await window.api.maximizeWindow())}
-              aria-label="Maximize"
-            >
-              {maximized ? <Copy size={12} /> : <Square size={11} />}
-            </button>
-            <button
-              className="no-drag inline-flex h-8 w-9 cursor-pointer items-center justify-center text-ink-3 transition-colors duration-fast ease-ease hover:bg-bad hover:text-white"
-              onClick={() => window.api.closeWindow()}
-              aria-label="Close"
-            >
-              <X size={15} />
-            </button>
-          </div>
-        )}
+        {!isMac && <CaptionButtons />}
       </header>
 
       {/* Page + the streams found on it */}

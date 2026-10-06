@@ -162,6 +162,8 @@ const api = {
   maximizeWindow: (): Promise<boolean> => ipcRenderer.invoke(IPC.windowMaximize),
   closeWindow: (): Promise<void> => ipcRenderer.invoke(IPC.windowClose),
   isWindowMaximized: (): Promise<boolean> => ipcRenderer.invoke(IPC.windowIsMaximized),
+  /** Every maximise and restore, including the ones the caption button did not cause. */
+  onMaximizedChange: (cb: (maximized: boolean) => void) => on<boolean>(IPC.evtWindowState, cb),
 
   // Events
   onDownloadProgress: (cb: (p: DownloadProgress) => void) =>

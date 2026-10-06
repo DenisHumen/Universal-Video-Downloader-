@@ -36,6 +36,7 @@ import {
 } from './services/downloader'
 import { startClipboardWatch, stopClipboardWatch } from './services/clipboard'
 import { rendererIndex, wireNavigation } from './services/navigation'
+import { chromeOptions, forwardMaximized } from './services/window-chrome'
 import { currentLanguage, mt, type MainLanguage } from './services/locale'
 import type { AppSettings, PendingDelivery } from '@shared/types'
 import { cliArgvFrom } from './cli/format'
@@ -95,6 +96,7 @@ function wireWindow(win: BrowserWindow, showWhenReady = true): void {
 
   // Never let the renderer navigate away from the app's own document.
   wireNavigation(win)
+  forwardMaximized(win)
 
   // If the renderer ever crashes (GPU/OOM/…) the window turns into a black
   // rectangle until it's reloaded — do that reload automatically.
@@ -113,9 +115,7 @@ function windowOptions(width: number, height: number): Electron.BrowserWindowCon
     minHeight: 560,
     show: false,
     backgroundColor: '#08080a',
-    frame: isMac,
-    titleBarStyle: isMac ? 'hiddenInset' : 'default',
-    trafficLightPosition: isMac ? { x: 16, y: 18 } : undefined,
+    ...chromeOptions(),
     icon: isMac ? undefined : loadIcon('app.png'),
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),

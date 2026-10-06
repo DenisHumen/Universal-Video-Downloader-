@@ -35,8 +35,13 @@ export const ru: Dictionary = {
   'nav.queue': 'очередь',
   'nav.search': 'поиск',
   'nav.settings': 'настройки',
+  'nav.label': 'разделы',
 
   // ---- title bar ----
+  'window.minimize': 'свернуть',
+  'window.maximize': 'развернуть',
+  'window.restore': 'свернуть в окно',
+  'window.close': 'закрыть',
   'engine.ready': 'движок готов',
   'engine.downloading': 'движок {percent}%',
   'engine.checking': 'движок…',
@@ -50,7 +55,7 @@ export const ru: Dictionary = {
   // ---- home ----
   'home.title': 'вставьте ссылку — получите видео',
   'home.subtitle': 'автоопределение потока для тысяч сайтов — или введите название для поиска.',
-  'home.placeholder': 'вставьте ссылку на видео — или найдите по названию',
+  'home.placeholder': 'вставьте ссылку или найдите по названию',
   'home.linkLabel': 'ссылка на видео',
   'home.saveDefault': 'папка по умолчанию',
   'home.get': 'получить',

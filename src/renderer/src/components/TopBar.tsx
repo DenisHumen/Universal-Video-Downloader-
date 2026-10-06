@@ -1,22 +1,18 @@
-import { useEffect, useState } from 'react'
 import {
-  Copy,
   Download,
   Globe,
   Keyboard,
   ListVideo,
-  Minus,
   Radar,
   Search,
-  Settings as SettingsIcon,
-  Square,
-  X
+  Settings as SettingsIcon
 } from 'lucide-react'
 import { useStore, type ViewId } from '../store'
 import { useT, type TranslationKey } from '../i18n'
 import Logo from './Logo'
 import TabStrip from './TabStrip'
 import EngineBadge from './EngineBadge'
+import CaptionButtons from './CaptionButtons'
 
 interface NavItem {
   id: ViewId
@@ -68,15 +64,6 @@ export default function TopBar(): JSX.Element {
   const openShortcuts = useStore((s) => s.setShortcutsOpen)
   const alerts = useStore((s) => s.watchAlerts)
   const isMac = appInfo?.platform === 'darwin'
-  const [maximized, setMaximized] = useState(false)
-
-  useEffect(() => {
-    void window.api.isWindowMaximized().then(setMaximized)
-  }, [])
-
-  const onMaximize = async (): Promise<void> => {
-    setMaximized(await window.api.maximizeWindow())
-  }
 
   return (
     <header
@@ -86,20 +73,30 @@ export default function TopBar(): JSX.Element {
       <div className="flex min-w-0 items-stretch">
         <div className="flex shrink-0 items-center gap-2.5 pl-4 pr-5">
           <Logo className="h-[18px] w-[18px] text-ink" />
-          <span className="mono hidden text-[12px] font-semibold uppercase tracking-[0.16em] text-ink sm:inline">
+          {/*
+            From `lg` only. At the 940px minimum in Russian, with the queue
+            badge showing, the wordmark's 31px was what pushed the settings tab
+            behind the scroll arrow; the logo beside it already says whose
+            window this is.
+          */}
+          <span className="mono hidden text-[12px] font-semibold uppercase tracking-[0.16em] text-ink lg:inline">
             uvd
           </span>
         </div>
 
-        <TabStrip label={t('nav.home')}>
+        <TabStrip label={t('nav.label')}>
           {ITEMS.map((item) => {
             const on = view === item.id
             return (
               <button
                 key={item.id}
                 onClick={() => setView(item.id)}
-                role="tab"
-                aria-selected={on}
+                /*
+                  Links to pages, not tabs: there are no tab panels and no
+                  arrow-key handling, so announcing a tab list promised
+                  behaviour that was not there. aria-current says which page
+                  is showing.
+                */
                 aria-current={on ? 'page' : undefined}
                 /*
                   No `title`. The label is right there, so the tooltip added
@@ -134,7 +131,8 @@ export default function TopBar(): JSX.Element {
         </TabStrip>
       </div>
 
-      <div className="flex shrink-0 items-center gap-1 pl-3 pr-2">
+      {/* No right padding off the Mac: the caption buttons run to the corner. */}
+      <div className={`flex shrink-0 items-center gap-1 pl-3 ${isMac ? 'pr-2' : ''}`}>
         <EngineBadge />
         <button
           className="btn-icon-bare"
@@ -147,31 +145,7 @@ export default function TopBar(): JSX.Element {
           <Keyboard size={15} />
         </button>
 
-        {!isMac && (
-          <div className="ml-1 flex items-center">
-            <button
-              className="no-drag inline-flex h-8 w-9 cursor-pointer items-center justify-center text-ink-3 transition-colors duration-fast ease-ease hover:bg-sink hover:text-ink"
-              onClick={() => window.api.minimizeWindow()}
-              aria-label="Minimize"
-            >
-              <Minus size={15} />
-            </button>
-            <button
-              className="no-drag inline-flex h-8 w-9 cursor-pointer items-center justify-center text-ink-3 transition-colors duration-fast ease-ease hover:bg-sink hover:text-ink"
-              onClick={onMaximize}
-              aria-label="Maximize"
-            >
-              {maximized ? <Copy size={12} /> : <Square size={11} />}
-            </button>
-            <button
-              className="no-drag inline-flex h-8 w-9 cursor-pointer items-center justify-center text-ink-3 transition-colors duration-fast ease-ease hover:bg-bad hover:text-white"
-              onClick={() => window.api.closeWindow()}
-              aria-label="Close"
-            >
-              <X size={15} />
-            </button>
-          </div>
-        )}
+        {!isMac && <CaptionButtons />}
       </div>
     </header>
   )

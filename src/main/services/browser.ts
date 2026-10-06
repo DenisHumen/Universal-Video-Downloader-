@@ -15,6 +15,7 @@ import { startDownload } from './downloader'
 import { getSettings } from './settings'
 import { mt } from './locale'
 import { rendererIndex, wireNavigation } from './navigation'
+import { chromeOptions, forwardMaximized } from './window-chrome'
 import { log } from './log'
 import type { BrowserMedia, BrowserState, DownloadItem, DownloadRequest } from '@shared/types'
 
@@ -206,6 +207,8 @@ export function openBrowserWindow(initialUrl?: string): void {
     minHeight: 600,
     show: false,
     backgroundColor: '#08080a',
+    // The shell draws its own title bar, like the app's other windows.
+    ...chromeOptions(),
     icon: icon(),
     webPreferences: {
       preload: shellPreload(),
@@ -221,6 +224,7 @@ export function openBrowserWindow(initialUrl?: string): void {
     it now opens in the page view, which is where a dropped link was meant to go.
   */
   wireNavigation(win, (url) => void view?.webContents.loadURL(url, { userAgent: UA }))
+  forwardMaximized(win)
 
   view = new WebContentsView({
     webPreferences: {
