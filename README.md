@@ -25,8 +25,8 @@
 Universal Video Downloader is a free desktop app for macOS, Windows and Linux that finds the video stream on almost any web page and downloads it. It is built on [yt-dlp](https://github.com/yt-dlp/yt-dlp) and ffmpeg, adds automatic stream detection for sites yt-dlp does not know, and wraps it all in an interface that tells you the truth about what it is doing — which quality you will actually get, how big the file is, and which step is running. English / Русский interface, no account, no telemetry.
 
 <div align="center">
-  <a href="docs/assets/preview.mp4"><img src="docs/assets/preview.webp" alt="A 20-second tour: a link is pasted, the app shows the quality it will actually download, the queue fills, and a watched series handles every new episode" width="92%" /></a>
-  <br /><sub>▶ <a href="docs/assets/preview.mp4">watch it with sound</a></sub>
+  <a href="docs/assets/preview.mp4?raw=true"><img src="docs/assets/preview.webp" alt="A 20-second tour: a link is pasted, the app shows the quality it will actually download, the queue fills, and a watched series handles every new episode" width="92%" /></a>
+  <br /><sub>▶ <a href="docs/assets/preview.mp4?raw=true">the same tour as an MP4, with sound</a> (6 MB)</sub>
 </div>
 
 ## ✨ Features
