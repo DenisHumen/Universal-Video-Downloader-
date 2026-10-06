@@ -1,6 +1,7 @@
 import type { UvdApi, AppInfo } from '../../../preload/index'
 import type {
   AppSettings,
+  CliStatus,
   DownloadItem,
   DownloadsChanged,
   MediaInfo,
@@ -211,6 +212,14 @@ const setMaximized = (next: boolean): void => {
   maximizedListeners.forEach((cb) => cb(next))
 }
 
+/*
+  The terminal command as a Mac that has not linked it yet sees it. The
+  preview says it is Windows, where the row is hidden, and a hidden row cannot
+  be looked at; `__uvdMock.cli({ method: 'script', onPath: false })` and the
+  like reach the others.
+*/
+const cliState: CliStatus = { method: 'link', installed: false, path: '/usr/local/bin/uvd' }
+
 /** Preview-only: drive a state the mock bridge would otherwise never enter. */
 declare global {
   interface Window {
@@ -223,6 +232,8 @@ declare global {
       queue: (patch: Partial<DownloadItem>) => DownloadItem
       /** Maximise or restore the window the way Win+Up or Snap would, without the button. */
       maximize: (next: boolean) => void
+      /** The terminal command's state, read when Settings next opens. */
+      cli: (patch: Partial<CliStatus>) => void
     }
   }
 }
@@ -276,6 +287,9 @@ export function installMockApi(): void {
       else items.unshift(item)
       changedListeners.forEach((cb) => cb({ updated: [{ ...item }], removed: [] }))
       return item
+    },
+    cli: (patch) => {
+      Object.assign(cliState, patch)
     }
   }
   const api: UvdApi = {
@@ -417,6 +431,13 @@ export function installMockApi(): void {
     downloadUpdate: async () => undefined,
     installUpdate: async () => undefined,
     openReleasesPage: async () => undefined,
+    cliStatus: async () => ({ ...cliState }),
+    // A pause for the password prompt the real one shows on a Mac.
+    cliInstall: async () => {
+      await delay(900)
+      Object.assign(cliState, { installed: true, occupied: false })
+      return { ok: true, status: { ...cliState } }
+    },
     getAppInfo: async () => appInfo,
     minimizeWindow: async () => undefined,
     maximizeWindow: async () => {

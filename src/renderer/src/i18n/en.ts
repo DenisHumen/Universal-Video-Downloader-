@@ -305,6 +305,25 @@ export const en = {
   'settings.errorReports': 'offer to send error reports to the developer',
   'settings.errorReportsHint':
     'when a link fails or a site isn’t supported yet, ask whether to send the details so it can be fixed. nothing is sent without your click.',
+  'settings.cli': 'terminal command',
+  'settings.cliMissing': 'put uvd in {dir}, and uvd <link> in a terminal downloads without opening the window.',
+  'settings.cliInstalled':
+    'installed at {path}. uvd <link> in a terminal downloads without opening the window; uvd --help lists the options.',
+  'settings.cliPackage':
+    'installed with the app at {path}. uvd <link> in a terminal downloads without opening the window; uvd --help lists the options.',
+  'settings.cliPackageMissing':
+    'the package puts it at {path}, but it isn’t there now. reinstalling the app brings it back.',
+  'settings.cliOccupied':
+    '{path} is already a different program called uvd. installing puts this app’s command in its place.',
+  'settings.cliNotOnPath':
+    '{dir} isn’t on your PATH yet, so a terminal won’t look there. on most systems signing out and back in adds it; otherwise add it in your shell’s profile.',
+  'settings.cliTemporary':
+    'the app is running from the disk image or a temporary copy. move it to Applications and open it from there first, or the command would stop working once this copy is gone.',
+  'settings.cliDevelopment':
+    'uvd <link> downloads from a terminal in the installed app. a development run has no installed copy for it to start.',
+  'settings.cliInstall': 'install',
+  'settings.cliInstallDone': 'the uvd command is installed. open a new terminal and try uvd --help',
+  'settings.cliInstallFailed': 'couldn’t install the terminal command. the log has the details.',
 
   'settings.autoUpdate': 'automatic app updates',
   'settings.autoUpdateHint': 'check on launch and notify',

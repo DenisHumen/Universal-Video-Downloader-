@@ -48,6 +48,9 @@ export const IPC = {
   updateDownload: 'update:download',
   updateInstall: 'update:install',
   updateOpenPage: 'update:open-page',
+  /** Whether `uvd` can be typed in a terminal, and putting it there. */
+  cliStatus: 'cli:status',
+  cliInstall: 'cli:install',
   appInfo: 'app:info',
   windowMinimize: 'window:minimize',
   windowMaximize: 'window:maximize',

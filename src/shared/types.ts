@@ -541,6 +541,50 @@ export interface EngineUpdateResult {
   error?: string
 }
 
+/**
+ * How this build puts `uvd <link>` within reach of a terminal.
+ *
+ *  - `none`: Windows, where the command is not shipped, or a build with no
+ *    wrapper script in it. Settings shows nothing.
+ *  - `development`: a run from the source tree, which has no installed app
+ *    for the command to start.
+ *  - `package`: a .deb, .rpm or AUR install. The package itself links
+ *    /usr/bin/uvd, so there is nothing to do.
+ *  - `link`: macOS. A link in /usr/local/bin to the script inside the app,
+ *    made with an administrator password, because a disk image cannot do it.
+ *  - `script`: an AppImage. A few lines in ~/.local/bin that start it, since
+ *    the AppImage is one file with no script of its own to link to.
+ */
+export type CliInstallMethod = 'none' | 'development' | 'package' | 'link' | 'script'
+
+/** Whether the terminal command is there, and what Settings can do about it. */
+export interface CliStatus {
+  method: CliInstallMethod
+  /** Typing `uvd` reaches this copy of the app. */
+  installed: boolean
+  /** Where the command is, or where installing it would put it. */
+  path?: string
+  /** Something else called uvd is already at `path`; installing replaces it. */
+  occupied?: boolean
+  /** The folder `path` is in is on the PATH the app was started with. */
+  onPath?: boolean
+  /**
+   * The app is running from somewhere a link would not outlive - a mounted
+   * disk image, or the copy macOS makes of an app it has not let out of
+   * quarantine - so installing would leave a command pointing at nothing.
+   */
+  temporary?: boolean
+}
+
+export interface CliInstallResult {
+  ok: boolean
+  /** The password prompt was dismissed. Nothing went wrong and nothing changed. */
+  canceled?: boolean
+  error?: string
+  /** The status after the attempt, so the row redraws without asking again. */
+  status: CliStatus
+}
+
 export type UpdateState =
   | 'idle'
   | 'checking'

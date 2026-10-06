@@ -7,6 +7,8 @@ import type {
   AppSettings,
   BrowserMedia,
   BrowserState,
+  CliInstallResult,
+  CliStatus,
   DetectResult,
   DetectStatus,
   DownloadItem,
@@ -155,6 +157,11 @@ const api = {
   downloadUpdate: (): Promise<void> => ipcRenderer.invoke(IPC.updateDownload),
   installUpdate: (): Promise<void> => ipcRenderer.invoke(IPC.updateInstall),
   openReleasesPage: (): Promise<void> => ipcRenderer.invoke(IPC.updateOpenPage),
+
+  // Terminal command
+  cliStatus: (): Promise<CliStatus> => ipcRenderer.invoke(IPC.cliStatus),
+  /** May show the system's password prompt on a Mac; resolves once it is answered. */
+  cliInstall: (): Promise<CliInstallResult> => ipcRenderer.invoke(IPC.cliInstall),
 
   // App / window
   getAppInfo: (): Promise<AppInfo> => ipcRenderer.invoke(IPC.appInfo),

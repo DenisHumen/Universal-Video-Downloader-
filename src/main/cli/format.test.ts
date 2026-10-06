@@ -8,8 +8,10 @@ import {
   formatEta,
   parseCliArgs,
   parseProgress,
+  parseQuality,
   postprocessLine,
-  progressLine
+  progressLine,
+  USAGE
 } from './format'
 
 describe('cliArgvFrom', () => {
@@ -31,10 +33,36 @@ describe('parseCliArgs', () => {
       links: ['https://a.example/v', 'https://b.example/w'],
       output: '/tmp/x',
       audio: true,
+      quality: 'best',
       help: false,
       version: false
     })
     expect(parseCliArgs(['--output=/srv/videos', 'https://a.example/v']).output).toBe('/srv/videos')
+  })
+
+  it('takes a quality in any of the ways it is written', () => {
+    expect(parseCliArgs(['https://a.example/v']).quality).toBe('best')
+    expect(parseCliArgs(['-q', '720', 'https://a.example/v']).quality).toBe('720')
+    expect(parseCliArgs(['https://a.example/v', '--quality', '1080p']).quality).toBe('1080')
+    expect(parseCliArgs(['--quality=4K', 'https://a.example/v']).quality).toBe('2160')
+    const shouted = parseCliArgs(['-q', 'BEST', 'https://a.example/v'])
+    expect(shouted.quality).toBe('best')
+    expect(shouted.error).toBeUndefined()
+  })
+
+  it('refuses a quality off the ladder, or none at all, and says what it takes', () => {
+    expect(parseCliArgs(['-q', '72', 'https://a.example/v']).error).toBe(
+      '-q takes best, 2160, 1440, 1080, 720, 480 or 360, not "72".'
+    )
+    expect(parseCliArgs(['--quality=hd', 'https://a.example/v']).error).toMatch(/takes best, 2160/)
+    expect(parseCliArgs(['https://a.example/v', '-q']).error).toMatch(/-q needs a quality after it: best, 2160/)
+    expect(parseCliArgs(['--quality=', 'https://a.example/v']).error).toMatch(/needs a quality/)
+  })
+
+  it('will not guess between a video height and audio only', () => {
+    expect(parseCliArgs(['-a', '-q', '720', 'https://a.example/v']).error).toMatch(/does nothing with --audio/)
+    expect(parseCliArgs(['-q', 'best', '--audio', 'https://a.example/v']).error).toMatch(/does nothing with --audio/)
+    expect(parseCliArgs(['-a', 'https://a.example/v']).error).toBeUndefined()
   })
 
   it('wants a link unless asked for help or the version', () => {
@@ -50,6 +78,20 @@ describe('parseCliArgs', () => {
 
   it('takes everything after -- as a link, dash or not', () => {
     expect(parseCliArgs(['--', '-weird-id', 'https://a.example/v']).links).toEqual(['-weird-id', 'https://a.example/v'])
+  })
+})
+
+describe('parseQuality', () => {
+  it('reads every rung of the ladder the app offers', () => {
+    for (const q of ['best', '2160', '1440', '1080', '720', '480', '360']) expect(parseQuality(q)).toBe(q)
+  })
+
+  it('refuses heights the app does not offer and words it does not know', () => {
+    for (const q of ['', '72', '1000', '8k', '720pp', 'p', 'worst', '-1']) expect(parseQuality(q)).toBeNull()
+  })
+
+  it('is listed in the help', () => {
+    expect(USAGE).toMatch(/-q, --quality <best\|2160\|1440\|1080\|720\|480\|360>/)
   })
 })
 

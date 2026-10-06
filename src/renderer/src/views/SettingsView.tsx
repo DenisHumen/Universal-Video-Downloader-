@@ -7,11 +7,12 @@ import {
   useState,
   type ReactNode
 } from 'react'
-import { Folder, Github, Loader2, RefreshCw, RotateCcw } from 'lucide-react'
+import { Folder, Github, Loader2, RefreshCw, RotateCcw, Terminal } from 'lucide-react'
 import {
   SUPPORTED_COOKIE_BROWSERS,
   THEMES,
   type AppSettings,
+  type CliStatus,
   type DownloadMode,
   type LanguageId,
   type QualityPreset,
@@ -28,6 +29,7 @@ import { isSafeTemplate } from '@shared/filename'
 import { normaliseRate } from '@shared/rate'
 import { isProxyValue, proxyUser } from '@shared/proxy'
 import { templateExample, type TemplateExampleOptions } from '../lib/templateExample'
+import { describeCliCommand } from '../lib/cliCommand'
 
 type SectionId =
   | 'appearance'
@@ -506,6 +508,59 @@ function ProxySettings({
 }
 
 /**
+ * The terminal command: whether `uvd` is there, and a button that puts it there.
+ *
+ * Asked for once when the screen opens, since the answer is a look at a file or
+ * two in main. Installing answers with the new status, so the row redraws
+ * from that rather than asking again. A dismissed password prompt on a Mac is
+ * the user changing their mind, and says nothing at all.
+ */
+function CliCommandRow(): JSX.Element | null {
+  const t = useT()
+  const [status, setStatus] = useState<CliStatus | null>(null)
+  const [installing, setInstalling] = useState(false)
+
+  useEffect(() => {
+    let live = true
+    window.api
+      .cliStatus()
+      .then((s) => live && setStatus(s))
+      .catch(() => undefined)
+    return () => {
+      live = false
+    }
+  }, [])
+
+  const row = describeCliCommand(status, t)
+  if (!row) return null
+
+  const install = async (): Promise<void> => {
+    setInstalling(true)
+    try {
+      const result = await window.api.cliInstall()
+      setStatus(result.status)
+      if (result.ok) toast(t('settings.cliInstallDone'), 'success')
+      else if (!result.canceled) toast(t('settings.cliInstallFailed'), 'error')
+    } catch {
+      toast(t('settings.cliInstallFailed'), 'error')
+    } finally {
+      setInstalling(false)
+    }
+  }
+
+  return (
+    <Row label={t('settings.cli')} hint={row.hint}>
+      {row.install && (
+        <button className="btn-quiet" onClick={install} disabled={installing || row.disabled}>
+          {installing ? <Loader2 size={14} className="animate-spin" /> : <Terminal size={14} />}
+          {t('settings.cliInstall')}
+        </button>
+      )}
+    </Row>
+  )
+}
+
+/**
  * A switch, not a pill with a floating knob: a track that fills with the accent
  * and a knob that slides on a CSS transition rather than a spring, because a
  * binary control has nothing to be springy about.
@@ -914,6 +969,7 @@ export default function SettingsView(): JSX.Element {
             <Row label={t('settings.tray')} hint={t('settings.trayHint')}>
               <Switch value={settings.trayEnabled} onChange={(v) => set('trayEnabled', v)} />
             </Row>
+            <CliCommandRow />
             {/* On or off, never "send by itself": on still asks every time. */}
             <Row label={t('settings.errorReports')} hint={t('settings.errorReportsHint')}>
               <Switch
