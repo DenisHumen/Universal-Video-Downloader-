@@ -1,5 +1,5 @@
 import { randomUUID } from 'crypto'
-import { existsSync, renameSync, rmSync, statSync } from 'fs'
+import { existsSync, readdirSync, renameSync, rmdirSync, rmSync, statSync } from 'fs'
 import { dirname, extname, join } from 'path'
 import {
   cancelDownload,
@@ -12,6 +12,7 @@ import {
 import { acquireAwake, releaseAwake } from '../awake'
 import { shouldResume } from '../resume'
 import { getSettings } from '../settings'
+import { leftoversOf, mayRemoveFolder, splitLocalPath } from '@shared/cleanup'
 import { getSecret, SECRET } from '../secrets'
 import { log } from '../log'
 import { awaitDownload, DownloadStopped, type QueueView } from './await-download'
@@ -352,9 +353,14 @@ export async function runEpisode(
           rmSync(source, { force: true })
           // The share's copy is the only one now, and the row says so instead of a dead path.
           follow(source, { filepath: undefined, remotePath })
-          log.info('watcher', 'Removed the local copy after upload', { id: shortId })
-        } catch {
-          /* the upload is what mattered */
+          const extra = removeLeftovers(source, settings.downloadDir)
+          log.info('watcher', 'Removed the local copy after upload', { id: shortId, sidecars: extra })
+        } catch (err) {
+          // A player holding the file open; the upload is what mattered.
+          log.warn('watcher', 'Could not remove the local copy after upload', {
+            id: shortId,
+            why: err instanceof Error ? err.message : String(err)
+          })
         }
       } else {
         follow(source, { remotePath })
@@ -496,4 +502,36 @@ export function recordOutcome(watchId: string, ref: EpisodeRef, outcome: Episode
   const watch = getWatch(watchId)
   const patch = watch && settleEpisode(watch, ref, outcome)
   if (patch) updateWatch(watchId, patch)
+}
+
+/**
+ * Delete what the download left beside the episode, then its folder if that is
+ * now empty and one the app made inside the download directory. Each removal
+ * stands alone: a locked thumbnail does not keep the rest. Returns how many
+ * sidecar files went.
+ */
+function removeLeftovers(mediaPath: string, downloadDir: string): number {
+  const { dir, name } = splitLocalPath(mediaPath)
+  if (!dir) return 0
+  let removed = 0
+  let entries: string[] = []
+  try {
+    entries = readdirSync(dir)
+  } catch {
+    return 0
+  }
+  for (const extra of leftoversOf(name, entries)) {
+    try {
+      rmSync(join(dir, extra), { force: true })
+      removed++
+    } catch {
+      /* in use; it stays */
+    }
+  }
+  try {
+    if (mayRemoveFolder(dir, downloadDir) && readdirSync(dir).length === 0) rmdirSync(dir)
+  } catch {
+    /* not empty after all, or in use */
+  }
+  return removed
 }

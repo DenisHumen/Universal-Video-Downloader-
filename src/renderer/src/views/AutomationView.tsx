@@ -498,30 +498,47 @@ export default function AutomationView(): JSX.Element {
                 .filter((s) => s.kind !== 'download')
                 .sort(byStepOrder)
                 .map((step) => (
-                  <button
-                    key={step.id}
-                    onClick={() => setEditing(step)}
-                    className="panel flex w-full items-center gap-3 px-3 py-2.5 text-left transition-colors hover:bg-raise"
-                  >
-                    {STEP_ICON[step.kind]}
-                    <span className="min-w-0 flex-1">
-                      <span className="block text-[13px] text-ink">
-                        {t(STEP_LABEL[step.kind])}
+                  <div key={step.id}>
+                    <button
+                      onClick={() => setEditing(step)}
+                      className="panel flex w-full items-center gap-3 px-3 py-2.5 text-left transition-colors hover:bg-raise"
+                    >
+                      {STEP_ICON[step.kind]}
+                      <span className="min-w-0 flex-1">
+                        <span className="block text-[13px] text-ink">
+                          {t(STEP_LABEL[step.kind])}
+                        </span>
+                        <span className="mono block truncate text-[11px] text-ink-2">
+                          {step.kind === 'rename' && step.template}
+                          {step.kind === 'upload' &&
+                            `${step.remotePath} · ${t(step.deleteLocalAfter ? 'auto.localDeleted' : 'auto.localKept')}`}
+                          {step.kind === 'notify' &&
+                            settings?.telegramChatId &&
+                            t('auto.notifyTo', { id: settings.telegramChatId })}
+                        </span>
                       </span>
-                      <span className="mono block truncate text-[11px] text-ink-2">
-                        {step.kind === 'rename' && step.template}
-                        {step.kind === 'upload' && step.remotePath}
-                        {step.kind === 'notify' &&
-                          settings?.telegramChatId &&
-                          t('auto.notifyTo', { id: settings.telegramChatId })}
-                      </span>
-                    </span>
-                    {step.enabled ? (
-                      <Check size={14} className="text-good" />
-                    ) : (
-                      <X size={14} className="text-ink-3" />
+                      {step.enabled ? (
+                        <Check size={14} className="text-good" />
+                      ) : (
+                        <X size={14} className="text-ink-3" />
+                      )}
+                    </button>
+                    {/*
+                      On the screen, not only inside the editor: tucked away there,
+                      nobody found it, and every episode stayed on the computer as
+                      well as on the share.
+                    */}
+                    {step.kind === 'upload' && (
+                      <label className="mt-1.5 flex cursor-pointer items-center gap-2.5 px-3 text-[13px] text-ink-2">
+                        <input
+                          type="checkbox"
+                          checked={step.deleteLocalAfter}
+                          onChange={(e) => void saveStep({ ...step, deleteLocalAfter: e.target.checked })}
+                        />
+                        {t('auto.deleteLocal')}
+                      </label>
                     )}
-                  </button>
+                  </div>
                 ))}
 
               {missing.length > 0 && (

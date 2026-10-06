@@ -53,7 +53,7 @@ const blank = (kind: StepKind): PipelineStep => {
       targetId: '',
       remotePath: DEFAULT_REMOTE_PATH,
       createDirs: true,
-      deleteLocalAfter: false
+      deleteLocalAfter: true
     }
   }
   return { id, kind: kind as 'notify' | 'download', enabled: true }
