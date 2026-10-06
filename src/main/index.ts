@@ -586,6 +586,7 @@ if (cliArgs) {
     ensureYtdlp().catch((err) => log.error('engine', 'Setup failed', { error: String(err) }))
 
     // An update renames an AppImage; the `uvd` written for the old name follows it here.
+    // A package install deletes that script instead, since it would hide the package's own.
     refreshCliScript()
 
     /*

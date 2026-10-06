@@ -182,6 +182,14 @@ const VERSION_IN_NAME = /\d+\.\d+\.\d+(?:-(?:alpha|beta|rc)(?:\.\d+)*)?/
  * script at its next launch, but an update installed on quit has no next launch
  * until somebody opens the app - so the script also looks beside the old path
  * for the file the update put there, by the same name with any version.
+ *
+ * When the AppImage is gone for good, the likeliest reason is that the app was
+ * installed since from a .deb, .rpm or the AUR, which put its own command at
+ * PACKAGE_TARGET. On Ubuntu ~/.local/bin comes before /usr/bin on the PATH, so
+ * this script still answers to `uvd` and would only print an error; it hands
+ * over to the package's command instead. The installed app deletes this script
+ * at its next launch (see refreshCliScript), but until somebody opens it, this
+ * is what keeps `uvd` working.
  */
 export function appImageScript(appImage: string): string {
   const dir = posix.dirname(appImage)
@@ -210,6 +218,8 @@ export function appImageScript(appImage: string): string {
   }
   lines.push(
     'if [ ! -x "$app" ]; then',
+    '    # Installed since from a package, which brought its own uvd.',
+    `    [ -x ${shellQuote(PACKAGE_TARGET)} ] && exec ${shellQuote(PACKAGE_TARGET)} "$@"`,
     '    echo "uvd: Universal Video Downloader is no longer at $app." >&2',
     '    echo "     Open the app and install the command again from Settings, system." >&2',
     '    exit 1',
@@ -238,6 +248,40 @@ export function dirOnPath(dir: string, pathValue: string | undefined, home: stri
     entry.replace(/^(~|\$HOME|\$\{HOME\})(?=\/|$)/, home).replace(/\/+$/, '') || '/'
   const wanted = clean(dir)
   return (pathValue ?? '').split(':').some((entry) => entry && clean(entry) === wanted)
+}
+
+export interface ScriptUpkeepInput {
+  method: CliInstallMethod
+  /** `process.env.APPIMAGE`: the AppImage this run was started from. */
+  appImage?: string
+  /** The text of ~/.local/bin/uvd when it is a plain file; undefined for a link or nothing. */
+  scriptText?: string
+  /** The package's own command is at PACKAGE_TARGET. */
+  packageLinked: boolean
+}
+
+/**
+ * What a launch does to ~/.local/bin/uvd: leave it, rewrite it, or delete it.
+ *
+ * Only ever a script this app wrote; a `uvd` of anybody else's is left alone
+ * whatever this copy is. An AppImage rewrites its script when the script names
+ * another file, which is what an update leaves behind.
+ *
+ * A package install deletes it. The script is what an AppImage of this app
+ * wrote before the user moved to the .deb, .rpm or AUR package, and on Ubuntu
+ * ~/.local/bin comes before /usr/bin on the PATH, so it hides the package's
+ * command: `uvd` keeps starting the AppImage, or fails once that is deleted,
+ * while Settings reports the package's command as the one installed and has
+ * no button to fix it. Deleting it loses nothing, since the package's command
+ * does the same job - which is also why it waits until that command is there.
+ */
+export function scriptUpkeep(input: ScriptUpkeepInput): 'keep' | 'rewrite' | 'remove' {
+  if (input.scriptText === undefined || !isOurScript(input.scriptText)) return 'keep'
+  if (input.method === 'script' && input.appImage) {
+    return input.scriptText === appImageScript(input.appImage) ? 'keep' : 'rewrite'
+  }
+  if (input.method === 'package' && input.packageLinked) return 'remove'
+  return 'keep'
 }
 
 // ---------------------------------------------------------------------------
@@ -368,23 +412,34 @@ export async function installCli(): Promise<CliInstallResult> {
 }
 
 /**
- * Keep an AppImage's script pointing at the AppImage that is running.
+ * Keep the AppImage's script in ~/.local/bin right for the copy that is running.
  *
  * Called once per launch. An update renames the AppImage, and the script
  * written before it still names the old file; it can find the new one by
  * itself, but only while the old name's pattern still fits. Rewriting it here
- * puts the exact path back. A `uvd` the app did not write is never touched.
+ * puts the exact path back. A package install deletes the script instead, as
+ * scriptUpkeep explains. A `uvd` the app did not write is never touched.
  */
 export function refreshCliScript(): void {
+  const method = plan()
+  if (method !== 'script' && method !== 'package') return
   const appImage = process.env.APPIMAGE
-  if (plan() !== 'script' || !appImage) return
   const target = scriptTarget()
   const found = inspect(target)
-  if (found.kind !== 'file' || !isOurScript(found.text)) return
-  if (found.text === appImageScript(appImage)) return
+  const action = scriptUpkeep({
+    method,
+    appImage,
+    scriptText: found.kind === 'file' ? found.text : undefined,
+    packageLinked: method === 'package' && existsSync(PACKAGE_TARGET)
+  })
   try {
-    writeScript(target, appImage)
-    log.info('cli', 'Pointed the terminal command at the updated AppImage')
+    if (action === 'rewrite' && appImage) {
+      writeScript(target, appImage)
+      log.info('cli', 'Pointed the terminal command at the updated AppImage')
+    } else if (action === 'remove') {
+      rmSync(target, { force: true })
+      log.info('cli', 'Removed the AppImage terminal command that hid the installed one')
+    }
   } catch (error) {
     log.warn('cli', 'Could not update the terminal command', {
       why: error instanceof Error ? error.message : String(error)

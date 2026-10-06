@@ -10,6 +10,8 @@ import {
   isUserCancel,
   macInstallCommand,
   macInstallScript,
+  PACKAGE_TARGET,
+  scriptUpkeep,
   shellQuote,
   SCRIPT_MARKER
 } from './cli-install'
@@ -144,6 +146,19 @@ describe('the AppImage script', () => {
     expect(script).not.toContain('for candidate')
   })
 
+  it('hands over to the package’s uvd once the AppImage is gone, before giving up', () => {
+    for (const path of [appImage, '/home/me/Applications/Universal-Video-Downloader.AppImage']) {
+      const script = appImageScript(path)
+      const handOver = script.indexOf(`[ -x '${PACKAGE_TARGET}' ] && exec '${PACKAGE_TARGET}' "$@"`)
+      expect(handOver).toBeGreaterThan(-1)
+      // After the search for an updated AppImage, which should win when there is one,
+      // and before the error, which it exists to prevent.
+      expect(handOver).toBeGreaterThan(script.indexOf('if [ ! -x "$app" ]; then'))
+      expect(handOver).toBeLessThan(script.indexOf('echo "uvd: Universal Video Downloader is no longer at'))
+      if (script.includes('for candidate')) expect(handOver).toBeGreaterThan(script.indexOf('done'))
+    }
+  })
+
   it('quotes a path the shell would otherwise split or expand', () => {
     const script = appImageScript(`/home/me/it's $HOME/UVD-3.24.0-linux-x86_64.AppImage`)
     expect(script).toContain(`app='/home/me/it'\\''s $HOME/UVD-3.24.0-linux-x86_64.AppImage'`)
@@ -155,6 +170,50 @@ describe('the AppImage script', () => {
     expect(isOurScript(appImageScript(appImage).replace(/\n/g, '\r\n'))).toBe(true)
     expect(isOurScript('#!/bin/sh\nexec /opt/other/uvd "$@"\n')).toBe(false)
     expect(isOurScript(`#!/bin/sh\necho "${SCRIPT_MARKER}"\n`)).toBe(false)
+  })
+})
+
+describe('scriptUpkeep', () => {
+  const appImage = '/home/me/Applications/Universal Video Downloader-3.25.0-linux-x86_64.AppImage'
+  const older = appImageScript('/home/me/Applications/Universal Video Downloader-3.24.0-linux-x86_64.AppImage')
+  const foreign = '#!/bin/sh\nexec /opt/other/uvd "$@"\n'
+
+  it('points an AppImage’s script at the file that is running', () => {
+    expect(scriptUpkeep({ method: 'script', appImage, scriptText: older, packageLinked: false })).toBe('rewrite')
+    expect(
+      scriptUpkeep({ method: 'script', appImage, scriptText: appImageScript(appImage), packageLinked: false })
+    ).toBe('keep')
+  })
+
+  it('deletes the AppImage’s script once a package has put its own uvd in place', () => {
+    // The scenario: tried the AppImage, installed the command, then moved to the .deb.
+    expect(scriptUpkeep({ method: 'package', scriptText: older, packageLinked: true })).toBe('remove')
+    // Even when that AppImage is still there: the package's command is the one Settings reports.
+    expect(scriptUpkeep({ method: 'package', appImage, scriptText: appImageScript(appImage), packageLinked: true })).toBe(
+      'remove'
+    )
+  })
+
+  it('keeps the script while the package’s own command is missing', () => {
+    // Somebody removed /usr/bin/uvd; the script may be the only `uvd` that still works.
+    expect(scriptUpkeep({ method: 'package', scriptText: older, packageLinked: false })).toBe('keep')
+  })
+
+  it('never touches a uvd the app did not write, or nothing at all', () => {
+    for (const method of ['script', 'package'] as const) {
+      expect(scriptUpkeep({ method, appImage, scriptText: foreign, packageLinked: true })).toBe('keep')
+      expect(scriptUpkeep({ method, appImage, scriptText: undefined, packageLinked: true })).toBe('keep')
+      // A file too large to read comes back as no text at all.
+      expect(scriptUpkeep({ method, appImage, scriptText: '', packageLinked: true })).toBe('keep')
+    }
+  })
+
+  it('leaves the script alone on a Mac, in development and on an unknown install', () => {
+    for (const method of ['link', 'development', 'none'] as const) {
+      expect(scriptUpkeep({ method, appImage, scriptText: older, packageLinked: true })).toBe('keep')
+    }
+    // An AppImage run that somehow lost its path has nothing to point the script at.
+    expect(scriptUpkeep({ method: 'script', scriptText: older, packageLinked: false })).toBe('keep')
   })
 })
 
