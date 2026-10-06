@@ -551,10 +551,13 @@ export interface UpdateStatus {
   message?: string
   /**
    * True when this build can't install updates itself (unsigned macOS builds,
-   * .deb/.rpm installs). The UI then offers the download page instead.
+   * .deb/.rpm installs). The UI then offers the download instead.
    */
   manual?: boolean
-  /** Where to send the user when `manual` is set. */
+  /**
+   * Where to send the user when `manual` is set: the installer for this copy
+   * when the release has one, otherwise the release page.
+   */
   downloadUrl?: string
 }
 

@@ -35,7 +35,7 @@ export default function UpdateBanner(): JSX.Element {
       update.state === 'error')
 
   // Builds that can't self-install (unsigned macOS, .deb/.rpm) send the user to
-  // the releases page instead of pretending the app can restart into a new one.
+  // the matching download instead of pretending the app can restart into a new one.
   const manual = Boolean(update.manual)
 
   return (

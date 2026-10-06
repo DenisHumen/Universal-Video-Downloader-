@@ -327,7 +327,7 @@ export const en = {
   // ---- update banner ----
   'update.available': 'version {version} is available',
   'update.availableHint': 'ready to download and install',
-  'update.availableManualHint': 'opens the download page in your browser',
+  'update.availableManualHint': 'opens your download in the browser',
   'update.downloading': 'downloading update…',
   'update.ready': 'update {version} ready',
   'update.readyHint': 'the app will restart to apply it',
