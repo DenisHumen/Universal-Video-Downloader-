@@ -113,14 +113,26 @@ describe('anilibertyInfo', () => {
       translators: [{ id: ALIAS, name: 'AniLibria' }],
       defaultTranslator: ALIAS,
       seasons: [{ season: 1, episodes: [1, 2, 3] }],
-      qualities: ['1080p', '720p', '480p']
+      qualities: ['480p', '720p', '1080p']
     })
   })
 
   it('offers only the heights some episode has a manifest for', () => {
     const episodes = recorded.episodes!.map((e) => ({ ...e, hls_1080: null }))
     const info = anilibertyInfo(release({ episodes }), 'https://aniliberty.top', 'aniliberty.top')
-    expect(info.qualities).toEqual(['720p', '480p'])
+    expect(info.qualities).toEqual(['480p', '720p'])
+  })
+
+  it('lists its heights lowest first, so the watch dialog’s default is the best one', () => {
+    /*
+      With no height carried over, the Add watch dialog takes the last quality
+      as the best. Listed highest first, a followed release saved 480p and
+      downloaded every new episode in it.
+    */
+    const info = anilibertyInfo(release(), 'https://aniliberty.top', 'aniliberty.top')
+    const heights = info.qualities.map((q) => parseInt(q, 10))
+    expect(heights[heights.length - 1]).toBe(Math.max(...heights))
+    expect(heights).toEqual([...heights].sort((a, b) => a - b))
   })
 
   it('calls a running show with one episode out a series, and a finished one-episode release a film', () => {
@@ -352,7 +364,7 @@ describe('resolveUrl on AniLiberty', () => {
       loneEpisode: true,
       title: `${recorded.name?.main} - E02`,
       seasons: [{ season: 1, episodes: [2] }],
-      qualities: ['1080p', '720p', '480p']
+      qualities: ['480p', '720p', '1080p']
     })
     // The picker's download button queues episode 2, not episode 1.
     const s = resolved.streaming!

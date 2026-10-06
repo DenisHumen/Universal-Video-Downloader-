@@ -222,11 +222,24 @@ export function episodeLabel(ordinal: number): string {
   return `E${Number.isInteger(ordinal) ? String(ordinal).padStart(2, '0') : ordinal}`
 }
 
-/** Every height any episode comes in, highest first, as the picker lists them. */
+/**
+ * Heights as a picker's qualities, lowest first, the order every other
+ * provider lists them in.
+ *
+ * The order is load-bearing: the watch dialog takes the last entry as the best
+ * one when no height was carried over, so listed highest first, a followed
+ * release would have downloaded every new episode in 480p while 1080p was
+ * there.
+ */
+function qualityLabels(heights: Iterable<number>): string[] {
+  return [...new Set(heights)].sort((a, b) => a - b).map((h) => `${h}p`)
+}
+
+/** Every height any episode comes in, lowest first, as the picker lists them. */
 function releaseQualities(episodes: { episode: AniEpisode }[]): string[] {
-  const heights = new Set<number>()
-  for (const { episode } of episodes) for (const t of episodeTiers(episode)) heights.add(t.height)
-  return HEIGHTS.filter((h) => heights.has(h)).map((h) => `${h}p`)
+  const heights: number[] = []
+  for (const { episode } of episodes) for (const t of episodeTiers(episode)) heights.push(t.height)
+  return qualityLabels(heights)
 }
 
 /**
@@ -271,7 +284,7 @@ export function anilibertyInfo(release: AniRelease, origin: string, pageHost: st
         title,
         thumbnail,
         provider: 'aniliberty',
-        qualities: HEIGHTS.map((h) => `${h}p`).reverse()
+        qualities: qualityLabels(HEIGHTS)
       })
     }
     throw new Error(NO_EPISODES)
@@ -370,7 +383,7 @@ async function resolveEpisodePage(url: string): Promise<ResolvedUrl> {
     translators: [{ id: alias, name: DUB_NAME }],
     defaultTranslator: alias,
     seasons: [{ season: 1, episodes: [ordinal] }],
-    qualities: tiers.map((t) => `${t.height}p`)
+    qualities: qualityLabels(tiers.map((t) => t.height))
   }
   return {
     url: tiers[0].url,
