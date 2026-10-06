@@ -131,6 +131,58 @@ export interface WriteOptions {
   backup?: boolean
 }
 
+/** A temp name of its own, next to `target`, for one write. */
+function tempFor(target: string): string {
+  return `${target}.${process.pid}.${++sequence}.tmp`
+}
+
+/**
+ * Write every byte of `text`, or throw.
+ *
+ * One `writeSync` is one system call, and on Linux and macOS a disk that fills
+ * partway through makes that call write what fits and return the shorter count
+ * instead of failing - only the next call gets ENOSPC. Taking the first answer
+ * as the whole write fsynced a truncated file and renamed it over the good one.
+ * `writeFileSync` loops the same way; this does it on the open descriptor so
+ * the fsync after it still covers the same file.
+ */
+function writeAll(fd: number, text: string): void {
+  const bytes = Buffer.from(text, 'utf-8')
+  let done = 0
+  while (done < bytes.length) {
+    const wrote = writeSync(fd, bytes, done, bytes.length - done)
+    // A regular file never takes nothing without an error; never spin on one that does.
+    if (wrote <= 0) throw Object.assign(new Error('The file took no more bytes'), { code: 'EIO' })
+    done += wrote
+  }
+}
+
+/**
+ * Copy a file into place whole, or leave the destination as it was.
+ *
+ * `copyFileSync` writes straight onto its destination: it truncates it first,
+ * and when the copy fails partway - on a disk that has just filled - libuv
+ * deletes what it had started. Aimed at a `.bak`, one save on a full disk
+ * could delete the one good backup; aimed at a damaged file being repaired, it
+ * could leave no file at all, which the next launch reads as a first launch.
+ * The copy goes to a temp file of its own and only a complete one is renamed
+ * over the destination.
+ */
+function copyWhole(source: string, destination: string): void {
+  const tmp = tempFor(destination)
+  try {
+    copyFileSync(source, tmp)
+    patiently(() => renameSync(tmp, destination))
+  } catch (err) {
+    try {
+      rmSync(tmp, { force: true })
+    } catch {
+      /* the copy already failed; that is what gets reported */
+    }
+    throw err
+  }
+}
+
 /**
  * Replace a file with `data` as JSON, so that it is always either the old
  * version or the new one, whole.
@@ -146,11 +198,11 @@ export function writeJsonAtomic(target: string, data: unknown, options: WriteOpt
     way out shared one `.tmp`, and two writers renaming the same half-written
     file into place is how a whole store ends up truncated.
   */
-  const tmp = `${target}.${process.pid}.${++sequence}.tmp`
+  const tmp = tempFor(target)
   try {
     const fd = openSync(tmp, 'w')
     try {
-      writeSync(fd, text, null, 'utf-8')
+      writeAll(fd, text)
       /*
         On the disk before the rename, not just handed to the OS. Without this a
         power cut can keep the rename and lose the data, leaving a file of zero
@@ -162,7 +214,8 @@ export function writeJsonAtomic(target: string, data: unknown, options: WriteOpt
     }
     if (options.backup !== false && !skipBackup.has(target) && existsSync(target)) {
       try {
-        copyFileSync(target, `${target}.bak`)
+        // Whole or not at all: a failed copy keeps the older backup there was.
+        copyWhole(target, `${target}.bak`)
       } catch {
         /* a backup is a safety net; failing to make one must not stop the save */
       }
@@ -299,7 +352,7 @@ export function readJsonStore(
       directly instead of finding the same damage and setting aside another copy.
     */
     try {
-      copyFileSync(`${file}.bak`, file)
+      copyWhole(`${file}.bak`, file)
       skipBackup.delete(file)
     } catch {
       /* the next successful write repairs it; `skipBackup` protects the .bak until then */
