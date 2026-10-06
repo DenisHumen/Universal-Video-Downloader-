@@ -36,8 +36,14 @@ interface PageMeta {
 /**
  * Runs inside the page: unmute + start every <video>, nudge the usual "big play
  * button" shapes, and report whatever the player already exposes.
+ *
+ * It is a template literal, so the page receives it with every backslash
+ * already spent: a regex written `/^(https?:|\/\/)/` here reached the page as
+ * `/^(https?:|//)/`, a SyntaxError, and from v3.9.0 the whole script failed to
+ * parse on every page. No video was started and no play button pressed; only
+ * players that started on their own were ever caught. The test parses it.
  */
-const PROBE_SCRIPT = `(() => {
+export const PROBE_SCRIPT = `(() => {
   const meta = { title: document.title || undefined, thumbnail: undefined, duration: undefined, srcs: [] };
   const metaContent = (sel) => {
     const el = document.querySelector(sel);
@@ -94,7 +100,10 @@ const PROBE_SCRIPT = `(() => {
   for (const el of elements) {
     for (const name of DATA_ATTRS) {
       const value = el.getAttribute && el.getAttribute(name);
-      if (value && /^(https?:|\/\/)/.test(value)) meta.srcs.push(value);
+      // No backslashes anywhere in this script: see PROBE_SCRIPT above.
+      if (value && (value.startsWith('http:') || value.startsWith('https:') || value.startsWith('//'))) {
+        meta.srcs.push(value);
+      }
     }
   }
 
@@ -106,14 +115,18 @@ const PROBE_SCRIPT = `(() => {
     // Shapes seen on players that the list above walked straight past.
     '.ytp-large-play-button', '.fp-play', '.mejs__overlay-button', '.vjs-poster',
     '[class*="PlayButton"]', '[aria-label*="Play"]', '[aria-label*="роизв"]',
-    '[class*="start-button"]', '[class*="bigPlay"]', '[class*="video-overlay"]'
+    '[class*="start-button"]', '[class*="bigPlay"]', '[class*="video-overlay"]',
+    // Kodik's, on the player so many Russian anime sites embed.
+    '.play_button'
   ];
   let clicked = 0;
   for (const el of elements) {
     if (clicked >= 8) break;
     // Never click a link. A player overlay that happens to sit inside an anchor
     // would navigate the hidden window away from the page we came to watch.
-    if (el.tagName === 'A' || (el.closest && el.closest('a[href]'))) continue;
+    // An anchor with no address goes nowhere, though: it is a button in all but
+    // name, and Kodik's play button is one.
+    if (el.closest && el.closest('a[href]')) continue;
     let match = false;
     for (const sel of selectors) {
       try { if (el.matches(sel)) { match = true; break } } catch (e) {}

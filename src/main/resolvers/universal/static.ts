@@ -1,4 +1,5 @@
 import { absoluteUrl, cleanHtml, fetchText, hostOf, originOf, pick, UA } from '../http'
+import { KODIK_PLAYER } from '../sites/kodik'
 import { rank, scoreUrl, type MediaCandidate } from './candidates'
 
 /**
@@ -15,6 +16,14 @@ export interface StaticScrape {
   title?: string
   thumbnail?: string
   duration?: number
+  /**
+   * A Kodik player embedded in the page (or one frame down). There is nothing
+   * in its HTML to find - the stream comes from a signed request its script
+   * makes - so it is not scraped like other frames but left for the caller to
+   * hand to the Kodik resolver, which asks for the stream the way the player
+   * does.
+   */
+  player?: string
 }
 
 /** Iframes that are never a video player. */
@@ -306,16 +315,18 @@ async function scrapeOne(
   const text = unescapeMarkup(html)
   const meta = extractFromHtml(html, url)
   const out = meta.candidates
+  const frames = readIframes(text, url)
+  meta.player = frames.find((frame) => KODIK_PLAYER.test(frame))
 
   // Nothing convincing here — try the embedded players.
   if (depth > 0 && !out.some((c) => c.score >= 80)) {
-    const frames = readIframes(text, url).slice(0, 3)
-    for (const frame of frames) {
+    for (const frame of frames.filter((f) => !KODIK_PLAYER.test(f)).slice(0, 3)) {
       const nested = await scrapeOne(frame, depth - 1, url, fetcher)
       out.push(...nested.candidates)
       meta.title = meta.title || nested.title
       meta.thumbnail = meta.thumbnail || nested.thumbnail
       meta.duration = meta.duration || nested.duration
+      meta.player = meta.player || nested.player
       if (out.some((c) => c.score >= 90)) break
     }
   }

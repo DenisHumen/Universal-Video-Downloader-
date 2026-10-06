@@ -13,6 +13,7 @@ import type {
   FormatKind,
   MediaInfo,
   PlaylistEntry,
+  StreamingInfo,
   VideoFormat
 } from '@shared/types'
 
@@ -139,6 +140,26 @@ function pickThumbnail(info: RawInfo): string | undefined {
   return undefined
 }
 
+/** A streaming site's picker (translator → episodes → quality) in place of a format list. */
+function pickerInfo(
+  s: StreamingInfo,
+  extractor: string | undefined,
+  webpageUrl: string,
+  originalUrl: string
+): MediaInfo {
+  return {
+    id: s.id,
+    title: s.title,
+    thumbnail: s.thumbnail,
+    webpageUrl,
+    originalUrl,
+    extractor: extractor || s.provider,
+    isLive: false,
+    formats: [],
+    streaming: s
+  }
+}
+
 export async function detect(
   input: string,
   onStage: StageReporter = () => undefined,
@@ -181,19 +202,7 @@ export async function detect(
 
   // A streaming site (translator/episode/quality selection) — present its picker.
   if (resolved.streaming) {
-    const s = resolved.streaming
-    const info: MediaInfo = {
-      id: s.id,
-      title: s.title,
-      thumbnail: s.thumbnail,
-      webpageUrl: url,
-      originalUrl: url,
-      extractor: resolved.extractor || s.provider,
-      isLive: false,
-      formats: [],
-      streaming: s
-    }
-    return { ok: true, info }
+    return { ok: true, info: pickerInfo(resolved.streaming, resolved.extractor, url, url) }
   }
 
   // A custom resolver found a playlist/listing — present its entries directly.
@@ -267,6 +276,21 @@ export async function detect(
       if (code && !engineHasBetter && !signal?.aborted) {
         onStage('done')
         return { ok: false, error: err instanceof Error ? err.message : String(err), errorCode: code }
+      }
+    }
+
+    /*
+      A picker for a player embedded in the page (Kodik). A series' follow
+      button goes by webpageUrl, and a watcher re-reads that with resolveUrl
+      alone, never this scrape - so for a series it is the player's own
+      address, the one link that leads back to the episodes by itself.
+    */
+    if (universal?.streaming) {
+      const s = universal.streaming
+      onStage('done')
+      return {
+        ok: true,
+        info: pickerInfo(s, universal.extractor, s.isSeries ? universal.url : url, url)
       }
     }
 

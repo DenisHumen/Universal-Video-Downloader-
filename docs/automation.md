@@ -27,7 +27,7 @@ These were settled with the user before design began, and are not open:
 | --- | --- |
 | Reaching the SMB share | The app connects itself — host, share, user, password |
 | On a new episode | Download automatically, no confirmation |
-| Sources for the first version | Sites with built-in resolvers only (rezka, yummyani) — but see §3: rezka is currently down |
+| Sources for the first version | Sites with built-in resolvers only (rezka, yummyani) — rezka was down for a while; see §3 |
 | Running with the window closed | Yes — tray, and start with the system |
 
 Two things follow that are worth stating plainly. Connecting to SMB ourselves
@@ -92,21 +92,46 @@ opens its own TCP session and is not subject to that limit — which is a point 
 favour of the chosen approach, and a thing to confirm in stage 5.
 
 
-**Rezka is not currently usable, and that is not this feature's doing.** Three
+**Rezka was unusable for a while, and that was not this feature's doing.** Three
 signals from a plain HTTP client with a real browser user-agent, across
-`rezka.ag`, `hdrezka.ag` and `hdrezka.me`: every mirror answers with about 2.4 KB
-where a catalogue page is hundreds; the responses carry `X-Powered-By: Express`,
-while rezka itself runs nginx; and the bodies contain no title, no scripts and
-none of rezka's markup. Whatever the mechanism, the site is not handing a
-parseable page to the kind of request `resolvers/http.ts` makes, so the rezka
-resolver is broken end to end today, independently of anything here.
+`rezka.ag`, `hdrezka.ag` and `hdrezka.me`: every mirror answered with about
+2.4 KB where a catalogue page is hundreds; the responses carried
+`X-Powered-By: Express`, while rezka itself runs nginx; and the bodies contained
+no title, no scripts and none of rezka's markup. So the first version was
+verified against **yummyani**, which is also what both of the user's links are,
+and the model was kept provider-agnostic so rezka could slot back in.
 
-Consequences for scope. The first version is verified against **yummyani**,
-which is also what both of the user's links are. The model stays
-provider-agnostic — nothing assumes yummyani's URL shape, and §3 already notes
-that rezka's differs — so rezka slots back in when it works. One thing to know
-when it does: rezka never populates `episodesByTranslator`, so the
-per-translator comparison that yummyani needs has no data behind it there yet.
+*Update, 2026-10-05: rezka is back.* The mechanism turned out to be Anubis, a
+proof-of-work bot check now in front of every mirror. Its stock policy
+challenges any user agent that calls itself a browser — which the Chrome agent
+in `resolvers/http.ts` does — and lets a plainly named client through. The rezka
+resolver now introduces itself as `UniversalVideoDownloader/<version>` (rezka
+only; other sites still want Chrome), and says "bot check" in words when it
+meets the challenge instead of quietly finding nothing. Verified live on an
+anime series, a five-season series and a film: the page gives title, poster,
+the real translator list and episodes; `uvd-rezka://` resolves to a CDN stream
+the engine downloads; a rezka watch can be described, checked and turned into a
+download link.
+
+Two things the return brought to light, both fixed:
+
+- **A rezka page lists the episodes of one dub** — whichever it opens on — and
+  that list used to stand in for every dub, since rezka never fills
+  `episodesByTranslator`. That is exactly the mistake the quote above warns
+  about: on *Breaking Bad* the page's dub has 63 episodes and three others have
+  62. A rezka check therefore asks the player API for the chosen dub's own list
+  (`action=get_episodes`, the request the site makes when a dub is clicked).
+  The "add a watch" dialog does not: its per-dub counts for rezka are the page
+  dub's, for every dub, because asking for each would be one request per dub on
+  every look.
+- **The episode link a rezka watch built** spliced the whole page address in
+  where the host and title id belong and left the translator out. The title id
+  is the number in the page address (`/646-vo-vse-tyazhkie-2008.html`), the same
+  one the page hands its player, so the link is now built from that.
+
+Asking for an episode a dub does not have answers `success: false` with a
+generic "session expired" message; it now reads as "no stream for this
+translation and episode" rather than as a Premium translation.
 
 ### What a check costs
 
@@ -114,7 +139,10 @@ Worth knowing before choosing a default interval, because this runs unattended
 against someone else's server:
 
 - yummyani: **3 GETs** per check from the page URL, or 2 from `uvd-yummy-item://<id>`
-- rezka: **1 GET** per check
+- a Shikimori link: **4 GETs** (Shikimori's API, one yani.tv search, then the
+  title's two yummyani requests), plus a search for each further name tried
+  when the romanised one does not find the title - at most two more
+- rezka: **1 GET + 1 POST** per check (the page, then the chosen dub's episode list)
 - downloading one episode adds 1 GET + 1 POST (yummyani) or 1 POST (rezka)
 
 yummyani's `/videos` response also carries a `video_id` and a `date` per entry

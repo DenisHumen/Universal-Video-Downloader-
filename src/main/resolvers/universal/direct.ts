@@ -110,7 +110,9 @@ export async function resolveDirectUrl(
   if (!fresh && payload.pageUrl) {
     // Lazily imported: the universal resolver pulls in the headless browser.
     const { resolveUniversal } = await import('./index')
-    const refreshed = await resolveUniversal(payload.pageUrl, options).catch(() => null)
+    const refreshed = await resolveUniversal(payload.pageUrl, { ...options, needStream: true }).catch(
+      () => null
+    )
     if (refreshed) {
       return {
         ...refreshed,

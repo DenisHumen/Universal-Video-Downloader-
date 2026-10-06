@@ -212,6 +212,25 @@ const RULES: Rule[] = [
     code: 'permission',
     message: 'No permission to write to the download folder. Pick another one in Settings.'
   },
+  /*
+    A player the resolver recognises and knows it cannot read (Kodik's /uv/).
+    Its own words, because the generic "no downloadable video" below suggests
+    cookies, and no cookie will change this.
+  */
+  {
+    re: /player is not supported yet/,
+    code: 'unsupportedPlayer',
+    message: 'This kind of player is not supported yet.'
+  },
+  /*
+    A Shikimori title the app found, and YummyAnime does not have. Its own
+    words for the same reason: nothing about the link or cookies will help.
+  */
+  {
+    re: /isn't available on yummyanime/,
+    code: 'notOnYummyAnime',
+    message: "This title isn't available on YummyAnime, where Shikimori links are downloaded from."
+  },
   {
     re: /unsupported url|no video formats|unable to extract|nothing to download/,
     code: 'noFormats',

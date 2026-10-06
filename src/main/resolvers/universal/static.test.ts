@@ -207,6 +207,68 @@ describe('scrapeStatic failures', () => {
   })
 })
 
+/*
+  A Kodik player's HTML has no media in it: the stream comes from a signed POST
+  its script makes. Scraped like any other frame it gave nothing, and so did the
+  browser, which never got the player started - a page embedding the player
+  most Russian anime sites use came back as having no video at all.
+*/
+describe('scrapeStatic and an embedded Kodik player', () => {
+  const PAGE = 'https://anime.test/watch/42'
+  const KODIK = 'https://kodikplayer.com/season/94795/d5a209e9/720p?translations=false'
+
+  function recorder(pages: Record<string, string>): {
+    fetcher: (url: string) => Promise<string>
+    asked: string[]
+  } {
+    const asked: string[] = []
+    return {
+      asked,
+      fetcher: async (url) => {
+        asked.push(url)
+        return pages[url] ?? ''
+      }
+    }
+  }
+
+  it('hands the player over instead of scraping it', async () => {
+    const { fetcher, asked } = recorder({
+      [PAGE]: '<iframe src="//kodikplayer.com/season/94795/d5a209e9/720p?translations=false&amp;x=1"></iframe>'
+    })
+    const found = await scrapeStatic(PAGE, fetcher)
+
+    expect(found.player).toBe(`${KODIK}&x=1`)
+    expect(asked).toEqual([PAGE])
+  })
+
+  it('finds a player inside the site’s own player frame', async () => {
+    const FRAME = 'https://anime.test/player/42'
+    const { fetcher } = recorder({
+      [PAGE]: `<iframe data-src="${FRAME}"></iframe>`,
+      [FRAME]: `<iframe src="${KODIK}"></iframe>`
+    })
+    expect((await scrapeStatic(PAGE, fetcher)).player).toBe(KODIK)
+  })
+
+  it('still scrapes the other frames on the page', async () => {
+    const FRAME = 'https://player.cdn.test/embed/abc'
+    const { fetcher, asked } = recorder({
+      [PAGE]: `<iframe src="${KODIK}"></iframe><iframe src="${FRAME}"></iframe>`,
+      [FRAME]: '<video src="https://cdn.test/film.mp4"></video>'
+    })
+    const found = await scrapeStatic(PAGE, fetcher)
+
+    expect(asked).toEqual([PAGE, FRAME])
+    expect(found.candidates[0]?.url).toBe('https://cdn.test/film.mp4')
+    expect(found.player).toBe(KODIK)
+  })
+
+  it('reports no player on a page without one', async () => {
+    const { fetcher } = recorder({ [PAGE]: '<video src="https://cdn.test/film.mp4"></video>' })
+    expect((await scrapeStatic(PAGE, fetcher)).player).toBeUndefined()
+  })
+})
+
 describe('refererFor', () => {
   it('prefers the page that pointed at the URL', () => {
     expect(refererFor('https://player.cdn.test/embed/1', 'https://site.test/watch/42')).toBe(

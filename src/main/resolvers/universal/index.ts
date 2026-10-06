@@ -1,5 +1,6 @@
 import { b64urlDecode, b64urlEncode, hostOf } from '../http'
 import { unreachableCode } from '../neterror'
+import { kodikOnPage, resolveKodikPlayer } from '../sites/kodik'
 import type { ResolveOptions, ResolvedUrl } from '../types'
 import { best, type MediaCandidate } from './candidates'
 import { scrapeStatic, type StaticScrape } from './static'
@@ -16,7 +17,9 @@ import { sniffPage } from './sniffer'
  *     Slower, but works on sites that build their stream URL in JavaScript.
  *
  * Only when both come up empty does the app ask the user for a hand-written
- * resolver. Nothing here is site-specific.
+ * resolver. Nothing here is site-specific, with one exception: a Kodik player
+ * embedded in the page is handed to the Kodik resolver, because so many Russian
+ * anime and film sites embed it and neither strategy can read it.
  */
 
 export type UniversalStage = 'scraping' | 'browsing'
@@ -30,6 +33,12 @@ export interface UniversalOptions {
   browserTimeoutMs?: number
   /** Cancels the browser pass; the hidden window is torn down at once. */
   signal?: AbortSignal
+  /**
+   * The caller needs a stream, as re-resolving a queued item does. An episode
+   * picker for a series player found in the page is no answer there, so that
+   * page goes on to the browser as it always did.
+   */
+  needStream?: boolean
 }
 
 export const SNIFF_SCHEME = 'uvd-sniff://'
@@ -79,7 +88,7 @@ export async function resolveUniversal(
   pageUrl: string,
   options: UniversalOptions = {}
 ): Promise<ResolvedUrl | null> {
-  const { allowBrowser = true, onStage, browserTimeoutMs, signal } = options
+  const { allowBrowser = true, onStage, browserTimeoutMs, signal, needStream } = options
 
   onStage?.('scraping')
   let scraped: StaticScrape | null = null
@@ -93,6 +102,19 @@ export async function resolveUniversal(
   // A manifest found in the markup is as trustworthy as one seen on the wire.
   if (staticBest && staticBest.score >= 90) {
     return toResolved(pageUrl, staticBest, scraped!)
+  }
+
+  /*
+    A Kodik player in the page comes back as the Kodik resolver's picker, or as
+    its stream for a caller that needs one; either way it is queued by the
+    player's own address, so a restart asks Kodik again rather than scraping
+    this page. Anything Kodik will not answer - a /uv/ player, a page that
+    changed shape - falls through to the browser, as before.
+  */
+  if (scraped?.player && !signal?.aborted) {
+    const viaPlayer = await resolveKodikPlayer(scraped.player).catch(() => null)
+    const onPage = viaPlayer && kodikOnPage(viaPlayer, scraped, needStream)
+    if (onPage) return onPage
   }
 
   if (allowBrowser && !signal?.aborted) {
@@ -119,7 +141,7 @@ export async function resolveSniffUrl(
   options: ResolveOptions = {}
 ): Promise<ResolvedUrl> {
   const pageUrl = pageUrlFromSniffUrl(uvdUrl)
-  const resolved = await resolveUniversal(pageUrl, options)
+  const resolved = await resolveUniversal(pageUrl, { ...options, needStream: true })
   if (!resolved) {
     throw new Error('Could not find a video stream on this page any more.')
   }
