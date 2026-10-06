@@ -4,12 +4,14 @@ import { IPC } from '@shared/ipc'
 import { describeSeries } from './services/automation/detect'
 import {
   addWatch,
+  getWatch,
   listRuns,
   listWatches,
   removeWatch,
   updateWatch,
   watchEvents
 } from './services/automation/store'
+import { rescheduledCheck } from './services/automation/backoff'
 import { checkNow, retryRun } from './services/automation/watcher'
 import { stopEpisode } from './services/automation/pipeline'
 import { testTarget } from './services/automation/smb'
@@ -19,8 +21,12 @@ import { logFilePath } from './services/log'
 import { getSettings } from './services/settings'
 import { coalesce } from './services/coalesce'
 import {
+  exactDuplicate,
+  inheritedSeen,
   settleRunError,
+  type AddedWatch,
   type CheckSummary,
+  type EpisodeRef,
   type RetryAnswer,
   type Run,
   type SmbTarget,
@@ -44,8 +50,15 @@ export interface SeriesOffer {
   provider: string
   defaultTranslator: string
   qualities: string[]
-  /** Each dub with the number of episodes *it* has, which is what a watch follows. */
-  translators: { id: string; name: string; premium?: boolean; episodes: number }[]
+  /**
+   * Each dub with the episodes *it* has, which is what a watch follows.
+   *
+   * The list itself travels, not only its length, so a watch told to leave the
+   * back catalogue alone can mark exactly what was out when it was added -
+   * without a second look at the site, which costs three more requests and may
+   * not answer the same way a minute later.
+   */
+  translators: { id: string; name: string; premium?: boolean; episodes: number; list: EpisodeRef[] }[]
   /** Nothing is out yet. There are no dubs to list, only the date the site expects. */
   upcoming?: { releaseAt?: number }
 }
@@ -75,7 +88,10 @@ export function registerAutomationIpc(): void {
       provider: d.provider,
       defaultTranslator: d.defaultTranslator,
       qualities: d.qualities,
-      translators: d.translators.map((t) => ({ ...t, episodes: d.episodesFor(t.id).length })),
+      translators: d.translators.map((t) => {
+        const list = d.episodesFor(t.id)
+        return { ...t, episodes: list.length, list }
+      }),
       upcoming: d.upcoming
     }
   })
@@ -83,9 +99,19 @@ export function registerAutomationIpc(): void {
   ipcMain.handle(IPC.autoList, (): Watch[] => listWatches())
   ipcMain.handle(IPC.autoRuns, (_e, watchId: string): Run[] => listRuns(watchId))
 
-  ipcMain.handle(IPC.autoAdd, (_e, watch: Omit<Watch, 'id' | 'createdAt'>): Watch => {
+  /*
+    An exact copy of a watch that exists is refused, quietly: the screen is
+    handed that watch to show instead. Anything short of exact - another
+    quality, another share - is somebody's deliberate choice, and goes in,
+    having already seen what its elder sibling handled.
+  */
+  ipcMain.handle(IPC.autoAdd, (_e, watch: Omit<Watch, 'id' | 'createdAt'>): AddedWatch => {
+    const watches = listWatches()
+    const existing = exactDuplicate(watches, watch)
+    if (existing) return { ...existing, existing: true }
     const created = addWatch({
       ...watch,
+      seen: inheritedSeen(watches, watch),
       id: randomUUID(),
       createdAt: Date.now(),
       // Due straight away, so adding a series does something visible.
@@ -96,7 +122,16 @@ export function registerAutomationIpc(): void {
   })
 
   ipcMain.handle(IPC.autoUpdate, (_e, id: string, patch: Partial<Watch>): Watch | undefined => {
-    const next = updateWatch(id, settleRunError(patch))
+    // A tighter interval takes effect now, rather than after the check it was meant to bring forward.
+    const current = getWatch(id)
+    const sooner =
+      current && patch.intervalMinutes !== undefined && patch.nextCheckAt === undefined
+        ? rescheduledCheck(current, patch.intervalMinutes, Date.now())
+        : undefined
+    const next = updateWatch(
+      id,
+      settleRunError(sooner === undefined ? patch : { ...patch, nextCheckAt: sooner })
+    )
     // Pausing stops the episode downloading now too, not only the ones after it; resuming fetches it again.
     if (patch.enabled === false) stopEpisode(id, 'paused')
     broadcast()

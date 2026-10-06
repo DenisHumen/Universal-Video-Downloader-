@@ -21,6 +21,7 @@ import { addRun, getWatch, lastRunFor, updateRun, updateWatch } from './store'
 import { uploadFile } from './smb'
 import { composeEpisodeNews, composeFailure, sendNotification, TelegramError } from './telegram'
 import {
+  byStepOrder,
   episodeKey,
   remoteDirFor,
   renameFor,
@@ -145,9 +146,13 @@ export async function runEpisode(
   seriesTitle: string,
   options: EpisodeOptions = { final: true }
 ): Promise<EpisodeOutcome> {
+  // The run's record lists its steps in the order the code below takes them, not the order they were added.
   const kinds = [
     ...HEAD,
-    ...watch.steps.filter((s) => s.enabled && !HEAD.includes(s.kind)).map((s) => s.kind)
+    ...watch.steps
+      .filter((s) => s.enabled && !HEAD.includes(s.kind))
+      .sort(byStepOrder)
+      .map((s) => s.kind)
   ]
 
   const latest = options.previous ?? lastRunFor(watch.id, ref)

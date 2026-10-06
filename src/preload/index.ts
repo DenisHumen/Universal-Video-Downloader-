@@ -1,4 +1,4 @@
-import type { CheckSummary, RetryAnswer, Run, SmbTarget, Watch } from '@shared/automation'
+import type { AddedWatch, CheckSummary, RetryAnswer, Run, SmbTarget, Watch } from '@shared/automation'
 import type { SeriesOffer } from '../main/automation-ipc'
 import { contextBridge, ipcRenderer } from 'electron'
 import { IPC } from '@shared/ipc'
@@ -114,7 +114,7 @@ const api = {
   autoDescribe: (url: string): Promise<SeriesOffer> => ipcRenderer.invoke(IPC.autoDescribe, url),
   autoList: (): Promise<Watch[]> => ipcRenderer.invoke(IPC.autoList),
   autoRuns: (watchId: string): Promise<Run[]> => ipcRenderer.invoke(IPC.autoRuns, watchId),
-  autoAdd: (watch: Omit<Watch, 'id' | 'createdAt'>): Promise<Watch> =>
+  autoAdd: (watch: Omit<Watch, 'id' | 'createdAt'>): Promise<AddedWatch> =>
     ipcRenderer.invoke(IPC.autoAdd, watch),
   autoUpdate: (id: string, patch: Partial<Watch>): Promise<Watch | undefined> =>
     ipcRenderer.invoke(IPC.autoUpdate, id, patch),

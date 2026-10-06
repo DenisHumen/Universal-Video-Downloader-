@@ -210,9 +210,18 @@ declare global {
   }
 }
 
-import { settleRunError, type Watch } from '@shared/automation'
+import {
+  exactDuplicate,
+  inheritedSeen,
+  settleRunError,
+  type EpisodeRef,
+  type Watch
+} from '@shared/automation'
 
 const mockWatches: Watch[] = []
+
+const mockEpisodes = (n: number): EpisodeRef[] =>
+  Array.from({ length: n }, (_, i) => ({ season: 1, episode: i + 1 }))
 
 export function installMockApi(): void {
   const browserState: BrowserState = {
@@ -433,13 +442,25 @@ export function installMockApi(): void {
             provider: 'yummyani',
             defaultTranslator: 'a',
             qualities: ['360p', '480p', '720p'],
-            translators: [{ id: 'a', name: 'A dub', episodes: 8 }]
+            // The second dub is long enough to show that a back catalogue arrives in batches.
+            translators: [
+              { id: 'a', name: 'A dub', episodes: 8, list: mockEpisodes(8) },
+              { id: 'b', name: 'A long dub', episodes: 30, list: mockEpisodes(30) }
+            ]
           },
     // Kept in memory, so the watch screen can be seen with something on it.
     autoList: async () => [...mockWatches],
     autoRuns: async () => [],
+    // The same duplicate rules main applies.
     autoAdd: async (w) => {
-      const created = { ...w, id: crypto.randomUUID(), createdAt: Date.now() }
+      const existing = exactDuplicate(mockWatches, w)
+      if (existing) return { ...existing, existing: true as const }
+      const created = {
+        ...w,
+        seen: inheritedSeen(mockWatches, w),
+        id: crypto.randomUUID(),
+        createdAt: Date.now()
+      }
       mockWatches.push(created)
       return created
     },

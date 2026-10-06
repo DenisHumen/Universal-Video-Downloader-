@@ -146,6 +146,7 @@ export const ru: Dictionary = {
   'streaming.seriesSeasons': 'сериал · сезонов: {count}',
   'streaming.movie': 'фильм',
   'streaming.follow': 'следить за новыми сериями',
+  'streaming.watching': 'уже следим - показать',
   'streaming.selectEpisode': 'выберите хотя бы одну серию',
 
   // ---- format selector ----
@@ -426,6 +427,7 @@ export const ru: Dictionary = {
   'err.cutFailed': 'с выбранного места начала ничего не записалось, так что обрабатывать было нечего. попробуйте скачать целиком, а потом обрезать готовый файл.',
   'err.cookieHint': 'попробуйте включить cookies браузера в настройках → доступ.',
   'common.save': 'сохранить',
+  'common.saved': 'сохранено',
   'nav.automation': 'слежение',
   'auto.title': 'слежение',
   'auto.add': 'добавить',
@@ -497,6 +499,16 @@ export const ru: Dictionary = {
   'auto.dubCount': 'доступно озвучек: {n}',
   'auto.nEpisodes': 'серий: {n}',
   'auto.startWatching': 'начать следить',
+  'auto.backfill': 'скачать и уже вышедшие серии ({n})',
+  'auto.backfillHint': 'без галочки скачиваются только серии, которые выйдут дальше',
+  'auto.backfillBatches': 'они придут партиями по {n}, по одной за проверку',
+  'auto.alreadyWatching': 'за этим сериалом в этой озвучке уже следим',
+  'auto.alreadyHint':
+    'второе слежение имеет смысл ради другого качества или другой шары. серии, которые первое уже обработало, оно пропустит',
+  'auto.alreadySameQuality':
+    'в том же качестве оно лишь скачивало бы каждую серию дважды - выберите другое, чтобы добавить второе',
+  'auto.openExisting': 'открыть',
+  'auto.addAnyway': 'всё равно добавить',
   'auto.template': 'имя файла',
   'auto.templateHint': 'подстановки: {title} {season} {episode} {season2} {episode2} {quality} {year}',
   'auto.templateNoEpisode':
@@ -525,6 +537,10 @@ export const ru: Dictionary = {
   'auto.shareName2': 'шара',
   'auto.shareUser': 'логин',
   'auto.sharePassword': 'пароль',
+  'auto.passwordMissing': 'пароль не сохранён',
+  'auto.removeShareConfirm': 'удалить эту шару?',
+  'auto.removeShareConfirmBody':
+    '{name} удалится вместе с сохранённым паролем. Шаги отправки, которые на неё ссылаются, будут завершаться ошибкой, пока их не направят на другую шару.',
   'auto.secretKept': 'сохранён - оставьте пустым, чтобы не менять',
   'auto.secretHint': 'хранится зашифрованным средствами системы, не в файле настроек',
   'auto.shareLabel': 'название',

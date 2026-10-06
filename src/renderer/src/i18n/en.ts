@@ -153,6 +153,7 @@ export const en = {
   'streaming.seriesSeasons': 'series · {count} seasons',
   'streaming.movie': 'movie',
   'streaming.follow': 'follow new episodes',
+  'streaming.watching': 'watching already - show it',
   'streaming.selectEpisode': 'select at least one episode',
 
   // ---- format selector ----
@@ -439,6 +440,7 @@ export const en = {
   'err.cutFailed': 'nothing was recorded from the point you chose to start at, so there was nothing to process. try downloading it without cutting, then trim the file.',
   'err.cookieHint': 'try switching on browser cookies in settings → access.',
   'common.save': 'save',
+  'common.saved': 'saved',
   'nav.automation': 'watch',
   'auto.title': 'watching',
   'auto.add': 'add',
@@ -510,6 +512,16 @@ export const en = {
   'auto.dubCount': '{n} translations available',
   'auto.nEpisodes': '{n} episodes',
   'auto.startWatching': 'start watching',
+  'auto.backfill': 'also download the episodes already out ({n})',
+  'auto.backfillHint': 'unticked, only episodes released from now on are fetched',
+  'auto.backfillBatches': 'they arrive {n} at a time, one batch per check',
+  'auto.alreadyWatching': 'already watching this series in this translation',
+  'auto.alreadyHint':
+    'a second watch makes sense at another quality or for another share. it skips the episodes the first one has handled',
+  'auto.alreadySameQuality':
+    'at the same quality it would only fetch every episode twice - pick another quality to add a second one',
+  'auto.openExisting': 'open it',
+  'auto.addAnyway': 'add anyway',
   'auto.template': 'filename',
   'auto.templateHint': 'tokens: {title} {season} {episode} {season2} {episode2} {quality} {year}',
   'auto.templateNoEpisode':
@@ -538,6 +550,10 @@ export const en = {
   'auto.shareName2': 'share',
   'auto.shareUser': 'username',
   'auto.sharePassword': 'password',
+  'auto.passwordMissing': 'no password saved',
+  'auto.removeShareConfirm': 'remove this share?',
+  'auto.removeShareConfirmBody':
+    '{name} and its saved password will be removed. Upload steps that send to it will fail until they are pointed at another share.',
   'auto.secretKept': 'saved - leave blank to keep it',
   'auto.secretHint': 'kept encrypted by your operating system, never in a settings file',
   'auto.shareLabel': 'name it',

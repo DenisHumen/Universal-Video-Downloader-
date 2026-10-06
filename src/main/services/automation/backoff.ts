@@ -1,7 +1,7 @@
-import type { Watch } from '@shared/automation'
+import { upcomingDelayMinutes, type Watch } from '@shared/automation'
 
 /**
- * How a watch's schedule answers a check that failed.
+ * How a watch's schedule answers a check that failed, or a change of pace.
  *
  * Apart from the watcher, which needs Electron to run, so the arithmetic that
  * decides how long a series goes unchecked can be tested on its own.
@@ -31,6 +31,28 @@ export function backoffMinutes(intervalMinutes: number, failures: number): numbe
   const minutes = Math.max(MIN_INTERVAL_MINUTES, intervalMinutes)
   const factor = BACKOFF[Math.min(Math.max(0, failures), BACKOFF.length - 1)] ?? 1
   return Math.min(minutes * factor, Math.max(minutes, CAP_MINUTES))
+}
+
+/**
+ * When a watch whose interval has just been changed should next be looked at,
+ * if that is sooner than it is due now.
+ *
+ * The schedule only took a new interval up after the next check, so tightening
+ * a daily watch to a quarter of an hour still left it waiting most of a day,
+ * with the old time on screen. Only ever closer: a looser interval applies from
+ * the next check, as it always has, and a watch already due stays due. One that
+ * is failing keeps its backoff, and one waiting for a release its waiting pace.
+ */
+export function rescheduledCheck(
+  watch: Watch,
+  intervalMinutes: number,
+  now: number
+): number | undefined {
+  const minutes = watch.pending
+    ? upcomingDelayMinutes(watch.releaseAt, intervalMinutes, now)
+    : backoffMinutes(intervalMinutes, watch.failures)
+  const sooner = now + minutes * 60_000
+  return watch.nextCheckAt > sooner ? sooner : undefined
 }
 
 /*

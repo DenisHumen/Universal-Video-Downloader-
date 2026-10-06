@@ -10,6 +10,7 @@ import {
   episodeKey,
   isFinalAttempt,
   MAX_ATTEMPTS,
+  MAX_PER_CHECK,
   upcomingDelayMinutes,
   type CheckSummary,
   type EpisodeRef,
@@ -50,16 +51,6 @@ const CONCURRENCY = 2
 */
 const RESUME_DELAY_MS = 45_000
 const LAUNCH_DELAY_MS = 30_000
-
-/**
- * A watch may enqueue at most this many episodes from one check.
- *
- * A detection bug spends bandwidth and disk while nobody is watching, and the
- * shape it would take is "the site renumbered and now everything looks new".
- * A first check of a finished series legitimately finds a whole season, so this
- * is not a small number — but it is a number.
- */
-const MAX_PER_CHECK = 25
 
 /**
  * Failed checks in a row before anybody is told.

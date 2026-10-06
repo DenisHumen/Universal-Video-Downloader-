@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   applyReplacements,
+  byStepOrder,
   formatSmbPath,
   normaliseSmbTarget,
   episodeKey,
@@ -11,7 +12,9 @@ import {
   renameFor,
   renameGap,
   safeSegment,
-  type RenameStep
+  STEP_ORDER,
+  type RenameStep,
+  type StepKind
 } from './automation'
 
 const AT = new Date(2026, 7, 25)
@@ -270,6 +273,49 @@ describe('newEpisodes', () => {
 describe('episodeKey', () => {
   it('tells seasons apart', () => {
     expect(episodeKey({ season: 1, episode: 12 })).not.toBe(episodeKey({ season: 11, episode: 2 }))
+  })
+})
+
+describe('byStepOrder', () => {
+  const kinds = (list: { kind: StepKind }[]): StepKind[] => list.map((s) => s.kind)
+
+  /*
+    A real watch was saved as download, notify, upload - the order its steps
+    were added in - and the screen and its history said the message went out
+    before the file reached the share. The pipeline never ran it that way.
+  */
+  it('puts steps in the order they run, not the order they were added', () => {
+    const added = [{ kind: 'download' }, { kind: 'notify' }, { kind: 'upload' }] as const
+    expect(kinds([...added].sort(byStepOrder))).toEqual(['download', 'upload', 'notify'])
+  })
+
+  it('agrees with the order the pipeline takes them in', () => {
+    const shuffled: { kind: StepKind }[] = [
+      { kind: 'notify' },
+      { kind: 'rename' },
+      { kind: 'download' },
+      { kind: 'upload' }
+    ]
+    expect(kinds(shuffled.sort(byStepOrder))).toEqual([...STEP_ORDER])
+  })
+
+  // A file written by a newer build may name a step this one has never heard of.
+  it('puts a kind it does not know last rather than first', () => {
+    const list: { kind: StepKind }[] = [
+      { kind: 'transcode' as StepKind },
+      { kind: 'notify' },
+      { kind: 'download' }
+    ]
+    expect(kinds(list.sort(byStepOrder))).toEqual(['download', 'notify', 'transcode'])
+  })
+
+  it('keeps two steps of the same kind in the order they were in', () => {
+    const list = [
+      { kind: 'upload' as StepKind, id: 'first' },
+      { kind: 'rename' as StepKind, id: 'r' },
+      { kind: 'upload' as StepKind, id: 'second' }
+    ]
+    expect(list.sort(byStepOrder).map((s) => s.id)).toEqual(['r', 'first', 'second'])
   })
 })
 

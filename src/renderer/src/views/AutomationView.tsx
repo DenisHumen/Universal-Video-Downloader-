@@ -32,7 +32,9 @@ import StepEditor from '../components/StepEditor'
 import { RUN_LABEL, STEP_LABEL } from '../lib/automationLabels'
 import {
   attemptsAt,
+  byStepOrder,
   MAX_ATTEMPTS,
+  STEP_ORDER,
   upcomingDelayMinutes,
   watchFailing,
   type PipelineStep,
@@ -57,8 +59,8 @@ const STEP_ICON: Record<StepKind, JSX.Element> = {
   notify: <Send size={15} />
 }
 
-/** Steps a watch can gain, in the order they would run. */
-const ADDABLE: StepKind[] = ['rename', 'upload', 'notify']
+/** Steps a watch can gain, in the order they would run. Derived, so the two lists cannot drift apart. */
+const ADDABLE: StepKind[] = STEP_ORDER.filter((k) => k !== 'download')
 
 /*
   Units are looked up, never written: the first version said "in 2 h" in a
@@ -169,16 +171,22 @@ export default function AutomationView(): JSX.Element {
     disabled too.
   */
   const [checking, setChecking] = useState<ReadonlySet<string>>(new Set())
+  /** The list has been read once, so an empty one means nothing is watched rather than not yet known. */
+  const [loaded, setLoaded] = useState(false)
   const settings = useStore((s) => s.settings)
   const takePendingWatch = useStore((s) => s.takePendingWatch)
   const locale = useStore((s) =>
     resolveLanguage(s.settings?.language ?? 'auto', s.appInfo?.locale ?? 'en')
   )
 
-  // A series handed over from the home screen opens the dialog already filled in.
+  /*
+    A series handed over from the home screen opens the dialog already filled
+    in - or, when it is watched already, opens that watch.
+  */
   useEffect(() => {
     const intent = takePendingWatch()
-    if (intent) setAdding(intent)
+    if (intent?.watchId) setSelectedId(intent.watchId)
+    else if (intent) setAdding(intent)
   }, [takePendingWatch])
 
   const selected = useMemo(
@@ -189,6 +197,7 @@ export default function AutomationView(): JSX.Element {
   const refresh = useCallback(async (): Promise<void> => {
     const list = await window.api.autoList()
     setWatches(list)
+    setLoaded(true)
     setSelectedId((current) => current ?? list[0]?.id ?? null)
     // The mark on the tab reads the same list; keep the two from disagreeing.
     void useStore.getState().refreshWatchAlerts()
@@ -266,7 +275,7 @@ export default function AutomationView(): JSX.Element {
     const exists = selected.steps.some((s) => s.id === step.id)
     const steps = exists
       ? selected.steps.map((s) => (s.id === step.id ? step : s))
-      : [...selected.steps, step]
+      : [...selected.steps, step].sort(byStepOrder)
     await patch({ steps })
     setEditing(null)
   }
@@ -279,21 +288,27 @@ export default function AutomationView(): JSX.Element {
 
   const missing = ADDABLE.filter((k) => !selected?.steps.some((s) => s.kind === k))
 
+  /*
+    Nothing watched: the screen's title and the one way to add something. The
+    list beside it used to stay, an empty third of the window with a second
+    "add" button at the top of it.
+  */
+  const empty = loaded && watches.length === 0
+
   return (
     <div className="flex h-full min-h-0">
       {/* ---- the list ---- */}
-      <aside className="flex w-[300px] shrink-0 flex-col border-r border-edge">
-        <div className="flex items-center gap-2 border-b border-edge px-3 py-2.5">
-          <h1 className="label flex-1">{t('auto.title')}</h1>
-          <button className="btn-solid px-2.5 py-1.5" onClick={() => setAdding(true)}>
-            <Plus size={14} /> {t('auto.add')}
-          </button>
-        </div>
+      {!empty && (
+        <aside className="flex w-[300px] shrink-0 flex-col border-r border-edge">
+          <div className="flex items-center gap-2 border-b border-edge px-3 pb-3 pt-8">
+            <h1 className="h1 min-w-0 flex-1 truncate">{t('auto.title')}</h1>
+            <button className="btn-solid px-2.5 py-1.5" onClick={() => setAdding(true)}>
+              <Plus size={14} /> {t('auto.add')}
+            </button>
+          </div>
 
-        <div className="min-h-0 flex-1 overflow-y-auto">
-          {watches.length === 0
-            ? null
-            : watches.map((w) => (
+          <div className="min-h-0 flex-1 overflow-y-auto">
+            {watches.map((w) => (
               <button
                 key={w.id}
                 onClick={() => setSelectedId(w.id)}
@@ -308,7 +323,9 @@ export default function AutomationView(): JSX.Element {
                   fallback={<Film size={14} className="text-ink-3" />}
                 />
                 <span className="min-w-0 flex-1">
-                  <span className="block truncate text-[13px] text-ink">{w.title}</span>
+                  <span className="block truncate text-[13px] text-ink" title={w.title}>
+                    {w.title}
+                  </span>
                   <span className="mono block truncate text-[11px] text-ink-2">
                     {w.enabled
                       ? w.lastError
@@ -327,8 +344,9 @@ export default function AutomationView(): JSX.Element {
                 )}
               </button>
             ))}
-        </div>
-      </aside>
+          </div>
+        </aside>
+      )}
 
       {/* ---- the selected series ---- */}
       <motion.section
@@ -338,18 +356,23 @@ export default function AutomationView(): JSX.Element {
         transition={enter}
         className="min-h-0 flex-1 overflow-y-auto"
       >
-        {watches.length === 0 ? (
-          <EmptyState
-            icon={<Radar size={22} />}
-            title={t('auto.empty')}
-            hint={t('auto.emptyHint')}
-            action={
-              <button className="btn-solid" onClick={() => setAdding(true)}>
-                <Plus size={14} /> {t('auto.add')}
-              </button>
-            }
-          />
-        ) : !selected ? (
+        {empty ? (
+          <div className="mx-auto flex h-full w-full max-w-[860px] flex-col px-6 pb-8 pt-10">
+            <h1 className="h1">{t('auto.title')}</h1>
+            <div className="min-h-0 flex-1">
+              <EmptyState
+                icon={<Radar size={22} />}
+                title={t('auto.empty')}
+                hint={t('auto.emptyHint')}
+                action={
+                  <button className="btn-solid" onClick={() => setAdding(true)}>
+                    <Plus size={14} /> {t('auto.add')}
+                  </button>
+                }
+              />
+            </div>
+          </div>
+        ) : !loaded ? null : !selected ? (
           <div className="flex h-full items-center justify-center">
             <p className="hint">{t('auto.pickOne')}</p>
           </div>
@@ -363,7 +386,9 @@ export default function AutomationView(): JSX.Element {
                 fallback={<Film size={20} className="text-ink-3" />}
               />
               <div className="min-w-0 flex-1">
-                <h2 className="h2 truncate">{selected.title}</h2>
+                <h2 className="h2 truncate" title={selected.title}>
+                  {selected.title}
+                </h2>
                 <p className="hint mt-1 truncate">
                   {[selected.translatorName, selected.quality].filter(Boolean).join(' · ')}
                 </p>
@@ -465,8 +490,10 @@ export default function AutomationView(): JSX.Element {
                 <span className="hint">{t('auto.always')}</span>
               </div>
 
+              {/* In the order they run, which a watch saved before this need not be stored in. */}
               {selected.steps
                 .filter((s) => s.kind !== 'download')
+                .sort(byStepOrder)
                 .map((step) => (
                   <button
                     key={step.id}
@@ -534,7 +561,8 @@ export default function AutomationView(): JSX.Element {
                       </span>
                     </div>
                     <div className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5">
-                      {run.steps.map((s, i) => (
+                      {/* A copy: runs recorded before steps were kept in order are shown in it too. */}
+                      {[...run.steps].sort(byStepOrder).map((s, i) => (
                         <span
                           key={i}
                           className={`mono text-[11px] ${

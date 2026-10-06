@@ -5,6 +5,7 @@ import { useStore } from '../store'
 import { toast } from '../lib/toast'
 import { describeError } from '../lib/errors'
 import { emptyTarget, pathOf, ShareForm, TelegramForm, useSecretState } from './AutomationForms'
+import ConfirmDialog from './ConfirmDialog'
 import type { SmbTarget } from '@shared/automation'
 
 /**
@@ -25,7 +26,11 @@ export default function AutomationSettings(): JSX.Element {
   const [editing, setEditing] = useState<string | null>(null)
   const [draft, setDraft] = useState<SmbTarget>(emptyTarget)
   const [password, setPassword] = useState('')
-  const [saving, setSaving] = useState(false)
+  // Two flags, not one: saving a share used to grey out the Telegram button as well, and the other way round.
+  const [savingShare, setSavingShare] = useState(false)
+  const [savingTelegram, setSavingTelegram] = useState(false)
+  /** The share whose trash button was pressed, until the question is answered. */
+  const [confirmShare, setConfirmShare] = useState<SmbTarget | null>(null)
 
   const [token, setToken] = useState('')
   const [chatId, setChatId] = useState('')
@@ -45,7 +50,7 @@ export default function AutomationSettings(): JSX.Element {
   }
 
   const saveShare = async (): Promise<void> => {
-    setSaving(true)
+    setSavingShare(true)
     try {
       const target: SmbTarget = {
         ...draft,
@@ -58,7 +63,7 @@ export default function AutomationSettings(): JSX.Element {
     } catch (err) {
       toast(describeError(err), 'error')
     } finally {
-      setSaving(false)
+      setSavingShare(false)
     }
   }
 
@@ -66,24 +71,35 @@ export default function AutomationSettings(): JSX.Element {
     Removing a share does not touch the steps pointing at it. A watch whose
     share has gone says so when it next runs, which is a clearer thing to read
     than a step that quietly stopped uploading.
+
+    Asked first, because it also deletes the stored password, which nothing
+    can read back: one stray click on the bin used to lose it for good.
   */
   const removeShare = async (id: string): Promise<void> => {
-    await saveSettings({ smbTargets: targets.filter((x) => x.id !== id) })
-    await window.api.autoSetSecret('smb', id, '')
-    secrets.refresh()
-    if (editing === id) setEditing(null)
+    try {
+      await saveSettings({ smbTargets: targets.filter((x) => x.id !== id) })
+      await window.api.autoSetSecret('smb', id, '')
+      if (editing === id) setEditing(null)
+    } catch (err) {
+      toast(describeError(err), 'error')
+    } finally {
+      secrets.refresh()
+    }
   }
 
   const saveTelegram = async (): Promise<void> => {
-    setSaving(true)
+    setSavingTelegram(true)
     try {
       await saveSettings({ telegramChatId: chatId.trim() })
       if (token.trim()) await window.api.autoSetSecret('telegram', '', token.trim())
       setToken('')
-      secrets.refresh()
-      toast(t('common.save'), 'success')
+      // Said as done, in the past tense; it used to answer with the button's own "save".
+      toast(t('common.saved'), 'success')
+    } catch (err) {
+      toast(describeError(err), 'error')
     } finally {
-      setSaving(false)
+      secrets.refresh()
+      setSavingTelegram(false)
     }
   }
 
@@ -107,13 +123,17 @@ export default function AutomationSettings(): JSX.Element {
                   <span className="block text-[13px] text-ink">{target.name}</span>
                   <span className="mono block text-[11px] text-ink-2">
                     {pathOf(target)}
-                    {secrets.smb[target.id] ? '' : ` · ${t('auto.sharePassword')}?`}
+                    {/* Said in words and in the warning colour; it used to read "· password?". */}
+                    {!secrets.smb[target.id] && (
+                      <span className="text-warn"> · {t('auto.passwordMissing')}</span>
+                    )}
                   </span>
                 </button>
                 <button
                   className="btn-icon"
                   aria-label={t('common.remove')}
-                  onClick={() => void removeShare(target.id)}
+                  title={t('common.remove')}
+                  onClick={() => setConfirmShare(target)}
                 >
                   <Trash2 size={14} />
                 </button>
@@ -132,8 +152,8 @@ export default function AutomationSettings(): JSX.Element {
                     <button className="btn" onClick={() => setEditing(null)}>
                       {t('common.cancel')}
                     </button>
-                    <button className="btn-solid" onClick={() => void saveShare()} disabled={saving}>
-                      {saving ? <Loader2 size={14} className="animate-spin" /> : null}
+                    <button className="btn-solid" onClick={() => void saveShare()} disabled={savingShare}>
+                      {savingShare ? <Loader2 size={14} className="animate-spin" /> : null}
                       {t('common.save')}
                     </button>
                   </div>
@@ -155,8 +175,8 @@ export default function AutomationSettings(): JSX.Element {
                 <button className="btn" onClick={() => setEditing(null)}>
                   {t('common.cancel')}
                 </button>
-                <button className="btn-solid" onClick={() => void saveShare()} disabled={saving}>
-                  {saving ? <Loader2 size={14} className="animate-spin" /> : null}
+                <button className="btn-solid" onClick={() => void saveShare()} disabled={savingShare}>
+                  {savingShare ? <Loader2 size={14} className="animate-spin" /> : null}
                   {t('common.save')}
                 </button>
               </div>
@@ -182,12 +202,26 @@ export default function AutomationSettings(): JSX.Element {
           tokenStored={secrets.telegram}
         />
         <div className="mt-3 flex justify-end">
-          <button className="btn-solid" onClick={() => void saveTelegram()} disabled={saving}>
-            {saving ? <Loader2 size={14} className="animate-spin" /> : null}
+          <button className="btn-solid" onClick={() => void saveTelegram()} disabled={savingTelegram}>
+            {savingTelegram ? <Loader2 size={14} className="animate-spin" /> : null}
             {t('common.save')}
           </button>
         </div>
       </div>
+
+      {confirmShare && (
+        <ConfirmDialog
+          title={t('auto.removeShareConfirm')}
+          body={t('auto.removeShareConfirmBody', { name: confirmShare.name })}
+          confirmLabel={t('common.remove')}
+          onConfirm={() => {
+            const id = confirmShare.id
+            setConfirmShare(null)
+            void removeShare(id)
+          }}
+          onCancel={() => setConfirmShare(null)}
+        />
+      )}
     </>
   )
 }

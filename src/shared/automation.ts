@@ -6,6 +6,8 @@
  * will produce before anything is downloaded.
  */
 
+import { normalizeUrl } from './urls'
+
 export type StepKind = 'download' | 'rename' | 'upload' | 'notify'
 export type StepState = 'pending' | 'running' | 'done' | 'failed' | 'skipped'
 /** `skipped`: somebody cancelled or removed the episode's download in the queue, or stopped the watch. */
@@ -51,6 +53,27 @@ export interface NotifyStep {
 }
 
 export type PipelineStep = DownloadStep | RenameStep | UploadStep | NotifyStep
+
+/**
+ * The order steps run in, whatever order they were added in.
+ *
+ * The pipeline has always run them in this order, but the screen drew a
+ * watch's steps - and listed each episode's in its history - in the order they
+ * were added, so a chain built as "notify, then upload" read as if the message
+ * went out before the file had arrived.
+ */
+export const STEP_ORDER: readonly StepKind[] = ['download', 'rename', 'upload', 'notify']
+
+/** A kind this build does not know - a file from a newer one - goes last rather than first. */
+function stepRank(kind: StepKind): number {
+  const rank = STEP_ORDER.indexOf(kind)
+  return rank < 0 ? STEP_ORDER.length : rank
+}
+
+/** For `sort`, and only ever on a copy: steps, or a run's record of them, in the order they run. */
+export function byStepOrder(a: { kind: StepKind }, b: { kind: StepKind }): number {
+  return stepRank(a.kind) - stepRank(b.kind)
+}
 
 /**
  * A remote share. Lives in settings rather than in a watch, because one server
@@ -194,6 +217,12 @@ export type CheckSummary =
  * not fetch: the pause would only cancel the download the moment it was queued.
  */
 export type RetryAnswer = { started: true } | { busy: true } | { paused: true } | { error: string }
+
+/**
+ * What adding a watch answers: the watch it made, or - asked for an exact copy
+ * of one that exists - that one, marked `existing`, with nothing added.
+ */
+export type AddedWatch = Watch & { existing?: true }
 
 // ---------------------------------------------------------------------------
 // Templates
@@ -396,6 +425,89 @@ export function newEpisodes(seen: EpisodeRef[], available: EpisodeRef[]): Episod
     .sort((a, b) => a.season - b.season || a.episode - b.episode)
 }
 
+/**
+ * A watch may enqueue at most this many episodes from one check.
+ *
+ * A detection bug spends bandwidth and disk while nobody is watching, and the
+ * shape it would take is "the site renumbered and now everything looks new".
+ * A first check of a finished series legitimately finds a whole season, so this
+ * is not a small number — but it is a number. Shared so the "add a watch"
+ * screen can say a long back catalogue arrives in batches of it.
+ */
+export const MAX_PER_CHECK = 25
+
+// ---------------------------------------------------------------------------
+// The same series twice
+// ---------------------------------------------------------------------------
+
+/** What tells the series and dub one watch follows from another's. */
+export type WatchIdentity = Pick<Watch, 'provider' | 'url' | 'translatorId'>
+
+/**
+ * Whether two watches follow the same series in the same dub.
+ *
+ * Compared through `normalizeUrl`, so a link pasted with a tracking parameter
+ * or a trailing slash and the one the home screen hands over count as one. A
+ * watch still waiting for a release has no dub yet (`''`), so it matches only
+ * another that is waiting for the same title.
+ */
+export function sameDub(a: WatchIdentity, b: WatchIdentity): boolean {
+  return (
+    a.provider === b.provider &&
+    a.translatorId === b.translatorId &&
+    normalizeUrl(a.url) === normalizeUrl(b.url)
+  )
+}
+
+/** The watch already following this series in this dub, if there is one. */
+export function watchingAlready(watches: Watch[], series: WatchIdentity): Watch | undefined {
+  return watches.find((w) => sameDub(w, series))
+}
+
+/**
+ * The watch a new one would be an exact copy of: same series, dub and quality.
+ *
+ * Such a copy has no purpose and does harm. Both ask the queue for the same
+ * file, whose duplicate check hands them one row; the first rename moves the
+ * file, and the second run fails because it is not where it should be. When
+ * the checks do not overlap, every episode is fetched, uploaded and announced
+ * twice. A waiting watch is never one: there is no dub yet to compare.
+ */
+export function exactDuplicate(
+  watches: Watch[],
+  candidate: WatchIdentity & Pick<Watch, 'quality' | 'pending'>
+): Watch | undefined {
+  if (candidate.pending) return undefined
+  return watches.find((w) => !w.pending && w.quality === candidate.quality && sameDub(w, candidate))
+}
+
+/**
+ * What a new watch starts out having seen: its own list, and everything the
+ * watches already following this series in this dub have handled.
+ *
+ * A second watch on a series - at another quality, for another share - is
+ * deliberate, but the episodes the first one delivered are not news to it.
+ * Starting from nothing, its first check fetched a whole check's worth of them
+ * again.
+ */
+export function inheritedSeen(
+  watches: Watch[],
+  candidate: WatchIdentity & Pick<Watch, 'seen'>
+): EpisodeRef[] {
+  const out = [...candidate.seen]
+  const have = new Set(out.map(episodeKey))
+  for (const w of watches) {
+    if (!sameDub(w, candidate)) continue
+    for (const ref of w.seen) {
+      const key = episodeKey(ref)
+      if (have.has(key)) continue
+      have.add(key)
+      out.push(ref)
+    }
+  }
+  return out
+}
+
 // ---------------------------------------------------------------------------
 // Trying an episode again
 // ---------------------------------------------------------------------------
@@ -553,9 +665,11 @@ export function migrateWatches(raw: unknown): StoredWatches {
       nextCheckAt: Number(candidate.nextCheckAt) || 0,
       seen: Array.isArray(candidate.seen) ? candidate.seen : [],
       attempts: cleanAttempts(candidate.attempts),
+      // In the order they run, so a chain saved in the order it was built reads right everywhere.
       steps: candidate.steps
         .filter((step) => step && typeof step.kind === 'string')
-        .map(withoutTheSeasonFolder),
+        .map(withoutTheSeasonFolder)
+        .sort(byStepOrder),
       createdAt: Number(candidate.createdAt) || 0
     })
   }

@@ -18,6 +18,8 @@ export interface WatchIntent {
   url: string
   translatorId?: string
   quality?: string
+  /** The series is watched already: show that watch rather than offer to add another. */
+  watchId?: string
 }
 
 const VIEWS: ViewId[] = ['home', 'search', 'downloads', 'automation', 'settings']

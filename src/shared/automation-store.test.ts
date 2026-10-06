@@ -122,6 +122,35 @@ describe('migrateWatches', () => {
     expect(w.steps).toHaveLength(1)
   })
 
+  /*
+    Sorting only what is saved from now on would leave the watches already on
+    disk - one was stored as download, notify, upload - reading out of order
+    for good. Repaired once on load, every screen that draws the list is right.
+  */
+  it('puts a chain saved in the order it was built into the order it runs', () => {
+    const [w] = migrateWatches({
+      watches: [
+        watch({
+          steps: [
+            { id: 'd', kind: 'download', enabled: true },
+            { id: 'n', kind: 'notify', enabled: true },
+            {
+              id: 'u',
+              kind: 'upload',
+              enabled: true,
+              targetId: 't',
+              remotePath: '{title}',
+              createDirs: true,
+              deleteLocalAfter: false
+            }
+          ]
+        })
+      ],
+      runs: {}
+    }).watches
+    expect(w.steps.map((s) => s.id)).toEqual(['d', 'u', 'n'])
+  })
+
   it('forgets runs whose watch is gone, since nothing could reach them', () => {
     const out = migrateWatches({
       watches: [watch({ id: 'w1' })],
