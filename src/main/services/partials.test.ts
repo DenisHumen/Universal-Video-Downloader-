@@ -70,3 +70,27 @@ describe('partialsFor', () => {
     expect(partialsFor(names, 'Q3 (2024) [x]')).toEqual(['Q3 (2024) [x].mp4.part'])
   })
 })
+
+/*
+  HLS and DASH downloads leave fragment files too. Cancelling or removing one
+  used to leave every `.part-FragN` behind, because only `.part` and `.ytdl`
+  counted as its own.
+*/
+describe('partialsFor, fragment files', () => {
+  const folder = [
+    'Show [x].mp4.part-Frag1',
+    'Show [x].mp4.part-Frag12.part',
+    'Show [x].f137.mp4.part-Frag3',
+    'Show 2 [y].mp4.part-Frag1',
+  ]
+
+  it('counts a fragment of this download as its own', () => {
+    expect(partialsFor(folder, 'Show [x]').sort()).toEqual(
+      ['Show [x].f137.mp4.part-Frag3', 'Show [x].mp4.part-Frag1', 'Show [x].mp4.part-Frag12.part'].sort()
+    )
+  })
+
+  it('leaves the fragments of another download alone', () => {
+    expect(partialsFor(folder, 'Show [x]')).not.toContain('Show 2 [y].mp4.part-Frag1')
+  })
+})

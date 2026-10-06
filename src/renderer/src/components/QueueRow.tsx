@@ -271,7 +271,7 @@ function QueueRow({ item, index, animateIn = true }: Props): JSX.Element {
             {/* The bar already carries the number's meaning; on a narrow window
                 the title needs those 40px more than the reader does. */}
             <span className="mono hidden w-9 shrink-0 text-right text-[12px] tabular-nums text-ink-2 md:block">
-              {indeterminate && percent === 0 ? '—' : `${percent}%`}
+              {(indeterminate || item.state === 'queued') && percent === 0 ? '—' : `${percent}%`}
             </span>
           </div>
         )}
@@ -409,14 +409,21 @@ function QueueRow({ item, index, animateIn = true }: Props): JSX.Element {
               <X size={15} />
             </button>
           )}
-          <button
-            className="btn-icon-bare hover:text-bad"
-            title={t('common.remove')}
-                aria-label={t('common.remove')}
-            onClick={() => window.api.removeDownload(item.id)}
-          >
-            <Trash2 size={15} />
-          </button>
+          {/*
+            Not on a row that is still working: beside Cancel, a bin that also
+            stops the download read as a second way to do the same thing, and
+            removed the row with it. Cancel first, then remove.
+          */}
+          {!['downloading', 'processing', 'detecting', 'queued', 'paused'].includes(item.state) && (
+            <button
+              className="btn-icon-bare hover:text-bad"
+              title={t('common.remove')}
+              aria-label={t('common.remove')}
+              onClick={() => window.api.removeDownload(item.id)}
+            >
+              <Trash2 size={15} />
+            </button>
+          )}
         </div>
       </div>
 

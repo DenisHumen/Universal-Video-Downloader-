@@ -62,6 +62,7 @@ const api = {
   retryDownload: (id: string): Promise<void> => ipcRenderer.invoke(IPC.downloadRetry, id),
   removeDownload: (id: string): Promise<void> => ipcRenderer.invoke(IPC.downloadRemove, id),
   clearFinished: (): Promise<void> => ipcRenderer.invoke(IPC.downloadClearFinished),
+  clearFailed: (): Promise<void> => ipcRenderer.invoke(IPC.downloadClearFailed),
   listDownloads: (): Promise<DownloadItem[]> => ipcRenderer.invoke(IPC.downloadList),
   // Local media jobs (trim / convert)
   startMediaJob: (req: MediaJobRequest): Promise<DownloadItem> =>

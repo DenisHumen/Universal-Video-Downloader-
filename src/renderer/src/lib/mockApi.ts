@@ -309,6 +309,7 @@ export function installMockApi(): void {
     retryDownload: async () => undefined,
     removeDownload: async () => undefined,
     clearFinished: async () => undefined,
+    clearFailed: async () => undefined,
     listDownloads: async () => items,
     startMediaJob: async (req) => {
       const item: DownloadItem = {

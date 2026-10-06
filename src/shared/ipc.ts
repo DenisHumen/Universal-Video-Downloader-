@@ -13,6 +13,7 @@ export const IPC = {
   downloadRetry: 'download:retry',
   downloadRemove: 'download:remove',
   downloadClearFinished: 'download:clear-finished',
+  downloadClearFailed: 'download:clear-failed',
   downloadList: 'download:list',
   mediaJobStart: 'media:job-start',
   mediaProbe: 'media:probe',

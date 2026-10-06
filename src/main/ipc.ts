@@ -29,6 +29,7 @@ import { mt } from './services/locale'
 import {
   cancelDownload,
   clearFinished,
+  clearFailed,
   downloadEvents,
   listDownloads,
   pauseAll,
@@ -143,6 +144,7 @@ export function registerIpc({ getWindow, openSearchWindow, onSettingsChanged }: 
   ipcMain.handle(IPC.downloadRetry, (_e, id: string) => retryDownload(id))
   ipcMain.handle(IPC.downloadRemove, (_e, id: string) => removeDownload(id))
   ipcMain.handle(IPC.downloadClearFinished, () => clearFinished())
+  ipcMain.handle(IPC.downloadClearFailed, () => clearFailed())
   ipcMain.handle(IPC.downloadList, () => listDownloads())
   ipcMain.handle(IPC.mediaJobStart, (_e, req: MediaJobRequest) => startMediaJob(req))
   ipcMain.handle(IPC.mediaProbe, (_e, path: string) => probeMedia(path))

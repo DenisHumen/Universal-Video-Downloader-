@@ -1,5 +1,16 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { FolderOpen, Inbox, Pause, Play, Plus, RotateCw, Search, SearchX, Trash2 } from 'lucide-react'
+import {
+  CircleX,
+  FolderOpen,
+  Inbox,
+  Pause,
+  Play,
+  Plus,
+  RotateCw,
+  Search,
+  SearchX,
+  Trash2
+} from 'lucide-react'
 import type { DownloadItem } from '@shared/types'
 import { useStore } from '../store'
 import { formatBytes, formatEta, formatSpeed } from '../lib/format'
@@ -7,6 +18,7 @@ import { useT, type TranslationKey } from '../i18n'
 import QueueRow from '../components/QueueRow'
 import Choice from '../components/Choice'
 import EmptyState from '../components/EmptyState'
+import ConfirmDialog from '../components/ConfirmDialog'
 
 type Filter = 'all' | 'active' | 'done' | 'failed'
 
@@ -57,6 +69,7 @@ export default function DownloadsView(): JSX.Element {
 
   const [filter, setFilter] = useState<Filter>('all')
   const [query, setQuery] = useState('')
+  const [confirmClearFailed, setConfirmClearFailed] = useState(false)
   const [limit, setLimit] = useState(PAGE)
   const scrollRef = useRef<HTMLDivElement>(null)
   const sentinelRef = useRef<HTMLLIElement>(null)
@@ -117,12 +130,14 @@ export default function DownloadsView(): JSX.Element {
     return () => observer.disconnect()
   }, [hasMore, limit])
 
-  const hasFinished = downloads.some((d) => ['completed', 'error', 'canceled'].includes(d.state))
+  // Failures are not "finished": they keep their error and their retry until cleared on purpose.
+  const hasFinished = downloads.some((d) => d.state === 'completed' || d.state === 'canceled')
   const hasRunning = downloads.some((d) =>
     ['downloading', 'processing', 'detecting', 'queued'].includes(d.state)
   )
   const hasPaused = downloads.some((d) => d.state === 'paused')
   const hasFailed = downloads.some((d) => d.state === 'error' || d.state === 'canceled')
+  const hasErrors = downloads.some((d) => d.state === 'error')
 
   const running = downloads.filter((d) => d.state === 'downloading')
   const totalSpeed = running.reduce((n, d) => n + (d.speed || 0), 0)
@@ -188,6 +203,16 @@ export default function DownloadsView(): JSX.Element {
           {hasFinished && (
             <button className="btn-icon" title={t('queue.clearFinished')} aria-label={t('queue.clearFinished')} onClick={clearFinished}>
               <Trash2 size={16} />
+            </button>
+          )}
+          {hasErrors && (
+            <button
+              className="btn-icon"
+              title={t('queue.clearFailed')}
+              aria-label={t('queue.clearFailed')}
+              onClick={() => setConfirmClearFailed(true)}
+            >
+              <CircleX size={16} />
             </button>
           )}
         </div>
@@ -270,6 +295,18 @@ export default function DownloadsView(): JSX.Element {
           </ul>
         )}
       </div>
+      {confirmClearFailed && (
+        <ConfirmDialog
+          title={t('queue.clearFailedConfirm')}
+          body={t('queue.clearFailedBody')}
+          confirmLabel={t('queue.clearFailed')}
+          onConfirm={() => {
+            setConfirmClearFailed(false)
+            void window.api.clearFailed()
+          }}
+          onCancel={() => setConfirmClearFailed(false)}
+        />
+      )}
     </div>
   )
 }

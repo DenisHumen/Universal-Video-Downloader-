@@ -1042,16 +1042,22 @@ async function runMediaJob(item: DownloadItem): Promise<void> {
   const { code, stderr } = await run.done
   procs.delete(item.id)
 
-  // Re-read the state: pause/cancel mutate the item while ffmpeg is running.
+  /*
+    Re-read the state: pause, cancel and remove all act while ffmpeg runs. A
+    removed job has no state at all, and used to fall through to the exit-code
+    check - a convert removed mid-run was marked completed, or failed, on an
+    item that no longer existed, with its half-written output left behind.
+  */
+  const stoppedOnPurpose = deliberateStops.delete(item.id)
   const stateAfterRun = items.get(item.id)?.state
-  if (stateAfterRun === 'paused' || stateAfterRun === 'canceled') {
+  if (stoppedOnPurpose || stateAfterRun !== 'processing') {
     // Half-written output is useless; don't leave it lying around.
     try {
       if (item.filepath && existsSync(item.filepath)) rmSync(item.filepath, { force: true })
     } catch {
       /* best effort */
     }
-    emitUpdated(item)
+    if (items.has(item.id)) emitUpdated(item)
     processQueue()
     return
   }
@@ -1584,8 +1590,14 @@ export function partialsFor(names: string[], stem: string): string[] {
   if (stem.length < 3) return []
   const perFormat = new RegExp(`^${escapeForRegExp(stem)}\\.f[\\w-]+\\.[\\w]+$`)
   return names.filter((name) => {
-    if (!name.endsWith('.part') && !name.endsWith('.ytdl')) return false
-    const body = name.replace(/\.(part|ytdl)$/, '')
+    /*
+      HLS and DASH downloads also leave `<name>.part-Frag12`, and `.part` on
+      the end of that while a fragment is being written. Those are this
+      download's too.
+    */
+    const fragment = /\.part-Frag\d+(?:\.part)?$/
+    if (!fragment.test(name) && !name.endsWith('.part') && !name.endsWith('.ytdl')) return false
+    const body = fragment.test(name) ? name.replace(fragment, '') : name.replace(/\.(part|ytdl)$/, '')
     return body === stem || partialStem(body) === stem || perFormat.test(body)
   })
 }
@@ -1606,7 +1618,10 @@ function cleanupPartials(item: DownloadItem): void {
     and leaked partials forever.
   */
   const known = item.filepath || finalPaths.get(item.id)?.path
-  if (!known) return
+  if (known) cleanupPartialsAt(known)
+}
+
+function cleanupPartialsAt(known: string): void {
   const stem = partialStem(known)
   const dir = dirname(known)
   try {
@@ -1677,10 +1692,25 @@ export function removeDownload(id: string): void {
   clearRetry(id)
   abortResolve(id)
   forgetProgress(id)
+  /*
+    Removing an unfinished download used to leave its partials behind for
+    good: the row was gone, so nothing would ever resume or clear them. A trim
+    or convert never owns its source, and a finished file is the user's.
+  */
+  const item = items.get(id)
+  const unfinished =
+    item !== undefined &&
+    IN_FLIGHT_STATES.includes(item.state) &&
+    item.kind !== 'trim' &&
+    item.kind !== 'convert'
+  const known = unfinished ? item.filepath || finalPaths.get(id)?.path : undefined
   const proc = procs.get(id)
   if (proc) {
     deliberateStops.add(id)
+    if (known) proc.once('close', () => cleanupPartialsAt(known))
     killTree(proc)
+  } else if (known) {
+    cleanupPartialsAt(known)
   }
   procs.delete(id)
   items.delete(id)
@@ -1691,8 +1721,21 @@ export function removeDownload(id: string): void {
 }
 
 export function clearFinished(): void {
+  clearWhere((item) => item.state === 'completed' || item.state === 'canceled')
+}
+
+/*
+  Failures are kept by "clear finished": a failed row is the one still owed an
+  answer, and clearing it with the successes threw away the error text and the
+  retry along with them. They have a separate action, behind a confirmation.
+*/
+export function clearFailed(): void {
+  clearWhere((item) => item.state === 'error')
+}
+
+function clearWhere(match: (item: DownloadItem) => boolean): void {
   for (const [id, item] of items) {
-    if (item.state === 'completed' || item.state === 'canceled' || item.state === 'error') {
+    if (match(item)) {
       clearRetry(id)
       forgetProgress(id)
       items.delete(id)
@@ -1707,10 +1750,15 @@ export function clearFinished(): void {
 
 /** Bulk actions the queue toolbar exposes. */
 export function pauseAll(): void {
-  for (const item of [...items.values()]) {
-    if (['downloading', 'processing', 'detecting', 'queued'].includes(item.state)) {
-      pauseDownload(item.id)
-    }
+  /*
+    Queued items first. Pausing a running download frees its slot, and the
+    queue promptly started the next queued item - so "pause all" left the
+    queue running, one download at a time, behind the user's back.
+  */
+  const all = [...items.values()]
+  for (const item of all) if (item.state === 'queued') pauseDownload(item.id)
+  for (const item of all) {
+    if (['downloading', 'processing', 'detecting'].includes(item.state)) pauseDownload(item.id)
   }
 }
 
