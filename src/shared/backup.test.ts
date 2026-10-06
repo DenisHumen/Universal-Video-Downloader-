@@ -429,6 +429,50 @@ describe('planImport: settings', () => {
     )
     expect(blank.settings).not.toHaveProperty('telegramChatId')
   })
+
+  it('says a proxy that signs in needs its password again, since the file never has it', () => {
+    const plan = planImport(
+      viaFile(backupOf({ settings: { proxy: 'http://demo:secret@192.168.1.10:3128' } })),
+      { settings: settings(), watches: [] },
+      env()
+    )
+    expect(plan.settings.proxy).toBe('http://demo@192.168.1.10:3128')
+    expect(plan.counts).toMatchObject({ settings: true, proxyPassword: true })
+  })
+
+  it('does not ask for a password a proxy without a user name never sends', () => {
+    const plan = planImport(
+      viaFile(backupOf({ settings: { proxy: 'socks5://192.168.1.10:1080' } })),
+      { settings: settings(), watches: [] },
+      env()
+    )
+    expect(plan.settings.proxy).toBe('socks5://192.168.1.10:1080')
+    expect(plan.counts.proxyPassword).toBe(false)
+
+    const cleared = planImport(
+      viaFile(backupOf({ settings: { proxy: '' } })),
+      { settings: settings({ proxy: 'http://demo@192.168.1.10:3128' }), watches: [] },
+      env()
+    )
+    expect(cleared.settings.proxy).toBe('')
+    expect(cleared.counts.proxyPassword).toBe(false)
+  })
+
+  it('leaves the proxy in use alone, password and all, when the file names the same one', () => {
+    // A system with no key store keeps the password inside the address.
+    const inline = 'http://demo:secret@192.168.1.10:3128'
+    const current = settings({ proxy: inline })
+    const backup = buildBackup({ settings: current, watches: [], app: '3.24.0', now: new Date(NOW) })
+    const plan = planImport(viaFile(backup), { settings: current, watches: [] }, env())
+    expect(plan.settings).not.toHaveProperty('proxy')
+    expect(plan.counts).toMatchObject({ settings: false, proxyPassword: false })
+
+    // With a key store the address here already has no password, and the stored one stays.
+    const stored = settings({ proxy: 'http://demo@192.168.1.10:3128' })
+    const again = planImport(viaFile(backup), { settings: stored, watches: [] }, env())
+    expect(again.settings).not.toHaveProperty('proxy')
+    expect(again.counts.proxyPassword).toBe(false)
+  })
 })
 
 describe('planImport: shares', () => {

@@ -602,6 +602,9 @@ function BackupRows(): JSX.Element {
             {result.folderKept && <li>{t('settings.backupResultFolder')}</li>}
           </ul>
           <p className="mt-3 text-[13px] text-warn">{t('settings.backupSecrets')}</p>
+          {result.proxyPassword && (
+            <p className="mt-1 text-[13px] text-warn">{t('settings.backupResultProxy')}</p>
+          )}
         </div>
       )}
     </>

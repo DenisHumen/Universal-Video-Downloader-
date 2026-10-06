@@ -326,6 +326,8 @@ export const en = {
     'the backup’s download folder doesn’t exist on this computer, so the current one was kept',
   'settings.backupSecrets':
     'passwords for network shares and the telegram bot token are never in a backup. enter them again in the watching section above.',
+  'settings.backupResultProxy':
+    'the proxy password isn’t in a backup either, and nothing gets through the proxy without it. enter it again in the network section above.',
   'settings.backupErrJson': 'this file isn’t valid JSON',
   'settings.backupErrFormat': 'this isn’t a backup made by universal video downloader',
   'settings.backupErrVersion': 'this backup was made by a newer version of the app. update first, then import it.',

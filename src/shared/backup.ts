@@ -21,7 +21,7 @@
  */
 
 import { AUDIO_CONTAINERS, SUPPORTED_COOKIE_BROWSERS, type AppSettings } from './types'
-import { splitProxyPassword } from './proxy'
+import { proxyUser, splitProxyPassword } from './proxy'
 import { normalizeUrl } from './urls'
 import {
   DEFAULT_REMOTE_PATH,
@@ -83,6 +83,13 @@ export interface ImportCounts {
   targetsAdded: number
   /** The backup's download folder does not exist on this machine, so the current one stayed. */
   folderKept: boolean
+  /**
+   * The import set a proxy that signs in with a user name. Its password never
+   * travels, and the proxy turns away every download and every request of the
+   * app's own until it is typed in again - somewhere other than the watching
+   * section the share passwords and the bot token are entered in.
+   */
+  proxyPassword: boolean
 }
 
 export type ExportOutcome =
@@ -499,12 +506,13 @@ export interface ImportPlan {
  *
  * Settings are replaced, since restoring them is the point - except a download
  * folder or a cookies file that does not exist on this machine, which would
- * only make every download fail; the current one stays. Shares and watches are
- * only ever added. A share that is already here is reused, and the uploads of
- * the imported watches are pointed at it. Each imported watch keeps the
- * episodes it has handled, plus any a watch already here on the same series
- * and dub has handled, so nothing old is downloaded again; the record of its
- * last check starts afresh.
+ * only make every download fail; the current one stays. So does a proxy that
+ * is the one already in use, so it keeps the password it has here. Shares and
+ * watches are only ever added. A share that is already here is reused, and the
+ * uploads of the imported watches are pointed at it. Each imported watch keeps
+ * the episodes it has handled, plus any a watch already here on the same
+ * series and dub has handled, so nothing old is downloaded again; the record
+ * of its last check starts afresh.
  */
 export function planImport(
   { backup, invalid }: { backup: Backup; invalid: number },
@@ -519,6 +527,17 @@ export function planImport(
     delete patch.downloadDir
   }
   if (patch.cookiesFile && !env.exists(patch.cookiesFile)) delete patch.cookiesFile
+  /*
+    The proxy in use here is compared without its password, because the file's
+    copy never has one. When they are the same proxy it stays as it is: on a
+    system with no key store the password still lives inside the address, and
+    writing the file's copy over it would throw away the only place it is kept.
+    Any other proxy that names a user arrives without the password it needs,
+    and the screen has to say so.
+  */
+  const proxyHere = splitProxyPassword(current.settings.proxy).proxy
+  if (patch.proxy !== undefined && patch.proxy === proxyHere) delete patch.proxy
+  const proxyPassword = patch.proxy !== undefined && proxyUser(patch.proxy) !== undefined
   // A chat the file does not name leaves the one set here alone.
   if (backup.telegram.chatId) patch.telegramChatId = backup.telegram.chatId
   const settingsChanged = (Object.keys(patch) as (keyof AppSettings)[]).some(
@@ -576,7 +595,8 @@ export function planImport(
       watchesSkipped,
       watchesInvalid: invalid,
       targetsAdded,
-      folderKept
+      folderKept,
+      proxyPassword
     }
   }
 }

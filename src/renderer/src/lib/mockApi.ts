@@ -393,8 +393,9 @@ export function installMockApi(): void {
     /*
       The preview has no file dialog. Export says it wrote what is in memory;
       import merges a made-up backup through the same rules main uses - from a
-      machine whose download folder is not here - so the result it reports and
-      the series and share it adds can be looked at without a real file.
+      machine whose download folder is not here, behind a proxy that signs in -
+      so the result it reports and the series and share it adds can be looked
+      at without a real file.
     */
     exportBackup: async () => ({
       ok: true,
@@ -409,6 +410,7 @@ export function installMockApi(): void {
           ...settings,
           theme: 'day',
           downloadDir: 'D:\\Old PC\\Videos',
+          proxy: 'http://demo@192.168.1.10:3128',
           smbTargets: [
             {
               id: 'mock-nas',
