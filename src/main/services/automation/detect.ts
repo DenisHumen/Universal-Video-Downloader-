@@ -241,7 +241,8 @@ export async function checkWatch(watch: Watch): Promise<CheckResult> {
  *
  * The providers do not agree on shape, and none should be assumed. For
  * yummyani and a pasted Kodik player the translator id *is* a season — it
- * decodes to a player URL for one season — so the episode number stands alone.
+ * decodes to a player URL for one season, or for a YummyAnime dub on Aksor to
+ * the title and dub — so the episode number stands alone.
  * Rezka names the season separately.
  */
 export function downloadUrlFor(watch: Watch, ref: EpisodeRef): string {

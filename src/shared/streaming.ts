@@ -19,7 +19,8 @@ export const PROVIDER_NAMES: Record<StreamProvider, string> = {
  * union has to be given a case here before anything compiles.
  *
  * For YummyAnime and Kodik the translator id is a player's own address, one
- * dub of one season, so the episode number is all that is added to it.
+ * dub of one season - or, for a YummyAnime dub on Aksor, the title and dub -
+ * so the episode number is all that is added to it.
  */
 export function streamUrl(
   s: Pick<StreamingInfo, 'provider' | 'host' | 'id'>,
