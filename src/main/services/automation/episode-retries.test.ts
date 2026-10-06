@@ -264,6 +264,24 @@ describe('an episode that fails', () => {
   })
 
   /*
+    "Try again" on a paused series put the episode on the queue, found the
+    watch paused, cancelled it on the spot and replaced the failed run with a
+    skipped one - a dead row in Downloads, under a toast saying it was trying.
+  */
+  it('is not tried by hand while the watch is paused', async () => {
+    h.plan = ['fail']
+    await check()
+    const [failed] = runs()
+    m.store.updateWatch('w1', { enabled: false })
+
+    expect(m.watcher.retryRun(failed.id)).toEqual({ paused: true })
+    expect(m.watcher.watcherBusy()).toBe(false)
+    expect(h.started).toHaveLength(1)
+    expect(runs()).toEqual([failed])
+    expect(m.store.getWatch('w1')?.attempts).toEqual({ s1e4: 1 })
+  })
+
+  /*
     A NAS asleep at four in the morning. The retry used to download the whole
     episode again and leave a second copy beside the first.
   */

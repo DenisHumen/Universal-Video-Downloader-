@@ -355,6 +355,10 @@ export async function checkNow(watchId: string): Promise<CheckSummary> {
  * The watch is held in flight for the length of it, as a check would hold it,
  * and a watch already in flight is refused: the schedule and the button must
  * not fetch the same episode side by side.
+ *
+ * So is a paused one. The download step treats a paused watch as one stopped
+ * mid-run, so the retry queued the episode, cancelled it at once and put a
+ * skipped run in place of the failed one - while the screen said it was trying.
  */
 export function retryRun(runId: string): RetryAnswer {
   const run = findRun(runId)
@@ -365,6 +369,7 @@ export function retryRun(runId: string): RetryAnswer {
     return { error: 'Only an episode that failed or was skipped can be tried again.' }
   }
   if (inFlight.has(watch.id)) return { busy: true }
+  if (!watch.enabled) return { paused: true }
 
   inFlight.add(watch.id)
   const ref: EpisodeRef = { season: run.season, episode: run.episode }

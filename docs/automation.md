@@ -284,7 +284,8 @@ A run is a small state machine over its steps. Rules:
   same chain and the same resume, by hand. It is refused while the watch is
   being checked or is working through episodes, and holds the watch the same
   way while it runs, so the schedule and the button never fetch one episode
-  side by side.
+  side by side. It is refused while the watch is paused, too, and says so:
+  the pause would cancel the download the moment it was queued.
 - **A run cannot stay "running" across a restart.** The watch list is loaded
   once per launch, before anything runs, so a run the file still calls running
   belonged to a process that has gone. On load it becomes `failed`, ends when

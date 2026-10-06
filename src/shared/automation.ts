@@ -190,9 +190,10 @@ export type CheckSummary =
  * Answered as soon as the episode is on its way, like "check now"; the run
  * itself reaches the screen through the usual broadcasts. Busy while the
  * schedule is working on the same watch, so the two cannot fetch one episode
- * side by side.
+ * side by side. Paused while the watch is, the way "check now" finds but does
+ * not fetch: the pause would only cancel the download the moment it was queued.
  */
-export type RetryAnswer = { started: true } | { busy: true } | { error: string }
+export type RetryAnswer = { started: true } | { busy: true } | { paused: true } | { error: string }
 
 // ---------------------------------------------------------------------------
 // Templates

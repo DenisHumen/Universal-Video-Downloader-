@@ -485,6 +485,7 @@ export const ru: Dictionary = {
   'auto.runWillRetry': 'попытка {n} из {max} - повторим при следующей проверке',
   'auto.retryRun': 'повторить',
   'auto.retryStarted': 'пробуем эту серию ещё раз',
+  'auto.retryPaused': 'на паузе - снимите сериал с паузы, чтобы повторить эту серию',
   'auto.runQueuePaused': 'на паузе в очереди - продолжите загрузку там',
   'auto.showInQueue': 'показать в очереди',
   'auto.addTitle': 'следить за сериалом',

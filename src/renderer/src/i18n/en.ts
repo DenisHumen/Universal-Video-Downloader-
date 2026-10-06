@@ -498,6 +498,7 @@ export const en = {
   'auto.runWillRetry': 'attempt {n} of {max} - trying again at the next check',
   'auto.retryRun': 'try again',
   'auto.retryStarted': 'trying this episode again',
+  'auto.retryPaused': 'paused - resume the series to try this episode again',
   'auto.runQueuePaused': 'paused in the queue - resume it there to carry on',
   'auto.showInQueue': 'show in the queue',
   'auto.addTitle': 'watch a series',

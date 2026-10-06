@@ -254,6 +254,7 @@ export default function AutomationView(): JSX.Element {
       await refresh()
       if ('started' in answer) toast(t('auto.retryStarted'), 'success')
       else if ('busy' in answer) toast(t('auto.checkBusy'), 'info')
+      else if ('paused' in answer) toast(t('auto.retryPaused'), 'info')
       else toast(answer.error, 'error')
     } catch (err) {
       toast(err instanceof Error ? err.message : String(err), 'error')
