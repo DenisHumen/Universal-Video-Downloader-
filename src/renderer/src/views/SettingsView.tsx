@@ -27,6 +27,7 @@ import { useSecretState } from '../components/AutomationForms'
 import { isSafeTemplate } from '@shared/filename'
 import { normaliseRate } from '@shared/rate'
 import { isProxyValue, proxyUser } from '@shared/proxy'
+import { templateExample, type TemplateExampleOptions } from '../lib/templateExample'
 
 type SectionId =
   | 'appearance'
@@ -193,22 +194,30 @@ function TextField({
  *
  * So: a draft that is only committed when it is safe, and a line saying why
  * when it is not.
+ *
+ * Under it, the names the draft would give a video and the same video picked
+ * from a playlist (see lib/templateExample.ts), so a template can be got right
+ * without downloading something to find out.
  */
 function TemplateField({
   value,
-  onCommit
+  onCommit,
+  example: exampleOptions
 }: {
   value: string
   onCommit: (v: string) => void
+  example: TemplateExampleOptions
 }): JSX.Element {
   const t = useT()
   const labelledBy = useContext(RowLabelId)
+  const exampleId = useId()
   const [draft, setDraft] = useState(value)
 
   // Follow the store when it changes underneath us — a reset, most obviously.
   useEffect(() => setDraft(value), [value])
 
   const safe = isSafeTemplate(draft)
+  const example = safe ? templateExample(draft, exampleOptions) : null
 
   return (
     <>
@@ -224,11 +233,30 @@ function TemplateField({
           else setDraft(value)
         }}
         aria-labelledby={labelledBy}
+        aria-describedby={example ? exampleId : undefined}
         aria-invalid={!safe}
         className="field mono text-[13px]"
         spellCheck={false}
       />
       {!safe && <p className="hint mt-1.5 text-bad">{t('settings.filenameTemplateUnsafe')}</p>}
+      {example && (
+        <dl id={exampleId} className="mt-2.5 space-y-1.5">
+          <div>
+            <dt className="hint">{t('settings.templateExample')}</dt>
+            <dd className="mono selectable text-[12px] text-ink-2 [overflow-wrap:anywhere]">
+              {example.video}
+            </dd>
+          </div>
+          {example.playlist && (
+            <div>
+              <dt className="hint">{t('settings.templateExamplePlaylist')}</dt>
+              <dd className="mono selectable text-[12px] text-ink-2 [overflow-wrap:anywhere]">
+                {example.playlist}
+              </dd>
+            </div>
+          )}
+        </dl>
+      )}
     </>
   )
 }
@@ -787,6 +815,13 @@ export default function SettingsView(): JSX.Element {
               <TemplateField
                 value={settings.filenameTemplate}
                 onCommit={(v) => set('filenameTemplate', v)}
+                example={{
+                  restrictFilenames: settings.restrictFilenames,
+                  siteFolders: settings.createSubfolders,
+                  playlistFolder: settings.playlistFolder,
+                  playlistNumbering: settings.playlistNumbering,
+                  sep: appInfo?.platform === 'win32' ? '\\' : '/'
+                }}
               />
             </Row>
           </Group>

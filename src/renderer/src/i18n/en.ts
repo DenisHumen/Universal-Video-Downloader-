@@ -250,6 +250,8 @@ export const en = {
   'settings.filenameTemplateUnsafe':
     'a template has to stay inside the download folder - no leading slash, no drive letter, no ..',
   'settings.filenameTemplateHint': 'yt-dlp output template',
+  'settings.templateExample': 'a video would be saved as',
+  'settings.templateExamplePlaylist': 'the same video from a playlist',
 
   'settings.universal': 'universal detection',
   'settings.universalHint':

@@ -39,11 +39,12 @@ import { ffmpegProgressSeconds, isFfmpegNoise, splitOutputLines } from './ffmpeg
 import { lineReader } from './engine-output'
 import { markOf, shouldEmitProgress, type ProgressMark } from './throttle'
 import { recordDownloadFailure } from './report'
-import { normalisePlaylist, numberedName, playlistDir, playlistTagArgs } from './playlist'
+import { normalisePlaylist, playlistDir, playlistTagArgs } from './playlist'
 import { resolveUrl } from '../resolvers'
 import { pageUrlFromSniffUrl, SNIFF_SCHEME } from '../resolvers/universal'
 import { DIRECT_SCHEME, parseDirectUrl } from '../resolvers/universal/direct'
 import { isAbsoluteUrl, normalizeUrl } from '@shared/urls'
+import { numberedName } from '@shared/playlist'
 import { hasTrim } from '@shared/types'
 import type {
   AppErrorCode,

@@ -243,6 +243,8 @@ export const ru: Dictionary = {
   'settings.filenameTemplateUnsafe':
     'шаблон должен оставаться внутри папки загрузок - без слэша в начале, без буквы диска, без ..',
   'settings.filenameTemplateHint': 'шаблон вывода yt-dlp',
+  'settings.templateExample': 'видео сохранится как',
+  'settings.templateExamplePlaylist': 'то же видео из плейлиста',
 
   'settings.universal': 'универсальное определение',
   'settings.universalHint':
