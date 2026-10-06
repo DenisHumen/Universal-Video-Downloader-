@@ -9,6 +9,10 @@ on:
 
 jobs:
   # The cheap gate: everything that is platform-independent, once.
+  #
+  # Node 24, the active LTS, here and in release.yml, so a Node upgrade that
+  # breaks the build shows up on main rather than at the tag. 20 reached end of
+  # life in April 2026, and setup-node goes on installing it without a word.
   check:
     name: Typecheck, test & contrast
     runs-on: ubuntu-latest
@@ -16,7 +20,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 24
           cache: npm
       - run: npm ci
       - run: npm run typecheck
@@ -68,11 +72,13 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 24
           cache: npm
       - run: npm ci
       # ffmpeg-static stops at 6.1.1, which cannot seek into fragmented-MP4 HLS
-      # (every trimmed Twitch VOD came out empty). Pinned by URL and SHA-256.
+      # (every trimmed Twitch VOD came out empty). Pinned by URL and SHA-256,
+      # refused if FFmpeg marks the build nonfree, and written with the README
+      # and GPLv3 text that ship beside it (scripts/ffmpeg-pins.mjs).
       - name: Replace the bundled ffmpeg with the pinned release
         run: node scripts/fetch-ffmpeg.mjs
       # The bundled ffmpeg must be able to run on the machine it ships to.
@@ -82,3 +88,26 @@ jobs:
       - run: npx --no-install electron-builder --dir ${{ matrix.args }}
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: false
+      # after-pack flips Electron's fuses and, on a Mac, seals the app; this
+      # reads the fuses back from what electron-builder left once it was done
+      # (on Windows it rewrites the executable with rcedit after the hook).
+      - name: Check Electron's fuses in the packed app
+        run: node scripts/check-fuses.mjs
+
+      # The .deb and .rpm themselves, not only the unpacked app. The AppArmor
+      # profile, the hicolor icons and the desktop entry are all written by
+      # electron-builder's deb/rpm step, and each of them shipped broken while
+      # `--dir` stayed green: the .deb could not start on Ubuntu 24.04, every
+      # launcher showed a generic icon, and the desktop entry was invalid.
+      # scripts/check-linux-packages.mjs says what it looks for.
+      - name: Install Linux packaging tools
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y rpm fakeroot desktop-file-utils apparmor
+      - name: Build the .deb and .rpm
+        if: runner.os == 'Linux'
+        run: npx --no-install electron-builder --linux deb rpm --x64 --publish never
+      - name: Check what the .deb and .rpm install
+        if: runner.os == 'Linux'
+        run: node scripts/check-linux-packages.mjs

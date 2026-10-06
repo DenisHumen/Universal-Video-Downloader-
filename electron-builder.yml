@@ -19,17 +19,28 @@ files:
   - '!.claude{,/**/*}'
   - '!{vitest.config.ts,vite.preview.config.ts}'
   - '!electron.vite.config.{js,ts,mjs,cjs}'
-  - '!{.eslintignore,.eslintrc.cjs,.prettierignore,.prettierrc.yaml,dev-app-update.yml,CHANGELOG.md,README.md}'
+  - '!{.eslintignore,.eslintrc.cjs,.prettierignore,.prettierrc.yaml,dev-app-update.yml,CHANGELOG.md,README.md,THIRD_PARTY_NOTICES.txt}'
   - '!{.env,.env.*,.npmrc,pnpm-lock.yaml,package-lock.json}'
   - '!{tsconfig.json,tsconfig.node.json,tsconfig.web.json,tailwind.config.js,postcss.config.js}'
 
 # ffmpeg-static ships a per-platform binary that must stay executable on disk.
-# Checks the ffmpeg inside each packed target, before its installer is built.
+# Checks the ffmpeg inside each packed target, before its installer is built -
+# that it runs there, that it may be redistributed and that its notices are
+# beside it - and on Linux the icon sizes and the AppArmor profile as well.
 afterPack: scripts/after-pack.mjs
 
 asarUnpack:
   - resources/**
   - '**/node_modules/ffmpeg-static/**'
+
+# The licences of what ships inside the app, with the source of the bundled
+# ffmpeg (GPLv3) and the written offer for it. README.md is not packaged, so
+# this and the ffmpeg.README / ffmpeg.LICENSE beside the binary are the only
+# notice a user receives. electron-builder adds linux.extraResources to this
+# list rather than replacing it.
+extraResources:
+  - from: THIRD_PARTY_NOTICES.txt
+    to: THIRD_PARTY_NOTICES.txt
 
 win:
   executableName: Universal Video Downloader
@@ -68,11 +79,12 @@ mac:
 
 # The install window.
 #
-# Gatekeeper quarantines unsigned builds and tells the user the app is
-# "damaged", which reads like a broken download rather than a policy — so the
-# one command that clears it is printed on the window's own background. This is
-# the only moment we are sure to be read: it opens by itself, before the app has
-# ever run, which is exactly when the notice inside the app cannot help.
+# Gatekeeper quarantines builds without a paid Apple certificate and can tell
+# the user the app is "damaged", which reads like a broken download rather than
+# a policy — so the one command that clears it (the same one the README, the
+# release notes and MacNotice give) is printed on the window's own background.
+# This is the only moment we are sure to be read: it opens by itself, before the
+# app has ever run, which is exactly when the notice inside the app cannot help.
 #
 # `window` must match the size the background is rendered at in
 # scripts/generate-icons.mjs, and the icon positions have to stay inside the
@@ -98,14 +110,31 @@ dmg:
 
 linux:
   artifactName: ${productName}-${version}-linux-${arch}.${ext}
-  category: AudioVideo
+  # electron-builder 25 always writes Categories from here, whatever `desktop`
+  # says. The menu spec wants Video always alongside AudioVideo.
+  category: AudioVideo;Video;
   maintainer: Denis Humen <dberkut18@gmail.com>
   synopsis: Universal video downloader with automatic stream detection
   description: A beautiful cross-platform desktop app that detects and downloads video streams from almost any website.
+  # The sizes hicolor actually looks up, 16 to 512, from scripts/generate-icons.mjs.
+  # Without them the packages carried one 1024px icon no launcher ever finds.
+  icon: build/icons
+  # Flat keys: 25 copies this map into the desktop entry line by line. The nested
+  # `entry:` form is electron-builder 26's, and 25 wrote it out as a literal
+  # `entry=[object Object]`, which desktop-file-validate rejects.
+  #
+  # StartupWMClass has to be the window class Electron really sets, which is the
+  # package.json name (see `desktopName` there) — not the product name 25 puts in
+  # by default. Otherwise the dock cannot tell the window belongs to the launcher
+  # and shows a second, unpinnable icon for it.
   desktop:
-    entry:
-      Name: Universal Video Downloader
-      Categories: AudioVideo;Network;Utility;
+    GenericName: Video Downloader
+    Keywords: video;download;downloader;youtube;yt-dlp;stream;
+    StartupWMClass: universal-video-downloader
+  # Lets the app start on Ubuntu 24.04; installed by build/linux/after-install.sh.
+  extraResources:
+    - from: build/linux/apparmor-profile
+      to: apparmor-profile
   target:
     - target: AppImage
       arch:
@@ -117,8 +146,28 @@ linux:
       arch:
         - x64
 
+# electron-builder's stock scripts never install an AppArmor profile, and they
+# leave chrome-sandbox without setuid on the very systems that then need it, so
+# the .deb could not start on Ubuntu 24.04. These are the stock scripts plus the
+# profile; the header of each says what changed and why.
+#
+# `default`, which both used to say, is neither a Debian section nor an RPM group.
+deb:
+  packageCategory: video
+  afterInstall: build/linux/after-install.sh
+  afterRemove: build/linux/after-remove.sh
+
+rpm:
+  packageCategory: Applications/Multimedia
+  afterInstall: build/linux/after-install.sh
+  afterRemove: build/linux/after-remove.sh
+
+# A draft, never a release: each runner uploads into the draft the release
+# workflow opened for the tag, and its finalize job publishes it once all of
+# them are done. With `release`, the first runner to finish made it public
+# while the others were still building.
 publish:
   provider: github
   owner: DenisHumen
   repo: Universal-Video-Downloader-
-  releaseType: release
+  releaseType: draft

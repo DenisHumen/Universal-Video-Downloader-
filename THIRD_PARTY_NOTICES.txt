@@ -1,0 +1,252 @@
+Universal Video Downloader - third-party notices
+================================================
+
+Universal Video Downloader is free software under the MIT licence,
+Copyright (c) 2026 Denis Humen. Its source code is at
+https://github.com/DenisHumen/Universal-Video-Downloader-
+
+It ships, or fetches when it first runs, the software below. Each part keeps
+its own licence.
+
+
+FFmpeg 9.0.2 - GNU General Public License, version 3 or later
+-------------------------------------------------------------
+
+Bundled as a separate program, which the app starts to merge, trim and convert
+media; it is not linked into the app. It is installed at
+
+    resources/app.asar.unpacked/node_modules/ffmpeg-static/ffmpeg
+    (ffmpeg.exe on Windows)
+
+and beside it are ffmpeg.README, which names the exact build in this copy and
+where its source is, and ffmpeg.LICENSE, the full text of the GNU GPL
+version 3. Each platform's package carries its own build of the same release:
+
+  Windows x64
+    Binary:          https://github.com/GyanD/codexffmpeg/releases/download/9.0.2/ffmpeg-9.0.2-essentials_build.zip
+    SHA-256:         60f467265b1e312373dbcd92200c2618a74850f98d3d078e94296bb3fa2047ba
+    Built by:        gyan.dev, https://www.gyan.dev/ffmpeg/builds/
+    Source:          https://github.com/FFmpeg/FFmpeg/tree/n9.0.2
+    Source archive:  https://ffmpeg.org/releases/ffmpeg-9.0.2.tar.xz
+
+  macOS, Apple silicon (arm64)
+    Binary:          https://ffmpeg.martin-riedl.de/download/macos/arm64/1789931890_9.0.2/ffmpeg.zip
+    SHA-256:         c8ed4c4e6978a03c485edbfe4e0a5dc2380f8a30bba5150531b31b094492d924
+    Built by:        Martin Riedl, with https://git.martin-riedl.de/ffmpeg/build-script
+    Source:          https://github.com/FFmpeg/FFmpeg/tree/n9.0.2
+    Source archive:  https://ffmpeg.org/releases/ffmpeg-9.0.2.tar.xz
+
+  macOS, Intel (x64)
+    Binary:          https://ffmpeg.martin-riedl.de/download/macos/amd64/1789931006_9.0.2/ffmpeg.zip
+    SHA-256:         7c6b4125b191cbf773832dc51f424cf2b6bb7da43007d1e066f95909e47cacd4
+    Built by:        Martin Riedl, with https://git.martin-riedl.de/ffmpeg/build-script
+    Source:          https://github.com/FFmpeg/FFmpeg/tree/n9.0.2
+    Source archive:  https://ffmpeg.org/releases/ffmpeg-9.0.2.tar.xz
+
+  Linux x64 (.AppImage, .deb and .rpm)
+    Binary:          https://github.com/BtbN/FFmpeg-Builds/releases/download/autobuild-2026-09-30-13-08/ffmpeg-n9.0.2-17-g2a571b6068-linux64-gpl-9.0.tar.xz
+    SHA-256:         68ee646831adaae2495618346f3bba94ff207ff83bbd34d643e7004730d66269
+    Built by:        BtbN/FFmpeg-Builds, with the scripts at
+                     https://github.com/BtbN/FFmpeg-Builds/tree/6c9aec5fc9a72ec3abedd1fa84db141fa18cf52b
+    Source:          https://github.com/FFmpeg/FFmpeg/tree/2a571b606854520cf89804d8030c8b328e621689
+                     (9.0.2 and the 17 fixes after it on the release/9.0 branch)
+    Source archive:  https://github.com/FFmpeg/FFmpeg/archive/2a571b606854520cf89804d8030c8b328e621689.tar.gz
+
+The build scripts name every library compiled into their build, the version
+used and where its source comes from.
+
+Written offer. For three years from the day you received this copy, and for
+as long after that as a release containing it is offered for download, anyone
+who has it may ask for the complete corresponding source code of the FFmpeg
+build inside it - FFmpeg itself, the libraries compiled into it and the scripts
+that built it - and will be given access to download it at no charge. Ask by
+opening an issue at https://github.com/DenisHumen/Universal-Video-Downloader-/issues
+
+
+ffmpeg-static 5.3.0 - GNU General Public License, version 3 or later
+--------------------------------------------------------------------
+
+The small JavaScript module that tells the app where ffmpeg is. Its licence is
+the LICENSE file in the same folder as ffmpeg.
+https://github.com/eugeneware/ffmpeg-static
+
+
+Electron 33 - MIT
+-----------------
+
+The runtime the app is built on. https://github.com/electron/electron
+
+    Copyright (c) Electron contributors
+    Copyright (c) 2013-2020 GitHub Inc.
+
+The MIT licence text is below. Chromium, which Electron includes, and the
+libraries it uses have licences of their own; on Windows and Linux they are
+collected in LICENSES.chromium.html in the installation folder.
+
+
+yt-dlp - The Unlicense
+----------------------
+
+Not part of this package. When the app first runs it downloads the yt-dlp
+program from the project's own releases, https://github.com/yt-dlp/yt-dlp/releases,
+and keeps it up to date from there. yt-dlp is published there under its own
+terms.
+
+
+Compiled into the app's interface
+---------------------------------
+
+    React, React DOM and scheduler   MIT   Copyright (c) Facebook, Inc. and its affiliates.
+    Zustand                          MIT   Copyright (c) 2019 Paul Henschel
+    Framer Motion                    MIT   Copyright (c) 2018 Framer B.V.
+    Lucide (lucide-react)            ISC   Copyright (c) for portions of Lucide are held by
+                                           Cole Bemis 2013-2022 as part of Feather (MIT). All
+                                           other copyright (c) for Lucide are held by Lucide
+                                           Contributors 2022.
+    Inter typeface                   SIL Open Font License 1.1
+                                           Copyright 2016 The Inter Project Authors
+                                           (https://github.com/rsms/inter)
+    JetBrains Mono typeface          SIL Open Font License 1.1
+                                           Copyright 2020 The JetBrains Mono Project Authors
+                                           (https://github.com/JetBrains/JetBrainsMono)
+
+electron-updater, node-smb2 and the modules they use are installed in app.asar
+under node_modules, each with its own licence file.
+
+
+MIT License (Electron, React, React DOM, scheduler, Zustand, Framer Motion)
+===========================================================================
+
+Copyright (c) the holders named above for each component.
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+
+ISC License (Lucide)
+====================
+
+Copyright (c) the holders named above for Lucide.
+
+Permission to use, copy, modify, and/or distribute this software for any
+purpose with or without fee is hereby granted, provided that the above
+copyright notice and this permission notice appear in all copies.
+
+THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+
+
+SIL Open Font License 1.1 (Inter, JetBrains Mono)
+=================================================
+
+This Font Software is licensed under the SIL Open Font License, Version 1.1.
+This license is copied below, and is also available with a FAQ at:
+http://scripts.sil.org/OFL
+
+
+-----------------------------------------------------------
+SIL OPEN FONT LICENSE Version 1.1 - 26 February 2007
+-----------------------------------------------------------
+
+PREAMBLE
+The goals of the Open Font License (OFL) are to stimulate worldwide
+development of collaborative font projects, to support the font creation
+efforts of academic and linguistic communities, and to provide a free and
+open framework in which fonts may be shared and improved in partnership
+with others.
+
+The OFL allows the licensed fonts to be used, studied, modified and
+redistributed freely as long as they are not sold by themselves. The
+fonts, including any derivative works, can be bundled, embedded,
+redistributed and/or sold with any software provided that any reserved
+names are not used by derivative works. The fonts and derivatives,
+however, cannot be released under any other type of license. The
+requirement for fonts to remain under this license does not apply
+to any document created using the fonts or their derivatives.
+
+DEFINITIONS
+"Font Software" refers to the set of files released by the Copyright
+Holder(s) under this license and clearly marked as such. This may
+include source files, build scripts and documentation.
+
+"Reserved Font Name" refers to any names specified as such after the
+copyright statement(s).
+
+"Original Version" refers to the collection of Font Software components as
+distributed by the Copyright Holder(s).
+
+"Modified Version" refers to any derivative made by adding to, deleting,
+or substituting -- in part or in whole -- any of the components of the
+Original Version, by changing formats or by porting the Font Software to a
+new environment.
+
+"Author" refers to any designer, engineer, programmer, technical
+writer or other person who contributed to the Font Software.
+
+PERMISSION & CONDITIONS
+Permission is hereby granted, free of charge, to any person obtaining
+a copy of the Font Software, to use, study, copy, merge, embed, modify,
+redistribute, and sell modified and unmodified copies of the Font
+Software, subject to the following conditions:
+
+1) Neither the Font Software nor any of its individual components,
+in Original or Modified Versions, may be sold by itself.
+
+2) Original or Modified Versions of the Font Software may be bundled,
+redistributed and/or sold with any software, provided that each copy
+contains the above copyright notice and this license. These can be
+included either as stand-alone text files, human-readable headers or
+in the appropriate machine-readable metadata fields within text or
+binary files as long as those fields can be easily viewed by the user.
+
+3) No Modified Version of the Font Software may use the Reserved Font
+Name(s) unless explicit written permission is granted by the corresponding
+Copyright Holder. This restriction only applies to the primary font name as
+presented to the users.
+
+4) The name(s) of the Copyright Holder(s) or the Author(s) of the Font
+Software shall not be used to promote, endorse or advertise any
+Modified Version, except to acknowledge the contribution(s) of the
+Copyright Holder(s) and the Author(s) or with their explicit written
+permission.
+
+5) The Font Software, modified or unmodified, in part or in whole,
+must be distributed entirely under this license, and must not be
+distributed under any other license. The requirement for fonts to
+remain under this license does not apply to any document created
+using the Font Software.
+
+TERMINATION
+This license becomes null and void if any of the above conditions are
+not met.
+
+DISCLAIMER
+THE FONT SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO ANY WARRANTIES OF
+MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT
+OF COPYRIGHT, PATENT, TRADEMARK, OR OTHER RIGHT. IN NO EVENT SHALL THE
+COPYRIGHT HOLDER BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+INCLUDING ANY GENERAL, SPECIAL, INDIRECT, INCIDENTAL, OR CONSEQUENTIAL
+DAMAGES, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+FROM, OUT OF THE USE OR INABILITY TO USE THE FONT SOFTWARE OR FROM
+OTHER DEALINGS IN THE FONT SOFTWARE.

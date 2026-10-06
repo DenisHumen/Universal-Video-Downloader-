@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 /**
- * Replace the ffmpeg that `ffmpeg-static` installed with a pinned, newer one.
+ * Replace the ffmpeg that `ffmpeg-static` installed with a pinned, newer one,
+ * and the README and licence beside it with ones that describe it.
  *
  * `ffmpeg-static` stops at 6.1.1 - its newest binary release - and 6.1.1 has a
  * bug that became everyone's problem when Twitch moved its recordings to HLS
@@ -15,47 +16,40 @@
  * locates ffmpeg changes, and the architecture guard that runs next in CI
  * (`check-ffmpeg-arch.mjs`) checks this file rather than the one it replaced.
  *
- * Every archive is pinned by URL *and* by SHA-256. A build server that quietly
- * republishes something different fails the build instead of shipping it.
+ * What is pinned, and why each copy may be passed on, is in ffmpeg-pins.mjs.
+ * A wrong checksum, a nonfree build, or one without the encoders the app uses
+ * fails here, before anything is written.
  *
  *   node scripts/fetch-ffmpeg.mjs                        this machine's platform
  *   node scripts/fetch-ffmpeg.mjs --target=darwin-arm64 --out=DIR   another one
  */
 import { createHash } from 'node:crypto'
 import { execFileSync } from 'node:child_process'
-import { chmodSync, existsSync, mkdirSync, renameSync, writeFileSync } from 'node:fs'
+import {
+  chmodSync,
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  renameSync,
+  rmSync,
+  writeFileSync
+} from 'node:fs'
+import { tmpdir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { inflateRawSync } from 'node:zlib'
-
-const VERSION = '9.0.2'
-
-const PINNED = {
-  'win32-x64': {
-    url: 'https://github.com/GyanD/codexffmpeg/releases/download/9.0.2/ffmpeg-9.0.2-essentials_build.zip',
-    sha256: '60f467265b1e312373dbcd92200c2618a74850f98d3d078e94296bb3fa2047ba',
-    member: 'ffmpeg-9.0.2-essentials_build/bin/ffmpeg.exe',
-    bin: 'ffmpeg.exe'
-  },
-  'darwin-arm64': {
-    url: 'https://ffmpeg.martin-riedl.de/download/macos/arm64/1789931890_9.0.2/ffmpeg.zip',
-    sha256: 'c8ed4c4e6978a03c485edbfe4e0a5dc2380f8a30bba5150531b31b094492d924',
-    member: 'ffmpeg',
-    bin: 'ffmpeg'
-  },
-  'darwin-x64': {
-    url: 'https://ffmpeg.martin-riedl.de/download/macos/amd64/1789931006_9.0.2/ffmpeg.zip',
-    sha256: '7c6b4125b191cbf773832dc51f424cf2b6bb7da43007d1e066f95909e47cacd4',
-    member: 'ffmpeg',
-    bin: 'ffmpeg'
-  },
-  'linux-x64': {
-    url: 'https://ffmpeg.martin-riedl.de/download/linux/amd64/1789931100_9.0.2/ffmpeg.zip',
-    sha256: 'fa8ecf4abbd290d98f7d188b8649cc6b391ae209a98452be955a15aab1909d7f',
-    member: 'ffmpeg',
-    bin: 'ffmpeg'
-  }
-}
+import {
+  NONFREE_MARKER,
+  PINNED,
+  VERSION,
+  bannerMatches,
+  ffmpegReadme,
+  isNonfree,
+  missingLibraries,
+  noticeProblems,
+  tarArgs
+} from './ffmpeg-pins.mjs'
 
 /**
  * Read one file out of a zip.
@@ -128,6 +122,36 @@ export function extractMember(zip, name) {
   throw new Error(`${name} is not in the archive`)
 }
 
+/**
+ * Read files out of a .tar.xz by their exact paths.
+ *
+ * Node has no xz, so this is the one place tar is used - unpacked into a
+ * scratch directory and read back, so the binary still goes through the same
+ * checks and the same write-beside-then-rename as one out of a zip. The
+ * archive is named relative to tar's working directory because GNU tar takes
+ * the `C:` of a Windows path for a remote host.
+ */
+function extractTarMembers(archive, names) {
+  const work = mkdtempSync(join(tmpdir(), 'uvd-ffmpeg-'))
+  try {
+    writeFileSync(join(work, 'archive.tar.xz'), archive)
+    execFileSync('tar', tarArgs('archive.tar.xz', names), {
+      cwd: work,
+      stdio: ['ignore', 'ignore', 'pipe']
+    })
+    return names.map((name) => readFileSync(join(work, ...name.split('/'))))
+  } finally {
+    rmSync(work, { recursive: true, force: true })
+  }
+}
+
+/** Write beside, then rename: an interrupted run never leaves half a file. */
+function writeAtomic(path, data, mode) {
+  writeFileSync(`${path}.tmp`, data)
+  if (mode && process.platform !== 'win32') chmodSync(`${path}.tmp`, mode)
+  renameSync(`${path}.tmp`, path)
+}
+
 function arg(name) {
   const hit = process.argv.find((a) => a.startsWith(`--${name}=`))
   return hit?.slice(name.length + 3)
@@ -149,26 +173,62 @@ async function main() {
   console.log(`ffmpeg ${VERSION} for ${target}: ${pin.url}`)
   const response = await fetch(pin.url, { redirect: 'follow' })
   if (!response.ok) throw new Error(`download failed: HTTP ${response.status}`)
-  const zip = Buffer.from(await response.arrayBuffer())
+  const archive = Buffer.from(await response.arrayBuffer())
 
-  const digest = createHash('sha256').update(zip).digest('hex')
+  const digest = createHash('sha256').update(archive).digest('hex')
   if (digest !== pin.sha256) {
     throw new Error(`checksum mismatch for ${target}: expected ${pin.sha256}, got ${digest}`)
   }
 
-  const binary = extractMember(zip, pin.member)
-  // Write beside, then rename: an interrupted run never leaves half a binary.
-  writeFileSync(`${dest}.tmp`, binary)
-  if (process.platform !== 'win32') chmodSync(`${dest}.tmp`, 0o755)
-  renameSync(`${dest}.tmp`, dest)
+  const names = [pin.member, pin.readme, pin.licence].filter(Boolean)
+  const contents =
+    pin.extract === 'tar.xz'
+      ? extractTarMembers(archive, names)
+      : names.map((name) => extractMember(archive, name))
+  const files = new Map(names.map((name, i) => [name, contents[i]]))
+  const binary = files.get(pin.member)
+
+  if (isNonfree(binary)) {
+    throw new Error(
+      `${target}: this build was configured with --enable-nonfree ("${NONFREE_MARKER}"), ` +
+        `so FFmpeg's licence forbids passing it on. Pin a GPL build instead.`
+    )
+  }
+  const missing = missingLibraries(binary)
+  if (missing.length > 0) {
+    throw new Error(`${target}: this build has no ${missing.join(', ')}, which trim and convert use`)
+  }
+
+  writeAtomic(dest, binary, 0o755)
   console.log(`  wrote ${dest} (${(binary.length / 1048576).toFixed(1)} MB)`)
 
+  let body = pin.readme ? files.get(pin.readme).toString('utf8') : ''
   // Only runnable when it is this machine's own platform, which in CI it is.
   if (target === `${process.platform}-${process.arch}`) {
     const banner = execFileSync(dest, ['-hide_banner', '-version'], { encoding: 'utf8' }).split('\n')[0]
-    if (!banner.includes(`version ${VERSION}`)) throw new Error(`unexpected binary: ${banner}`)
+    if (!bannerMatches(banner)) throw new Error(`unexpected binary: ${banner}`)
     console.log(`  runs: ${banner}`)
+    if (!pin.readme) {
+      const conf = execFileSync(dest, ['-hide_banner', '-buildconf'], { encoding: 'utf8' })
+      body = `Build configuration (ffmpeg -buildconf):\n\n${conf.replace(/^\s*\n/, '')}`
+    }
   }
+
+  const readme = ffmpegReadme(target, pin, body)
+  const licence = pin.licence
+    ? files.get(pin.licence)
+    : readFileSync(join(root, 'node_modules', 'ffmpeg-static', 'LICENSE'))
+  const problems = noticeProblems({
+    name: pin.bin,
+    binary,
+    readme,
+    licence: licence.toString('utf8')
+  })
+  if (problems.length > 0) throw new Error(problems.join('; '))
+
+  writeAtomic(`${dest}.README`, readme)
+  writeAtomic(`${dest}.LICENSE`, licence)
+  console.log(`  wrote ${pin.bin}.README and ${pin.bin}.LICENSE beside it`)
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {

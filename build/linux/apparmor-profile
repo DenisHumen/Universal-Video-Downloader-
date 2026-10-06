@@ -1,0 +1,23 @@
+# Universal Video Downloader, unconfined but named.
+#
+# Ubuntu 24.04 and everything built on it (Mint 22, Pop!_OS, Zorin) only let a
+# program create user namespaces when an AppArmor profile says it may.
+# Chromium's sandbox is built on them, so without this the app aborts before it
+# shows a window. The profile confines nothing - the same thing Ubuntu ships for
+# chrome, code, obsidian, signal-desktop and slack.
+#
+# The attach path has to be the installed executable exactly, or the profile
+# applies to nothing and the app aborts all the same. scripts/after-pack.mjs
+# refuses to build a package where it is not.
+#
+# Installed to /etc/apparmor.d by build/linux/after-install.sh.
+
+abi <abi/4.0>,
+include <tunables/global>
+
+profile universal-video-downloader "/opt/Universal Video Downloader/universal-video-downloader" flags=(unconfined) {
+  userns,
+
+  # Site-specific additions and overrides. See local/README for details.
+  include if exists <local/universal-video-downloader>
+}

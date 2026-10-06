@@ -4,7 +4,8 @@ import { defineConfig } from 'vitest/config'
 /**
  * Unit tests cover the pure logic only — URL scoring, error classification,
  * quality selection, formatting, version comparison and translation coverage.
- * Anything that needs Electron lives behind those helpers on purpose.
+ * Anything that needs Electron lives behind those helpers on purpose. The
+ * packaging checks in scripts/ are pure in the same way, and tested alongside.
  */
 export default defineConfig({
   resolve: {
@@ -15,7 +16,7 @@ export default defineConfig({
   },
   test: {
     environment: 'node',
-    include: ['src/**/*.test.ts'],
+    include: ['src/**/*.test.ts', 'scripts/**/*.test.ts'],
     reporters: 'default'
   }
 })

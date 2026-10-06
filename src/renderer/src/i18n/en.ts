@@ -301,7 +301,7 @@ export const en = {
   // ---- mac notice ----
   'mac.title': 'macOS says the app is “damaged” or won’t open?',
   'mac.why':
-    'It isn’t — the build is unsigned, so Gatekeeper quarantines it. Run this once in Terminal:',
+    'It isn’t — the build has no paid Apple certificate, so Gatekeeper quarantines it. Run this once in Terminal:',
 
   // ---- shortcuts ----
   'shortcuts.title': 'keyboard shortcuts',
