@@ -151,6 +151,7 @@ Tailwind: `rounded-1` · `rounded-2` · `rounded-3` · `rounded-full`.
 | `.skeleton` | Placeholder plane; pulses in place |
 | `EmptyState` | The one "nothing here" layout: icon, heading, hint, and always a way out |
 | `TabStrip` | A tab row that scrolls with arrows, never a scrollbar |
+| `Modal` | The one dialog shell: role and name on the panel, focus in on open and back on close, Tab kept inside, Esc for the top dialog only. Every dialog is built on it |
 
 React: `components/Choice.tsx` (choice row), `components/EmptyState.tsx`, and
 `Switch` inside `SettingsView` (booleans).

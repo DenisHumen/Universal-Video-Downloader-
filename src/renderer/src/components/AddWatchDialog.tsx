@@ -1,13 +1,12 @@
-import { useEffect, useState } from 'react'
-import { AnimatePresence, motion } from 'framer-motion'
+import { useEffect, useId, useState } from 'react'
 import { CalendarClock, Film, Loader2, Radar, X } from 'lucide-react'
-import { dialog, overlay } from '../lib/motion'
 import { resolveLanguage, useT } from '../i18n'
 import { toast } from '../lib/toast'
 import { describeError } from '../lib/errors'
 import { releaseDate, releaseText } from '../lib/release'
 import { useStore } from '../store'
 import Thumbnail from './Thumbnail'
+import Modal from './Modal'
 import {
   exactDuplicate,
   inheritedSeen,
@@ -39,6 +38,7 @@ export default function AddWatchDialog({
   onAdded: (id: string) => void
 }): JSX.Element {
   const t = useT()
+  const titleId = useId()
   const locale = useStore((s) =>
     resolveLanguage(s.settings?.language ?? 'auto', s.appInfo?.locale ?? 'en')
   )
@@ -151,182 +151,169 @@ export default function AddWatchDialog({
   }
 
   return (
-    <AnimatePresence>
-      <motion.div
-        {...overlay}
-        className="fixed inset-0 flex items-center justify-center bg-canvas/80 p-6"
-        style={{ zIndex: 'var(--z-modal)' }}
-        onClick={onClose}
-      >
-        <motion.div
-          {...dialog}
-          role="dialog"
-          aria-modal="true"
-          className="panel w-full max-w-lg overflow-hidden"
-          onClick={(e) => e.stopPropagation()}
-        >
-          <div className="flex items-center gap-3 border-b border-edge px-4 py-3">
-            <h2 className="h2 flex-1">{t('auto.addTitle')}</h2>
-            <button className="btn-icon" onClick={onClose} aria-label={t('common.close')}>
-              <X size={15} />
+    <Modal onClose={onClose} labelledBy={titleId} className="panel w-full max-w-lg overflow-hidden">
+      <div className="flex items-center gap-3 border-b border-edge px-4 py-3">
+        <h2 className="h2 flex-1" id={titleId}>
+          {t('auto.addTitle')}
+        </h2>
+        <button className="btn-icon" onClick={onClose} aria-label={t('common.close')}>
+          <X size={15} />
+        </button>
+      </div>
+
+      <div className="space-y-4 p-4">
+        <div>
+          <p className="label mb-2">{t('auto.seriesUrl')}</p>
+          <div className="flex gap-2">
+            <input
+              value={url}
+              onChange={(e) => setUrl(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && void look()}
+              placeholder="https://…"
+              aria-label={t('auto.seriesUrl')}
+              className="field mono flex-1 text-[13px]"
+              spellCheck={false}
+              autoFocus
+            />
+            <button
+              className="btn-quiet"
+              onClick={() => void look()}
+              disabled={looking || !url.trim()}
+            >
+              {looking ? <Loader2 size={14} className="animate-spin" /> : null}
+              {t('auto.look')}
             </button>
           </div>
+          <p className="hint mt-1.5">{t('auto.seriesUrlHint')}</p>
+        </div>
 
-          <div className="space-y-4 p-4">
-            <div>
-              <p className="label mb-2">{t('auto.seriesUrl')}</p>
-              <div className="flex gap-2">
-                <input
-                  value={url}
-                  onChange={(e) => setUrl(e.target.value)}
-                  onKeyDown={(e) => e.key === 'Enter' && void look()}
-                  placeholder="https://…"
-                  aria-label={t('auto.seriesUrl')}
-                  className="field mono flex-1 text-[13px]"
-                  spellCheck={false}
-                  autoFocus
-                />
-                <button
-                  className="btn-quiet"
-                  onClick={() => void look()}
-                  disabled={looking || !url.trim()}
-                >
-                  {looking ? <Loader2 size={14} className="animate-spin" /> : null}
-                  {t('auto.look')}
-                </button>
+        {offer && (
+          <>
+            <div className="flex gap-3 border-t border-edge pt-4">
+              <Thumbnail
+                src={offer.thumbnail}
+                alt=""
+                className="h-24 w-16 shrink-0 rounded"
+                fallback={<Film size={18} className="text-ink-3" />}
+              />
+              <div className="min-w-0">
+                <p className="text-[14px] text-ink">{offer.title}</p>
+                <p className="hint mt-1">
+                  {offer.upcoming
+                    ? releaseText(offer.upcoming.releaseAt, t)
+                    : t('auto.dubCount', { n: String(offer.translators.length) })}
+                </p>
               </div>
-              <p className="hint mt-1.5">{t('auto.seriesUrlHint')}</p>
             </div>
 
-            {offer && (
-              <>
-                <div className="flex gap-3 border-t border-edge pt-4">
-                  <Thumbnail
-                    src={offer.thumbnail}
-                    alt=""
-                    className="h-24 w-16 shrink-0 rounded"
-                    fallback={<Film size={18} className="text-ink-3" />}
-                  />
-                  <div className="min-w-0">
-                    <p className="text-[14px] text-ink">{offer.title}</p>
-                    <p className="hint mt-1">
-                      {offer.upcoming
-                        ? releaseText(offer.upcoming.releaseAt, t)
-                        : t('auto.dubCount', { n: String(offer.translators.length) })}
-                    </p>
-                  </div>
+            {/*
+              Pointed out, not forbidden: a second watch at another quality
+              or for another share is a fair thing to want. Only an exact
+              copy, which could do nothing but fetch every episode twice,
+              cannot be added.
+            */}
+            {already && (
+              <div className="well flex gap-3 p-3">
+                <Radar size={16} className="mt-0.5 shrink-0 text-ink-2" />
+                <div className="min-w-0 flex-1">
+                  <p className="text-[13px] text-ink">{t('auto.alreadyWatching')}</p>
+                  <p className="hint mt-1">
+                    {copy ? t('auto.alreadySameQuality') : t('auto.alreadyHint')}
+                  </p>
                 </div>
-
-                {/*
-                  Pointed out, not forbidden: a second watch at another quality
-                  or for another share is a fair thing to want. Only an exact
-                  copy, which could do nothing but fetch every episode twice,
-                  cannot be added.
-                */}
-                {already && (
-                  <div className="well flex gap-3 p-3">
-                    <Radar size={16} className="mt-0.5 shrink-0 text-ink-2" />
-                    <div className="min-w-0 flex-1">
-                      <p className="text-[13px] text-ink">{t('auto.alreadyWatching')}</p>
-                      <p className="hint mt-1">
-                        {copy ? t('auto.alreadySameQuality') : t('auto.alreadyHint')}
-                      </p>
-                    </div>
-                    <button
-                      className="btn-quiet shrink-0 self-start"
-                      onClick={() => onAdded((copy || already).id)}
-                    >
-                      {t('auto.openExisting')}
-                    </button>
-                  </div>
-                )}
-
-                {offer.upcoming && (
-                  <div className="well flex gap-3 p-3">
-                    <CalendarClock size={16} className="mt-0.5 shrink-0 text-ink-2" />
-                    <div className="min-w-0">
-                      {offer.upcoming.releaseAt && (
-                        <p className="text-[13px] text-ink">
-                          {t('auto.releaseOn', {
-                            date: releaseDate(offer.upcoming.releaseAt, locale)
-                          })}
-                        </p>
-                      )}
-                      <p className="hint mt-1">{t('auto.upcomingNote')}</p>
-                    </div>
-                  </div>
-                )}
-
-                <div hidden={Boolean(offer.upcoming)}>
-                  <p className="label mb-2">{t('auto.dub')}</p>
-                  <select
-                    className="field w-full text-[13px]"
-                    aria-label={t('auto.dub')}
-                    value={translatorId}
-                    onChange={(e) => setTranslatorId(e.target.value)}
-                  >
-                    {offer.translators.map((x) => (
-                      <option key={x.id} value={x.id}>
-                        {x.name} — {t('auto.nEpisodes', { n: String(x.episodes) })}
-                        {x.premium ? ' ★' : ''}
-                      </option>
-                    ))}
-                  </select>
-                  <p className="hint mt-1.5">{t('auto.dubHint')}</p>
-                </div>
-
-                {!offer.upcoming && backlog.length > 0 && (
-                  <div>
-                    <label className="flex items-center gap-2.5 text-[13px] text-ink">
-                      <input
-                        type="checkbox"
-                        checked={backfill}
-                        onChange={(e) => setBackfill(e.target.checked)}
-                      />
-                      {t('auto.backfill', { n: String(backlog.length) })}
-                    </label>
-                    <p className="hint mt-1.5">
-                      {backfill && backlog.length > MAX_PER_CHECK
-                        ? t('auto.backfillBatches', { n: String(MAX_PER_CHECK) })
-                        : t('auto.backfillHint')}
-                    </p>
-                  </div>
-                )}
-
-                <div>
-                  <p className="label mb-2">{t('common.quality')}</p>
-                  <select
-                    className="field w-full text-[13px]"
-                    aria-label={t('common.quality')}
-                    value={quality}
-                    onChange={(e) => setQuality(e.target.value)}
-                  >
-                    {offer.qualities.map((q) => (
-                      <option key={q} value={q}>
-                        {q}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              </>
+                <button
+                  className="btn-quiet shrink-0 self-start"
+                  onClick={() => onAdded((copy || already).id)}
+                >
+                  {t('auto.openExisting')}
+                </button>
+              </div>
             )}
-          </div>
 
-          <div className="flex justify-end gap-2 border-t border-edge px-4 py-3">
-            <button className="btn-quiet" onClick={onClose}>
-              {t('common.cancel')}
-            </button>
-            <button
-              className="btn-solid"
-              onClick={() => void add()}
-              disabled={!offer || saving || Boolean(copy)}
-            >
-              {saving ? <Loader2 size={14} className="animate-spin" /> : null}
-              {already ? t('auto.addAnyway') : t('auto.startWatching')}
-            </button>
-          </div>
-        </motion.div>
-      </motion.div>
-    </AnimatePresence>
+            {offer.upcoming && (
+              <div className="well flex gap-3 p-3">
+                <CalendarClock size={16} className="mt-0.5 shrink-0 text-ink-2" />
+                <div className="min-w-0">
+                  {offer.upcoming.releaseAt && (
+                    <p className="text-[13px] text-ink">
+                      {t('auto.releaseOn', {
+                        date: releaseDate(offer.upcoming.releaseAt, locale)
+                      })}
+                    </p>
+                  )}
+                  <p className="hint mt-1">{t('auto.upcomingNote')}</p>
+                </div>
+              </div>
+            )}
+
+            <div hidden={Boolean(offer.upcoming)}>
+              <p className="label mb-2">{t('auto.dub')}</p>
+              <select
+                className="field w-full text-[13px]"
+                aria-label={t('auto.dub')}
+                value={translatorId}
+                onChange={(e) => setTranslatorId(e.target.value)}
+              >
+                {offer.translators.map((x) => (
+                  <option key={x.id} value={x.id}>
+                    {x.name} — {t('auto.nEpisodes', { n: String(x.episodes) })}
+                    {x.premium ? ' ★' : ''}
+                  </option>
+                ))}
+              </select>
+              <p className="hint mt-1.5">{t('auto.dubHint')}</p>
+            </div>
+
+            {!offer.upcoming && backlog.length > 0 && (
+              <div>
+                <label className="flex items-center gap-2.5 text-[13px] text-ink">
+                  <input
+                    type="checkbox"
+                    checked={backfill}
+                    onChange={(e) => setBackfill(e.target.checked)}
+                  />
+                  {t('auto.backfill', { n: String(backlog.length) })}
+                </label>
+                <p className="hint mt-1.5">
+                  {backfill && backlog.length > MAX_PER_CHECK
+                    ? t('auto.backfillBatches', { n: String(MAX_PER_CHECK) })
+                    : t('auto.backfillHint')}
+                </p>
+              </div>
+            )}
+
+            <div>
+              <p className="label mb-2">{t('common.quality')}</p>
+              <select
+                className="field w-full text-[13px]"
+                aria-label={t('common.quality')}
+                value={quality}
+                onChange={(e) => setQuality(e.target.value)}
+              >
+                {offer.qualities.map((q) => (
+                  <option key={q} value={q}>
+                    {q}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </>
+        )}
+      </div>
+
+      <div className="flex justify-end gap-2 border-t border-edge px-4 py-3">
+        <button className="btn-quiet" onClick={onClose}>
+          {t('common.cancel')}
+        </button>
+        <button
+          className="btn-solid"
+          onClick={() => void add()}
+          disabled={!offer || saving || Boolean(copy)}
+        >
+          {saving ? <Loader2 size={14} className="animate-spin" /> : null}
+          {already ? t('auto.addAnyway') : t('auto.startWatching')}
+        </button>
+      </div>
+    </Modal>
   )
 }

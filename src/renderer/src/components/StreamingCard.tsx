@@ -19,12 +19,20 @@ interface Props {
   /** Home's save folder for the job on screen; '' is the one in Settings. */
   saveDir: string
   onSaveDirChange: (dir: string) => void
+  /** An id for the title, so the search window's picker dialog can be named by it. */
+  titleId?: string
 }
 
 const pad2 = (n: number): string => String(n).padStart(2, '0')
 
 /** Translator → season → episodes → quality, in the order the site imposes. */
-export default function StreamingCard({ info, onDone, saveDir, onSaveDirChange }: Props): JSX.Element {
+export default function StreamingCard({
+  info,
+  onDone,
+  saveDir,
+  onSaveDirChange,
+  titleId
+}: Props): JSX.Element {
   const t = useT()
   const setView = useStore((s) => s.setView)
   const requestWatch = useStore((s) => s.requestWatch)
@@ -197,7 +205,9 @@ export default function StreamingCard({ info, onDone, saveDir, onSaveDirChange }
           fallback={<div className="h-24 w-16 shrink-0 rounded-2 bg-sink" />}
         />
         <div className="min-w-0 flex-1">
-          <h2 className="h2">{s.title}</h2>
+          <h2 className="h2" id={titleId}>
+            {s.title}
+          </h2>
           <p className="mono mt-1 text-[12px] text-ink-2">
             {s.isSeries
               ? seasonsForT.length > 1

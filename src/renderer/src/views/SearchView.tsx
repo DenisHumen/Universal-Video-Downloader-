@@ -1,6 +1,6 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useId, useRef, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
-import { dialog, enter, overlay, staggerChild, staggerParent } from '../lib/motion'
+import { enter, staggerChild, staggerParent } from '../lib/motion'
 import { Check, Download, ExternalLink, Loader2, Search, SearchX, X } from 'lucide-react'
 import type {
   AppErrorCode,
@@ -12,6 +12,7 @@ import type {
   SearchService
 } from '@shared/types'
 import StreamingCard from '../components/StreamingCard'
+import Modal from '../components/Modal'
 import Thumbnail from '../components/Thumbnail'
 import Choice from '../components/Choice'
 import EmptyState from '../components/EmptyState'
@@ -78,6 +79,7 @@ export default function SearchView({ settings, embedded = false }: Props): JSX.E
   const [probes, setProbes] = useState<Record<string, QualityProbe>>({})
   const [added, setAdded] = useState<Set<string>>(new Set())
   const [picker, setPicker] = useState<MediaInfo | null>(null)
+  const pickerTitleId = useId()
   const [pickerBusy, setPickerBusy] = useState<string | null>(null)
   /*
     The series picker shows a save folder and sends it, as it does on Home.
@@ -398,36 +400,30 @@ export default function SearchView({ settings, embedded = false }: Props): JSX.E
       {/* Anime episode/translator/quality picker */}
       <AnimatePresence>
         {picker && (
-          <motion.div
-            key="picker-backdrop"
-            {...overlay}
-            className="fixed inset-0 flex items-center justify-center bg-canvas/80 p-6"
-            style={{ zIndex: 'var(--z-modal)' }}
-            onClick={() => setPicker(null)}
+          <Modal
+            key="picker"
+            onClose={() => setPicker(null)}
+            labelledBy={pickerTitleId}
+            className="relative max-h-[86vh] w-full max-w-lg overflow-y-auto"
           >
-            <motion.div
-              {...dialog}
-              className="relative max-h-[86vh] w-full max-w-lg overflow-y-auto"
-              onClick={(e) => e.stopPropagation()}
+            <button
+              className="btn-icon absolute right-2 top-2 z-10 bg-raise"
+              onClick={() => setPicker(null)}
+              aria-label={t('common.close')}
             >
-              <button
-                className="btn-icon absolute right-2 top-2 z-10 bg-raise"
-                onClick={() => setPicker(null)}
-                aria-label={t('common.close')}
-              >
-                <X size={15} />
-              </button>
-              <StreamingCard
-                info={picker}
-                onDone={() => {
-                  setPicker(null)
-                  if (embedded) setView('downloads')
-                }}
-                saveDir={pickerDir}
-                onSaveDirChange={setPickerDir}
-              />
-            </motion.div>
-          </motion.div>
+              <X size={15} />
+            </button>
+            <StreamingCard
+              info={picker}
+              onDone={() => {
+                setPicker(null)
+                if (embedded) setView('downloads')
+              }}
+              saveDir={pickerDir}
+              onSaveDirChange={setPickerDir}
+              titleId={pickerTitleId}
+            />
+          </Modal>
         )}
       </AnimatePresence>
     </div>
