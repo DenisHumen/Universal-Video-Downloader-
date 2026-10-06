@@ -123,8 +123,20 @@ describe('runRefresh', () => {
   })
 
   it('never replaces the file once a download has started using it', async () => {
-    const s = steps(1, { busy: true })
+    const s = steps(1)
+    // The download starts while `-U` runs, after the first look found the engine free.
+    s.selfUpdate.mockImplementation(async () => {
+      s.isBusy.mockReturnValue(true)
+      return 1
+    })
     expect(await runRefresh(s)).toEqual({ kind: 'busy', code: 1 })
+    expect(s.download).not.toHaveBeenCalled()
+  })
+
+  it('does not even run the self-update while a download is using the engine', async () => {
+    const s = steps(0, { busy: true })
+    expect(await runRefresh(s)).toEqual({ kind: 'busy' })
+    expect(s.selfUpdate).not.toHaveBeenCalled()
     expect(s.download).not.toHaveBeenCalled()
   })
 })

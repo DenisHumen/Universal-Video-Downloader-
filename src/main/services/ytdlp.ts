@@ -175,7 +175,31 @@ function fetchToFile(url: string, tmp: string): Promise<void> {
   })
 }
 
-async function downloadBinary(): Promise<void> {
+/** The binary download in flight, shared by everyone who asks for one meanwhile. */
+let downloading: Promise<void> | null = null
+
+/**
+ * A fresh copy of the engine over the old one, one at a time.
+ *
+ * Three paths can ask for this: `ensureYtdlp` replacing a binary that will not
+ * start, the scheduled refresh falling back after a failed `-U`, and the button
+ * in Settings doing the same. All of them write the same `.download` file and
+ * rename it over the same binary, so two at once truncated each other's half
+ * of the file and whichever finished first moved the other's still-growing copy
+ * into place - a corrupt engine that the next `--version` could not start. A
+ * second caller now waits for the copy already on its way, which is the same
+ * latest release it would have fetched itself.
+ */
+function downloadBinary(): Promise<void> {
+  if (!downloading) {
+    downloading = fetchBinary().finally(() => {
+      downloading = null
+    })
+  }
+  return downloading
+}
+
+async function fetchBinary(): Promise<void> {
   const url = `${RELEASE_BASE}/${assetName()}`
   const dest = ytdlpBinaryPath()
   const tmp = `${dest}.download`
@@ -378,10 +402,21 @@ export async function updateYtdlp(isBusy: () => boolean = () => false): Promise<
       person who pressed the button, not be swallowed the way the background
       one's is.
     */
-    if (refreshing && (await refreshing)) {
-      const version = await getVersion()
-      emit({ state: 'ready', version, message: 'Ready' })
-      return version
+    if (refreshing) {
+      if (await refreshing) {
+        const version = await getVersion()
+        emit({ state: 'ready', version, message: 'Ready' })
+        return version
+      }
+      /*
+        The busy check at the top is stale by now. That wait lasts minutes
+        when the refresh fell back to a download, and a transfer started in
+        them is often why the refresh gave up: on Windows the rename over a
+        running yt-dlp.exe fails. Running `-U` beside it would replace the
+        file it runs from. Nothing has been emitted yet, so the engine card
+        still shows what the refresh left there.
+      */
+      if (isBusy()) throw new EngineBusyError()
     }
     emit({ state: 'checking', message: 'Updating download engine…' })
     try {
@@ -461,6 +496,21 @@ function markRefreshed(): void {
 export async function refreshEngineIfDue(isBusy: () => boolean): Promise<void> {
   // One at a time, and never beside the button in Settings: both replace one file.
   if (updating || refreshing) return
+  /*
+    Nor beside `ensureYtdlp`. When the binary on disk will not start, it is
+    downloading a replacement right now, and a `-U` on the broken file can only
+    fail and fall back to a download of its own. Wait for it, then look again,
+    since the button may have been pressed meanwhile. If it failed there is no
+    working engine to refresh, and the next detection or download installs one.
+  */
+  if (ensurePromise) {
+    try {
+      await ensurePromise
+    } catch {
+      return
+    }
+    if (updating || refreshing) return
+  }
   const state = readRefreshState()
   if (!refreshDue(state, Date.now())) return
   /*

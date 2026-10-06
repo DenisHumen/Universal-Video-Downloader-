@@ -124,8 +124,12 @@ export interface RefreshSteps {
 
 export type RefreshOutcome =
   | { kind: 'done'; via: 'self-update' | 'fresh download' }
-  /** `-U` failed and a download started while it ran; nothing was replaced. */
-  | { kind: 'busy'; code: number }
+  /**
+   * A download was using the engine, so nothing was replaced. `code` is the
+   * exit code of a `-U` that failed before the download started, and absent
+   * when one was already running and `-U` never ran.
+   */
+  | { kind: 'busy'; code?: number }
   | { kind: 'failed'; code: number; error: string }
 
 /**
@@ -140,8 +144,14 @@ export type RefreshOutcome =
  * seconds and a download may have started in them. Replacing the file then is
  * the very thing the busy check exists to prevent: on Windows the rename fails
  * outright while the executable is loaded.
+ *
+ * It is asked first as well. `-U` replaces the same file, and both callers had
+ * to remember to ask just before calling this; the button in Settings asked
+ * once and then waited minutes for the scheduled refresh, long enough for a
+ * download to start. Here no caller can forget.
  */
 export async function runRefresh(steps: RefreshSteps): Promise<RefreshOutcome> {
+  if (steps.isBusy()) return { kind: 'busy' }
   const code = await steps.selfUpdate()
   if (code === 0) return { kind: 'done', via: 'self-update' }
   if (steps.isBusy()) return { kind: 'busy', code }
