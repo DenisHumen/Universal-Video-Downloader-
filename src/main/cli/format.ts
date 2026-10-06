@@ -1,4 +1,4 @@
-import type { AppErrorCode } from '@shared/types'
+import type { AppErrorCode, QualityPreset } from '@shared/types'
 
 /**
  * The command line's words: what it accepts, what it prints while it works,
@@ -23,11 +23,40 @@ export function cliArgvFrom(argv: string[]): string[] | null {
   return at === -1 ? null : argv.slice(at + 1)
 }
 
+/**
+ * The heights `--quality` takes: the same ladder the app's quality picker and
+ * its default-quality setting offer, so a script and the window mean the same
+ * thing by "1080".
+ */
+export const CLI_QUALITIES = ['best', '2160', '1440', '1080', '720', '480', '360'] as const
+
+/** One of the ladder's rungs; each is a `QualityPreset` the downloader already reads. */
+export type CliQuality = (typeof CLI_QUALITIES)[number] & QualityPreset
+
+const QUALITY_LIST = 'best, 2160, 1440, 1080, 720, 480 or 360'
+
+/**
+ * A quality as somebody types it, or null when it is not one of the ladder's.
+ *
+ * "1080p" and "4K" are how heights are written everywhere else, including on
+ * the app's own buttons, so they are read as the numbers they stand for rather
+ * than refused on a technicality. Anything else is refused outright: when no
+ * format fits a height the engine falls back to the best there is, so a typo
+ * such as "72" would quietly cost a download many times the size asked for.
+ */
+export function parseQuality(value: string): CliQuality | null {
+  const text = value.trim().toLowerCase()
+  const normalised = text === '4k' ? '2160' : text.replace(/^(\d+)p$/, '$1')
+  return (CLI_QUALITIES as readonly string[]).includes(normalised) ? (normalised as CliQuality) : null
+}
+
 export interface CliOptions {
   links: string[]
   /** A folder to save into instead of the one in Settings. */
   output?: string
   audio: boolean
+  /** The tallest video to take; `best` takes whatever the site has. */
+  quality: CliQuality
   help: boolean
   version: boolean
   /** What was wrong with the command line, if anything. */
@@ -35,7 +64,17 @@ export interface CliOptions {
 }
 
 export function parseCliArgs(args: string[]): CliOptions {
-  const options: CliOptions = { links: [], audio: false, help: false, version: false }
+  const options: CliOptions = { links: [], audio: false, quality: 'best', help: false, version: false }
+  // Whether -q was given at all, since `-q best -a` is as contradictory as `-q 720 -a`.
+  let qualityGiven = false
+  const takeQuality = (flag: string, value: string | undefined): string | undefined => {
+    if (!value) return `${flag} needs a quality after it: ${QUALITY_LIST}.`
+    const quality = parseQuality(value)
+    if (!quality) return `${flag} takes ${QUALITY_LIST}, not "${value}".`
+    options.quality = quality
+    qualityGiven = true
+    return undefined
+  }
   for (let i = 0; i < args.length; i++) {
     const arg = args[i]
     if (arg === '-h' || arg === '--help') options.help = true
@@ -46,12 +85,26 @@ export function parseCliArgs(args: string[]): CliOptions {
       if (!value) return { ...options, error: `${arg} needs a folder after it.` }
       options.output = value
     } else if (arg.startsWith('--output=')) options.output = arg.slice('--output='.length)
-    else if (arg === '--') {
+    else if (arg === '-q' || arg === '--quality') {
+      const error = takeQuality(arg, args[++i])
+      if (error) return { ...options, error }
+    } else if (arg.startsWith('--quality=')) {
+      const error = takeQuality('--quality', arg.slice('--quality='.length))
+      if (error) return { ...options, error }
+    } else if (arg === '--') {
       // Everything after `--` is a link, even one that starts with a dash.
       options.links.push(...args.slice(i + 1).map((a) => a.trim()).filter(Boolean))
       break
     } else if (arg.startsWith('-')) return { ...options, error: `Unknown option: ${arg}` }
     else if (arg.trim()) options.links.push(arg.trim())
+  }
+  /*
+    The engine ignores a video height when it is asked for sound only, so the
+    two together would download something other than what one of them says.
+    Better to ask than to guess which one was meant.
+  */
+  if (qualityGiven && options.audio && !options.error) {
+    options.error = '--quality picks a video size, so it does nothing with --audio. Leave one of them out.'
   }
   if (!options.help && !options.version && !options.error && options.links.length === 0) {
     options.error = 'Give it a link to download.'
@@ -65,6 +118,9 @@ Downloads the video at each link in the best quality it offers, into your
 Downloads folder (or the folder chosen in the app's settings).
 
 Options:
+  -q, --quality <best|2160|1440|1080|720|480|360>
+                         take at most this height (1080p and 4K work too);
+                         a site without it gives the best it has
   -o, --output <folder>  save into this folder instead
   -a, --audio            save the audio only
   -V, --version          print the version

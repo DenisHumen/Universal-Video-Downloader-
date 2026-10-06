@@ -29,7 +29,8 @@ import {
   postprocessLine,
   progressLine,
   USAGE,
-  type CliOptions
+  type CliOptions,
+  type CliQuality
 } from './format'
 
 /**
@@ -143,20 +144,21 @@ async function run(options: CliOptions): Promise<number> {
   let worst = 0
   for (const link of options.links) {
     if (stopping) break
-    const code = await download(link, outputDir, options.audio)
+    const code = await download(link, outputDir, options.audio, options.quality)
     worst = Math.max(worst, code)
   }
   return worst
 }
 
-function download(link: string, outputDir: string, audio: boolean): Promise<number> {
+function download(link: string, outputDir: string, audio: boolean, quality: CliQuality): Promise<number> {
   const settings = getSettings()
   const item: DownloadItem = {
     id: randomUUID(),
     url: normalizeUrl(link),
     title: '',
     mode: audio ? 'audio' : 'video',
-    quality: 'best',
+    // The same preset the window's quality picker hands the downloader.
+    quality: audio ? 'audio' : quality,
     state: 'downloading',
     percent: 0,
     outputDir,
