@@ -100,10 +100,10 @@ uvd https://www.youtube.com/watch?v=jNQXAC9IVRw
 | **Cut and convert** | Download only the part you need, re-cut finished files, convert to MP4 / MKV / WebM / MOV / GIF or extract MP3 / M4A / FLAC / OPUS. |
 | **Search by title** | YouTube, SoundCloud, Dailymotion, Bilibili, Niconico and the YummyAnime catalogue, one service or all at once. PornHub too, once switched on in Settings. |
 | **Built-in browser** | For the stubborn page: open it, press play, and every stream it loads appears in a side panel, one click from the queue. |
-| **Series and playlists** | Voiceovers, seasons and episodes on HDrezka and YummyAnime; playlists and channels as a pickable list; a whole list of links at once. |
+| **Series and playlists** | Voiceovers, seasons and episodes on HDrezka, YummyAnime and AniLiberty; playlists and channels as a pickable list; a whole list of links at once. |
 | **Watch a series** | New episodes downloaded, renamed, sent to an SMB share and announced in Telegram, on a schedule. |
 | **Sign-in videos** | Age-gated and members-only videos with cookies from your browser or a `cookies.txt`. |
-| **Extras** | Subtitles, thumbnails and chapters embedded, SponsorBlock, per-site folders, filename template, speed limit, proxy, two themes. |
+| **Extras** | Subtitles, thumbnails and chapters embedded, SponsorBlock, per-site folders, filename template, speed limit, proxy, two themes, and a backup file that carries settings and watched series to a new computer. |
 
 ## Screenshots
 

@@ -24,6 +24,8 @@ const NOW = Date.UTC(2026, 9, 6, 12, 0, 0)
 
 const settings = (over: Partial<AppSettings> = {}): AppSettings => ({
   downloadDir: '/home/demo/Videos',
+  keepFinished: 0,
+  showAdultServices: false,
   concurrentDownloads: 3,
   defaultMode: 'video',
   defaultQuality: 'best',
