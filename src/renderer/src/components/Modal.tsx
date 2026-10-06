@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactNode, type RefObject } from 'react'
+import { useEffect, useRef, type ReactNode, type RefObject } from 'react'
 import { motion, useIsPresent } from 'framer-motion'
 import { dialog, overlay } from '../lib/motion'
 import {
@@ -131,21 +131,45 @@ export default function Modal({
   */
   const close = useRef(onClose)
   close.current = onClose
+  const present = useIsPresent()
   /*
-    Read while rendering, before anything inside commits. By the time an effect
+    Where focus was when the dialog appeared, so it can go back there. Read
+    while rendering, before anything inside commits: by the time an effect
     runs, an `autoFocus` field in the dialog has already taken focus, and the
     control that opened the dialog would be lost.
+
+    Read again each time the dialog appears, not once per mount.
+    AnimatePresence keeps the same instance when a dialog is reopened during
+    its exit animation, as Ctrl+/ pressed twice in quick succession does, and
+    by then focus has been handed back to the page and may have moved on.
   */
-  const [previous] = useState(() => document.activeElement as HTMLElement | null)
-  const release = useRef<(() => void) | null>(null)
-  const present = useIsPresent()
+  const previous = useRef<HTMLElement | null>(null)
+  const wasPresent = useRef(false)
+  if (present !== wasPresent.current) {
+    if (present) previous.current = document.activeElement as HTMLElement | null
+    wasPresent.current = present
+  }
   // Set by a press that starts on the backdrop itself; see the click handler.
   const pressedBackdrop = useRef(false)
 
+  /*
+    The dialog holds the stack, the keyboard and focus while it is present,
+    not while it is mounted.
+
+    A dialog animating out under AnimatePresence is closed already. Letting go
+    as the exit starts, not when it ends, means the next Esc goes to whatever
+    is underneath and focus is back on the page while the panel fades.
+
+    A dialog reopened before that exit finished is the same instance coming
+    back, so it has to take all of it again. When this ran once per mount, the
+    shortcut list reopened that way ignored Esc, since it was no longer on the
+    stack, and let Tab walk onto the page behind it.
+  */
   useEffect(() => {
+    if (!present) return
+    const node = panel.current
     const unregister = register({ close: () => close.current() }, () => panel.current)
 
-    const node = panel.current
     if (node && !node.contains(document.activeElement)) {
       const first =
         initialFocus?.current ??
@@ -156,15 +180,13 @@ export default function Modal({
       first.focus()
     }
 
-    let done = false
-    release.current = () => {
-      if (done) return
-      done = true
+    return () => {
       unregister()
       // Back where the keyboard was, not at the top of the document - unless
       // that control went away with what the dialog did, like a removed row.
-      if (previous && previous !== document.body && document.contains(previous)) {
-        previous.focus()
+      const back = previous.current
+      if (back && back !== document.body && document.contains(back)) {
+        back.focus()
         return
       }
       /*
@@ -174,20 +196,10 @@ export default function Modal({
         its exit animation and would otherwise keep it, invisibly.
       */
       const active = document.activeElement
-      if (active instanceof HTMLElement && panel.current?.contains(active)) active.blur()
+      if (active instanceof HTMLElement && node?.contains(active)) active.blur()
     }
-    return () => release.current?.()
-    // Once per dialog: see `close` above.
+    // Keyed on presence alone: see `close` above.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
-
-  /*
-    A dialog animating out under AnimatePresence is closed already. Letting go
-    now, not when the exit animation ends, means the next Esc goes to whatever
-    is underneath and focus is back on the page while the panel fades.
-  */
-  useEffect(() => {
-    if (!present) release.current?.()
   }, [present])
 
   return (
