@@ -424,7 +424,7 @@ export const ru: Dictionary = {
   'err.emptyPage': 'на этой странице не нашлось видео.',
   'err.cutFailed': 'с выбранного места начала ничего не записалось, так что обрабатывать было нечего. попробуйте скачать целиком, а потом обрезать готовый файл.',
   'err.unsupportedPlayer': 'такой плеер Kodik пока не поддерживается.',
-  'err.notOnYummyAnime': 'этого тайтла нет на YummyAnime, откуда приложение скачивает ссылки с Shikimori.',
+  'err.notOnYummyAnime': 'этого тайтла нет на YummyAnime — а видео по ссылкам с Shikimori приложение берёт именно оттуда.',
   'err.cookieHint': 'попробуйте включить cookies браузера в настройках → доступ.',
   'common.save': 'сохранить',
   'nav.automation': 'слежение',
