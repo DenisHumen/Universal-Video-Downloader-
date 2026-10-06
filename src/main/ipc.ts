@@ -48,6 +48,7 @@ import {
 import { forwardQueueEvents } from './services/queue-events'
 import { getSettings, resetSettings, setSettings } from './services/settings'
 import { forgetFailures, previewReport, sendReport } from './services/report'
+import { getCliStatus, installCli } from './services/cli-install'
 import { isReportMailto } from '@shared/report'
 import {
   EngineBusyError,
@@ -257,6 +258,14 @@ export function registerIpc({ getWindow, openSearchWindow, onSettingsChanged }: 
   ipcMain.handle(IPC.updateDownload, () => downloadUpdate())
   ipcMain.handle(IPC.updateInstall, () => quitAndInstall())
   ipcMain.handle(IPC.updateOpenPage, () => openReleasesPage())
+
+  // ---- Terminal command ----
+  ipcMain.handle(IPC.cliStatus, () => getCliStatus())
+  // It writes outside the app's own folders, on a Mac as administrator.
+  ipcMain.handle(IPC.cliInstall, (event) => {
+    requireRenderer(event, IPC.cliInstall)
+    return installCli()
+  })
 
   // ---- App / window ----
   ipcMain.handle(IPC.appInfo, () => ({

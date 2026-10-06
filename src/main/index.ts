@@ -40,6 +40,7 @@ import { currentLanguage, mt, type MainLanguage } from './services/locale'
 import type { AppSettings, PendingDelivery } from '@shared/types'
 import { cliArgvFrom } from './cli/format'
 import { startCli } from './cli/run'
+import { refreshCliScript } from './services/cli-install'
 
 const isMac = process.platform === 'darwin'
 let mainWindow: BrowserWindow | null = null
@@ -583,6 +584,9 @@ if (cliArgs) {
 
     // Prepare the download engine in the background.
     ensureYtdlp().catch((err) => log.error('engine', 'Setup failed', { error: String(err) }))
+
+    // An update renames an AppImage; the `uvd` written for the old name follows it here.
+    refreshCliScript()
 
     /*
       Pick up whatever the last shutdown cut short.

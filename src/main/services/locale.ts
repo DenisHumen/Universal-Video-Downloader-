@@ -41,7 +41,9 @@ const EN = {
   'tray.quit': 'Quit',
   'notify.done': 'Download complete',
   'notify.failed': 'Download failed',
-  'pick.hint': 'Click the video you want · Esc to cancel'
+  'pick.hint': 'Click the video you want · Esc to cancel',
+  // The macOS password prompt; the system adds its own line asking for the password.
+  'cli.adminPrompt': 'Universal Video Downloader wants to add the uvd command to /usr/local/bin, so that it can be typed in a terminal.'
 } as const
 
 export type MainKey = keyof typeof EN
@@ -64,7 +66,8 @@ const RU: Record<MainKey, string> = {
   'tray.quit': 'Выход',
   'notify.done': 'Загрузка завершена',
   'notify.failed': 'Загрузка не удалась',
-  'pick.hint': 'Нажмите на нужное видео · Esc — отмена'
+  'pick.hint': 'Нажмите на нужное видео · Esc — отмена',
+  'cli.adminPrompt': 'Universal Video Downloader хочет добавить команду uvd в /usr/local/bin, чтобы её можно было набирать в терминале.'
 }
 
 const DICTIONARIES: Record<MainLanguage, Record<MainKey, string>> = { en: EN, ru: RU }
