@@ -2,6 +2,11 @@
  * English strings — the source of truth. Every other locale is typed against
  * this object, so a missing translation is a compile error rather than a
  * mystery blank label at runtime.
+ *
+ * A counted string lists its plural forms '|'-separated, in the order its
+ * language writes them (English: one|other, Russian: one|few|many), with the
+ * number as {count}. Those are read with tp(), never t(), which would print
+ * every form at once.
  */
 export const en = {
   // ---- common ----
@@ -65,7 +70,7 @@ export const en = {
   'home.openAccessSettings': 'open settings → access',
   'home.batch': 'multiple links',
   'home.batchHint': 'one link per line — each becomes its own download',
-  'home.batchAdd': 'queue {count} links',
+  'home.batchAdd': 'queue {count} link|queue {count} links',
   'home.batchOpen': 'paste several links at once',
   'home.universal': 'found by universal detection',
   'home.universalHint':
@@ -88,8 +93,7 @@ export const en = {
 
   // ---- queue ----
   'queue.title': 'queue',
-  'queue.items': '{count} items',
-  'queue.item': '{count} item',
+  'queue.items': '{count} item|{count} items',
   'queue.empty': 'nothing here yet',
   'queue.emptyHint': 'paste a link to get started',
   'queue.emptyFiltered': 'nothing matches this filter',
@@ -122,7 +126,7 @@ export const en = {
   'queue.copyError': 'copy the error',
   'queue.retryingIn': 'retrying automatically…',
   'queue.onShare': 'on the share: {path}',
-  'queue.openFailed': 'could not open that file - it may have been moved or deleted',
+  'queue.openFailed': 'could not open that file — it may have been moved or deleted',
 
   // ---- download states ----
   'state.queued': 'queued',
@@ -138,13 +142,13 @@ export const en = {
   'state.canceled': 'canceled',
 
   // ---- playlist ----
-  'playlist.videos': '{count} videos',
+  'playlist.videos': '{count} video|{count} videos',
   'playlist.downloadAll': 'download all ({count})',
   'playlist.selected': 'download selected ({count})',
   'playlist.selectAll': 'select all',
   'playlist.range': 'items',
   'playlist.selectRange': 'select range',
-  'playlist.added': 'added {count} videos to the queue',
+  'playlist.added': 'added {count} video to the queue|added {count} videos to the queue',
   'playlist.numbering': 'number the files',
   'playlist.numberingHint': '01 - title, in the order of the list',
   'playlist.folder': 'put them in a folder of their own',
@@ -167,7 +171,7 @@ export const en = {
   'streaming.movie': 'movie',
   'streaming.episode': 'episode',
   'streaming.follow': 'follow new episodes',
-  'streaming.watching': 'watching already - show it',
+  'streaming.watching': 'watching already — show it',
   'streaming.selectEpisode': 'select at least one episode',
   'streaming.latest': 'latest',
   'streaming.latestHint': 'the newest episode of the last season',
@@ -177,7 +181,7 @@ export const en = {
   'format.audioFormat': 'audio format',
   'format.plusAudio': '+ audio',
   'format.upTo': 'up to {height}p',
-  'format.subtitles': '{count} subtitle tracks',
+  'format.subtitles': '{count} subtitle track|{count} subtitle tracks',
   'format.youGet': 'you get',
 
   // ---- search ----
@@ -263,7 +267,7 @@ export const en = {
   'settings.restrictFilenamesHint': 'ascii-only, no spaces',
   'settings.filenameTemplate': 'filename template',
   'settings.filenameTemplateUnsafe':
-    'a template has to stay inside the download folder - no leading slash, no drive letter, no ..',
+    'a template has to stay inside the download folder — no leading slash, no drive letter, no ..',
   'settings.filenameTemplateHint': 'yt-dlp output template',
   'settings.templateExample': 'a video would be saved as',
   'settings.templateExamplePlaylist': 'the same video from a playlist',
@@ -353,7 +357,7 @@ export const en = {
   // ---- mac notice ----
   'mac.title': 'macOS says the app is “damaged” or won’t open?',
   'mac.why':
-    'It isn’t — the build has no paid Apple certificate, so Gatekeeper quarantines it. Run this once in Terminal:',
+    'it isn’t — the build has no paid Apple certificate, so Gatekeeper quarantines it. run this once in Terminal:',
 
   // ---- shortcuts ----
   'shortcuts.title': 'keyboard shortcuts',
@@ -371,7 +375,7 @@ export const en = {
   'cap.title': 'what this does',
   'cap.watch.title': 'follow a series',
   'cap.watch.body':
-    'Paste a link to a series once. Every new episode is downloaded as it appears, and can be renamed, sent to a share and announced in Telegram.',
+    'paste a link to a series once. every new episode is downloaded as it appears, and can be renamed, sent to a share and announced in Telegram.',
   'cap.link.title': 'paste any link',
   'cap.link.body':
     '1800+ sites natively, and for the rest the app reads the page — or watches it in a hidden browser — to find the stream itself.',
@@ -379,14 +383,14 @@ export const en = {
   'cap.search.body': 'YouTube, SoundCloud, Dailymotion, Bilibili, Niconico, anime and more, at once.',
   'cap.trim.title': 'cut before you download',
   'cap.trim.body':
-    'Pick a start and end — only that part is fetched. Already-downloaded files can be trimmed too.',
+    'pick a start and end — only that part is fetched. already-downloaded files can be trimmed too.',
   'cap.convert.title': 'convert anything',
   'cap.convert.body': 'MP4, MKV, WebM, MOV, GIF, or extract audio as MP3, FLAC, OPUS…',
   'cap.channel.title': 'whole channels & playlists',
-  'cap.channel.body': 'Paste a channel or playlist link and queue all of it — or just a range.',
+  'cap.channel.body': 'paste a channel or playlist link and queue all of it — or just a range.',
   'cap.browser.title': 'built-in browser',
   'cap.browser.body':
-    'Nothing found automatically? Browse to the video, click it, and download it by hand.',
+    'nothing found automatically? browse to the video, click it, and download it by hand.',
 
   // ---- trim ----
   'trim.title': 'trim',
@@ -398,7 +402,7 @@ export const en = {
   'trim.reset': 'whole video',
   'trim.precise': 'exact cut',
   'trim.fast': 'fast cut',
-  'trim.preciseHint': 're-encodes so the cut lands exactly here — slower, but no leftover intro',
+  'trim.preciseHint': 're-encodes so the cut lands exactly here — slower, but nothing extra at the start',
   'trim.fastHint':
     'copies the stream — near-instant, but the clip can start seconds early and run longer than asked',
   'settings.engineUpdated': 'download engine updated',
@@ -451,6 +455,7 @@ export const en = {
   */
   'stamp.update': 'update',
   'stamp.clipboard': 'clipboard',
+  'stamp.error': 'error',
 
   // ---- screen reader announcements ----
   'a11y.scrollLeft': 'scroll left',
@@ -510,9 +515,9 @@ export const en = {
   'auto.add': 'add',
   'auto.empty': 'nothing is being watched yet',
   'auto.emptyHint':
-    'paste a link to a series and each new episode is downloaded as it appears - then renamed, sent to a share and announced, if you ask',
+    'paste a link to a series and each new episode is downloaded as it appears — then renamed, sent to a share and announced, if you ask',
   'auto.failingCount': '{n} watched series failing',
-  'auto.notifyTo': 'Telegram - chat {id}',
+  'auto.notifyTo': 'Telegram — chat {id}',
   'auto.pickOne': 'pick a series on the left',
   'auto.failing': 'last check failed',
   'auto.runFailing': 'last episode failed',
@@ -535,6 +540,22 @@ export const en = {
   'time.min': 'min',
   'time.h': 'h',
   'time.d': 'd',
+  /*
+    The figures on a running download. They were English symbols whatever the
+    language — a Russian queue said "осталось 1m 35s", where "m" reads as
+    metres — so each is a word in the dictionary now. Time left is a whole
+    pattern rather than a unit, because languages space and order it
+    differently.
+  */
+  'time.eta.s': '{s}s',
+  'time.eta.m': '{m}m {s}s',
+  'time.eta.h': '{h}h {m}m',
+  'bytes.B': 'B',
+  'bytes.KB': 'KB',
+  'bytes.MB': 'MB',
+  'bytes.GB': 'GB',
+  'bytes.TB': 'TB',
+  'speed.perSecond': '/s',
   'auto.interval': 'how often to check',
   'auto.pause': 'pause',
   'auto.resume': 'resume',
@@ -543,12 +564,12 @@ export const en = {
   'auto.checkQueuedOne': 'a new episode is in the queue',
   'auto.checkQueued': '{n} new episodes are in the queue',
   'auto.checkQueuedSome': '{fresh} new episodes found; {n} are in the queue, the rest come with the next check',
-  'auto.checkPaused': 'paused - found {n} new; resume to download them',
-  'auto.checkBusy': 'already on it - still checking or downloading',
+  'auto.checkPaused': 'paused — found {n} new; resume to download them',
+  'auto.checkBusy': 'already on it — still checking or downloading',
   'auto.checkNotOut': 'not out yet, expected {date}',
   'auto.remove': 'stop watching',
   'auto.removeConfirm': 'stop watching this series?',
-  'auto.removeConfirmBody': '{title} will no longer be checked, and its history here goes with it. An episode downloading for it now is stopped; downloads already on disk are untouched.',
+  'auto.removeConfirmBody': '{title} will no longer be checked, and its history here goes with it. an episode downloading for it now is stopped; downloads already on disk are untouched.',
   'auto.pipeline': 'what happens with a new episode',
   'auto.always': 'always first',
   'auto.history': 'what has happened',
@@ -561,11 +582,11 @@ export const en = {
   'auto.run.done': 'done',
   'auto.run.failed': 'failed',
   'auto.run.skipped': 'skipped',
-  'auto.runWillRetry': 'attempt {n} of {max} - trying again at the next check',
+  'auto.runWillRetry': 'attempt {n} of {max} — trying again at the next check',
   'auto.retryRun': 'try again',
   'auto.retryStarted': 'trying this episode again',
-  'auto.retryPaused': 'paused - resume the series to try this episode again',
-  'auto.runQueuePaused': 'paused in the queue - resume it there to carry on',
+  'auto.retryPaused': 'paused — resume the series to try this episode again',
+  'auto.runQueuePaused': 'paused in the queue — resume it there to carry on',
   'auto.showInQueue': 'show in the queue',
   'auto.addTitle': 'watch a series',
   'auto.seriesUrl': 'link to the series',
@@ -573,8 +594,8 @@ export const en = {
   'auto.look': 'look',
   'auto.dub': 'which translation',
   'auto.dubHint': 'dubs carry different numbers of episodes, so this decides what counts as new',
-  'auto.dubCount': '{n} translations available',
-  'auto.nEpisodes': '{n} episodes',
+  'auto.dubCount': '{count} translation available|{count} translations available',
+  'auto.nEpisodes': '{count} episode|{count} episodes',
   'auto.startWatching': 'start watching',
   'auto.backfill': 'also download the episodes already out ({n})',
   'auto.backfillHint': 'unticked, only episodes released from now on are fetched',
@@ -583,13 +604,13 @@ export const en = {
   'auto.alreadyHint':
     'a second watch makes sense at another quality or for another share. it skips the episodes the first one has handled',
   'auto.alreadySameQuality':
-    'at the same quality it would only fetch every episode twice - pick another quality to add a second one',
+    'at the same quality it would only fetch every episode twice — pick another quality to add a second one',
   'auto.openExisting': 'open it',
   'auto.addAnyway': 'add anyway',
   'auto.template': 'filename',
   'auto.templateHint': 'tokens: {title} {season} {episode} {season2} {episode2} {quality} {year}',
   'auto.templateNoEpisode':
-    'there is no {episode} here, so the episode number goes on the end - otherwise each episode would replace the one before',
+    'there is no {episode} here, so the episode number goes on the end — otherwise each episode would replace the one before',
   'auto.templateNoSeason':
     'there is no {season} here: episodes of different seasons would share names and replace each other',
   'auto.replacements': 'replace in the title',
@@ -606,7 +627,7 @@ export const en = {
   'auto.notifyHint': 'sends a message when an episode arrives, when one fails, and when the page cannot be checked three times running',
   'auto.preview': 'this would produce',
   'auto.stepEnabled': 'this step is on',
-  'auto.shareNew': 'a different share...',
+  'auto.shareNew': 'a different share…',
   'auto.sharePath': 'path',
   'auto.sharePathHint':
     'the whole path, written the way you would type it into an address bar. any folder that is not there yet gets created',
@@ -619,8 +640,8 @@ export const en = {
   'auto.passwordMissing': 'no password saved',
   'auto.removeShareConfirm': 'remove this share?',
   'auto.removeShareConfirmBody':
-    '{name} and its saved password will be removed. Upload steps that send to it will fail until they are pointed at another share.',
-  'auto.secretKept': 'saved - leave blank to keep it',
+    '{name} and its saved password will be removed. upload steps that send to it will fail until they are pointed at another share.',
+  'auto.secretKept': 'saved — leave blank to keep it',
   'auto.secretHint': 'kept encrypted by your operating system, never in a settings file',
   'auto.shareLabel': 'name it',
   'auto.shareLabelHint': 'how it appears in lists here. optional',

@@ -1,5 +1,5 @@
 import type { AppErrorCode } from '@shared/types'
-import type { TranslateFn, TranslationKey } from '../i18n'
+import { t as tNow, type TranslateFn, type TranslationKey } from '../i18n'
 
 /**
  * Say what went wrong in the user's language.
@@ -85,10 +85,13 @@ export function errorReport(t: TranslateFn, failure: FailureLike & { log?: strin
  * message itself is kept verbatim, so whatever main went to the trouble of
  * saying still reaches the screen.
  *
- * `fallback` is for the rare throw that carries no words at all; callers pass
- * a translated line so even that case doesn't drop into English.
+ * `fallback` is for the rare throw that carries no words at all. A caller that
+ * knows what was being attempted passes its own translated line; the rest get
+ * the translated "something went wrong" — it used to be that sentence in
+ * English, so the one toast with nothing else to say said it in the wrong
+ * language.
  */
-export function describeError(err: unknown, fallback = 'Something went wrong.'): string {
+export function describeError(err: unknown, fallback: string = tNow('error.title')): string {
   let text = (err instanceof Error ? err.message : String(err ?? '')).trim()
 
   // Electron: "Error invoking remote method '<channel>': <the actual error>"

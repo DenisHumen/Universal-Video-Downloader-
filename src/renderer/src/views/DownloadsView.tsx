@@ -14,7 +14,7 @@ import {
 import type { DownloadItem } from '@shared/types'
 import { useStore } from '../store'
 import { formatBytes, formatEta, formatSpeed } from '../lib/format'
-import { useT, type TranslationKey } from '../i18n'
+import { useT, useTp, type TranslationKey } from '../i18n'
 import QueueRow from '../components/QueueRow'
 import Choice from '../components/Choice'
 import EmptyState from '../components/EmptyState'
@@ -63,6 +63,7 @@ const PAGE = 100
  */
 export default function DownloadsView(): JSX.Element {
   const t = useT()
+  const tp = useTp()
   const downloads = useStore((s) => s.downloads)
   const settings = useStore((s) => s.settings)
   const setView = useStore((s) => s.setView)
@@ -156,9 +157,7 @@ export default function DownloadsView(): JSX.Element {
   const totalEta = totalSpeed > 0 && remainingBytes > 0 ? remainingBytes / totalSpeed : 0
 
   const summary = [
-    downloads.length === 1
-      ? t('queue.item', { count: 1 })
-      : t('queue.items', { count: downloads.length }),
+    tp('queue.items', downloads.length),
     totalSpeed > 0 ? formatSpeed(totalSpeed) : null,
     remainingBytes > 0 ? t('queue.remaining', { size: formatBytes(remainingBytes) }) : null,
     totalEta > 0 ? t('queue.etaAll', { time: formatEta(totalEta) }) : null

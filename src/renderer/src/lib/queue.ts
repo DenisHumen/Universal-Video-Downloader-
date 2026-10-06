@@ -2,7 +2,7 @@ import type { DownloadRequest } from '@shared/types'
 import { useStore } from '../store'
 import { toast } from './toast'
 import { describeError } from './errors'
-import { t } from '../i18n'
+import { t, tp } from '../i18n'
 
 export interface QueueResult {
   /** Items that became new queue entries. */
@@ -72,7 +72,7 @@ export async function queueDownloads(requests: DownloadRequest[]): Promise<boole
   if (duplicates) {
     toast(t('queue.addedWithDuplicates', { count: added, duplicates }), added ? 'success' : 'info')
   } else {
-    toast(t('playlist.added', { count: added }), 'success')
+    toast(tp('playlist.added', added), 'success')
   }
   return added > 0 || (duplicates > 0 && failed === 0)
 }

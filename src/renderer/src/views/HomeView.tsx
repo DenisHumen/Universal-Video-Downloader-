@@ -36,7 +36,7 @@ import { detectIsDone, errorLead } from '../lib/emphasis'
 import { queueDownload, queueDownloads } from '../lib/queue'
 import { escapeClearsHome, linkIn } from '../lib/shortcuts'
 import { toClock } from '../lib/time'
-import { useT, type TranslationKey } from '../i18n'
+import { useT, useTp, type TranslationKey } from '../i18n'
 import FormatSelector, { type Selection } from '../components/FormatSelector'
 import PlaylistCard from '../components/PlaylistCard'
 import SaveLocation from '../components/SaveLocation'
@@ -70,6 +70,7 @@ const STAGE_LABEL: Record<DetectStage, TranslationKey> = {
  */
 export default function HomeView(): JSX.Element {
   const t = useT()
+  const tp = useTp()
   const settings = useStore((s) => s.settings)
   const setView = useStore((s) => s.setView)
   const requestSearch = useStore((s) => s.requestSearch)
@@ -482,7 +483,7 @@ export default function HomeView(): JSX.Element {
                 onClick={queueBatch}
               >
                 {starting ? <Loader2 size={15} className="animate-spin" /> : null}
-                {t('home.batchAdd', { count: batchLinks.length })}
+                {tp('home.batchAdd', batchLinks.length)}
               </button>
             </div>
           </motion.div>
@@ -661,7 +662,7 @@ export default function HomeView(): JSX.Element {
                     )}
                     {info.subtitleLanguages && info.subtitleLanguages.length > 0 && (
                       <span className="tag">
-                        {t('format.subtitles', { count: info.subtitleLanguages.length })}
+                        {tp('format.subtitles', info.subtitleLanguages.length)}
                       </span>
                     )}
                     {info.viaUniversal && (

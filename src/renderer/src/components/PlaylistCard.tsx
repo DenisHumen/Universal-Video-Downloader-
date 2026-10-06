@@ -6,7 +6,7 @@ import SaveLocation from './SaveLocation'
 import { placeEntries } from '../lib/playlist'
 import { initialMode, initialQuality } from '../lib/quality'
 import { queueDownloads } from '../lib/queue'
-import { useT } from '../i18n'
+import { useT, useTp } from '../i18n'
 import { useStore } from '../store'
 
 interface Props {
@@ -27,6 +27,7 @@ const OVERSCAN = 6
 /** A channel or playlist: pick a format once, then choose what to take. */
 export default function PlaylistCard({ info, onDone, saveDir, onSaveDirChange }: Props): JSX.Element {
   const t = useT()
+  const tp = useTp()
   const setView = useStore((s) => s.setView)
   const settings = useStore((s) => s.settings)
   const saveSettings = useStore((s) => s.saveSettings)
@@ -134,7 +135,7 @@ export default function PlaylistCard({ info, onDone, saveDir, onSaveDirChange }:
       <div className="border-b border-edge p-4">
         <h2 className="h2 truncate">{info.title}</h2>
         <p className="mono mt-1 text-[12px] text-ink-2">
-          {t('playlist.videos', { count: entries.length })} · {info.extractor}
+          {tp('playlist.videos', entries.length)} · {info.extractor}
         </p>
       </div>
 
@@ -174,7 +175,7 @@ export default function PlaylistCard({ info, onDone, saveDir, onSaveDirChange }:
 
         <div>
           <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-            <p className="label">{t('playlist.videos', { count: entries.length })}</p>
+            <p className="label">{tp('playlist.videos', entries.length)}</p>
             <div className="flex items-center gap-3">
               <button
                 className="btn-quiet px-3 py-1.5"
