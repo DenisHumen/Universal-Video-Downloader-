@@ -80,11 +80,11 @@ The same command is printed in the install window. Unsigned apps can't replace t
 uvd https://www.youtube.com/watch?v=jNQXAC9IVRw
 ```
 
-`uvd` takes the best quality the video has and saves it to your *Downloads* folder (or the folder set in the app), using the same engine, ffmpeg, cookies and proxy as the app. `uvd -a <link>` keeps the audio only, `-o <folder>` saves somewhere else, and several links download one after another. If a link isn't recognised, `uvd` says so and suggests opening the app, which has more ways to find the stream; it then exits with code 2, so scripts can tell.
+`uvd` takes the best quality the video has and saves it to your *Downloads* folder (or the folder set in the app), using the same engine, ffmpeg, cookies and proxy as the app. `uvd -q 720 <link>` takes at most 720p (`best`, `2160`, `1440`, `1080`, `720`, `480` or `360`; a video without that height gives the best it has), `uvd -a <link>` keeps the audio only, `-o <folder>` saves somewhere else, and several links download one after another. `uvd --help` lists it all. If a link isn't recognised, `uvd` says so and suggests opening the app, which has more ways to find the stream; it then exits with code 2, so scripts can tell.
 
-- **Linux, apt / dnf / `.deb` / `.rpm`:** `uvd` is installed with the app.
-- **Linux, AppImage:** run the AppImage with `--cli`, e.g. `alias uvd='~/Applications/Universal-Video-Downloader.AppImage --cli'`.
-- **macOS:** link it onto your PATH once:
+- **Linux, apt / dnf / `.deb` / `.rpm` / AUR:** `uvd` is installed with the app.
+- **Linux, AppImage:** open *Settings → system → terminal command* and press *install*. It puts a small `uvd` script in `~/.local/bin` that starts the AppImage, and keeps it pointing at the AppImage after updates. Or run the AppImage with `--cli` yourself, e.g. `alias uvd='~/Applications/Universal-Video-Downloader.AppImage --cli'`.
+- **macOS:** open *Settings → system → terminal command* and press *install*; macOS asks for your password once to link it into `/usr/local/bin`. Move the app to *Applications* first. Or make the link yourself:
 
   ```bash
   sudo mkdir -p /usr/local/bin && sudo ln -sf "/Applications/Universal Video Downloader.app/Contents/Resources/bin/uvd" /usr/local/bin/uvd

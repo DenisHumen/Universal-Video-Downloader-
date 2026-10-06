@@ -94,6 +94,7 @@ src/
 │       ├── report.ts          # error reports, sent only when the user agrees
 │       ├── options.ts         # engine flags & error classification
 │       ├── settings.ts        # persisted user settings
+│       ├── cli-install.ts     # puts `uvd` on the PATH from Settings (macOS link, AppImage script)
 │       └── automation/        # watches: detect, schedule, pipeline, SMB, Telegram
 ├── preload/                   # the contextBridge API, and the script for the built-in browser
 ├── renderer/src/              # React UI: components, views, i18n (en + ru), the Zustand store
