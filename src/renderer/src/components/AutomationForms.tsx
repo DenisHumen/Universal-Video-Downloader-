@@ -220,7 +220,7 @@ export function ShareForm({
         placeholder={pathOf(target)}
         hint={t('auto.shareLabelHint')}
       />
-      <button className="btn" onClick={() => void test()} disabled={testing || !ready}>
+      <button className="btn-quiet" onClick={() => void test()} disabled={testing || !ready}>
         {testing ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />}
         {t('auto.testConnection')}
       </button>
@@ -274,7 +274,7 @@ export function TelegramForm({
         hint={t('auto.chatIdHint')}
       />
       <button
-        className="btn"
+        className="btn-quiet"
         onClick={() => void test()}
         disabled={testing || !chatId.trim() || (!tokenStored && !token.trim())}
       >

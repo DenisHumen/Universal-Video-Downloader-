@@ -273,6 +273,33 @@ export function ensureYtdlp(): Promise<string> {
   return ensurePromise
 }
 
+export interface EngineFailure {
+  ok: false
+  error: string
+  errorCode: 'engineMissing'
+}
+
+/**
+ * Get the engine ready, or say why it can't be in a form a result can carry.
+ *
+ * Detection and search both start by waiting on the engine, and when it can't
+ * be installed — offline on the very first run, say — `ensureYtdlp` throws.
+ * That rejection crossed the IPC bridge as "Error invoking remote method
+ * 'media:detect': Error: …" and was printed verbatim on the home card, the one
+ * untranslated line in the window at the moment the user most needed to read
+ * it. As a coded failure it arrives as a sentence in their language, with the
+ * engine's own English kept as the fallback.
+ */
+export async function engineUnavailable(): Promise<EngineFailure | undefined> {
+  try {
+    await ensureYtdlp()
+    return undefined
+  } catch (err) {
+    const error = err instanceof Error ? err.message : String(err)
+    return { ok: false, error, errorCode: 'engineMissing' }
+  }
+}
+
 /** The engine is in use, so replacing it now would break a running download. */
 export class EngineBusyError extends Error {
   readonly code = 'engineBusy'

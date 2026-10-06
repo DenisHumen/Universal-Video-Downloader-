@@ -71,6 +71,7 @@ export const en = {
   'home.startFailed': 'could not start the download',
   'home.liveHint':
     'this is a live stream — it records from now until you stop it, so there is no length to trim and no percentage to report.',
+  'home.liveBadge': 'live',
 
   // ---- detection stages ----
   'detect.resolving': 'checking the link…',
@@ -334,6 +335,7 @@ export const en = {
   'shortcuts.paste': 'paste a link and detect',
   'shortcuts.help': 'this list',
   'shortcuts.escape': 'clear / close',
+  'shortcuts.or': 'or',
 
   // ---- capabilities panel ----
   'cap.title': 'what this does',
@@ -468,6 +470,7 @@ export const en = {
   'err.badSetting': 'the engine refused one of your settings. check the speed limit in settings → downloads and the filename template in settings → post-processing.',
   'err.unsupportedPlayer': 'this kind of Kodik player is not supported yet.',
   'err.notOnYummyAnime': 'this title isn’t on YummyAnime, which is where Shikimori links are downloaded from.',
+  'err.engineMissing': 'the download engine couldn’t be installed — check your connection and try again.',
   'err.cookieHint': 'try switching on browser cookies in settings → access.',
   'common.save': 'save',
   'common.saved': 'saved',

@@ -30,6 +30,19 @@ const PLANE_VARS = ['--bg', '--surface', '--surface-2']
 const TINT_VARS = ['--good', '--warn', '--bad']
 /** The tint strength those buttons use (`bg-bad/12`). */
 const TINT_ALPHA = 0.12
+/** Solid fills that carry a label, and the token that label is set in. */
+const FILL_PAIRS = [
+  ['--accent', '--accent-fg'],
+  ['--bad', '--bad-fg']
+]
+/**
+ * Day's hairline round quiet and icon buttons (`--line`), against every plane
+ * those buttons sit on. Not text, so not 4.5:1 — a rule only has to be seen,
+ * and a floor anywhere near text contrast would fail every palette that keeps
+ * its rules quiet. The guard is against the one failure that matters: a tweak
+ * to --line or a plane that makes the edge vanish again.
+ */
+const HAIRLINE_MIN = 1.12
 
 const THEMES = [
   { name: 'night', selector: "\\[data-theme='night'\\]" },
@@ -66,6 +79,8 @@ const contrast = (a, b) => {
 
 let checks = 0
 let worst = { ratio: Infinity, what: '' }
+let hairlines = 0
+let faintest = { ratio: Infinity, what: '' }
 
 for (const { name, selector } of THEMES) {
   const vars = readTheme(selector)
@@ -96,11 +111,21 @@ for (const { name, selector } of THEMES) {
     }
   }
 
-  // The label on an accent fill — the one place text sits on the brand colour.
-  if (vars['--accent'] && vars['--accent-fg']) {
-    const ratio = contrast(vars['--accent'], vars['--accent-fg'])
+  /*
+   * Labels on a solid fill: the primary button on the brand colour, and the
+   * live badge on `bad`. The badge was white on Night's pink at 2.69:1 — the
+   * one word that changes what a download means, and the hardest to read.
+   */
+  for (const [fillVar, labelVar] of FILL_PAIRS) {
+    const fill = vars[fillVar]
+    const label = vars[labelVar]
+    if (!fill || !label) {
+      fail(`theme "${name}" is missing ${fill ? labelVar : fillVar}`)
+      continue
+    }
+    const ratio = contrast(fill, label)
     checks++
-    const what = `${name} · --accent-fg on --accent`
+    const what = `${name} · ${labelVar} on ${fillVar}`
     if (ratio < worst.ratio) worst = { ratio, what }
     if (ratio < AA_NORMAL) fail(`${what} → ${ratio.toFixed(2)}:1 (needs ${AA_NORMAL}:1)`)
   }
@@ -127,13 +152,35 @@ for (const { name, selector } of THEMES) {
       if (ratio < AA_NORMAL) fail(`${what} → ${ratio.toFixed(2)}:1 (needs ${AA_NORMAL}:1)`)
     }
   }
+
+  if (name === 'day') {
+    const line = vars['--line']
+    if (!line) {
+      fail('theme "day" is missing --line')
+      continue
+    }
+    for (const planeVar of PLANE_VARS) {
+      const plane = vars[planeVar]
+      if (!plane) continue
+      const ratio = contrast(line, plane)
+      hairlines++
+      if (ratio < faintest.ratio) faintest = { ratio, what: `--line on ${planeVar}` }
+      if (ratio < HAIRLINE_MIN) {
+        fail(`day · --line hairline on ${planeVar} → ${ratio.toFixed(2)}:1 (needs ${HAIRLINE_MIN}:1)`)
+      }
+    }
+  }
 }
 
 if (process.exitCode) {
-  console.error(`\n${checks} pairings checked — see failures above.`)
+  console.error(`\n${checks + hairlines} pairings checked — see failures above.`)
 } else {
   console.log(
     `✓ ${checks} theme/text/plane pairings all clear ${AA_NORMAL}:1 ` +
       `(tightest: ${worst.what} at ${worst.ratio.toFixed(2)}:1)`
+  )
+  console.log(
+    `✓ ${hairlines} day hairlines all clear ${HAIRLINE_MIN}:1 ` +
+      `(faintest: ${faintest.what} at ${faintest.ratio.toFixed(2)}:1)`
   )
 }

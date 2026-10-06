@@ -24,7 +24,7 @@ import {
 } from '@shared/types'
 import { needsCookiesOften } from '@shared/urls'
 import { useStore } from '../store'
-import { errorText } from '../lib/errors'
+import { describeError, errorText } from '../lib/errors'
 import { formatCount, formatDuration, isProbablyUrl } from '../lib/format'
 import {
   availableHeights,
@@ -33,7 +33,9 @@ import {
   maxHeightOf,
   resolveSelection
 } from '../lib/quality'
+import { detectIsDone, errorLead } from '../lib/emphasis'
 import { queueDownload, queueDownloads } from '../lib/queue'
+import { escapeClearsHome, linkIn } from '../lib/shortcuts'
 import { toClock } from '../lib/time'
 import { useT, type TranslationKey } from '../i18n'
 import FormatSelector, { type Selection } from '../components/FormatSelector'
@@ -77,6 +79,8 @@ export default function HomeView(): JSX.Element {
   const detectStatus = useStore((s) => s.detect)
 
   const [url, setUrl] = useState('')
+  /** The link the result or error on screen came from; see `detectIsDone`. */
+  const [detectedUrl, setDetectedUrl] = useState('')
   const [status, setStatus] = useState<Status>('idle')
   const [info, setInfo] = useState<MediaInfo | null>(null)
   const [error, setError] = useState('')
@@ -148,6 +152,12 @@ export default function HomeView(): JSX.Element {
     inputRef.current?.focus({ preventScroll: true })
   }, [])
 
+  /** Stop listening for the detect in flight, and stop the engine working on it. */
+  const dropRequest = (): void => {
+    if (requestRef.current) void window.api.cancelDetect(requestRef.current)
+    requestRef.current = null
+  }
+
   const detect = async (value?: string): Promise<void> => {
     const target = (value ?? url).trim()
     if (!target) return
@@ -156,6 +166,8 @@ export default function HomeView(): JSX.Element {
       requestSearch(target)
       return
     }
+    // A new link supersedes one still detecting; the engine can stop on that.
+    dropRequest()
     const requestId = `${Date.now()}-${Math.random().toString(36).slice(2)}`
     requestRef.current = requestId
     setStatus('detecting')
@@ -164,13 +176,15 @@ export default function HomeView(): JSX.Element {
     setCookieHint(false)
     setReported(null)
     setInfo(null)
-    // Same reasoning as SearchView: the engine can refuse to install, and a
-    // rejected invoke would otherwise leave the card in its skeleton.
+    // Same reasoning as SearchView: main reports an engine that won't install
+    // as a coded result, but any other rejected invoke would otherwise leave
+    // the card in its skeleton.
     const res: DetectResult = await window.api.detect(target, requestId).catch(
-      (err: unknown) => ({ ok: false, error: err instanceof Error ? err.message : String(err) })
+      (err: unknown) => ({ ok: false, error: describeError(err) })
     )
     if (requestRef.current !== requestId) return
     requestRef.current = null
+    setDetectedUrl(target)
     if (res.ok && res.info) {
       setInfo(res.info)
       // Preselect the user's defaults, falling back to automatic "best" when
@@ -196,12 +210,17 @@ export default function HomeView(): JSX.Element {
   }
 
   const cancelDetect = (): void => {
-    if (requestRef.current) void window.api.cancelDetect(requestRef.current)
-    requestRef.current = null
+    dropRequest()
     setStatus('idle')
   }
 
+  /*
+    Clearing the screen used to leave the detect running underneath it: Esc a
+    moment after pasting emptied the field, then the result card arrived under
+    the empty field a second later, and yt-dlp worked on to the end regardless.
+  */
   const reset = (): void => {
+    dropRequest()
     setInfo(null)
     setError('')
     setErrorCode(undefined)
@@ -211,52 +230,38 @@ export default function HomeView(): JSX.Element {
     setUrl('')
   }
 
-  // Paste a link anywhere to auto-detect; Esc clears; drop a link onto the window.
+  /*
+    Esc clears. Paste and drop live in usePasteDetect, which works on every
+    screen and hands the link over through `pendingUrl` below — listening here
+    as well would detect every pasted link twice.
+  */
   useEffect(() => {
-    const onPaste = (e: ClipboardEvent): void => {
-      const target = e.target as HTMLElement | null
-      if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA')) return
-      const text = e.clipboardData?.getData('text')?.trim()
-      if (text && isProbablyUrl(text)) {
-        setUrl(text)
-        void detect(text)
-      }
-    }
     const onKey = (e: KeyboardEvent): void => {
-      if (e.key === 'Escape') reset()
+      if (escapeClearsHome(e, useStore.getState().shortcutsOpen)) reset()
     }
-    const onDrop = (e: DragEvent): void => {
-      e.preventDefault()
-      const text = e.dataTransfer?.getData('text')?.trim()
-      if (text && isProbablyUrl(text)) {
-        setUrl(text)
-        void detect(text)
-      }
-    }
-    const prevent = (e: DragEvent): void => e.preventDefault()
-    window.addEventListener('paste', onPaste)
     window.addEventListener('keydown', onKey)
-    window.addEventListener('drop', onDrop)
-    window.addEventListener('dragover', prevent)
-    return () => {
-      window.removeEventListener('paste', onPaste)
-      window.removeEventListener('keydown', onKey)
-      window.removeEventListener('drop', onDrop)
-      window.removeEventListener('dragover', prevent)
-    }
+    return () => window.removeEventListener('keydown', onKey)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
+  // Leaving Home — ⌘/Ctrl+2…5 mid-detect — leaves no engine request behind.
+  useEffect(() => () => dropRequest(), [])
+
   /*
-    A link handed to this screen from elsewhere — the clipboard strip, a link
-    the OS opened the app with, a second instance. It arrives as state rather
-    than an event precisely because the event was dispatched before this
-    component existed to hear it.
+    A link handed to this screen from elsewhere — a paste or a drop on any
+    screen, the clipboard strip, a link the OS opened the app with, a second
+    instance. It arrives as state rather than an event precisely because the
+    event was dispatched before this component existed to hear it.
+
+    When the store comes back empty, the link from this render still stands.
+    StrictMode replays mount effects in development, cleanups first: the one
+    above drops the detect this started, and a rerun that asked the store
+    again would find it emptied — leaving the screen in its skeleton, waiting
+    on a request nobody listens for.
   */
   useEffect(() => {
     if (!pendingUrl) return
-    const link = takePendingUrl()
-    if (!link) return
+    const link = takePendingUrl() ?? pendingUrl
     setUrl(link)
     void detect(link)
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -350,6 +355,13 @@ export default function HomeView(): JSX.Element {
   const cutting = selection.mode === 'video' && trimOpen && hasTrim(section)
   const isSearchQuery = url.trim().length > 0 && !isProbablyUrl(url)
   const busy = status === 'detecting'
+  const detectDone = detectIsDone({
+    url,
+    detectedUrl,
+    showing: Boolean(info) || status === 'error',
+    batchOpen
+  })
+  const retryLeads = errorLead(errorCode) === 'retry'
 
   return (
     <div className="h-full overflow-y-auto" ref={scrollRef}>
@@ -375,6 +387,19 @@ export default function HomeView(): JSX.Element {
             value={url}
             onChange={(e) => setUrl(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && detect()}
+            /*
+              Fields take dropped text at the caret, and usePasteDetect leaves
+              them to it — which here would splice a second link into the
+              first. A link dropped on this field replaces it and is detected,
+              as it is anywhere else in the window.
+            */
+            onDrop={(e) => {
+              const link = linkIn(e.dataTransfer.getData('text'))
+              if (!link) return
+              e.preventDefault()
+              setUrl(link)
+              void detect(link)
+            }}
             placeholder={t('home.placeholder')}
             aria-label={t('home.placeholder')}
             className="no-drag min-w-0 flex-1 bg-transparent px-2.5 py-2 text-[16px] text-ink outline-none placeholder:text-ink-3"
@@ -390,7 +415,7 @@ export default function HomeView(): JSX.Element {
             <ClipboardPaste size={17} />
           </button>
           <button
-            className="btn-solid px-5"
+            className={detectDone ? 'btn-quiet px-5' : 'btn-solid px-5'}
             data-uvd="detect"
             onClick={() => detect()}
             disabled={!url.trim() || busy}
@@ -499,9 +524,10 @@ export default function HomeView(): JSX.Element {
                   </p>
                 )}
                 <div className="mt-4 flex flex-wrap items-center gap-2">
-                  {/* The honest escape hatch: let the user find it by hand. */}
+                  {/* The honest escape hatch: let the user find it by hand —
+                      unless the link is fine and only the moment wasn't. */}
                   <button
-                    className="btn-solid"
+                    className={retryLeads ? 'btn-quiet' : 'btn-solid'}
                     onClick={() => window.api.openBrowser(url || undefined)}
                   >
                     <Globe size={14} /> {t('browser.open')}
@@ -511,7 +537,10 @@ export default function HomeView(): JSX.Element {
                       {t('home.openAccessSettings')}
                     </button>
                   )}
-                  <button className="btn-quiet" onClick={() => void detect()}>
+                  <button
+                    className={retryLeads ? 'btn-solid' : 'btn-quiet'}
+                    onClick={() => void detect()}
+                  >
                     <RotateCw size={14} /> {t('common.retry')}
                   </button>
                 </div>
@@ -570,9 +599,17 @@ export default function HomeView(): JSX.Element {
                     loading="eager"
                     fallback={<div className="h-full w-full bg-sink" />}
                   />
+                  {/*
+                    The one mark that changes what the download means — no trim,
+                    no percentage — so it gets the label floor (11px) and a
+                    label colour checked against the fill; white on Night's pink
+                    was 2.69:1, at 9px, and in English whatever the language.
+                    `font-mono`, not `.mono`: that class sits after the utilities
+                    and its tight letter-spacing would win over the tracking.
+                  */}
                   {info.isLive && (
-                    <span className="mono absolute left-1.5 top-1.5 rounded-1 bg-bad px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-white">
-                      live
+                    <span className="absolute left-1.5 top-1.5 rounded-1 bg-bad px-1.5 py-0.5 font-mono text-[11px] font-semibold uppercase leading-none tracking-[0.08em] text-bad-fg">
+                      {t('home.liveBadge')}
                     </span>
                   )}
                 </div>

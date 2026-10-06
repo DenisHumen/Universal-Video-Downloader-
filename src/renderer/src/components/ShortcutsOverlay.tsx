@@ -1,19 +1,10 @@
+import { Fragment } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { dialog, overlay } from '../lib/motion'
 import { X } from 'lucide-react'
 import { useStore } from '../store'
-import { useT, type TranslationKey } from '../i18n'
-
-const ROWS: { keys: string[]; label: TranslationKey }[] = [
-  { keys: ['mod', '1'], label: 'shortcuts.newDownload' },
-  { keys: ['mod', '2'], label: 'shortcuts.search' },
-  { keys: ['mod', '3'], label: 'shortcuts.queue' },
-  { keys: ['mod', '4'], label: 'shortcuts.watch' },
-  { keys: ['mod', '5'], label: 'shortcuts.settings' },
-  { keys: ['mod', 'V'], label: 'shortcuts.paste' },
-  { keys: ['mod', '/'], label: 'shortcuts.help' },
-  { keys: ['Esc'], label: 'shortcuts.escape' }
-]
+import { useT } from '../i18n'
+import { SHORTCUT_ROWS } from '../lib/shortcuts'
 
 export default function ShortcutsOverlay(): JSX.Element {
   const t = useT()
@@ -45,17 +36,22 @@ export default function ShortcutsOverlay(): JSX.Element {
               </button>
             </div>
             <div className="px-4">
-              {ROWS.map((row) => (
+              {SHORTCUT_ROWS.map((row) => (
                 <div
                   key={row.label}
                   className="flex items-center justify-between gap-4 border-b border-edge py-2.5 last:border-b-0"
                 >
                   <span className="text-[13px] text-ink-2">{t(row.label)}</span>
                   <span className="flex shrink-0 items-center gap-1">
-                    {row.keys.map((key) => (
-                      <kbd key={key} className="kbd">
-                        {key === 'mod' ? mod : key}
-                      </kbd>
+                    {row.keys.map((chord, i) => (
+                      <Fragment key={chord.join('+')}>
+                        {i > 0 && <span className="px-1 text-[12px] text-ink-3">{t('shortcuts.or')}</span>}
+                        {chord.map((key) => (
+                          <kbd key={key} className="kbd">
+                            {key === 'mod' ? mod : key}
+                          </kbd>
+                        ))}
+                      </Fragment>
                     ))}
                   </span>
                 </div>

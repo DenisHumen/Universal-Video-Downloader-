@@ -93,7 +93,7 @@ export default function ConfirmDialog({
             </div>
           </div>
           <div className="flex justify-end gap-2 border-t border-edge px-4 py-3">
-            <button className="btn" ref={cancel} onClick={onCancel}>
+            <button className="btn-quiet" ref={cancel} onClick={onCancel}>
               {t('common.cancel')}
             </button>
             <button className="btn-danger" onClick={onConfirm}>

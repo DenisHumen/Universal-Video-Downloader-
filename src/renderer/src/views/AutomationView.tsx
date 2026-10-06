@@ -449,11 +449,14 @@ export default function AutomationView(): JSX.Element {
             </header>
 
             <div className="mt-4 flex flex-wrap gap-2">
-              <button className="btn" onClick={() => void patch({ enabled: !selected.enabled })}>
+              <button
+                className="btn-quiet"
+                onClick={() => void patch({ enabled: !selected.enabled })}
+              >
                 {selected.enabled ? t('auto.pause') : t('auto.resume')}
               </button>
               <button
-                className="btn"
+                className="btn-quiet"
                 onClick={() => void checkNow()}
                 disabled={checking.has(selected.id)}
               >
@@ -524,7 +527,7 @@ export default function AutomationView(): JSX.Element {
               {missing.length > 0 && (
                 <div className="flex flex-wrap gap-2 pt-1">
                   {missing.map((kind) => (
-                    <button key={kind} className="btn" onClick={() => setEditing(kind)}>
+                    <button key={kind} className="btn-quiet" onClick={() => setEditing(kind)}>
                       <Plus size={14} /> {t(STEP_LABEL[kind])}
                     </button>
                   ))}

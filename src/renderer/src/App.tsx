@@ -17,6 +17,7 @@ import LiveRegion from './components/LiveRegion'
 import ShortcutsOverlay from './components/ShortcutsOverlay'
 import ClipboardPrompt from './components/ClipboardPrompt'
 import { useShortcuts } from './hooks/useShortcuts'
+import { usePasteDetect } from './hooks/usePasteDetect'
 import { useT } from './i18n'
 
 export default function App(): JSX.Element {
@@ -31,6 +32,7 @@ export default function App(): JSX.Element {
   }, [init])
 
   useShortcuts()
+  usePasteDetect()
 
   return (
     <>

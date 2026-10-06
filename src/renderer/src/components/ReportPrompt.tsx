@@ -157,7 +157,7 @@ export default function ReportPrompt(props: ReportFailure): JSX.Element | null {
       <div className="mt-3 flex flex-wrap items-center gap-2">
         {phase === 'idle' && (
           <>
-            <button className="btn bg-accent/12 text-accent-ink hover:bg-accent/20" onClick={send}>
+            <button className="btn-base bg-accent/12 text-accent-ink hover:bg-accent/20" onClick={send}>
               <Send size={14} /> {t('report.send')}
             </button>
             <button className="btn-quiet" onClick={() => remember(key)}>
@@ -166,7 +166,7 @@ export default function ReportPrompt(props: ReportFailure): JSX.Element | null {
           </>
         )}
         {phase === 'sending' && (
-          <button className="btn bg-accent/12 text-accent-ink" disabled>
+          <button className="btn-base bg-accent/12 text-accent-ink" disabled>
             <Loader2 size={14} className="animate-spin" /> {t('report.sending')}
           </button>
         )}
@@ -188,7 +188,7 @@ export default function ReportPrompt(props: ReportFailure): JSX.Element | null {
             {(failure !== 'expired' || preview) && (
               <div className="mt-3 flex flex-wrap items-center gap-2">
                 {failure !== 'expired' && (
-                  <button className="btn bg-accent/12 text-accent-ink hover:bg-accent/20" onClick={send}>
+                  <button className="btn-base bg-accent/12 text-accent-ink hover:bg-accent/20" onClick={send}>
                     <RefreshCw size={14} /> {t('common.retry')}
                   </button>
                 )}

@@ -69,6 +69,7 @@ export const ru: Dictionary = {
   'home.startFailed': 'не удалось запустить загрузку',
   'home.liveHint':
     'это прямой эфир — запись идёт с этого момента и до остановки, поэтому обрезать нечего и процент показать не из чего.',
+  'home.liveBadge': 'эфир',
 
   // ---- detection stages ----
   'detect.resolving': 'проверяю ссылку…',
@@ -327,6 +328,7 @@ export const ru: Dictionary = {
   'shortcuts.paste': 'вставить ссылку и определить',
   'shortcuts.help': 'этот список',
   'shortcuts.escape': 'очистить / закрыть',
+  'shortcuts.or': 'или',
 
   // ---- capabilities panel ----
   'cap.title': 'что умеет приложение',
@@ -455,6 +457,7 @@ export const ru: Dictionary = {
   'err.badSetting': 'движок не принял одну из настроек. проверьте ограничение скорости в настройках → загрузки и шаблон имени файла в настройках → обработка.',
   'err.unsupportedPlayer': 'такой плеер Kodik пока не поддерживается.',
   'err.notOnYummyAnime': 'этого тайтла нет на YummyAnime — а видео по ссылкам с Shikimori приложение берёт именно оттуда.',
+  'err.engineMissing': 'не удалось установить движок загрузок — проверьте подключение и попробуйте снова.',
   'err.cookieHint': 'попробуйте включить cookies браузера в настройках → доступ.',
   'common.save': 'сохранить',
   'common.saved': 'сохранено',

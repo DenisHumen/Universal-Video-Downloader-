@@ -135,6 +135,7 @@ export type AppErrorCode =
   | 'badSetting'
   | 'unsupportedPlayer'
   | 'notOnYummyAnime'
+  | 'engineMissing'
 
 export type DownloadState =
   | 'queued'
@@ -484,6 +485,20 @@ export interface YtDlpStatus {
   version?: string
   percent?: number
   message?: string
+}
+
+/**
+ * The answer to "update the engine now". A refusal travels as data rather
+ * than as a rejection, because Electron carries only a rejected invoke's
+ * message across the bridge - never its class or a `code` - so the renderer
+ * could not tell "a download is still using it" from a real failure.
+ */
+export interface EngineUpdateResult {
+  ok: boolean
+  version?: string
+  /** Set when the update was refused because a download is using the engine. */
+  code?: 'engineBusy'
+  error?: string
 }
 
 export type UpdateState =

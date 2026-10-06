@@ -106,11 +106,19 @@ const RowLabelId = createContext<string | undefined>(undefined)
 function Row({
   label,
   hint,
+  hintMono = false,
   children,
   stack = false
 }: {
   label: string
   hint?: string
+  /**
+   * The hint is a path rather than a sentence. Paths are set in mono like all
+   * data, and allowed to break anywhere: a UNC download folder has no spaces
+   * to wrap at, and ran 216px out of its 448px column and under the "change"
+   * button beside it. Selectable, so the folder can be copied out.
+   */
+  hintMono?: boolean
   children: ReactNode
   stack?: boolean
 }): JSX.Element {
@@ -125,7 +133,14 @@ function Row({
         <p className="text-[14px] text-ink" id={labelId}>
           {label}
         </p>
-        {hint && <p className="hint mt-1">{hint}</p>}
+        {hint &&
+          (hintMono ? (
+            <p className="hint mono selectable mt-1 [overflow-wrap:anywhere]" title={hint}>
+              {hint}
+            </p>
+          ) : (
+            <p className="hint mt-1">{hint}</p>
+          ))}
       </div>
       <div className={stack ? '' : 'shrink-0'}>
         <RowLabelId.Provider value={labelId}>{children}</RowLabelId.Provider>
@@ -456,12 +471,12 @@ export default function SettingsView(): JSX.Element {
   const updateEngine = async (): Promise<void> => {
     setUpdatingEngine(true)
     try {
-      await window.api.updateYtdlp()
-      toast(t('settings.engineUpdated'), 'success')
-    } catch (err) {
-      const message = err instanceof Error ? err.message : String(err)
+      const res = await window.api.updateYtdlp()
+      if (res.ok) toast(t('settings.engineUpdated'), 'success')
       // Main refuses to swap the binary out from under a running transfer.
-      toast(/engineBusy/.test(message) ? t('err.engineBusy') : t('settings.engineFailed'), 'error')
+      else toast(res.code === 'engineBusy' ? t('err.engineBusy') : t('settings.engineFailed'), 'error')
+    } catch {
+      toast(t('settings.engineFailed'), 'error')
     } finally {
       setUpdatingEngine(false)
     }
@@ -544,7 +559,7 @@ export default function SettingsView(): JSX.Element {
           </Group>
 
           <Group id="downloads" title={t('settings.section.downloads')}>
-            <Row label={t('settings.saveLocation')} hint={settings.downloadDir}>
+            <Row label={t('settings.saveLocation')} hint={settings.downloadDir} hintMono>
               <button className="btn-quiet" onClick={chooseFolder}>
                 <Folder size={14} /> {t('common.change')}
               </button>
@@ -704,6 +719,7 @@ export default function SettingsView(): JSX.Element {
             <Row
               label={t('settings.cookiesFile')}
               hint={settings.cookiesFile || t('settings.cookiesFileHint')}
+              hintMono={!!settings.cookiesFile}
             >
               <div className="flex items-center gap-2">
                 {settings.cookiesFile && (

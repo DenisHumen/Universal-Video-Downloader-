@@ -77,6 +77,8 @@ const REPORTABLE: Record<AppErrorCode, boolean> = {
   // What the user typed, or a setting of theirs the engine refused.
   notALink: false,
   badSetting: false,
+  // The engine could not be installed - nearly always the network, not a site.
+  engineMissing: false,
   // A premiere that has not started, or a title the site does not carry.
   upcoming: false,
   notOnYummyAnime: false,

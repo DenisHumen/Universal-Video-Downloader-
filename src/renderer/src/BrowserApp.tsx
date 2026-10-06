@@ -273,7 +273,7 @@ export default function BrowserApp(): JSX.Element {
                   </p>
                   <button
                     className={`mt-2.5 w-full py-2 ${
-                      queued.has(entry.id) ? 'btn bg-good/12 text-good' : 'btn-quiet'
+                      queued.has(entry.id) ? 'btn-base bg-good/12 text-good' : 'btn-quiet'
                     }`}
                     disabled={queued.has(entry.id)}
                     onClick={() => download({ mediaId: entry.id }, entry.id)}

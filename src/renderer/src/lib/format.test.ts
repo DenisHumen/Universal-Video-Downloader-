@@ -1,5 +1,13 @@
 import { describe, expect, it } from 'vitest'
-import { formatBytes, formatCount, formatDuration, formatEta, formatSpeed, isProbablyUrl } from './format'
+import {
+  formatBytes,
+  formatCount,
+  formatDuration,
+  formatEta,
+  formatSpeed,
+  isProbablyUrl,
+  splitPath
+} from './format'
 
 describe('formatBytes', () => {
   it('shows a dash for missing or nonsensical sizes', () => {
@@ -77,5 +85,37 @@ describe('isProbablyUrl', () => {
     expect(isProbablyUrl('big buck bunny')).toBe(false)
     expect(isProbablyUrl('')).toBe(false)
     expect(isProbablyUrl('   ')).toBe(false)
+  })
+})
+
+/*
+  A finished row truncated its path from the end, so a long title pushed the
+  file name off and left only the folders - the half nobody was looking for.
+*/
+describe('splitPath', () => {
+  it('splits a Windows path at its last backslash', () => {
+    expect(splitPath('C:\\Users\\demo\\Downloads\\youtube\\Some Long Title [abc123].mp4')).toEqual({
+      dir: 'C:\\Users\\demo\\Downloads\\youtube\\',
+      base: 'Some Long Title [abc123].mp4'
+    })
+  })
+
+  it('splits a POSIX path, and a Windows path that mixes both separators', () => {
+    expect(splitPath('/home/demo/Videos/clip.mkv')).toEqual({ dir: '/home/demo/Videos/', base: 'clip.mkv' })
+    expect(splitPath('C:\\Users\\demo/Downloads/clip.mp4')).toEqual({
+      dir: 'C:\\Users\\demo/Downloads/',
+      base: 'clip.mp4'
+    })
+  })
+
+  it('puts back together into exactly the path it was given', () => {
+    for (const path of ['C:\\a\\b.mp4', '/a/b.mp4', 'b.mp4', '', '\\\\192.168.1.10\\media\\b.mp4']) {
+      const { dir, base } = splitPath(path)
+      expect(dir + base).toBe(path)
+    }
+  })
+
+  it('treats a bare file name as all name', () => {
+    expect(splitPath('clip.mp4')).toEqual({ dir: '', base: 'clip.mp4' })
   })
 })

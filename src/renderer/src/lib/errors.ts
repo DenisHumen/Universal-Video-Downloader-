@@ -40,7 +40,8 @@ const KEYS: Record<AppErrorCode, TranslationKey> = {
   upcoming: 'err.upcoming',
   badSetting: 'err.badSetting',
   unsupportedPlayer: 'err.unsupportedPlayer',
-  notOnYummyAnime: 'err.notOnYummyAnime'
+  notOnYummyAnime: 'err.notOnYummyAnime',
+  engineMissing: 'err.engineMissing'
 }
 
 export interface FailureLike {
@@ -58,6 +59,21 @@ export function errorText(t: TranslateFn, failure: FailureLike): string {
 }
 
 /**
+ * What the Copy button on a failed row puts on the clipboard: the translated
+ * advice first, then the engine's own words.
+ *
+ * It used to copy only the raw English, so the one thing the row actually told
+ * the user to do was the one thing they couldn't paste anywhere. The raw text
+ * still follows, because that is what a bug report needs; it is left off when
+ * the sentence already is that text, so nothing is pasted twice.
+ */
+export function errorReport(t: TranslateFn, failure: FailureLike & { log?: string }): string {
+  const sentence = errorText(t, failure)
+  const raw = failure.error?.trim() || failure.log?.trim() || ''
+  return raw && !sentence.includes(raw) ? `${sentence}\n\n${raw}` : sentence
+}
+
+/**
  * What to show when something *threw*, rather than reported a code.
  *
  * An error that crosses the IPC bridge arrives wearing Electron's wrapper -
@@ -67,17 +83,22 @@ export function errorText(t: TranslateFn, failure: FailureLike): string {
  * reading a toast. This takes the machinery off and leaves the sentence; the
  * message itself is kept verbatim, so whatever main went to the trouble of
  * saying still reaches the screen.
+ *
+ * `fallback` is for the rare throw that carries no words at all; callers pass
+ * a translated line so even that case doesn't drop into English.
  */
-export function describeError(err: unknown): string {
+export function describeError(err: unknown, fallback = 'Something went wrong.'): string {
   let text = (err instanceof Error ? err.message : String(err ?? '')).trim()
 
   // Electron: "Error invoking remote method '<channel>': <the actual error>"
   const wrapped = text.match(/^Error invoking remote method '[^']*':\s*(.*)$/s)
   if (wrapped) text = wrapped[1].trim()
 
-  // A thrown class announcing itself: "SmbError: ...", "TypeError: ...".
-  const classed = text.match(/^[A-Z][A-Za-z0-9]*Error:\s+(.*)$/s)
+  // A thrown class announcing itself: "SmbError: ...", "TypeError: ...", or
+  // just "Error: ...", which is what a plain `throw new Error()` in main
+  // arrives as.
+  const classed = text.match(/^(?:[A-Z][A-Za-z0-9]*)?Error:\s+(.*)$/s)
   if (classed) text = classed[1].trim()
 
-  return text || 'Something went wrong.'
+  return text || fallback
 }
