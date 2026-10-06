@@ -48,11 +48,31 @@ async function digest(path) {
   return { size, sha256: sha256.digest('hex'), sha512: sha512.digest('base64') }
 }
 
-/** The latest-mac.yml one Mac runner kept, by its artifact name. */
-function runnerCopy(macDir, runner) {
-  const path = join(macDir, runner, 'latest-mac.yml')
-  if (!existsSync(path)) throw new Error(`${runner}/latest-mac.yml is missing: that runner kept no copy`)
-  return readFileSync(path, 'utf8')
+/**
+ * The latest-mac.yml one Mac runner kept, by its artifact name.
+ *
+ * Found at any depth, not at the artifact's root. upload-artifact keeps the
+ * folders after the first wildcard in its path, and the build writes into
+ * `release/<version>/` - so the file arrives as `mac-x64/3.21.0/latest-mac.yml`.
+ * Looking only at the root failed v3.21.0's publish with both copies present.
+ */
+export function runnerCopy(macDir, runner) {
+  const found = findFile(join(macDir, runner), 'latest-mac.yml')
+  if (!found) throw new Error(`${runner}/latest-mac.yml is missing: that runner kept no copy`)
+  return readFileSync(found, 'utf8')
+}
+
+function findFile(dir, name) {
+  if (!existsSync(dir)) return undefined
+  for (const entry of readdirSync(dir, { withFileTypes: true })) {
+    const path = join(dir, entry.name)
+    if (entry.isFile() && entry.name === name) return path
+    if (entry.isDirectory()) {
+      const deeper = findFile(path, name)
+      if (deeper) return deeper
+    }
+  }
+  return undefined
 }
 
 /**

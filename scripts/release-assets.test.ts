@@ -3,7 +3,7 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'fs'
 import { tmpdir } from 'os'
 import { join } from 'path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { finalizeRelease } from './finalize-release.mjs'
+import { finalizeRelease, runnerCopy } from './finalize-release.mjs'
 import {
   PRODUCT,
   installersIn,
@@ -459,5 +459,33 @@ describe('the release workflow', () => {
       expect(versions.length).toBeGreaterThan(0)
       for (const v of versions) expect(v).toBeGreaterThanOrEqual(22)
     }
+  })
+})
+
+/*
+  v3.21.0 failed to publish with both Mac copies present: upload-artifact keeps
+  the folders after the first wildcard, so the file arrived one level down.
+*/
+describe('runnerCopy', () => {
+  let dir = ''
+  beforeEach(() => {
+    dir = mkdtempSync(join(tmpdir(), 'uvd-mac-'))
+  })
+  afterEach(() => rmSync(dir, { recursive: true, force: true }))
+
+  it('finds the copy under the version folder the artifact keeps', () => {
+    mkdirSync(join(dir, 'mac-x64', '3.21.0'), { recursive: true })
+    writeFileSync(join(dir, 'mac-x64', '3.21.0', 'latest-mac.yml'), 'version: 3.21.0')
+    expect(runnerCopy(dir, 'mac-x64')).toBe('version: 3.21.0')
+  })
+
+  it('still finds a copy at the root', () => {
+    mkdirSync(join(dir, 'mac-arm64'), { recursive: true })
+    writeFileSync(join(dir, 'mac-arm64', 'latest-mac.yml'), 'version: 1')
+    expect(runnerCopy(dir, 'mac-arm64')).toBe('version: 1')
+  })
+
+  it('says which runner kept nothing', () => {
+    expect(() => runnerCopy(dir, 'mac-x64')).toThrow(/mac-x64\/latest-mac.yml is missing/)
   })
 })
