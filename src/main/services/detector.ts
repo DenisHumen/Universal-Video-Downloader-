@@ -8,6 +8,8 @@ import { withSignal } from '../resolvers/http'
 import { unreachableCode } from '../resolvers/neterror'
 import { engineKnowsHost, isAbsoluteUrl, looksLikeCollection, normalizeUrl } from '@shared/urls'
 import { reportDetectFailure, type DetectVerdict } from './report'
+import { infoKey } from './info-cache'
+import { infoCache } from './info-store'
 import type { DetectTrace } from '@shared/report'
 import type {
   AppErrorCode,
@@ -287,6 +289,12 @@ export async function detect(
   const probe = await probeWithEngine(resolved, signal)
   // The engine answered; the scrape it raced is not needed.
   if (probe.ok && probe.info) head?.abort()
+  /*
+    Kept for the download that usually follows; see info-cache.ts. Only for a
+    link no resolver rewrote: the download re-resolves the page and compares,
+    and a rewritten one is fetched with headers this JSON knows nothing of.
+  */
+  if (probe.ok && probe.json && !wasRewritten) infoCache.put(infoKey(url, settings), probe.json)
   if (probe.ok && probe.info) {
     const info = probe.info
     info.webpageUrl = url
@@ -498,7 +506,8 @@ function syntheticInfo(pageUrl: string, resolved: ResolvedUrl): MediaInfo {
 }
 
 type JsonProbe =
-  | { ok: true; raw: RawInfo }
+  /** `text` is the engine's JSON as printed, for `--load-info-json`. */
+  | { ok: true; raw: RawInfo; text: string }
   /** `output` is what the engine printed, kept for the error report. */
   | { ok: false; error: string; errorCode?: AppErrorCode; cookieHint?: boolean; output?: string }
 
@@ -564,7 +573,7 @@ function spawnJson(args: string[], signal: AbortSignal | undefined, timeoutMs: n
         return
       }
       try {
-        done({ ok: true, raw: JSON.parse(stdout) as RawInfo })
+        done({ ok: true, raw: JSON.parse(stdout) as RawInfo, text: stdout })
       } catch (err) {
         done({ ok: false, error: err instanceof Error ? err.message : 'Failed to parse media info.' })
       }
@@ -670,7 +679,10 @@ async function probeCollection(url: string, signal?: AbortSignal): Promise<Media
   }
 }
 
-async function probeWithEngine(resolved: ResolvedUrl, signal?: AbortSignal): Promise<DetectVerdict> {
+async function probeWithEngine(
+  resolved: ResolvedUrl,
+  signal?: AbortSignal
+): Promise<DetectVerdict & { json?: string }> {
   const settings = getSettings()
   const args = [
     '-J',
@@ -737,5 +749,11 @@ async function probeWithEngine(resolved: ResolvedUrl, signal?: AbortSignal): Pro
     isPlaylist,
     playlistCount: isPlaylist ? raw.playlist_count || raw.entries?.length : undefined
   }
-  return { ok: true, info }
+  /*
+    One video, not live: the only answer a download can be started from as it
+    stands. A playlist's JSON describes its first entry, and a live stream's
+    manifest is a moving target.
+  */
+  const reusable = !isPlaylist && !primary.is_live
+  return { ok: true, info, json: reusable ? result.text : undefined }
 }

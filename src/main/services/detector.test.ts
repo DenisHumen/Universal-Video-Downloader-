@@ -29,6 +29,8 @@ vi.mock('./ytdlp', () => ({
   ytdlpBinaryPath: () => 'yt-dlp',
   ytdlpSpawnOptions: () => ({ windowsHide: true, env: {} })
 }))
+const putInfo = vi.hoisted(() => vi.fn())
+vi.mock('./info-store', () => ({ infoCache: { put: putInfo } }))
 const resolveUrl = vi.hoisted(() => vi.fn())
 const resolveUniversal = vi.hoisted(() => vi.fn())
 vi.mock('../resolvers', async (importOriginal) => {
@@ -202,6 +204,38 @@ describe('detect, on a host the engine has no extractor for', () => {
     expect(resolveUniversal).toHaveBeenCalledTimes(1)
     const options = resolveUniversal.mock.calls.at(-1)?.[1] as { scraped?: Promise<unknown> }
     expect(options.scraped).toBeUndefined()
+  })
+})
+
+describe('detect, keeping the answer for the download', () => {
+  /** An engine run that prints `json` and exits 0. */
+  function answering(json: object): EventEmitter {
+    const child = Object.assign(new EventEmitter(), { stdout: new PassThrough(), stderr: new PassThrough() })
+    child.stdout.write(JSON.stringify(json))
+    setImmediate(() => child.emit('close', 0))
+    return child
+  }
+  const format = { format_id: '18', ext: 'mp4', vcodec: 'avc1', acodec: 'mp4a', height: 360 }
+
+  it("keeps a single video's JSON, keyed by its link", async () => {
+    putInfo.mockClear()
+    spawn.mockImplementationOnce(() => answering({ id: 'v', title: 'One', formats: [format] }))
+    const result = await detect('https://unknown-site.test/watch/keep')
+    expect(result.ok).toBe(true)
+    expect(putInfo).toHaveBeenCalledTimes(1)
+    expect(putInfo.mock.calls[0][0]).toMatch(/^https:\/\/unknown-site\.test\/watch\/keep#/)
+    expect(JSON.parse(putInfo.mock.calls[0][1])).toMatchObject({ id: 'v' })
+  })
+
+  it('keeps nothing for a live stream or a playlist', async () => {
+    putInfo.mockClear()
+    spawn.mockImplementationOnce(() => answering({ id: 'l', is_live: true, formats: [format] }))
+    await detect('https://unknown-site.test/watch/live')
+    spawn.mockImplementationOnce(() =>
+      answering({ _type: 'playlist', id: 'p', entries: [{ id: 'a', formats: [format] }] })
+    )
+    await detect('https://unknown-site.test/watch/list')
+    expect(putInfo).not.toHaveBeenCalled()
   })
 })
 

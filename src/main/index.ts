@@ -46,6 +46,7 @@ import { startCli } from './cli/run'
 import { refreshCliScript } from './services/cli-install'
 import { taskbarProgress } from './services/taskbar'
 import { coalesce } from './services/coalesce'
+import { infoCache } from './services/info-store'
 
 const isMac = process.platform === 'darwin'
 let mainWindow: BrowserWindow | null = null
@@ -593,6 +594,8 @@ if (cliArgs) {
       this cannot happen at module load.
     */
     initLog(getSettings().logVerbose ? 'debug' : 'info')
+    // Probe JSON a previous session kept for its downloads; the addresses in it have expired.
+    infoCache.clearDir()
 
     // Before any request is made: the proxy the user set applies to our own too.
     void applyProxy(getSettings())

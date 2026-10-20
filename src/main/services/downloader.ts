@@ -46,6 +46,8 @@ import { resolveUrl } from '../resolvers'
 import { pageUrlFromSniffUrl, SNIFF_SCHEME } from '../resolvers/universal'
 import { DIRECT_SCHEME, parseDirectUrl } from '../resolvers/universal/direct'
 import { isAbsoluteUrl, normalizeUrl } from '@shared/urls'
+import { infoKey, isStaleInfoError } from './info-cache'
+import { infoCache } from './info-store'
 import { numberedName } from '@shared/playlist'
 import { hasTrim } from '@shared/types'
 import type {
@@ -92,6 +94,9 @@ const resolveAborts = new Map<string, AbortController>()
   everything from the toolbar did it to every running item at once.
 */
 const deliberateStops = new Set<string>()
+
+/** Items whose next run must extract afresh: the detect's JSON just failed them once. */
+const skipInfo = new Set<string>()
 
 /*
   What we told the engine to name each file, so the result can be found again.
@@ -500,7 +505,9 @@ export function buildArgs(
   item: DownloadItem,
   settings: AppSettings,
   dir: string,
-  ffmpeg?: string
+  ffmpeg?: string,
+  /** The detect's JSON for this link, read instead of extracting it again. */
+  infoJson?: string
 ): string[] {
   const args: string[] = [
     '--ignore-config',
@@ -633,7 +640,12 @@ export function buildArgs(
     it can come from places the user never typed: a playlist entry copied out of
     the site's JSON, or the decoded payload of a `uvd-direct://` link.
   */
-  args.push('--', item.url)
+  /*
+    Or the detect's own answer in place of the URL. The path is one this app
+    wrote into its own folder, never anything from the item.
+  */
+  if (infoJson) args.push('--load-info-json', infoJson)
+  else args.push('--', item.url)
   return args
 }
 
@@ -1256,6 +1268,7 @@ async function runDownload(item: DownloadItem): Promise<void> {
     slot.
   */
   let child: ChildProcessWithoutNullStreams
+  let infoFile: string | null = null
   try {
     const settings = getSettings()
     const dir = outputDirFor(item, settings)
@@ -1263,9 +1276,23 @@ async function runDownload(item: DownloadItem): Promise<void> {
     expectedNames.delete(item.id)
     alreadyOnDisk.delete(item.id)
     if (stem) expectedNames.set(item.id, { dir, stem })
-    const args = buildArgs(item, settings, dir, ffmpegLocation())
+    /*
+      The detect's JSON, when this is the link it described and nothing has
+      changed it since: no resolver rewrote it (that brings headers the JSON
+      does not carry), and the cache is keyed by the access settings too.
+      Taken, not peeked: a retry, a resume or the second download of a link
+      extracts afresh.
+    */
+    const source = item.sourceUrl || item.url
+    const skip = skipInfo.delete(item.id)
+    infoFile =
+      !skip && item.url === source && !item.headers && !item.referer
+        ? infoCache.take(infoKey(source, settings))
+        : null
+    const args = buildArgs(item, settings, dir, ffmpegLocation(), infoFile ?? undefined)
     child = spawn(ytdlpBinaryPath(), args, ytdlpSpawnOptions())
   } catch (err) {
+    if (infoFile) infoCache.release(infoFile)
     expectedNames.delete(item.id)
     fail(item, err instanceof Error ? err.message : String(err))
     return
@@ -1334,6 +1361,7 @@ async function runDownload(item: DownloadItem): Promise<void> {
     if (settled) return
     settled = true
     procs.delete(item.id)
+    if (infoFile) infoCache.release(infoFile)
     fail(item, err.message)
   })
 
@@ -1351,6 +1379,8 @@ async function runDownload(item: DownloadItem): Promise<void> {
     */
     stdout.flush()
     stderr.flush()
+    // Read or not, the file has had its one use.
+    if (infoFile) infoCache.release(infoFile)
     const existing = alreadyOnDisk.get(item.id)
     alreadyOnDisk.delete(item.id)
     // If we deliberately stopped it, the state was already set — or has since
@@ -1381,6 +1411,25 @@ async function runDownload(item: DownloadItem): Promise<void> {
       finalPaths.delete(item.id)
       expectedNames.delete(item.id)
       log.info('download', 'Finished', downloadFields(item))
+      emitUpdated(item)
+      processQueue()
+      return
+    }
+    /*
+      A run from the detect's JSON that failed the way stale JSON fails - its
+      signed stream addresses expired, or the file would not load - gets one
+      ordinary run, extracting afresh. Not an automatic retry: it spends none
+      of the item's attempts, since the failure was this optimisation's, not
+      the download's.
+    */
+    if (infoFile && isStaleInfoError(stderrTail)) {
+      appendLog(item, 'The saved video details were out of date; asking the site again\n')
+      skipInfo.add(item.id)
+      item.state = 'queued'
+      item.speed = undefined
+      item.eta = undefined
+      resetProgress(item)
+      finalPaths.delete(item.id)
       emitUpdated(item)
       processQueue()
       return
