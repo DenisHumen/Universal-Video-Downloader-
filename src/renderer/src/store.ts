@@ -9,7 +9,7 @@ import type {
   UpdateStatus,
   YtDlpStatus
 } from '@shared/types'
-import { normalizeUrl } from '@shared/urls'
+import { engineKnowsHost, normalizeUrl } from '@shared/urls'
 import { watchFailing } from '@shared/automation'
 import type { ImportOutcome } from '@shared/backup'
 import type { AppInfo } from '../../preload/index'
@@ -315,10 +315,11 @@ export const useStore = create<AppState>((set, get) => ({
     carries its request id until Home adopts it.
   */
   prefetchDetect: (url) => {
-    if (!isProbablyUrl(url) || detectCache.get(url) || inflightDetects.has(url)) return
+    // Hosts the engine reads by name only: anywhere else a detect may scrape or browse the page.
+    if (!isProbablyUrl(url) || !engineKnowsHost(url) || detectCache.get(url) || inflightDetects.has(url)) return
     const requestId = `pre-${Date.now()}-${Math.random().toString(36).slice(2)}`
     const promise = window.api
-      .detect(url, requestId)
+      .detect(url, requestId, { prefetch: true })
       .catch((err: unknown): DetectResult => ({ ok: false, error: String(err) }))
       .then((res) => {
         detectCache.set(url, res)

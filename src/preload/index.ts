@@ -11,6 +11,7 @@ import type {
   CliInstallResult,
   CliStatus,
   DetectResult,
+  DetectOptions,
   DetectPreview,
   DetectStatus,
   DownloadItem,
@@ -47,8 +48,8 @@ function on<T>(channel: string, cb: (payload: T) => void): () => void {
 
 const api = {
   // Detection
-  detect: (url: string, requestId?: string): Promise<DetectResult> =>
-    ipcRenderer.invoke(IPC.detect, url, requestId),
+  detect: (url: string, requestId?: string, options?: DetectOptions): Promise<DetectResult> =>
+    ipcRenderer.invoke(IPC.detect, url, requestId, options),
   cancelDetect: (requestId: string): Promise<void> => ipcRenderer.invoke(IPC.detectCancel, requestId),
 
   // Title search

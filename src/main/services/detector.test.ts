@@ -184,6 +184,15 @@ describe('detect, on a host the engine has no extractor for', () => {
     await options.scraped?.catch(() => undefined)
   })
 
+  it('neither scrapes nor browses for a prefetch', async () => {
+    spawn.mockImplementationOnce(() => engine('ERROR: Unsupported URL: https://unknown-site.test/v/2\n'))
+    resolveUniversal.mockClear()
+
+    const result = await detect('https://unknown-site.test/v/2', undefined, undefined, { prefetch: true })
+    expect(result.ok).toBe(false)
+    expect(resolveUniversal).not.toHaveBeenCalled()
+  })
+
   it('leaves the page alone on a host the engine knows by name', async () => {
     spawn.mockImplementationOnce(() => engine('ERROR: [dailymotion] x1: Unable to extract info\n'))
     resolveUniversal.mockClear()

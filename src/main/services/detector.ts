@@ -11,6 +11,7 @@ import { reportDetectFailure, type DetectVerdict } from './report'
 import type { DetectTrace } from '@shared/report'
 import type {
   AppErrorCode,
+  DetectOptions,
   DetectResult,
   DetectStage,
   FormatKind,
@@ -190,7 +191,8 @@ function pickerInfo(
 export async function detect(
   input: string,
   onStage: StageReporter = () => undefined,
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  options: DetectOptions = {}
 ): Promise<DetectResult> {
   const settings = getSettings()
   /*
@@ -281,7 +283,7 @@ export async function detect(
   }
 
   onStage(wasRewritten ? 'probing' : 'engine')
-  const head = wasRewritten ? null : headStartScrape(url, signal)
+  const head = wasRewritten || options.prefetch ? null : headStartScrape(url, signal)
   const probe = await probeWithEngine(resolved, signal)
   // The engine answered; the scrape it raced is not needed.
   if (probe.ok && probe.info) head?.abort()
@@ -299,7 +301,8 @@ export async function detect(
 
   // The engine gave up. Fall back to universal detection: scrape the page, and
   // if that isn't enough, open it in a hidden browser and watch for the stream.
-  if (!wasRewritten && !signal?.aborted && universalCanHelp(probe)) {
+  // Never for a prefetch: see DetectOptions. Home detects again if the probe alone was not enough.
+  if (!wasRewritten && !options.prefetch && !signal?.aborted && universalCanHelp(probe)) {
     const tried = { browserAllowed: settings.universalFallback, stages: [] as string[] }
     trace.universal = tried
     let universal: ResolvedUrl | null = null

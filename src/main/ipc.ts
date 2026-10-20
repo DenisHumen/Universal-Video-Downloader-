@@ -11,6 +11,7 @@ import {
 import { IPC } from '@shared/ipc'
 import type {
   AppSettings,
+  DetectOptions,
   DetectResult,
   DetectStage,
   DownloadItem,
@@ -108,7 +109,7 @@ export function registerIpc({ getWindow, openSearchWindow, onSettingsChanged }: 
   }
 
   // ---- Media detection & search ----
-  ipcMain.handle(IPC.detect, async (event, url: string, requestId?: string): Promise<DetectResult> => {
+  ipcMain.handle(IPC.detect, async (event, url: string, requestId?: string, options?: DetectOptions): Promise<DetectResult> => {
     /*
       Registered before the engine check, not after it. On first launch that
       check downloads the engine, and a cancel pressed meanwhile looked up an id
@@ -138,7 +139,7 @@ export function registerIpc({ getWindow, openSearchWindow, onSettingsChanged }: 
       const engineFailure = await engineUnavailable()
       if (engineFailure) return engineFailure
       if (controller.signal.aborted) return { ok: false, error: 'Detection canceled.', errorCode: 'canceled' }
-      return await detect(url, report, controller.signal)
+      return await detect(url, report, controller.signal, { prefetch: options?.prefetch === true })
     } finally {
       if (requestId) detections.delete(requestId)
       // Every exit ends the narration, not only the ones the detector marks 'done'.

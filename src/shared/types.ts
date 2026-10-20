@@ -657,6 +657,16 @@ export interface BrowserState {
 }
 
 /** What the detector is currently doing, streamed to the UI while it works. */
+/** How a detect was asked for. */
+export interface DetectOptions {
+  /**
+   * Speculative: nobody is waiting on it yet. The engine probe only - no page
+   * scrape, no hidden browser - so a link that is merely sitting on the
+   * clipboard never opens a window or fetches a page behind the user's back.
+   */
+  prefetch?: boolean
+}
+
 export type DetectStage =
   | 'idle'
   | 'resolving'

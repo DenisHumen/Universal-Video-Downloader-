@@ -213,10 +213,21 @@ export default function HomeView(): JSX.Element {
     // Same reasoning as SearchView: main reports an engine that won't install
     // as a coded result, but any other rejected invoke would otherwise leave
     // the card in its skeleton.
-    const res: DetectResult = await (adopted?.promise ?? window.api.detect(target, requestId)).catch(
+    let res: DetectResult = await (adopted?.promise ?? window.api.detect(target, requestId)).catch(
       (err: unknown) => ({ ok: false, error: describeError(err) })
     )
     if (requestRef.current !== requestId) return
+    /*
+      A prefetch is the engine probe alone, with no page scrape or browser
+      behind it. When that was not enough, run the whole detect now that
+      someone is actually waiting for it.
+    */
+    if (adopted && !res.ok && res.errorCode !== 'canceled') {
+      res = await window.api.detect(target, requestId).catch(
+        (err: unknown) => ({ ok: false, error: describeError(err) })
+      )
+      if (requestRef.current !== requestId) return
+    }
     requestRef.current = null
     endDetect()
     detectCache.set(target, res)
