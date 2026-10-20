@@ -14,6 +14,7 @@ import Toasts from './components/Toasts'
 import LiveRegion from './components/LiveRegion'
 import ShortcutsOverlay from './components/ShortcutsOverlay'
 import ClipboardPrompt from './components/ClipboardPrompt'
+import DropOverlay from './components/DropOverlay'
 import { useShortcuts } from './hooks/useShortcuts'
 import { usePasteDetect } from './hooks/usePasteDetect'
 import { useT } from './i18n'
@@ -30,7 +31,7 @@ export default function App(): JSX.Element {
   }, [init])
 
   useShortcuts()
-  usePasteDetect()
+  const dragging = usePasteDetect()
 
   return (
     <>
@@ -39,6 +40,7 @@ export default function App(): JSX.Element {
       {/* Outcomes as text, for anyone not watching the window. */}
       <LiveRegion />
       <ShortcutsOverlay />
+      {dragging && <DropOverlay />}
 
       {/*
         Notices are full-width strips pinned under the chrome, not floating

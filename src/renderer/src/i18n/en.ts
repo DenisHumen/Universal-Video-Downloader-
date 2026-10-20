@@ -66,6 +66,7 @@ export const en = {
   'home.linkLabel': 'video link',
   'home.saveDefault': 'use default folder',
   'home.get': 'get video',
+  'home.dropHint': 'drop to download',
   'home.active': 'active',
   'home.recent': 'recent',
   'home.openQueue': 'open the queue',
