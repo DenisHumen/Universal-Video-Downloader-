@@ -22,7 +22,7 @@ import {
   type MediaInfo,
   type TrimRange
 } from '@shared/types'
-import { needsCookiesOften, youtubeIdOf } from '@shared/urls'
+import { looksLikeCollection, needsCookiesOften, youtubeIdOf } from '@shared/urls'
 import { detectCache, inflightDetects, useStore } from '../store'
 import { describeError, errorText } from '../lib/errors'
 import { formatCount, formatDuration, isProbablyUrl } from '../lib/format'
@@ -35,7 +35,7 @@ import {
 } from '../lib/quality'
 import { detectIsDone, errorLead } from '../lib/emphasis'
 import { queueDownload, queueDownloads } from '../lib/queue'
-import { escapeClearsHome, linkIn } from '../lib/shortcuts'
+import { escapeClearsHome, isDownloadNowChord, linkIn } from '../lib/shortcuts'
 import { toClock } from '../lib/time'
 import { useT, useTp, type TranslationKey } from '../i18n'
 import FormatSelector, { type Selection } from '../components/FormatSelector'
@@ -276,6 +276,10 @@ export default function HomeView(): JSX.Element {
   useEffect(() => {
     const onKey = (e: KeyboardEvent): void => {
       if (escapeClearsHome(e, useStore.getState().shortcutsOpen)) reset()
+      else if (isDownloadNowChord(e) && !useStore.getState().shortcutsOpen) {
+        e.preventDefault()
+        void downloadNowRef.current()
+      }
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
@@ -351,6 +355,55 @@ export default function HomeView(): JSX.Element {
     setView('downloads')
   }
 
+  /*
+    Download without waiting for the format list.
+
+    Detection is for choosing; most of the time the choice is the one in
+    Settings, and the downloader resolves the link again on its own when the
+    item starts. So while the card is still detecting - or straight from the
+    field - the link can be queued with the default quality, under whatever
+    title and poster are already known. A collection is the exception: queued
+    whole it would fetch every video on a channel, so it waits for the picker.
+    A result already on screen downloads what is selected on it, which starts
+    out as those same defaults.
+  */
+  const canDownloadNow = (link: string): boolean =>
+    Boolean(settings) && isProbablyUrl(link) && !looksLikeCollection(link)
+
+  const downloadNow = async (): Promise<void> => {
+    if (starting) return
+    if (info) {
+      if (!info.isPlaylist && !info.streaming && status === 'idle') await start()
+      return
+    }
+    const target = url.trim()
+    if (!settings || !canDownloadNow(target)) return
+    const preview = useStore.getState().detectPreview
+    const ytId = youtubeIdOf(target)
+    const mode = initialMode(settings)
+    setStarting(true)
+    let ok = false
+    try {
+      ok = await queueDownload({
+        url: target,
+        title: preview?.title || target,
+        thumbnail: preview?.thumbnail ?? (ytId ? `https://i.ytimg.com/vi/${ytId}/mqdefault.jpg` : undefined),
+        mode,
+        quality: mode === 'audio' ? 'audio' : initialQuality(settings),
+        outputDir: saveDir || undefined
+      })
+    } finally {
+      setStarting(false)
+    }
+    if (!ok) return
+    // Stops the detect too: the queue resolves the link for itself.
+    reset()
+    setView('downloads')
+  }
+  // The window listener is registered once; it calls whatever this render's is.
+  const downloadNowRef = useRef(downloadNow)
+  downloadNowRef.current = downloadNow
+
   const batchLinks = useMemo(
     () =>
       batchText
@@ -419,7 +472,8 @@ export default function HomeView(): JSX.Element {
             ref={inputRef}
             value={url}
             onChange={(e) => setUrl(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && detect()}
+            // ⌘/Ctrl+Enter is "download now", answered by the window listener above.
+            onKeyDown={(e) => e.key === 'Enter' && !e.metaKey && !e.ctrlKey && detect()}
             /*
               Fields take dropped text at the caret, and usePasteDetect leaves
               them to it — which here would splice a second link into the
@@ -550,6 +604,8 @@ export default function HomeView(): JSX.Element {
               label={t(STAGE_LABEL[detectStatus?.stage ?? 'resolving'])}
               url={detectStatus?.url ?? url}
               preview={detectPreview}
+              onDownloadNow={canDownloadNow(url.trim()) ? () => void downloadNow() : undefined}
+              starting={starting}
               slowHint={t('detect.slowHint')}
               cancelLabel={t('common.cancel')}
               onCancel={cancelDetect}
@@ -866,7 +922,9 @@ function DetectingCard({
   preview,
   slowHint,
   cancelLabel,
-  onCancel
+  onCancel,
+  onDownloadNow,
+  starting
 }: {
   stage: DetectStage
   label: string
@@ -875,6 +933,9 @@ function DetectingCard({
   slowHint: string
   cancelLabel: string
   onCancel: () => void
+  /** Absent for a link that has to be detected first - a playlist or channel. */
+  onDownloadNow?: () => void
+  starting: boolean
 }): JSX.Element {
   const t = useT()
   const slow = stage === 'scraping' || stage === 'browsing'
@@ -952,6 +1013,19 @@ function DetectingCard({
           ))}
         </div>
       </div>
+      {onDownloadNow && (
+        <div className="border-t border-edge p-4">
+          <button
+            className="btn-solid w-full py-3 text-[14px]"
+            onClick={onDownloadNow}
+            disabled={starting}
+          >
+            {starting ? <Loader2 size={16} className="animate-spin" /> : null}
+            {t('home.downloadNow')}
+          </button>
+          <p className="hint mt-2 text-center">{t('home.downloadNowHint')}</p>
+        </div>
+      )}
     </motion.div>
   )
 }

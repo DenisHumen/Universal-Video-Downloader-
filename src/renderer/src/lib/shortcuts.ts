@@ -28,6 +28,8 @@ export const SHORTCUT_ROWS: ShortcutRow[] = [
   { keys: [['mod', '4']], label: 'shortcuts.watch', action: 'automation' },
   { keys: [['mod', '5'], ['mod', ',']], label: 'shortcuts.settings', action: 'settings' },
   { keys: [['mod', 'V']], label: 'shortcuts.paste' },
+  // Home's own: it needs the link on screen, so it is answered there, not globally.
+  { keys: [['mod', 'Enter']], label: 'shortcuts.downloadNow' },
   { keys: [['mod', '/']], label: 'shortcuts.help', action: 'help' },
   { keys: [['Esc']], label: 'shortcuts.escape' }
 ]
@@ -101,6 +103,24 @@ export function isEditableTarget(target: TargetLike | null | undefined): boolean
 export function linkIn(text: string | null | undefined): string | null {
   const value = text?.trim()
   return value && isProbablyUrl(value) ? value : null
+}
+
+/** The parts of a keydown the download-now chord looks at. */
+export interface ChordLike {
+  key: string
+  metaKey: boolean
+  ctrlKey: boolean
+  defaultPrevented: boolean
+  isComposing: boolean
+}
+
+/**
+ * ⌘/Ctrl+Enter on Home: queue the link with the default quality now, without
+ * waiting for the format list. Not mid-composition - an input method may be
+ * using Enter to commit - and not when something else already took the key.
+ */
+export function isDownloadNowChord(e: ChordLike): boolean {
+  return e.key === 'Enter' && (e.metaKey || e.ctrlKey) && !e.defaultPrevented && !e.isComposing
 }
 
 /** The parts of a keydown Home's Esc looks at. */

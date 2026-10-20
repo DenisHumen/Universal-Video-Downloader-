@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest'
-import { SHORTCUT_ROWS, chordAction, escapeClearsHome, isEditableTarget, linkIn } from './shortcuts'
+import {
+  SHORTCUT_ROWS,
+  chordAction,
+  escapeClearsHome,
+  isDownloadNowChord,
+  isEditableTarget,
+  linkIn
+} from './shortcuts'
 
 /*
   The shortcut list used to be its own array, and it fell behind the handler:
@@ -116,6 +123,26 @@ describe('linkIn', () => {
   Esc on Home cleared the field on every keypress - including the one that
   closed the shortcut list, which threw away the video just found under it.
 */
+describe('isDownloadNowChord', () => {
+  const key = { key: 'Enter', metaKey: false, ctrlKey: true, defaultPrevented: false, isComposing: false }
+
+  it('is ⌘ or Ctrl with Enter', () => {
+    expect(isDownloadNowChord(key)).toBe(true)
+    expect(isDownloadNowChord({ ...key, ctrlKey: false, metaKey: true })).toBe(true)
+  })
+
+  it('is not plain Enter, a composition or a key already answered', () => {
+    expect(isDownloadNowChord({ ...key, ctrlKey: false })).toBe(false)
+    expect(isDownloadNowChord({ ...key, isComposing: true })).toBe(false)
+    expect(isDownloadNowChord({ ...key, defaultPrevented: true })).toBe(false)
+    expect(isDownloadNowChord({ ...key, key: 'a' })).toBe(false)
+  })
+
+  it('is in the shortcut list', () => {
+    expect(SHORTCUT_ROWS.some((row) => row.label === 'shortcuts.downloadNow')).toBe(true)
+  })
+})
+
 describe('escapeClearsHome', () => {
   const esc = { key: 'Escape', defaultPrevented: false, isComposing: false }
 
