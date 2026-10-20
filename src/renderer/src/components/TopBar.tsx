@@ -91,7 +91,7 @@ export default function TopBar(): JSX.Element {
         <div className="flex shrink-0 items-center gap-2.5 pl-4 pr-5">
           <Logo className="h-[18px] w-[18px] text-ink" />
           {/*
-            From `lg` only. At the 940px minimum in Russian, with the queue
+            From `lg` only. At 940px in Russian, with the queue
             badge showing, the wordmark's 31px was what pushed the settings tab
             behind the scroll arrow; the logo beside it already says whose
             window this is.

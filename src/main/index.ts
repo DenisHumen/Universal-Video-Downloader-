@@ -152,7 +152,7 @@ function loadRenderer(win: BrowserWindow, hash?: string): void {
  * `showMainWindow`, which shows it like any window hidden to the tray.
  */
 function createWindow(hidden = false): void {
-  mainWindow = new BrowserWindow({ ...windowOptions(1220, 820), minWidth: 940, minHeight: 640 })
+  mainWindow = new BrowserWindow({ ...windowOptions(1220, 820), minWidth: 720, minHeight: 640 })
   wireWindow(mainWindow, !hidden)
   loadRenderer(mainWindow)
   const stopTaskbar = mirrorProgressOnTaskbar(mainWindow)
