@@ -667,6 +667,8 @@ export type DetectStage =
 export interface DetectStatus {
   stage: DetectStage
   url: string
+  /** The request this stage belongs to: the same link detected twice is two requests. */
+  requestId?: string
 }
 
 // ---- Title search ----

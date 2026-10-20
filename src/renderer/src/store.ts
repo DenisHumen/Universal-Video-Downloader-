@@ -77,6 +77,10 @@ interface AppState {
   dismissUpdate: () => void
   dismissClipboardLink: () => void
   setShortcutsOpen: (open: boolean) => void
+  /** Home started detecting this link: its stage starts over, from resolving. */
+  beginDetect: (url: string, requestId: string) => void
+  /** Home stopped waiting - a result, an error, a cancel, or it went away. */
+  endDetect: () => void
   /** Go to Home and detect this link. */
   requestDetect: (url: string) => void
   /** Go to Search and run this query. */
@@ -155,7 +159,17 @@ async function runInit(set: SetState, get: GetState): Promise<void> {
         s.state === 'available' && prev.version !== s.version ? false : get().updateDismissed
     })
   })
-  window.api.onDetectStatus((s) => set({ detect: s.stage === 'done' ? null : s }))
+  /*
+    Only for the detect Home is waiting on. The stage used to be cleared on
+    'done' alone, which most failure exits and every cancel never send - so
+    the next link opened on the last one's "opening in the browser", and a
+    cancelled detect still working its way out kept narrating over the new.
+  */
+  window.api.onDetectStatus((s) => {
+    const current = get().detect
+    if (!current || current.url !== s.url || current.requestId !== s.requestId) return
+    set({ detect: s.stage === 'done' ? null : s })
+  })
   window.api.onClipboardLink((url) => {
     /*
       Ignore a link that's already in the queue — nothing new to offer.
@@ -266,6 +280,10 @@ export const useStore = create<AppState>((set, get) => ({
   dismissUpdate: () => set({ updateDismissed: true }),
   dismissClipboardLink: () => set({ clipboardLink: null }),
   setShortcutsOpen: (open) => set({ shortcutsOpen: open }),
+  beginDetect: (url, requestId) => set({ detect: { stage: 'resolving', url, requestId } }),
+  endDetect: () => {
+    if (get().detect) set({ detect: null })
+  },
 
   requestDetect: (url) => set({ pendingUrl: url, view: 'home' }),
   requestSearch: (query) => set({ pendingQuery: query, view: 'search' }),

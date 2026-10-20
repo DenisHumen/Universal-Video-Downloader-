@@ -78,6 +78,8 @@ export default function HomeView(): JSX.Element {
   const takePendingUrl = useStore((s) => s.takePendingUrl)
   const saveSettings = useStore((s) => s.saveSettings)
   const detectStatus = useStore((s) => s.detect)
+  const beginDetect = useStore((s) => s.beginDetect)
+  const endDetect = useStore((s) => s.endDetect)
 
   const [url, setUrl] = useState('')
   /** The link the result or error on screen came from; see `detectIsDone`. */
@@ -169,6 +171,7 @@ export default function HomeView(): JSX.Element {
   const dropRequest = (): void => {
     if (requestRef.current) void window.api.cancelDetect(requestRef.current)
     requestRef.current = null
+    endDetect()
   }
 
   const detect = async (value?: string): Promise<void> => {
@@ -183,6 +186,7 @@ export default function HomeView(): JSX.Element {
     dropRequest()
     const requestId = `${Date.now()}-${Math.random().toString(36).slice(2)}`
     requestRef.current = requestId
+    beginDetect(target, requestId)
     setStatus('detecting')
     setError('')
     setErrorCode(undefined)
@@ -197,6 +201,7 @@ export default function HomeView(): JSX.Element {
     )
     if (requestRef.current !== requestId) return
     requestRef.current = null
+    endDetect()
     setDetectedUrl(target)
     if (res.ok && res.info) {
       setInfo(res.info)

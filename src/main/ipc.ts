@@ -118,7 +118,7 @@ export function registerIpc({ getWindow, openSearchWindow, onSettingsChanged }: 
     if (requestId) detections.set(requestId, controller)
     const report = (stage: DetectStage): void => {
       if (!event.sender.isDestroyed()) {
-        event.sender.send(IPC.evtDetectStatus, { stage, url })
+        event.sender.send(IPC.evtDetectStatus, { stage, url, requestId })
       }
     }
     try {
@@ -129,6 +129,8 @@ export function registerIpc({ getWindow, openSearchWindow, onSettingsChanged }: 
       return await detect(url, report, controller.signal)
     } finally {
       if (requestId) detections.delete(requestId)
+      // Every exit ends the narration, not only the ones the detector marks 'done'.
+      report('done')
     }
   })
   ipcMain.handle(IPC.detectCancel, (_e, requestId: string) => {
