@@ -23,7 +23,7 @@ import {
   type TrimRange
 } from '@shared/types'
 import { needsCookiesOften, youtubeIdOf } from '@shared/urls'
-import { useStore } from '../store'
+import { detectCache, inflightDetects, useStore } from '../store'
 import { describeError, errorText } from '../lib/errors'
 import { formatCount, formatDuration, isProbablyUrl } from '../lib/format'
 import {
@@ -186,24 +186,42 @@ export default function HomeView(): JSX.Element {
     }
     // A new link supersedes one still detecting; the engine can stop on that.
     dropRequest()
-    const requestId = `${Date.now()}-${Math.random().toString(36).slice(2)}`
-    requestRef.current = requestId
-    beginDetect(target, requestId)
-    setStatus('detecting')
     setError('')
     setErrorCode(undefined)
     setCookieHint(false)
     setReported(null)
+    // The same link detected in the last few minutes: its card, at once.
+    const cached = detectCache.get(target)
+    if (cached) {
+      show(target, cached)
+      return
+    }
+    /*
+      The clipboard strip may have started this one already; waiting on that
+      run, under its request id, is both faster and one engine fewer. Its
+      stage and preview events then reach this card too.
+    */
+    const adopted = inflightDetects.take(target)
+    const requestId = adopted?.requestId ?? `${Date.now()}-${Math.random().toString(36).slice(2)}`
+    requestRef.current = requestId
+    beginDetect(target, requestId)
+    setStatus('detecting')
     setInfo(null)
     // Same reasoning as SearchView: main reports an engine that won't install
     // as a coded result, but any other rejected invoke would otherwise leave
     // the card in its skeleton.
-    const res: DetectResult = await window.api.detect(target, requestId).catch(
+    const res: DetectResult = await (adopted?.promise ?? window.api.detect(target, requestId)).catch(
       (err: unknown) => ({ ok: false, error: describeError(err) })
     )
     if (requestRef.current !== requestId) return
     requestRef.current = null
     endDetect()
+    detectCache.set(target, res)
+    show(target, res)
+  }
+
+  /** Put a detect's outcome on screen, whether it just ran or came from the cache. */
+  const show = (target: string, res: DetectResult): void => {
     setDetectedUrl(target)
     if (res.ok && res.info) {
       setInfo(res.info)

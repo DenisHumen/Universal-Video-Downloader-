@@ -2,6 +2,7 @@ import { create } from 'zustand'
 import type {
   AppSettings,
   DetectPreview,
+  DetectResult,
   DetectStatus,
   DownloadItem,
   DownloadProgress,
@@ -13,7 +14,14 @@ import { watchFailing } from '@shared/automation'
 import type { ImportOutcome } from '@shared/backup'
 import type { AppInfo } from '../../preload/index'
 import { applyDownloadsChanged } from './lib/downloads'
+import { DetectCache, InflightDetects } from './lib/detectCache'
+import { isProbablyUrl } from './lib/format'
 import { applyAppearance } from './lib/theme'
+
+/** Recent successful detects; see lib/detectCache.ts. Not state: nothing renders from it. */
+export const detectCache = new DetectCache()
+/** Speculative detects Home can adopt rather than start again. */
+export const inflightDetects = new InflightDetects()
 
 export type ViewId = 'home' | 'search' | 'downloads' | 'automation' | 'settings'
 
@@ -84,6 +92,10 @@ interface AppState {
   beginDetect: (url: string, requestId: string) => void
   /** Home stopped waiting - a result, an error, a cancel, or it went away. */
   endDetect: () => void
+  /** Start detecting a link nobody has asked for yet, silently, so it is ready if they do. */
+  prefetchDetect: (url: string) => void
+  /** The link was turned down: stop the engine working on it. */
+  cancelPrefetch: (url: string) => void
   /** Go to Home and detect this link. */
   requestDetect: (url: string) => void
   /** Go to Search and run this query. */
@@ -293,6 +305,30 @@ export const useStore = create<AppState>((set, get) => ({
     set({ detect: { stage: 'resolving', url, requestId }, detectPreview: null }),
   endDetect: () => {
     if (get().detect || get().detectPreview) set({ detect: null, detectPreview: null })
+  },
+  /*
+    The clipboard strip is a strong hint the link is about to be wanted, and
+    it sits on screen for as long as the user takes to read it. Detecting in
+    that time means "use it" opens on a finished card. The engine run is the
+    same one Home would have started; nothing is downloaded, and the stage
+    and preview events it sends are ignored, because no detect on screen
+    carries its request id until Home adopts it.
+  */
+  prefetchDetect: (url) => {
+    if (!isProbablyUrl(url) || detectCache.get(url) || inflightDetects.has(url)) return
+    const requestId = `pre-${Date.now()}-${Math.random().toString(36).slice(2)}`
+    const promise = window.api
+      .detect(url, requestId)
+      .catch((err: unknown): DetectResult => ({ ok: false, error: String(err) }))
+      .then((res) => {
+        detectCache.set(url, res)
+        return res
+      })
+    inflightDetects.add(url, { requestId, promise })
+  },
+  cancelPrefetch: (url) => {
+    const pending = inflightDetects.take(url)
+    if (pending) void window.api.cancelDetect(pending.requestId)
   },
 
   requestDetect: (url) => set({ pendingUrl: url, view: 'home' }),

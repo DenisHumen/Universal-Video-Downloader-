@@ -1,3 +1,4 @@
+import { useEffect } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { collapse } from '../lib/motion'
 import { X } from 'lucide-react'
@@ -13,6 +14,18 @@ export default function ClipboardPrompt(): JSX.Element {
   const link = useStore((s) => s.clipboardLink)
   const dismiss = useStore((s) => s.dismissClipboardLink)
   const requestDetect = useStore((s) => s.requestDetect)
+  const prefetchDetect = useStore((s) => s.prefetchDetect)
+  const cancelPrefetch = useStore((s) => s.cancelPrefetch)
+
+  // Detected while it is being read; see `prefetchDetect`.
+  useEffect(() => {
+    if (link) prefetchDetect(link)
+  }, [link, prefetchDetect])
+
+  const decline = (): void => {
+    if (link) cancelPrefetch(link)
+    dismiss()
+  }
 
   const accept = (): void => {
     if (!link) return
@@ -41,7 +54,7 @@ export default function ClipboardPrompt(): JSX.Element {
             <button className="btn-quiet shrink-0 px-3 py-2" onClick={accept}>
               {t('home.clipboardUse')}
             </button>
-            <button className="btn-icon" onClick={dismiss} aria-label={t('common.close')}>
+            <button className="btn-icon" onClick={decline} aria-label={t('common.close')}>
               <X size={15} />
             </button>
           </div>
