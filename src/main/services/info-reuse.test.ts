@@ -1,5 +1,5 @@
 import { EventEmitter } from 'events'
-import { existsSync, mkdtempSync } from 'fs'
+import { existsSync, mkdtempSync, writeFileSync } from 'fs'
 import { tmpdir } from 'os'
 import { join } from 'path'
 import { PassThrough } from 'stream'
@@ -65,21 +65,22 @@ const { infoKey } = await import('./info-cache')
 
 interface Run {
   args: string[]
-  finish: (code: number, stderr?: string) => void
+  finish: (code: number, stderr?: string, stdout?: string) => void
 }
 let runs: Run[] = []
 /** Runs that finish on their own, and how. */
-let autoFinish: ((args: string[]) => { code: number; stderr?: string } | null) | null = null
+let autoFinish: ((args: string[]) => { code: number; stderr?: string; stdout?: string } | null) | null = null
 
 spawn.mockImplementation((_bin: string, args: string[]) => {
   const child = Object.assign(new EventEmitter(), { stdout: new PassThrough(), stderr: new PassThrough() })
-  const finish = (code: number, stderr = ''): void => {
+  const finish = (code: number, stderr = '', stdout = ''): void => {
+    if (stdout) child.stdout.write(stdout)
     if (stderr) child.stderr.write(stderr)
     setImmediate(() => child.emit('close', code))
   }
   runs.push({ args, finish })
   const auto = autoFinish?.(args)
-  if (auto) finish(auto.code, auto.stderr)
+  if (auto) finish(auto.code, auto.stderr, auto.stdout)
   return child
 })
 
@@ -88,10 +89,12 @@ const infoArg = (args: string[]): string | undefined => args[args.indexOf('--loa
 const usesInfo = (args: string[]): boolean => args.includes('--load-info-json')
 
 let n = 0
+let lastDir = ''
 async function queue(): Promise<DownloadItem> {
   const url = `https://video.test/watch?v=reuse${++n}`
   infoCache.put(infoKey(url, SETTINGS), JSON.stringify({ id: `reuse${n}`, title: 'Talk' }))
-  return startDownload({ url, mode: 'video', outputDir: mkdtempSync(join(tmpdir(), 'uvd-reuse-')) })
+  lastDir = mkdtempSync(join(tmpdir(), 'uvd-reuse-'))
+  return startDownload({ url, mode: 'video', outputDir: lastDir })
 }
 
 beforeEach(() => {
@@ -121,6 +124,26 @@ describe('starting a download from the detect\'s JSON', () => {
     expect(runs.map((r) => usesInfo(r.args))).toEqual([true, false])
     expect(runs[1].args.slice(-2)).toEqual(['--', find(item.id)?.url])
     expect(find(item.id)?.attempts ?? 0).toBe(0)
+  })
+
+  it("clears the stale run's partial files before the fresh one starts", async () => {
+    let partAtRetry: boolean | undefined
+    autoFinish = (args) => {
+      const dest = join(lastDir, 'Talk [x].webm')
+      if (usesInfo(args)) {
+        writeFileSync(`${dest}.part`, 'old bytes')
+        return {
+          code: 1,
+          stdout: `[download] Destination: ${dest}\n`,
+          stderr: 'ERROR: unable to download video data: HTTP Error 403: Forbidden\n'
+        }
+      }
+      partAtRetry = existsSync(`${dest}.part`)
+      return { code: 0 }
+    }
+    const item = await queue()
+    await vi.waitFor(() => expect(find(item.id)?.state).toBe('completed'))
+    expect(partAtRetry).toBe(false)
   })
 
   it('fails a real failure as it always did', async () => {

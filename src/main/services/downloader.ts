@@ -1424,6 +1424,12 @@ async function runDownload(item: DownloadItem): Promise<void> {
     */
     if (infoFile && isStaleInfoError(stderrTail)) {
       appendLog(item, 'The saved video details were out of date; asking the site again\n')
+      /*
+        What the failed run wrote goes first. The fresh extraction may pick
+        other formats, and `--continue` would otherwise append to a part file
+        fetched from an address that no longer exists.
+      */
+      cleanupPartials(item)
       skipInfo.add(item.id)
       item.state = 'queued'
       item.speed = undefined
