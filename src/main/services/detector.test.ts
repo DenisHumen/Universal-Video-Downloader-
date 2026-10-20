@@ -206,6 +206,20 @@ describe('detect, on a host the engine has no extractor for', () => {
 })
 
 describe('universalCanHelp', () => {
+  it('lets the signed-in browser try a login or age gate, except on YouTube', () => {
+    const insta = { url: 'https://www.instagram.com/p/x', browserAllowed: true }
+    for (const errorCode of ['signIn', 'ageRestricted'] as const) {
+      expect(universalCanHelp({ errorCode, output: 'ERROR: [Instagram] x: login required' }, insta)).toBe(true)
+      expect(universalCanHelp({ errorCode }, { ...insta, browserAllowed: false })).toBe(false)
+      expect(
+        universalCanHelp({ errorCode, output: 'ERROR: [youtube] x: Sign in to confirm your age' }, insta)
+      ).toBe(false)
+      expect(
+        universalCanHelp({ errorCode }, { url: 'https://www.youtube.com/watch?v=x', browserAllowed: true })
+      ).toBe(false)
+    }
+  })
+
   it('skips the page scrape when the site already said no', () => {
     for (const errorCode of ['signIn', 'geo', 'drm', 'ageRestricted', 'upcoming', 'rateLimited', 'unavailable'] as const) {
       expect(universalCanHelp({ errorCode }), errorCode).toBe(false)

@@ -302,7 +302,7 @@ export async function detect(
   // The engine gave up. Fall back to universal detection: scrape the page, and
   // if that isn't enough, open it in a hidden browser and watch for the stream.
   // Never for a prefetch: see DetectOptions. Home detects again if the probe alone was not enough.
-  if (!wasRewritten && !options.prefetch && !signal?.aborted && universalCanHelp(probe)) {
+  if (!wasRewritten && !options.prefetch && !signal?.aborted && universalCanHelp(probe, { url, browserAllowed: settings.universalFallback })) {
     const tried = { browserAllowed: settings.universalFallback, stages: [] as string[] }
     trace.universal = tried
     let universal: ResolvedUrl | null = null
@@ -419,6 +419,16 @@ const DEFINITIVE: ReadonlySet<AppErrorCode> = new Set<AppErrorCode>([
   'adultHidden'
 ])
 
+/** Whether the failure is YouTube's, by the engine's extractor name or by the link's host. */
+function isYoutube(probe: { output?: string; error?: string }, url?: string): boolean {
+  if (/ERROR: \[youtube[\w:]*\]/i.test(probe.output ?? probe.error ?? '')) return true
+  try {
+    return url ? /(^|\.)(youtube\.com|youtu\.be|youtube-nocookie\.com)$/i.test(new URL(url).hostname) : false
+  } catch {
+    return false
+  }
+}
+
 /** An engine error that comes from a named site extractor, and says why. */
 const NAMED_EXTRACTOR = /ERROR: \[([\w:.-]+)\]/
 /** …unless the why is that the extractor itself no longer understands the page. */
@@ -434,7 +444,24 @@ const EXTRACTOR_BROKE = /Unable to extract|Unsupported URL|Failed to parse|No vi
  * the engine has no extractor for (`Unsupported URL`, `[generic]`), and an
  * extractor broken by a site redesign, where the stream is still on the page.
  */
-export function universalCanHelp(probe: { errorCode?: AppErrorCode; output?: string; error?: string }): boolean {
+export function universalCanHelp(
+  probe: { errorCode?: AppErrorCode; output?: string; error?: string },
+  context: { url?: string; browserAllowed?: boolean } = {}
+): boolean {
+  /*
+    Behind a login or an age gate the hidden browser is a different visitor
+    from the engine: it carries the in-app browser's session, so a site the
+    user has signed in to there shows it the video the engine was refused.
+    Not YouTube, whose gate the browser meets just the same, and only while
+    the browser pass is allowed to run at all.
+  */
+  if (
+    (probe.errorCode === 'signIn' || probe.errorCode === 'ageRestricted') &&
+    context.browserAllowed &&
+    !isYoutube(probe, context.url)
+  ) {
+    return true
+  }
   if (probe.errorCode && DEFINITIVE.has(probe.errorCode)) return false
   // Unreachable is checked by the pass itself, which can name the host it couldn't reach.
   if (probe.errorCode === 'network' || probe.errorCode === 'timeout') return true
