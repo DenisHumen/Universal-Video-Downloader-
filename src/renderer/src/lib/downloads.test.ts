@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { DownloadItem } from '@shared/types'
-import { applyDownloadsChanged, liveDownloads, overallPercent, recentFinished } from './downloads'
+import { applyDownloadsChanged, groupQueue, liveDownloads, overallPercent, recentFinished } from './downloads'
 
 function item(id: string, createdAt: number, overrides: Partial<DownloadItem> = {}): DownloadItem {
   return {
@@ -115,5 +115,19 @@ describe('overallPercent', () => {
         item('q', 3, { state: 'queued', percent: 0 })
       ])
     ).toBe(60)
+  })
+})
+
+describe('groupQueue', () => {
+  it('puts what is moving first, then failures, then what is done, each in list order', () => {
+    const list = [
+      item('done1', 1),
+      item('run1', 2, { state: 'downloading' }),
+      item('err1', 3, { state: 'error' }),
+      item('done2', 4),
+      item('paused', 5, { state: 'paused' }),
+      item('canceled', 6, { state: 'canceled' })
+    ]
+    expect(ids(groupQueue(list))).toEqual(['run1', 'paused', 'err1', 'canceled', 'done1', 'done2'])
   })
 })

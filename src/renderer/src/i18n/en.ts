@@ -125,6 +125,7 @@ export const en = {
   'queue.etaAll': '≈ {time} left in total',
   'queue.duplicate': 'already in the queue',
   'queue.addedWithDuplicates': 'added {count} · {duplicates} already queued',
+  'queue.more': 'more actions',
   'queue.copyLink': 'copy the link',
   'queue.openSource': 'open the source page',
   'queue.moveUp': 'download this one next',

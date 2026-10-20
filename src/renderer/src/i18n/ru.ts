@@ -119,6 +119,7 @@ export const ru: Dictionary = {
   'queue.etaAll': '≈ {time} до конца',
   'queue.duplicate': 'уже в очереди',
   'queue.addedWithDuplicates': 'добавлено: {count} · уже в очереди: {duplicates}',
+  'queue.more': 'другие действия',
   'queue.copyLink': 'скопировать ссылку',
   'queue.openSource': 'открыть страницу-источник',
   'queue.moveUp': 'скачать следующим',

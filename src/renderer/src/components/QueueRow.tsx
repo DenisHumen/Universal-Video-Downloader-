@@ -25,6 +25,7 @@ import { toast } from '../lib/toast'
 import MediaJobModal, { type JobMode } from './MediaJobModal'
 import Thumbnail from './Thumbnail'
 import ReportPrompt, { useReportOffer } from './ReportPrompt'
+import RowMenu, { type RowMenuItem } from './RowMenu'
 
 interface Props {
   item: DownloadItem
@@ -32,6 +33,8 @@ interface Props {
   index: number
   /** Fade in on mount: true for entries that arrive while the queue is open. */
   animateIn?: boolean
+  /** The section this row opens, when it is the first of one. */
+  heading?: string
 }
 
 
@@ -44,7 +47,7 @@ interface Props {
  * Hairlines between rows carry the same separation at a fraction of the visual
  * cost.
  */
-function QueueRow({ item, index, animateIn = true }: Props): JSX.Element {
+function QueueRow({ item, index, animateIn = true, heading }: Props): JSX.Element {
   const t = useT()
   const [logOpen, setLogOpen] = useState(false)
   // The engine output mounts only while open, so aria-controls is set only then.
@@ -168,6 +171,63 @@ function QueueRow({ item, index, animateIn = true }: Props): JSX.Element {
     }
   }
 
+  const running =
+    item.state === 'downloading' ||
+    item.state === 'queued' ||
+    item.state === 'processing' ||
+    item.state === 'detecting'
+
+  /*
+    Everything but the row's one primary action and its remove, behind "⋯".
+    Each used to be an icon of its own - up to eight on a finished row - so
+    the action the row was about was one square among many, and a narrow
+    window left the title ten characters.
+  */
+  const menu: RowMenuItem[] = [
+    ...(hasWebLink
+      ? [
+          { label: t('queue.copyLink'), icon: <Link2 size={14} />, onSelect: () => void copyLink() },
+          {
+            label: t('queue.openSource'),
+            icon: <ExternalLink size={14} />,
+            onSelect: () => void window.api.openExternal(sourceLink)
+          }
+        ]
+      : []),
+    ...(item.state === 'queued'
+      ? [
+          {
+            label: t('queue.moveUp'),
+            icon: <ArrowUp size={14} />,
+            onSelect: () => void window.api.prioritizeDownload(item.id)
+          }
+        ]
+      : []),
+    ...(item.state === 'completed' && item.filepath
+      ? [
+          { label: t('trim.openEditor'), icon: <Scissors size={14} />, onSelect: () => setJobModal('trim') },
+          { label: t('convert.open'), icon: <FileVideo size={14} />, onSelect: () => setJobModal('convert') }
+        ]
+      : []),
+    ...(item.state === 'error'
+      ? [{ label: t('queue.copyError'), icon: <Copy size={14} />, onSelect: () => void copyError() }]
+      : [])
+  ]
+
+  /* What the second line says, after the state: progress, speed, time left, quality. */
+  const progressFact =
+    item.state === 'downloading' || item.state === 'processing'
+      ? indeterminate && percent === 0
+        ? null
+        : `${percent}%`
+      : null
+  const lineFacts = [progressFact, ...facts]
+  /*
+    The track is for work that has started or been stopped part way. A queued
+    row has nothing to show on it, and a finished one says so in words.
+  */
+  const showTrack = ['downloading', 'processing', 'detecting', 'paused'].includes(item.state)
+
   return (
     <motion.li
       /*
@@ -184,12 +244,14 @@ function QueueRow({ item, index, animateIn = true }: Props): JSX.Element {
       transition={listItem}
       className="group relative border-b border-edge"
     >
-      <div className="flex items-center gap-3.5 py-3 pl-1 pr-1 transition-colors duration-fast ease-ease group-hover:bg-raise">
+      {/* In the row rather than between rows, so the list stays one <ul> of <li>s. */}
+      {heading && <p className="label border-b border-edge pb-2 pt-5">{heading}</p>}
+      <div className="flex items-center gap-3 py-2.5 pl-1 pr-1 transition-colors duration-fast ease-ease group-hover:bg-raise">
         <span className="mono w-6 shrink-0 text-center text-[12px] tabular-nums text-ink-3">
           {String(index + 1).padStart(2, '0')}
         </span>
 
-        <div className="relative h-11 w-[74px] shrink-0 overflow-hidden rounded-1 bg-sink">
+        <div className="relative h-9 w-16 shrink-0 overflow-hidden rounded-1 bg-sink">
           <Thumbnail
             src={item.thumbnail}
             pageUrl={item.sourceUrl}
@@ -202,115 +264,27 @@ function QueueRow({ item, index, animateIn = true }: Props): JSX.Element {
           <p className="truncate text-[14px] font-medium text-ink" title={item.title}>
             {item.title}
           </p>
-          <p className="mono mt-1 flex items-center gap-2 truncate text-[12px] text-ink-2">
-            <span className={`inline-flex items-center gap-1.5 ${meta.text}`}>
+          <p className="mono mt-0.5 flex items-center gap-2 truncate text-[12px] text-ink-2">
+            <span className={`inline-flex shrink-0 items-center gap-1.5 ${meta.text}`}>
               <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${meta.dot}`} />
               {t(meta.label)}
             </span>
             {item.state === 'queued' && (item.priority ?? 0) > 0 && (
-              <span className="text-accent-ink">{t('queue.next')}</span>
+              <span className="shrink-0 text-accent-ink">{t('queue.next')}</span>
             )}
-            {facts.length > 0 && <span className="truncate">{facts.join('  ·  ')}</span>}
+            {lineFacts.filter(Boolean).length > 0 && (
+              <span className="truncate">{lineFacts.filter(Boolean).join(' · ')}</span>
+            )}
           </p>
         </div>
 
         {/*
-          Progress: a real bar with a visible track, plus the number.
-
-          Two things were wrong here. The fill was a framer-motion `animate`,
-          so the bar rode the frame clock — the same clock that stalls in a
-          throttled window, which is exactly where a download sits while it
-          runs. It is a plain style with a CSS transition now: the browser
-          moves it whether or not anything is scheduling animation frames.
-
-          And when a site reports no total size, `percent` is genuinely
-          unknown. It used to render as a confident `0%` that never moved until
-          the download finished and the bar vanished. An indeterminate band and
-          the bytes downloaded so far say the true thing: working, size not
-          known.
+          Always visible: the state's one primary action, remove, and the menu.
+          These were `opacity-0` until hover once, which reads as tidy and
+          means a user who never moves the mouse over a row cannot discover
+          that pause or "show in folder" exist at all.
         */}
-        {!['completed', 'error', 'canceled'].includes(item.state) && (
-          <div className="flex w-24 shrink-0 items-center gap-2.5 lg:w-32">
-            <div
-              className="relative h-1.5 min-w-0 flex-1 overflow-hidden rounded-full bg-sink"
-              role="progressbar"
-              aria-valuenow={indeterminate ? undefined : percent}
-              aria-valuemin={0}
-              aria-valuemax={100}
-              aria-label={phaseLabel ?? t(meta.label)}
-            >
-              {/*
-                The bar carries both halves of the job: what is finished is
-                solid, and what is running without a figure to report is a band
-                travelling across the part that is left. A trimmed download
-                fills to 90% on the last byte, then the remaining tenth visibly
-                works while the re-encode runs — rather than standing still and
-                jumping to done.
-              */}
-              <div
-                className="h-full rounded-full bg-accent transition-[width] duration-base ease-ease"
-                style={{ width: `${percent}%` }}
-              />
-              {indeterminate && percent < 100 && (
-                <div
-                  className="absolute inset-y-0 right-0 overflow-hidden"
-                  style={{ left: `${percent}%` }}
-                >
-                  <div className="progress-indeterminate h-full bg-accent/45" />
-                </div>
-              )}
-            </div>
-            {/* The bar already carries the number's meaning; on a narrow window
-                the title needs those 40px more than the reader does. */}
-            <span className="mono hidden w-9 shrink-0 text-right text-[12px] tabular-nums text-ink-2 md:block">
-              {(indeterminate || item.state === 'queued') && percent === 0 ? '—' : `${percent}%`}
-            </span>
-          </div>
-        )}
-
-        {/*
-          Always visible.
-          These were `opacity-0` until hover, which reads as tidy and means a
-          user who never moves the mouse over a row cannot discover that pause,
-          cancel or "show in folder" exist at all. Critical actions do not hide.
-        */}
-        <div className="flex shrink-0 items-center gap-1">
-          {item.state === 'queued' && (
-            <button
-              className="btn-icon-bare"
-              title={t('queue.moveUp')}
-              aria-label={t('queue.moveUp')}
-              onClick={() => window.api.prioritizeDownload(item.id)}
-            >
-              <ArrowUp size={15} />
-            </button>
-          )}
-          {/*
-            Link actions are conveniences, so they are the first thing to yield
-            when the row runs out of width — measured at 660px, six buttons plus
-            the progress block left the title 86px, which is about ten
-            characters. Pause, cancel, remove and "next" never hide.
-          */}
-          {hasWebLink && (
-            <>
-              <button
-                className="btn-icon-bare hidden lg:inline-flex"
-                title={t('queue.copyLink')}
-                aria-label={t('queue.copyLink')}
-                onClick={copyLink}
-              >
-                <Link2 size={15} />
-              </button>
-              <button
-                className="btn-icon-bare hidden lg:inline-flex"
-                title={t('queue.openSource')}
-                aria-label={t('queue.openSource')}
-                onClick={() => window.api.openExternal(sourceLink)}
-              >
-                <ExternalLink size={15} />
-              </button>
-            </>
-          )}
+        <div className="flex shrink-0 items-center gap-0.5">
           {item.state === 'completed' && item.filepath && (
             <>
               <button
@@ -326,12 +300,6 @@ function QueueRow({ item, index, animateIn = true }: Props): JSX.Element {
               >
                 <Play size={15} />
               </button>
-              <button className="btn-icon-bare" title={t('trim.openEditor')} aria-label={t('trim.openEditor')} onClick={() => setJobModal('trim')}>
-                <Scissors size={15} />
-              </button>
-              <button className="btn-icon-bare" title={t('convert.open')} aria-label={t('convert.open')} onClick={() => setJobModal('convert')}>
-                <FileVideo size={15} />
-              </button>
               <button
                 className="btn-icon-bare"
                 title={t('common.showInFolder')}
@@ -342,14 +310,11 @@ function QueueRow({ item, index, animateIn = true }: Props): JSX.Element {
               </button>
             </>
           )}
-          {(item.state === 'downloading' ||
-            item.state === 'queued' ||
-            item.state === 'processing' ||
-            item.state === 'detecting') && (
+          {running && (
             <button
               className="btn-icon-bare"
               title={t('common.pause')}
-                aria-label={t('common.pause')}
+              aria-label={t('common.pause')}
               onClick={() => window.api.pauseDownload(item.id)}
             >
               <Pause size={15} />
@@ -359,7 +324,7 @@ function QueueRow({ item, index, animateIn = true }: Props): JSX.Element {
             <button
               className="btn-icon-bare"
               title={t('common.resume')}
-                aria-label={t('common.resume')}
+              aria-label={t('common.resume')}
               onClick={() => window.api.resumeDownload(item.id)}
             >
               <Play size={15} />
@@ -369,29 +334,20 @@ function QueueRow({ item, index, animateIn = true }: Props): JSX.Element {
             <button
               className="btn-icon-bare"
               title={t('common.retry')}
-                aria-label={t('common.retry')}
+              aria-label={t('common.retry')}
               onClick={() => window.api.retryDownload(item.id)}
             >
               <RotateCw size={15} />
             </button>
           )}
-          {item.state === 'error' && (
-            <button className="btn-icon-bare" title={t('queue.copyError')} aria-label={t('queue.copyError')} onClick={copyError}>
-              <Copy size={15} />
-            </button>
-          )}
           {/*
-            `processing` belongs here too. It was the one running state with no
-            way out: a merge or a trim on a long video takes minutes, and while
-            it ran the row offered pause but not cancel — so the only way to
-            abandon a job that had gone wrong was to pause it and then remove
-            it, which is two steps to say one thing.
+            Remove, in the form the state allows. A row still working is
+            cancelled - `processing` too: a merge on a long video takes
+            minutes, and it was once the one running state with no way out -
+            and a bin beside cancel read as a second way to say the same thing.
+            A row that has stopped is removed.
           */}
-          {(item.state === 'downloading' ||
-            item.state === 'processing' ||
-            item.state === 'paused' ||
-            item.state === 'queued' ||
-            item.state === 'detecting') && (
+          {running || item.state === 'paused' ? (
             <button
               className="btn-icon-bare hover:text-bad"
               title={t('common.cancel')}
@@ -400,13 +356,7 @@ function QueueRow({ item, index, animateIn = true }: Props): JSX.Element {
             >
               <X size={15} />
             </button>
-          )}
-          {/*
-            Not on a row that is still working: beside Cancel, a bin that also
-            stops the download read as a second way to do the same thing, and
-            removed the row with it. Cancel first, then remove.
-          */}
-          {!['downloading', 'processing', 'detecting', 'queued', 'paused'].includes(item.state) && (
+          ) : (
             <button
               className="btn-icon-bare hover:text-bad"
               title={t('common.remove')}
@@ -416,8 +366,43 @@ function QueueRow({ item, index, animateIn = true }: Props): JSX.Element {
               <Trash2 size={15} />
             </button>
           )}
+          <RowMenu label={t('queue.more')} items={menu} />
         </div>
       </div>
+
+      {/*
+        Progress: a 3px track across the whole row, along its bottom edge.
+
+        The fill is a plain style with a CSS transition, not a framer-motion
+        `animate`: that rode the frame clock, which stalls in a throttled
+        window - exactly where a download sits while it runs.
+
+        When a site reports no total size, `percent` is genuinely unknown, and
+        a confident 0% that never moves reads as stuck. A band travelling
+        across the part that is left says the true thing: working, size not
+        known. A trimmed download fills to 90% on the last byte, then the
+        remaining tenth visibly works while the re-encode runs.
+      */}
+      {showTrack && (
+        <div
+          className="absolute inset-x-0 bottom-0 h-[3px] overflow-hidden bg-sink"
+          role="progressbar"
+          aria-valuenow={indeterminate ? undefined : percent}
+          aria-valuemin={0}
+          aria-valuemax={100}
+          aria-label={phaseLabel ?? t(meta.label)}
+        >
+          <div
+            className={`h-full transition-[width] duration-base ease-ease ${item.state === 'paused' ? 'bg-edge-strong' : 'bg-accent'}`}
+            style={{ width: `${percent}%` }}
+          />
+          {indeterminate && percent < 100 && (
+            <div className="absolute inset-y-0 right-0 overflow-hidden" style={{ left: `${percent}%` }}>
+              <div className="progress-indeterminate h-full bg-accent/45" />
+            </div>
+          )}
+        </div>
+      )}
 
       {/*
         Outcome: the path it landed at, or why it didn't. An automated episode
@@ -425,7 +410,7 @@ function QueueRow({ item, index, animateIn = true }: Props): JSX.Element {
         share's path left; the buttons that need a local file are gone already.
       */}
       {(item.state === 'completed' || item.state === 'error') && (
-        <div className="pb-3 pl-[124px] pr-1">
+        <div className="pb-3 pl-[116px] pr-1">
           {/*
             Each translated failure says what happened and then what to do,
             and one truncated line kept only the first half. A path gives up
@@ -513,5 +498,9 @@ function QueueRow({ item, index, animateIn = true }: Props): JSX.Element {
  */
 export default memo(
   QueueRow,
-  (a, b) => a.item === b.item && a.index === b.index && a.animateIn === b.animateIn
+  (a, b) =>
+    a.item === b.item &&
+    a.index === b.index &&
+    a.animateIn === b.animateIn &&
+    a.heading === b.heading
 )
