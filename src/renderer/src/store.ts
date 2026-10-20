@@ -192,16 +192,22 @@ async function runInit(set: SetState, get: GetState): Promise<void> {
     cancelled detect still working its way out kept narrating over the new.
   */
   window.api.onDetectStatus((s) => {
+    /*
+      By request id alone. The url was compared too, but the field holds what
+      was typed while an adopted prefetch was asked for in the clipboard's
+      spelling of the same link, so its stages never matched. Ids are unique
+      per run; an event without one belongs to no detect on screen.
+    */
     const current = get().detect
-    if (!current || current.url !== s.url || current.requestId !== s.requestId) return
-    set({ detect: s.stage === 'done' ? null : s })
+    if (!current?.requestId || current.requestId !== s.requestId) return
+    set({ detect: s.stage === 'done' ? null : { ...s, url: current.url } })
   })
   window.api.onDetectPreview((p) => {
     // Kept even when nobody is showing it yet: a prefetch's preview arrives
     // before Home adopts the run, and would otherwise be lost to skeletons.
     rememberPreview(p)
     const current = get().detect
-    if (!current || current.url !== p.url || current.requestId !== p.requestId) return
+    if (!current?.requestId || current.requestId !== p.requestId) return
     set({ detectPreview: p })
   })
   window.api.onClipboardLink((url) => {
