@@ -216,6 +216,26 @@ export function normalizeUrl(input: string): string {
 }
 
 /**
+ * The video id of a YouTube watch, share or shorts link, or null.
+ *
+ * Enough to draw the video's poster - `i.ytimg.com/vi/<id>/…` is public and
+ * needs no request of ours - the moment the link is pasted, while the engine
+ * spends its several seconds on the rest. Channels, playlists and YouTube
+ * Music are not one video and have no such poster.
+ */
+export function youtubeIdOf(input: string): string | null {
+  let url: URL
+  try {
+    url = new URL(normalizeUrl(input))
+  } catch {
+    return null
+  }
+  if (url.hostname !== 'www.youtube.com' || url.pathname !== '/watch') return null
+  const id = url.searchParams.get('v')
+  return id && /^[\w-]{11}$/.test(id) ? id : null
+}
+
+/**
  * Whether a string is a `scheme://` address, and so safe to hand the engine as
  * the thing to download.
  *

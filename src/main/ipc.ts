@@ -20,6 +20,7 @@ import type {
   SearchScope
 } from '@shared/types'
 import { detect } from './services/detector'
+import { fetchOembed } from './services/oembed'
 import { searchVideos } from './services/search'
 import { probeMedia } from './services/ffmpeg'
 import { fetchThumbnail } from './services/thumbnails'
@@ -121,6 +122,17 @@ export function registerIpc({ getWindow, openSearchWindow, onSettingsChanged }: 
         event.sender.send(IPC.evtDetectStatus, { stage, url, requestId })
       }
     }
+    /*
+      The card's top half, from the site itself, while the engine is still
+      starting: a title and a poster in a few hundred ms instead of a
+      skeleton for several seconds. Fire-and-forget, cancelled with the
+      detect, and silent when it has nothing.
+    */
+    void fetchOembed(url, controller.signal).then((preview) => {
+      if (preview && !controller.signal.aborted && !event.sender.isDestroyed()) {
+        event.sender.send(IPC.evtDetectPreview, { ...preview, url, requestId })
+      }
+    })
     try {
       // A missing or broken engine is said in words, not thrown across IPC.
       const engineFailure = await engineUnavailable()

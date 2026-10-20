@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest'
-import { engineKnowsHost, isAbsoluteUrl, looksLikeCollection, needsCookiesOften, normalizeUrl } from './urls'
+import {
+  engineKnowsHost,
+  isAbsoluteUrl,
+  looksLikeCollection,
+  needsCookiesOften,
+  normalizeUrl,
+  youtubeIdOf
+} from './urls'
 
 describe('normalizeUrl', () => {
   it('leaves internal and non-http links untouched', () => {
@@ -232,6 +239,24 @@ describe('looksLikeCollection', () => {
   it('still expands a real playlist page', () => {
     expect(looksLikeCollection('https://site.test/playlist/rock-classics')).toBe(true)
     expect(looksLikeCollection('https://site.test/playlists/42')).toBe(true)
+  })
+})
+
+describe('youtubeIdOf', () => {
+  it('reads the id from every shape a YouTube video link comes in', () => {
+    expect(youtubeIdOf('https://www.youtube.com/watch?v=dQw4w9WgXcQ&list=PL1')).toBe('dQw4w9WgXcQ')
+    expect(youtubeIdOf('https://youtu.be/dQw4w9WgXcQ?si=abc')).toBe('dQw4w9WgXcQ')
+    expect(youtubeIdOf('https://m.youtube.com/shorts/dQw4w9WgXcQ')).toBe('dQw4w9WgXcQ')
+    expect(youtubeIdOf('youtube.com/watch?v=dQw4w9WgXcQ')).toBe('dQw4w9WgXcQ')
+  })
+
+  it('has none for what is not one video', () => {
+    expect(youtubeIdOf('https://www.youtube.com/@channel')).toBeNull()
+    expect(youtubeIdOf('https://www.youtube.com/playlist?list=PL1')).toBeNull()
+    expect(youtubeIdOf('https://music.youtube.com/watch?v=dQw4w9WgXcQ')).toBeNull()
+    expect(youtubeIdOf('https://www.youtube.com/watch?v=short')).toBeNull()
+    expect(youtubeIdOf('https://vimeo.com/123')).toBeNull()
+    expect(youtubeIdOf('not a link')).toBeNull()
   })
 })
 

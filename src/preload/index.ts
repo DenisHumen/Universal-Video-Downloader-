@@ -11,6 +11,7 @@ import type {
   CliInstallResult,
   CliStatus,
   DetectResult,
+  DetectPreview,
   DetectStatus,
   DownloadItem,
   DownloadProgress,
@@ -185,6 +186,7 @@ const api = {
   onYtdlpStatus: (cb: (s: YtDlpStatus) => void) => on<YtDlpStatus>(IPC.evtYtdlpStatus, cb),
   onUpdateStatus: (cb: (s: UpdateStatus) => void) => on<UpdateStatus>(IPC.evtUpdateStatus, cb),
   onDetectStatus: (cb: (s: DetectStatus) => void) => on<DetectStatus>(IPC.evtDetectStatus, cb),
+  onDetectPreview: (cb: (p: DetectPreview) => void) => on<DetectPreview>(IPC.evtDetectPreview, cb),
   onClipboardLink: (cb: (url: string) => void) => on<string>(IPC.evtClipboardLink, cb),
   onNavigate: (cb: (view: string) => void) => on<string>(IPC.evtNavigate, cb)
 }

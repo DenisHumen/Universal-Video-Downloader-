@@ -16,12 +16,13 @@ import {
 import {
   hasTrim,
   type AppErrorCode,
+  type DetectPreview,
   type DetectResult,
   type DetectStage,
   type MediaInfo,
   type TrimRange
 } from '@shared/types'
-import { needsCookiesOften } from '@shared/urls'
+import { needsCookiesOften, youtubeIdOf } from '@shared/urls'
 import { useStore } from '../store'
 import { describeError, errorText } from '../lib/errors'
 import { formatCount, formatDuration, isProbablyUrl } from '../lib/format'
@@ -78,6 +79,7 @@ export default function HomeView(): JSX.Element {
   const takePendingUrl = useStore((s) => s.takePendingUrl)
   const saveSettings = useStore((s) => s.saveSettings)
   const detectStatus = useStore((s) => s.detect)
+  const detectPreview = useStore((s) => s.detectPreview)
   const beginDetect = useStore((s) => s.beginDetect)
   const endDetect = useStore((s) => s.endDetect)
 
@@ -528,6 +530,8 @@ export default function HomeView(): JSX.Element {
               key="skeleton"
               stage={detectStatus?.stage ?? 'resolving'}
               label={t(STAGE_LABEL[detectStatus?.stage ?? 'resolving'])}
+              url={detectStatus?.url ?? url}
+              preview={detectPreview}
               slowHint={t('detect.slowHint')}
               cancelLabel={t('common.cancel')}
               onCancel={cancelDetect}
@@ -813,25 +817,62 @@ export default function HomeView(): JSX.Element {
   )
 }
 
+/** The host a link is on, for the card's site tag while the extractor is not known yet. */
+function hostLabel(link: string): string {
+  try {
+    return new URL(link).hostname.replace(/^www\./, '')
+  } catch {
+    return ''
+  }
+}
+
 /**
- * The waiting state. Blocks pulse in place rather than sweeping a gradient
- * across themselves — a shimmer repaints every frame to communicate nothing the
- * pulse doesn't, and detection can run for half a minute on an unknown site.
+ * The waiting state, shaped like the result it is waiting for.
+ *
+ * Blocks pulse in place rather than sweeping a gradient across themselves — a
+ * shimmer repaints every frame to communicate nothing the pulse doesn't, and
+ * detection can run for half a minute on an unknown site.
+ *
+ * What is already known is drawn for real: a YouTube video's poster comes
+ * straight from its id, and a title, uploader and poster from the site's
+ * oEmbed answer replace their skeletons when it lands, usually well before
+ * the engine is done. After a few seconds a counter says how long it has
+ * been, so a slow site reads as working rather than stuck. The counter is a
+ * one-second interval, not a frame loop: it has to keep counting in a window
+ * the compositor has throttled.
  */
 function DetectingCard({
   stage,
   label,
+  url,
+  preview,
   slowHint,
   cancelLabel,
   onCancel
 }: {
   stage: DetectStage
   label: string
+  url: string
+  preview: DetectPreview | null
   slowHint: string
   cancelLabel: string
   onCancel: () => void
 }): JSX.Element {
+  const t = useT()
   const slow = stage === 'scraping' || stage === 'browsing'
+  const [elapsed, setElapsed] = useState(0)
+  useEffect(() => {
+    const started = Date.now()
+    setElapsed(0)
+    const timer = window.setInterval(() => setElapsed(Math.floor((Date.now() - started) / 1000)), 1000)
+    return () => window.clearInterval(timer)
+  }, [url])
+
+  const ytId = youtubeIdOf(url)
+  const poster = preview?.thumbnail ?? (ytId ? `https://i.ytimg.com/vi/${ytId}/mqdefault.jpg` : undefined)
+  const host = hostLabel(url)
+  const skeletonThumb = <div className="skeleton h-full w-full" />
+
   return (
     <motion.div
       initial={{ opacity: 0 }}
@@ -839,6 +880,7 @@ function DetectingCard({
       exit={{ opacity: 0 }}
       transition={enter}
       className="panel overflow-hidden"
+      aria-busy="true"
     >
       <div className="flex items-center gap-2.5 border-b border-edge px-4 py-3">
         <span className="h-1.5 w-1.5 shrink-0 animate-idle-pulse rounded-full bg-accent" />
@@ -846,16 +888,42 @@ function DetectingCard({
           <p className="h2 truncate">{label}</p>
           {slow && <p className="hint mt-1 truncate">{slowHint}</p>}
         </div>
+        {elapsed >= 3 && (
+          <span className="mono shrink-0 text-[12px] tabular-nums text-ink-3" aria-hidden="true">
+            {t('detect.elapsed', { seconds: elapsed })}
+          </span>
+        )}
         <button className="btn-quiet shrink-0 px-3 py-1.5" onClick={onCancel}>
           <X size={13} /> {cancelLabel}
         </button>
       </div>
       <div className="flex gap-4 p-4">
-        <div className="skeleton aspect-video w-36 shrink-0 rounded-2" />
-        <div className="flex-1 space-y-2 py-1">
-          <div className="skeleton h-3.5 w-3/4 rounded-1" />
-          <div className="skeleton h-3 w-1/2 rounded-1" />
-          <div className="skeleton h-4 w-20 rounded-1" />
+        <div className="relative aspect-video w-36 shrink-0 overflow-hidden rounded-2 bg-sink">
+          {poster ? (
+            <Thumbnail
+              src={poster}
+              pageUrl={url}
+              className="h-full w-full object-cover"
+              loading="eager"
+              fallback={skeletonThumb}
+            />
+          ) : (
+            skeletonThumb
+          )}
+        </div>
+        <div className="min-w-0 flex-1 space-y-2 py-1">
+          {preview?.title ? (
+            <p className="h2 line-clamp-2" title={preview.title}>
+              {preview.title}
+            </p>
+          ) : (
+            <>
+              <div className="skeleton h-3.5 w-3/4 rounded-1" />
+              <div className="skeleton h-3 w-1/2 rounded-1" />
+            </>
+          )}
+          {preview?.author && <p className="mono truncate text-[12px] text-ink-2">{preview.author}</p>}
+          {host && <span className="tag">{host}</span>}
         </div>
       </div>
       <div className="space-y-2 px-4 pb-4">

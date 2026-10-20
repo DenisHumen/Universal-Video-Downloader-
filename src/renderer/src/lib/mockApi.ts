@@ -536,6 +536,8 @@ export function installMockApi(): void {
       return () => updateListeners.delete(cb)
     },
     onDetectStatus: () => () => undefined,
+    // No network in the preview build; a YouTube link still gets its poster from the id.
+    onDetectPreview: () => () => undefined,
     onClipboardLink: () => () => undefined,
     takePending: async () => ({}),
     /*

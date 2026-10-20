@@ -90,6 +90,7 @@ export const en = {
   'detect.browsing': 'opening the page to find the stream…',
   'detect.probing': 'reading stream details…',
   'detect.slowHint': 'unknown site — this can take up to half a minute.',
+  'detect.elapsed': '{seconds} s',
 
   // ---- queue ----
   'queue.title': 'queue',

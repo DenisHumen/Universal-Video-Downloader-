@@ -84,6 +84,7 @@ export const ru: Dictionary = {
   'detect.browsing': 'открываю страницу, ищу поток…',
   'detect.probing': 'читаю параметры потока…',
   'detect.slowHint': 'незнакомый сайт — это может занять до полуминуты.',
+  'detect.elapsed': '{seconds} с',
 
   // ---- queue ----
   'queue.title': 'очередь',

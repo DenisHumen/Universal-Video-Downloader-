@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import type {
   AppSettings,
+  DetectPreview,
   DetectStatus,
   DownloadItem,
   DownloadProgress,
@@ -65,6 +66,8 @@ interface AppState {
   watchAlerts: number
   /** Live progress of the detector, so the UI can narrate the slow parts. */
   detect: DetectStatus | null
+  /** The site's own title and poster for the link being detected, when it has one. */
+  detectPreview: DetectPreview | null
   shortcutsOpen: boolean
 
   init: () => Promise<void>
@@ -170,6 +173,11 @@ async function runInit(set: SetState, get: GetState): Promise<void> {
     if (!current || current.url !== s.url || current.requestId !== s.requestId) return
     set({ detect: s.stage === 'done' ? null : s })
   })
+  window.api.onDetectPreview((p) => {
+    const current = get().detect
+    if (!current || current.url !== p.url || current.requestId !== p.requestId) return
+    set({ detectPreview: p })
+  })
   window.api.onClipboardLink((url) => {
     /*
       Ignore a link that's already in the queue — nothing new to offer.
@@ -237,6 +245,7 @@ export const useStore = create<AppState>((set, get) => ({
   pendingWatch: null,
   watchAlerts: 0,
   detect: null,
+  detectPreview: null,
   shortcutsOpen: false,
 
   init: () => {
@@ -280,9 +289,10 @@ export const useStore = create<AppState>((set, get) => ({
   dismissUpdate: () => set({ updateDismissed: true }),
   dismissClipboardLink: () => set({ clipboardLink: null }),
   setShortcutsOpen: (open) => set({ shortcutsOpen: open }),
-  beginDetect: (url, requestId) => set({ detect: { stage: 'resolving', url, requestId } }),
+  beginDetect: (url, requestId) =>
+    set({ detect: { stage: 'resolving', url, requestId }, detectPreview: null }),
   endDetect: () => {
-    if (get().detect) set({ detect: null })
+    if (get().detect || get().detectPreview) set({ detect: null, detectPreview: null })
   },
 
   requestDetect: (url) => set({ pendingUrl: url, view: 'home' }),
