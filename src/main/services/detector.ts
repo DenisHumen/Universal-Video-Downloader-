@@ -295,7 +295,7 @@ export async function detect(
 
   // The engine gave up. Fall back to universal detection: scrape the page, and
   // if that isn't enough, open it in a hidden browser and watch for the stream.
-  if (!wasRewritten && !signal?.aborted) {
+  if (!wasRewritten && !signal?.aborted && universalCanHelp(probe)) {
     const tried = { browserAllowed: settings.universalFallback, stages: [] as string[] }
     trace.universal = tried
     let universal: ResolvedUrl | null = null
@@ -363,6 +363,47 @@ export async function detect(
 
   onStage('done')
   return reportDetectFailure(probe, url, trace)
+}
+
+/**
+ * Failures that are the site's answer about this video, not the engine's
+ * inability to read the page. Scraping the page again can't sign the user in,
+ * move them to another country or make a premiere start any sooner.
+ */
+const DEFINITIVE: ReadonlySet<AppErrorCode> = new Set<AppErrorCode>([
+  'unavailable',
+  'ageRestricted',
+  'rateLimited',
+  'signIn',
+  'geo',
+  'drm',
+  'upcoming',
+  'adultHidden'
+])
+
+/** An engine error that comes from a named site extractor, and says why. */
+const NAMED_EXTRACTOR = /ERROR: \[([\w:.-]+)\]/
+/** …unless the why is that the extractor itself no longer understands the page. */
+const EXTRACTOR_BROKE = /Unable to extract|Unsupported URL|Failed to parse|No video formats found/i
+
+/**
+ * Whether the universal pass - a page scrape, then a hidden browser - is worth
+ * running after the engine's probe failed.
+ *
+ * It ran after every failure, so a private or region-locked YouTube video
+ * spent another 15-45 s scraping a page that had already said no, and then
+ * reported the scrape's vaguer result. It stays for what it is for: a link
+ * the engine has no extractor for (`Unsupported URL`, `[generic]`), and an
+ * extractor broken by a site redesign, where the stream is still on the page.
+ */
+export function universalCanHelp(probe: { errorCode?: AppErrorCode; output?: string; error?: string }): boolean {
+  if (probe.errorCode && DEFINITIVE.has(probe.errorCode)) return false
+  // Unreachable is checked by the pass itself, which can name the host it couldn't reach.
+  if (probe.errorCode === 'network' || probe.errorCode === 'timeout') return true
+  const said = probe.output ?? probe.error ?? ''
+  const named = NAMED_EXTRACTOR.exec(said)?.[1]
+  if (named && named.toLowerCase() !== 'generic' && !EXTRACTOR_BROKE.test(said)) return false
+  return true
 }
 
 /** A minimal MediaInfo for a stream we found but the engine couldn't describe. */

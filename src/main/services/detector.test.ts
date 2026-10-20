@@ -1,7 +1,7 @@
 import { EventEmitter } from 'events'
 import { PassThrough } from 'stream'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { detect, flattenEntries, playlistEntries } from './detector'
+import { detect, flattenEntries, playlistEntries, universalCanHelp } from './detector'
 import { describeNetError } from '../resolvers/neterror'
 
 /*
@@ -119,9 +119,11 @@ describe('detect, when the host cannot be reached', () => {
     spawn.mockImplementationOnce(() =>
       engine('ERROR: [youtube] abc: The uploader has not made this video available in your country\n')
     )
-    resolveUniversal.mockRejectedValueOnce(describeNetError(new Error('net::ERR_CONNECTION_TIMED_OUT'), PAGE))
+    resolveUniversal.mockClear()
 
     expect(await detect(PAGE)).toMatchObject({ ok: false, errorCode: 'geo' })
+    // …and stands without a page scrape: no other route around a region lock.
+    expect(resolveUniversal).not.toHaveBeenCalled()
   })
 
   it('says the engine could not connect when it is cut off mid-attempt', async () => {
@@ -167,6 +169,30 @@ describe('playlistEntries', () => {
     expect(entries).toEqual([
       { url: 'https://site.test/watch/1', title: 'Untitled', thumbnail: 'https://i.test/big.jpg' }
     ])
+  })
+})
+
+describe('universalCanHelp', () => {
+  it('skips the page scrape when the site already said no', () => {
+    for (const errorCode of ['signIn', 'geo', 'drm', 'ageRestricted', 'upcoming', 'rateLimited', 'unavailable'] as const) {
+      expect(universalCanHelp({ errorCode }), errorCode).toBe(false)
+    }
+  })
+
+  it('skips it when a named extractor explains the failure', () => {
+    expect(
+      universalCanHelp({ output: 'ERROR: [youtube] abc: Private video. Sign in if you have access' })
+    ).toBe(false)
+    expect(universalCanHelp({ output: 'ERROR: [youtube:tab] @x: This channel does not exist.' })).toBe(false)
+  })
+
+  it('keeps it for unknown pages and broken extractors', () => {
+    expect(universalCanHelp({ output: 'ERROR: Unsupported URL: https://site.test/x' })).toBe(true)
+    expect(universalCanHelp({ output: 'ERROR: [generic] Unable to find video in page' })).toBe(true)
+    expect(universalCanHelp({ output: 'ERROR: [SomeSite] 42: Unable to extract video url' })).toBe(true)
+    expect(universalCanHelp({ errorCode: 'noFormats' })).toBe(true)
+    expect(universalCanHelp({ errorCode: 'network', output: 'ERROR: [youtube] x: timed out' })).toBe(true)
+    expect(universalCanHelp({})).toBe(true)
   })
 })
 
