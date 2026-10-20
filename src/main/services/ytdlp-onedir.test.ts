@@ -18,7 +18,8 @@ const h = vi.hoisted(() => ({
   dir: '',
   /** What each release asset answers: a body, or an HTTP status. */
   assets: new Map<string, Buffer | number>(),
-  requested: [] as string[]
+  requested: [] as string[],
+  spawned: [] as string[][]
 }))
 
 vi.mock('electron', () => ({
@@ -50,7 +51,8 @@ vi.mock('electron', () => ({
 vi.mock('child_process', async (importOriginal) => ({
   ...(await importOriginal<typeof import('child_process')>()),
   execFileSync: vi.fn(),
-  spawn: vi.fn((bin: string) => {
+  spawn: vi.fn((bin: string, args: string[]) => {
+    h.spawned.push(args)
     const stream = (): EventEmitter & { setEncoding: () => void } =>
       Object.assign(new EventEmitter(), { setEncoding: () => undefined })
     const child = Object.assign(new EventEmitter(), { stdout: stream(), stderr: stream() })
@@ -139,6 +141,7 @@ beforeEach(() => {
   h.dir = mkdtempSync(join(tmpdir(), 'uvd-onedir-'))
   process.env.PUBLIC = h.dir
   h.requested = []
+  h.spawned = []
   publish()
 })
 
@@ -186,6 +189,44 @@ describe('the onedir engine', () => {
     await (await fresh()).ensureYtdlp()
     await settle()
     expect(h.requested).toEqual([])
+  })
+
+  it('never touches a working single file when the migration fails', async () => {
+    mkdirSync(binDir(), { recursive: true })
+    writeFileSync(onefile(), ONEFILE)
+    publish({ 'yt-dlp_linux.zip': 403, 'yt-dlp_linux': Buffer.from('a different single file') })
+    const m = await fresh()
+    await m.ensureYtdlp()
+    await settle()
+    expect(h.requested).not.toContain('yt-dlp_linux')
+    expect(readFileSync(onefile()).equals(ONEFILE)).toBe(true)
+  })
+
+  it('updates a single file with -U while the onedir build is backing off, fetching nothing', async () => {
+    mkdirSync(binDir(), { recursive: true })
+    writeFileSync(onefile(), ONEFILE)
+    writeFileSync(join(binDir(), 'migration-failed'), JSON.stringify({ at: Date.now(), count: 1 }))
+    const m = await fresh()
+    await m.ensureYtdlp()
+    h.requested = []
+    await m.updateYtdlp(() => false)
+    expect(h.spawned.some((args) => args.includes('-U'))).toBe(true)
+    expect(h.requested).toEqual([])
+  })
+
+  it('does not fetch a newer onedir build every day once one failed to start', async () => {
+    const m = await fresh()
+    await m.ensureYtdlp()
+    const active = m.ytdlpBinaryPath()
+    const broken = zipOf({ 'yt-dlp_linux': 'broken build' })
+    publish({ 'yt-dlp_linux.zip': broken, 'SHA2-256SUMS': Buffer.from(`${sum(broken)}  yt-dlp_linux.zip\n`) })
+    await expect(m.updateYtdlp(() => false)).rejects.toThrow()
+    expect(m.ytdlpBinaryPath()).toBe(active)
+
+    h.requested = []
+    await m.updateYtdlp(() => false)
+    expect(h.requested).toEqual([])
+    expect(m.ytdlpBinaryPath()).toBe(active)
   })
 
   it('never switches to a copy that does not match its checksum', async () => {

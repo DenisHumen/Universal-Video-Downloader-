@@ -348,8 +348,42 @@ export type EnginePlan =
   /** Nothing runs: install the onedir build, falling back to the single file. */
   | 'install'
 
-/** After a failed migration, how long before the next try. */
+/** After a failed migration, how long before the next try; it doubles with each failure in a row. */
 export const MIGRATE_RETRY_MS = 24 * 3_600_000
+const MIGRATE_RETRY_MAX_MS = 30 * MIGRATE_RETRY_MS
+
+/** The failed onedir attempts in a row, and when the last one was. */
+export interface MigrationFailure {
+  at: number
+  count: number
+}
+
+/**
+ * Whether the onedir build is off the table for now.
+ *
+ * A build that will not start on this machine fails the same way every time,
+ * and each try is a ~60 MB download. A day after the first failure, two after
+ * the second, and so on up to a month: a passing network hiccup costs a day,
+ * a build that cannot run here stops being fetched.
+ */
+export function migrationBlocked(failure: MigrationFailure | undefined, now: number): boolean {
+  if (!failure) return false
+  const wait = Math.min(MIGRATE_RETRY_MAX_MS, MIGRATE_RETRY_MS * 2 ** Math.max(0, failure.count - 1))
+  return now - failure.at < wait
+}
+
+/** The failure file's contents, from either its current JSON or the bare timestamp it once was. */
+export function parseMigrationFailure(text: string): MigrationFailure | undefined {
+  try {
+    const raw = JSON.parse(text) as unknown
+    if (typeof raw === 'number' && Number.isFinite(raw)) return { at: raw, count: 1 }
+    const o = raw as Partial<MigrationFailure>
+    if (typeof o?.at === 'number' && typeof o.count === 'number') return { at: o.at, count: o.count }
+  } catch {
+    /* unreadable: as if none */
+  }
+  return undefined
+}
 
 /**
  * The launch decision. The single file keeps working until a onedir copy has
@@ -361,14 +395,13 @@ export function planEngine(input: {
   onedirRuns: boolean
   onefileRuns: boolean
   onedirAvailable: boolean
-  lastMigrationFailure?: number
+  migrationFailure?: MigrationFailure
   now: number
 }): EnginePlan {
   if (input.onedirRuns) return 'use-onedir'
   if (input.onefileRuns) {
-    const recentlyFailed =
-      input.lastMigrationFailure !== undefined && input.now - input.lastMigrationFailure < MIGRATE_RETRY_MS
-    return input.onedirAvailable && !recentlyFailed ? 'use-onefile-then-migrate' : 'use-onefile'
+    const blocked = migrationBlocked(input.migrationFailure, input.now)
+    return input.onedirAvailable && !blocked ? 'use-onefile-then-migrate' : 'use-onefile'
   }
   return 'install'
 }

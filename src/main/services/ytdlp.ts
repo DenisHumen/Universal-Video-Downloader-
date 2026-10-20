@@ -18,13 +18,16 @@ import {
   activate,
   cleanEngineDir,
   engineAssets,
+  migrationBlocked,
   onedirExe,
+  parseMigrationFailure,
   parseSums,
   planEngine,
   readPointer,
   stageOnedir,
   verifySum,
-  type EngineAssets
+  type EngineAssets,
+  type MigrationFailure
 } from './engine-dist'
 import { groupSpawnOptions } from './process'
 import { log } from './log'
@@ -156,21 +159,26 @@ function migrationFailureFile(): string {
   return join(binDir(), 'migration-failed')
 }
 
-function lastMigrationFailure(): number | undefined {
+function lastMigrationFailure(): MigrationFailure | undefined {
   try {
-    const at = Number(readFileSync(migrationFailureFile(), 'utf-8'))
-    return Number.isFinite(at) ? at : undefined
+    return parseMigrationFailure(readFileSync(migrationFailureFile(), 'utf-8'))
   } catch {
     return undefined
   }
 }
 
 function recordMigrationFailure(): void {
+  const count = (lastMigrationFailure()?.count ?? 0) + 1
   try {
-    writeFileSync(migrationFailureFile(), String(Date.now()), 'utf-8')
+    writeFileSync(migrationFailureFile(), JSON.stringify({ at: Date.now(), count }), 'utf-8')
   } catch {
     /* the back-off is an optimisation */
   }
+}
+
+/** The onedir build is backing off after failing here; see `migrationBlocked`. */
+function onedirBlocked(): boolean {
+  return migrationBlocked(lastMigrationFailure(), Date.now())
 }
 
 function headerValue(value: string | string[] | undefined): string {
@@ -261,9 +269,9 @@ let downloading: Promise<void> | null = null
  * second caller now waits for the copy already on its way, which is the same
  * latest release it would have fetched itself.
  */
-function downloadBinary(): Promise<void> {
+function downloadBinary(fallback: 'onefile' | 'none' = 'none'): Promise<void> {
   if (!downloading) {
-    downloading = fetchBinary().finally(() => {
+    downloading = fetchBinary(fallback).finally(() => {
       downloading = null
     })
   }
@@ -271,15 +279,21 @@ function downloadBinary(): Promise<void> {
 }
 
 /**
- * The newest engine, as a onedir copy where the release has one.
+ * The newest engine.
  *
- * A onedir copy that fails - to download, to verify, to start - leaves the
- * engine that was active where it was. Only with no engine at all to fall back
- * on does the single file get fetched instead: a working app matters more than
- * a faster one.
+ * As a onedir copy where the release has one and it has not been failing
+ * here. A onedir copy that fails - to download, to verify, to start - leaves
+ * the engine that was active where it was and is rethrown. The single file is
+ * fetched instead only when the caller says there is no engine at all to keep
+ * (`fallback: 'onefile'`, a first install or a broken one), or when onedir is
+ * backing off and a single file is what is in use: then this is that file's
+ * ordinary refresh, run only by a caller that checked nothing is using it.
+ * A background migration passes neither, so it can never overwrite a single
+ * file a download is running from.
  */
-async function fetchBinary(): Promise<void> {
-  if (ASSETS.onedir) {
+async function fetchBinary(fallback: 'onefile' | 'none'): Promise<void> {
+  const onedirActive = onedirExe(binDir()) !== null
+  if (ASSETS.onedir && (onedirActive || !onedirBlocked())) {
     try {
       await installOnedir(ASSETS.onedir)
       return
@@ -288,9 +302,10 @@ async function fetchBinary(): Promise<void> {
       log.warn('engine', 'The onedir engine could not be installed', {
         error: err instanceof Error ? err.message : String(err)
       })
-      if (onedirExe(binDir()) || !ASSETS.onefile) throw err
+      if (fallback !== 'onefile' || onedirActive || !ASSETS.onefile) throw err
     }
   }
+  if (onedirActive) throw new Error('The engine update is waiting after a failed attempt.')
   await installOnefile()
 }
 
@@ -461,7 +476,7 @@ export function ensureYtdlp(): Promise<string> {
         onedirRuns: Boolean(onedirVersion),
         onefileRuns: Boolean(onefileVersion),
         onedirAvailable: Boolean(ASSETS.onedir),
-        lastMigrationFailure: lastMigrationFailure(),
+        migrationFailure: lastMigrationFailure(),
         now: Date.now()
       })
       if (plan === 'use-onedir') {
@@ -481,7 +496,8 @@ export function ensureYtdlp(): Promise<string> {
       if (onedir || existsSync(onefile)) log.warn('engine', 'The installed engine does not start; fetching it again')
       if (readPointer(dir) && !onedirVersion) rmSync(join(dir, 'current.json'), { force: true })
       emit({ state: 'checking', message: 'Preparing download engine…' })
-      await downloadBinary()
+      // No engine runs, so the single file is a fallback worth having.
+      await downloadBinary('onefile')
       const path = ytdlpBinaryPath()
       let version = await getVersion()
       if (!version) {
@@ -558,13 +574,16 @@ async function selfUpdate(): Promise<number> {
   const dir = binDir()
   const pointer = onedirExe(dir) ? readPointer(dir) : null
   if (pointer && ASSETS.onedir) {
+    // A newer build that failed to start here is not retried daily: the one in use is kept as current.
+    if (onedirBlocked()) return 0
     try {
       return (await releaseSums()).get(ASSETS.onedir.zip) === pointer.sha256 ? 0 : 1
     } catch {
       return 1
     }
   }
-  if (ASSETS.onedir) return 1
+  // No onedir copy: move to one, unless that has been failing - then the single file updates itself.
+  if (ASSETS.onedir && !onedirBlocked()) return 1
   return (await spawnYtdlp(['-U'])).code
 }
 

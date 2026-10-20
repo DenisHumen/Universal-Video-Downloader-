@@ -9,7 +9,9 @@ import {
   crc32,
   engineAssets,
   MIGRATE_RETRY_MS,
+  migrationBlocked,
   onedirExe,
+  parseMigrationFailure,
   parseSums,
   planEngine,
   readPointer,
@@ -219,18 +221,40 @@ describe('planEngine', () => {
 
   it('waits a day after a failed migration, and never migrates where no onedir build exists', () => {
     expect(
-      planEngine({ onedirRuns: false, onefileRuns: true, onedirAvailable: true, lastMigrationFailure: now - 1000, now })
+      planEngine({
+        onedirRuns: false,
+        onefileRuns: true,
+        onedirAvailable: true,
+        migrationFailure: { at: now - 1000, count: 1 },
+        now
+      })
     ).toBe('use-onefile')
     expect(
       planEngine({
         onedirRuns: false,
         onefileRuns: true,
         onedirAvailable: true,
-        lastMigrationFailure: now - MIGRATE_RETRY_MS - 1,
+        migrationFailure: { at: now - MIGRATE_RETRY_MS - 1, count: 1 },
         now
       })
     ).toBe('use-onefile-then-migrate')
     expect(planEngine({ onedirRuns: false, onefileRuns: true, onedirAvailable: false, now })).toBe('use-onefile')
+  })
+
+  it('backs off further with every failure in a row, up to a month', () => {
+    const at = now
+    expect(migrationBlocked({ at, count: 1 }, at + MIGRATE_RETRY_MS + 1)).toBe(false)
+    expect(migrationBlocked({ at, count: 2 }, at + MIGRATE_RETRY_MS + 1)).toBe(true)
+    expect(migrationBlocked({ at, count: 2 }, at + 2 * MIGRATE_RETRY_MS + 1)).toBe(false)
+    expect(migrationBlocked({ at, count: 20 }, at + 29 * MIGRATE_RETRY_MS)).toBe(true)
+    expect(migrationBlocked({ at, count: 20 }, at + 31 * MIGRATE_RETRY_MS)).toBe(false)
+    expect(migrationBlocked(undefined, at)).toBe(false)
+  })
+
+  it('reads the failure file in its old and new shapes', () => {
+    expect(parseMigrationFailure('1234')).toEqual({ at: 1234, count: 1 })
+    expect(parseMigrationFailure('{"at":5,"count":3}')).toEqual({ at: 5, count: 3 })
+    expect(parseMigrationFailure('garbage')).toBeUndefined()
   })
 
   it('installs when nothing runs', () => {
