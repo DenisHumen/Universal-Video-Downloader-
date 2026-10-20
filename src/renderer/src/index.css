@@ -27,9 +27,12 @@
 
 :root {
   /* ---- Shape. Four steps, no in-between values. ---- */
-  --r-1: 8px; /* tags, swatches, icon buttons */
-  --r-2: 14px; /* fields, buttons, list rows */
-  --r-3: 22px; /* blocks, dialogs */
+  /* Tightened one step: at 8/14/22 a thumbnail, a field and the panel round
+     it read as three soft shapes rather than one structure; at 6/10/16 the
+     ladder still reads, and nested corners stop fighting their parents. */
+  --r-1: 6px; /* tags, swatches, icon buttons */
+  --r-2: 10px; /* fields, buttons, list rows */
+  --r-3: 16px; /* blocks, dialogs */
   --r-pill: 999px;
 
   /* ---- Motion. Decelerate-emphasised: starts immediately, lands soft. ---- */
@@ -282,6 +285,8 @@ textarea,
   /* The single loud element on any screen. There is never more than one. */
   .btn-solid {
     @apply btn-base bg-accent text-accent-fg hover:bg-accent/90;
+    /* The one loud control is also the easiest to hit. */
+    min-height: 40px;
   }
   /* Everything else: a filled neutral that reads as a control, not a link. */
   .btn-quiet {
