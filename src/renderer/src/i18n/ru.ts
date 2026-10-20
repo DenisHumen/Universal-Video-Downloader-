@@ -207,6 +207,10 @@ export const ru: Dictionary = {
 
   // ---- settings ----
   'settings.title': 'настройки',
+  'settings.search': 'найти настройку',
+  'settings.searchEmpty': 'такой настройки нет',
+  'settings.tier.essentials': 'основное',
+  'settings.tier.advanced': 'дополнительно',
   'settings.section.appearance': 'внешний вид',
   'settings.section.downloads': 'загрузки',
   'settings.section.processing': 'обработка',

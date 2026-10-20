@@ -7,7 +7,17 @@ import {
   useState,
   type ReactNode
 } from 'react'
-import { Download, Folder, Github, Loader2, RefreshCw, RotateCcw, Terminal, Upload } from 'lucide-react'
+import {
+  Download,
+  Folder,
+  Github,
+  Loader2,
+  RefreshCw,
+  RotateCcw,
+  Search,
+  Terminal,
+  Upload
+} from 'lucide-react'
 import {
   SUPPORTED_COOKIE_BROWSERS,
   THEMES,
@@ -31,6 +41,7 @@ import { isProxyValue, proxyUser } from '@shared/proxy'
 import type { BackupError, ImportCounts } from '@shared/backup'
 import { templateExample, type TemplateExampleOptions } from '../lib/templateExample'
 import { describeCliCommand } from '../lib/cliCommand'
+import { matchesQuery } from '../lib/settingsSearch'
 
 type SectionId =
   | 'appearance'
@@ -45,19 +56,42 @@ type SectionId =
   | 'backup'
   | 'about'
 
-const SECTIONS: { id: SectionId; label: TranslationKey }[] = [
-  { id: 'appearance', label: 'settings.section.appearance' },
-  { id: 'downloads', label: 'settings.section.downloads' },
-  { id: 'processing', label: 'settings.section.processing' },
-  { id: 'detection', label: 'settings.section.detection' },
-  { id: 'automation', label: 'settings.section.automation' },
-  { id: 'access', label: 'settings.section.access' },
-  { id: 'network', label: 'settings.section.network' },
-  { id: 'system', label: 'settings.section.system' },
-  { id: 'updates', label: 'settings.section.updates' },
-  { id: 'backup', label: 'settings.section.backup' },
-  { id: 'about', label: 'settings.section.about' }
+type Tier = 'essentials' | 'advanced'
+
+/*
+  Two tiers in the rail, and the page in the same order. Eleven equal entries
+  put "about" level with "downloads"; what most people come here for - the
+  folder, the quality, the theme, watching - is now one short list, and the
+  sections a person opens to fix something rather than to set up are filed
+  under it.
+*/
+const SECTIONS: { id: SectionId; label: TranslationKey; tier: Tier }[] = [
+  { id: 'appearance', label: 'settings.section.appearance', tier: 'essentials' },
+  { id: 'downloads', label: 'settings.section.downloads', tier: 'essentials' },
+  { id: 'processing', label: 'settings.section.processing', tier: 'essentials' },
+  { id: 'automation', label: 'settings.section.automation', tier: 'essentials' },
+  { id: 'system', label: 'settings.section.system', tier: 'essentials' },
+  { id: 'detection', label: 'settings.section.detection', tier: 'advanced' },
+  { id: 'access', label: 'settings.section.access', tier: 'advanced' },
+  { id: 'network', label: 'settings.section.network', tier: 'advanced' },
+  { id: 'updates', label: 'settings.section.updates', tier: 'advanced' },
+  { id: 'backup', label: 'settings.section.backup', tier: 'advanced' },
+  { id: 'about', label: 'settings.section.about', tier: 'advanced' }
 ]
+
+const TIERS: { id: Tier; label: TranslationKey }[] = [
+  { id: 'essentials', label: 'settings.tier.essentials' },
+  { id: 'advanced', label: 'settings.tier.advanced' }
+]
+
+/**
+ * The search in the rail, and whether the section a row sits in matched it by
+ * name - then every row of that section shows, since the name was the answer.
+ */
+const SettingsQuery = createContext<{ query: string; sectionHit: boolean }>({
+  query: '',
+  sectionHit: false
+})
 
 const THEME_LABEL: Record<ThemeId, TranslationKey> = {
   night: 'settings.theme.night',
@@ -84,10 +118,26 @@ function Group({
   title: string
   children: ReactNode
 }): JSX.Element {
+  const { query } = useContext(SettingsQuery)
+  const searching = query.trim().length > 0
+  const sectionHit = searching && matchesQuery(query, title)
   return (
-    <section id={`set-${id}`} data-section={id} className="scroll-mt-4 pt-10 first:pt-2">
+    <section
+      id={`set-${id}`}
+      data-section={id}
+      /*
+        While searching, a section none of whose rows matched goes too. Asked
+        of the DOM rather than counted in React: rows are spread across a
+        dozen components here, and each already knows whether it matched.
+      */
+      className={`scroll-mt-4 pt-10 first:pt-2 ${
+        searching && !sectionHit ? '[&:not(:has([data-row]:not([hidden])))]:hidden' : ''
+      }`}
+    >
       <h2 className="label border-b border-edge pb-2.5">{title}</h2>
-      <div>{children}</div>
+      <SettingsQuery.Provider value={{ query, sectionHit }}>
+        <div>{children}</div>
+      </SettingsQuery.Provider>
     </section>
   )
 }
@@ -130,8 +180,13 @@ function Row({
   stack?: boolean
 }): JSX.Element {
   const labelId = useId()
+  const { query, sectionHit } = useContext(SettingsQuery)
+  // Matched in the language on screen: label and hint are already translated.
+  const hidden = !sectionHit && !matchesQuery(query, label, hint)
   return (
     <div
+      data-row
+      hidden={hidden}
       className={`flex gap-x-6 gap-y-3 border-b border-edge py-4 ${
         stack ? 'flex-col' : 'flex-wrap items-center justify-between'
       }`}
@@ -714,6 +769,9 @@ export default function SettingsView(): JSX.Element {
   const reset = useStore((s) => s.resetSettings)
 
   const [active, setActive] = useState<SectionId>('appearance')
+  const [query, setQuery] = useState('')
+  /** Sections with something left to show for the query; null when not searching. */
+  const [shown, setShown] = useState<Set<SectionId> | null>(null)
   const [checking, setChecking] = useState(false)
   const [updatingEngine, setUpdatingEngine] = useState(false)
   const [confirmReset, setConfirmReset] = useState(false)
@@ -737,6 +795,21 @@ export default function SettingsView(): JSX.Element {
     root.querySelectorAll('[data-section]').forEach((el) => observer.observe(el))
     return () => observer.disconnect()
   }, [settings])
+
+  // Read back after the rows have hidden themselves, for the rail and the empty line.
+  useEffect(() => {
+    const root = scrollRef.current
+    if (!root || !query.trim()) {
+      setShown(null)
+      return
+    }
+    const ids = new Set<SectionId>()
+    root.querySelectorAll<HTMLElement>('[data-section]').forEach((el) => {
+      if (getComputedStyle(el).display !== 'none') ids.add(el.dataset.section as SectionId)
+    })
+    setShown(ids)
+    root.scrollTop = 0
+  }, [query, settings])
 
   /*
     An instant scroll, computed rather than smooth.
@@ -817,6 +890,26 @@ export default function SettingsView(): JSX.Element {
           readers to expect arrow keys that did nothing. aria-current marks
           the section in view.
         */}
+        <label className="field mx-2 mb-3 flex shrink-0 cursor-text items-center gap-2 rounded-full px-3 py-1.5">
+          <Search size={14} className="shrink-0 text-ink-3" />
+          <input
+            type="search"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            onKeyDown={(e) => {
+              // Esc empties the search first, before anything else answers it.
+              if (e.key === 'Escape' && query) {
+                e.preventDefault()
+                e.stopPropagation()
+                setQuery('')
+              }
+            }}
+            placeholder={t('settings.search')}
+            aria-label={t('settings.search')}
+            className="no-drag min-w-0 flex-1 bg-transparent text-[13px] text-ink outline-none placeholder:text-ink-3"
+            spellCheck={false}
+          />
+        </label>
         <nav aria-label={t('settings.title')} className="min-h-0 flex-1 overflow-y-auto px-2 pb-6">
         {/*
           An underline strip, not a pill row.
@@ -825,23 +918,33 @@ export default function SettingsView(): JSX.Element {
           radio groups it scrolls to, and nothing said which one changed a
           setting and which one just moved the page.
         */}
-          {SECTIONS.map((s) => (
-            <button
-              key={s.id}
-              onClick={() => jump(s.id)}
-              aria-current={active === s.id ? 'location' : undefined}
-              className={`w-full rounded px-2.5 py-1.5 text-left text-[13px] transition-colors ${
-                active === s.id ? 'bg-raise text-ink' : 'text-ink-2 hover:bg-raise/60'
-              }`}
-            >
-              {t(s.label)}
-            </button>
-          ))}
+          {TIERS.map((tier) => {
+            const sections = SECTIONS.filter((s) => s.tier === tier.id && (!shown || shown.has(s.id)))
+            if (!sections.length) return null
+            return (
+              <div key={tier.id} className="mb-3">
+                <p className="label px-2.5 pb-1.5 pt-2">{t(tier.label)}</p>
+                {sections.map((s) => (
+                  <button
+                    key={s.id}
+                    onClick={() => jump(s.id)}
+                    aria-current={active === s.id ? 'location' : undefined}
+                    className={`w-full rounded px-2.5 py-1.5 text-left text-[13px] transition-colors ${
+                      active === s.id ? 'bg-raise text-ink' : 'text-ink-2 hover:bg-raise/60'
+                    }`}
+                  >
+                    {t(s.label)}
+                  </button>
+                ))}
+              </div>
+            )
+          })}
         </nav>
       </aside>
 
       <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto">
         <div className="mx-auto w-full max-w-[720px] px-6 pb-24 pt-8">
+          <SettingsQuery.Provider value={{ query, sectionHit: false }}>
           <Group id="appearance" title={t('settings.section.appearance')}>
             <Row label={t('settings.language')}>
               <Choice
@@ -998,15 +1101,6 @@ export default function SettingsView(): JSX.Element {
             </Row>
           </Group>
 
-          <Group id="detection" title={t('settings.section.detection')}>
-            <Row label={t('settings.universal')} hint={t('settings.universalHint')}>
-              <Switch value={settings.universalFallback} onChange={(v) => set('universalFallback', v)} />
-            </Row>
-            <Row label={t('settings.adultServices')} hint={t('settings.adultServicesHint')}>
-              <Switch value={settings.showAdultServices} onChange={(v) => set('showAdultServices', v)} />
-            </Row>
-          </Group>
-
           <Group id="automation" title={t('settings.section.automation')}>
             <AutomationSettings />
             <Row label={t('settings.background')} hint={t('settings.backgroundHint')}>
@@ -1028,6 +1122,40 @@ export default function SettingsView(): JSX.Element {
               >
                 {t('settings.openLog')}
               </button>
+            </Row>
+          </Group>
+
+          <Group id="system" title={t('settings.section.system')}>
+            <Row label={t('settings.notifications')} hint={t('settings.notificationsHint')}>
+              <Switch value={settings.notifications} onChange={(v) => set('notifications', v)} />
+            </Row>
+            <Row label={t('settings.clipboardWatch')} hint={t('settings.clipboardWatchHint')}>
+              <Switch value={settings.clipboardWatch} onChange={(v) => set('clipboardWatch', v)} />
+            </Row>
+            <Row label={t('settings.tray')} hint={t('settings.trayHint')}>
+              <Switch value={settings.trayEnabled} onChange={(v) => set('trayEnabled', v)} />
+            </Row>
+            <CliCommandRow />
+            {/* On or off, never "send by itself": on still asks every time. */}
+            <Row label={t('settings.errorReports')} hint={t('settings.errorReportsHint')}>
+              <Switch
+                value={settings.errorReports !== 'off'}
+                onChange={(v) => set('errorReports', v ? 'ask' : 'off')}
+              />
+            </Row>
+            <Row label={t('settings.reset')}>
+              <button className="btn-danger" onClick={() => setConfirmReset(true)}>
+                <RotateCcw size={14} /> {t('settings.reset')}
+              </button>
+            </Row>
+          </Group>
+
+          <Group id="detection" title={t('settings.section.detection')}>
+            <Row label={t('settings.universal')} hint={t('settings.universalHint')}>
+              <Switch value={settings.universalFallback} onChange={(v) => set('universalFallback', v)} />
+            </Row>
+            <Row label={t('settings.adultServices')} hint={t('settings.adultServicesHint')}>
+              <Switch value={settings.showAdultServices} onChange={(v) => set('showAdultServices', v)} />
             </Row>
           </Group>
 
@@ -1063,31 +1191,6 @@ export default function SettingsView(): JSX.Element {
 
           <Group id="network" title={t('settings.section.network')}>
             <ProxySettings value={settings.proxy} onCommit={(v) => save({ proxy: v })} />
-          </Group>
-
-          <Group id="system" title={t('settings.section.system')}>
-            <Row label={t('settings.notifications')} hint={t('settings.notificationsHint')}>
-              <Switch value={settings.notifications} onChange={(v) => set('notifications', v)} />
-            </Row>
-            <Row label={t('settings.clipboardWatch')} hint={t('settings.clipboardWatchHint')}>
-              <Switch value={settings.clipboardWatch} onChange={(v) => set('clipboardWatch', v)} />
-            </Row>
-            <Row label={t('settings.tray')} hint={t('settings.trayHint')}>
-              <Switch value={settings.trayEnabled} onChange={(v) => set('trayEnabled', v)} />
-            </Row>
-            <CliCommandRow />
-            {/* On or off, never "send by itself": on still asks every time. */}
-            <Row label={t('settings.errorReports')} hint={t('settings.errorReportsHint')}>
-              <Switch
-                value={settings.errorReports !== 'off'}
-                onChange={(v) => set('errorReports', v ? 'ask' : 'off')}
-              />
-            </Row>
-            <Row label={t('settings.reset')}>
-              <button className="btn-danger" onClick={() => setConfirmReset(true)}>
-                <RotateCcw size={14} /> {t('settings.reset')}
-              </button>
-            </Row>
           </Group>
 
           <Group id="updates" title={t('settings.section.updates')}>
@@ -1153,6 +1256,10 @@ export default function SettingsView(): JSX.Element {
               </p>
             </div>
           </Group>
+          {shown && shown.size === 0 && (
+            <p className="hint py-10 text-center">{t('settings.searchEmpty')}</p>
+          )}
+          </SettingsQuery.Provider>
         </div>
       </div>
 

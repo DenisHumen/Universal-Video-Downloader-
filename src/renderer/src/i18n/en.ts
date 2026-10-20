@@ -215,6 +215,10 @@ export const en = {
 
   // ---- settings ----
   'settings.title': 'settings',
+  'settings.search': 'find a setting',
+  'settings.searchEmpty': 'no setting matches that',
+  'settings.tier.essentials': 'essentials',
+  'settings.tier.advanced': 'advanced',
   'settings.section.appearance': 'appearance',
   'settings.section.downloads': 'downloads',
   'settings.section.processing': 'post-processing',
