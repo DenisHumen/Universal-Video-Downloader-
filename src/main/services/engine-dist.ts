@@ -303,23 +303,38 @@ export function activate(binDir: string, pointer: EnginePointer): void {
   renameSync(tmp, join(binDir, POINTER_FILE))
 }
 
+/** How far a clean-up of the engine folder may go. */
+export interface CleanScope {
+  /**
+   * The active onedir copy has just been seen to start. Only then do the
+   * engines it replaces go - the single file and older copies - since until
+   * then the single file may be the only engine that runs.
+   */
+  onedirVerified: boolean
+}
+
 /**
- * Leftovers in the engine folder that may go: other onedir copies, unpacks a
- * crash cut short, half-downloaded files, and the single-file engine once a
- * onedir copy is active. Deletion is best effort; a copy still running a
- * download on Windows simply stays until the next launch.
+ * Leftovers in the engine folder that may go: unpacks a crash cut short and
+ * half-downloaded files always; other onedir copies and the single-file
+ * engine only once the active copy is verified. Deletion is best effort; a
+ * copy still running a download on Windows simply stays until the next launch.
  */
-export function staleEntries(names: string[], pointer: EnginePointer | null, onefileName: string): string[] {
+export function staleEntries(
+  names: string[],
+  pointer: EnginePointer | null,
+  onefileName: string,
+  scope: CleanScope
+): string[] {
   return names.filter((name) => {
     if (name.startsWith(UNPACK_PREFIX) || name.endsWith('.download')) return true
     if (name.startsWith(`${POINTER_FILE}.`)) return true
-    if (name.startsWith(DIST_PREFIX)) return name !== pointer?.dir
-    if (name === onefileName) return pointer !== null
-    return false
+    if (!scope.onedirVerified || !pointer) return false
+    if (name.startsWith(DIST_PREFIX)) return name !== pointer.dir
+    return name === onefileName
   })
 }
 
-export function cleanEngineDir(binDir: string, onefileName: string): void {
+export function cleanEngineDir(binDir: string, onefileName: string, scope: CleanScope): void {
   let names: string[]
   try {
     names = readdirSync(binDir)
@@ -327,7 +342,7 @@ export function cleanEngineDir(binDir: string, onefileName: string): void {
     return
   }
   const pointer = onedirExe(binDir) ? readPointer(binDir) : null
-  for (const name of staleEntries(names, pointer, onefileName)) {
+  for (const name of staleEntries(names, pointer, onefileName, scope)) {
     try {
       rmSync(join(binDir, name), { recursive: true, force: true })
     } catch {

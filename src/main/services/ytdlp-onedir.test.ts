@@ -191,6 +191,21 @@ describe('the onedir engine', () => {
     expect(h.requested).toEqual([])
   })
 
+  it('keeps running the single file beside a onedir copy that will not start', async () => {
+    const m = await fresh()
+    await m.ensureYtdlp()
+    const dist = m.ytdlpBinaryPath()
+    writeFileSync(dist, 'broken now')
+    writeFileSync(onefile(), ONEFILE)
+    publish({ 'yt-dlp_linux.zip': 403 })
+
+    const n = await fresh()
+    await expect(n.ensureYtdlp()).resolves.toBe(onefile())
+    await settle()
+    expect(existsSync(onefile())).toBe(true)
+    expect(n.ytdlpBinaryPath()).toBe(onefile())
+  })
+
   it('never touches a working single file when the migration fails', async () => {
     mkdirSync(binDir(), { recursive: true })
     writeFileSync(onefile(), ONEFILE)

@@ -462,8 +462,8 @@ export function ensureYtdlp(): Promise<string> {
   ensurePromise = (async () => {
     try {
       const dir = binDir()
-      // Copies replaced last session, half-finished unpacks, the old single file.
-      cleanEngineDir(dir, onefileName())
+      // Half-finished downloads and unpacks. What they replace goes only once a onedir copy is proven.
+      cleanEngineDir(dir, onefileName(), { onedirVerified: false })
       emit({ state: 'checking', message: 'Checking download engine…' })
       const onedir = onedirExe(dir)
       const onedirVersion = onedir ? await versionOf(onedir) : undefined
@@ -480,6 +480,8 @@ export function ensureYtdlp(): Promise<string> {
         now: Date.now()
       })
       if (plan === 'use-onedir') {
+        // It started: the single file and older copies are no longer anyone's fallback.
+        cleanEngineDir(dir, onefileName(), { onedirVerified: true })
         emit({ state: 'ready', version: onedirVersion, message: 'Ready' })
         log.info('engine', 'Ready', { version: onedirVersion, build: 'onedir' })
         return onedir as string

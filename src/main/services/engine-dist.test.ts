@@ -190,18 +190,22 @@ describe('staging and activating a onedir copy', () => {
     mkdirSync(join(bin, '.unpack-abc'))
     writeFileSync(join(bin, 'yt-dlp'), 'onefile')
     writeFileSync(join(bin, 'yt-dlp.download'), 'half')
-    cleanEngineDir(bin, 'yt-dlp')
+    // Not before the active copy has been seen to start.
+    cleanEngineDir(bin, 'yt-dlp', { onedirVerified: false })
+    expect(existsSync(join(bin, 'yt-dlp'))).toBe(true)
+    expect(existsSync(join(bin, 'yt-dlp-dist-old'))).toBe(true)
+    expect(existsSync(join(bin, 'yt-dlp.download'))).toBe(false)
+    cleanEngineDir(bin, 'yt-dlp', { onedirVerified: true })
     expect(readdirSync(bin).sort()).toEqual(['current.json', pointer.dir].sort())
   })
 
   it('keeps the single file while no onedir copy is active', () => {
-    expect(staleEntries(['yt-dlp', 'yt-dlp-dist-a', 'yt-dlp.download'], null, 'yt-dlp')).toEqual([
-      'yt-dlp-dist-a',
-      'yt-dlp.download'
-    ])
+    expect(
+      staleEntries(['yt-dlp', 'yt-dlp-dist-a', 'yt-dlp.download'], null, 'yt-dlp', { onedirVerified: true })
+    ).toEqual(['yt-dlp.download'])
     const bin = fresh()
     writeFileSync(join(bin, 'yt-dlp'), 'onefile')
-    cleanEngineDir(bin, 'yt-dlp')
+    cleanEngineDir(bin, 'yt-dlp', { onedirVerified: true })
     expect(existsSync(join(bin, 'yt-dlp'))).toBe(true)
   })
 })
