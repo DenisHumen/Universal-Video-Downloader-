@@ -76,6 +76,17 @@ beforeEach(() => {
   resolveUrl.mockReset()
 })
 
+describe('a queued page that needs a picker', () => {
+  it('fails with a pointer to Home instead of handing the page to the engine', async () => {
+    resolveUrl.mockResolvedValueOnce({ url: 'https://series.test/show', isPlaylist: true, entries: [] })
+    const outputDir = mkdtempSync(join(tmpdir(), 'uvd-race-'))
+    const item = await startDownload({ url: 'https://series.test/show', mode: 'video', outputDir })
+    await vi.waitFor(() => expect(find(item.id)?.state).toBe('error'))
+    expect(find(item.id)?.errorCode).toBe('needsPicker')
+    expect(spawn).not.toHaveBeenCalled()
+  })
+})
+
 describe('pause then resume while resolving', () => {
   it("does not let the first run's late abort fail the second", async () => {
     const first = deferred()

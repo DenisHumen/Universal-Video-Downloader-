@@ -1190,6 +1190,19 @@ async function runDownload(item: DownloadItem): Promise<void> {
       processQueue()
       return
     }
+    /*
+      A page that resolves to a picker - a series player, a listing - has no
+      one stream to fetch. Handed to the engine as it is, it failed with the
+      engine's own "unsupported URL"; the choice belongs on Home, so say so.
+    */
+    if (resolved.streaming || resolved.isPlaylist) {
+      failWith(
+        item,
+        'needsPicker',
+        'This page has several streams to choose from. Open it on the download screen and pick one.'
+      )
+      return
+    }
     item.url = resolved.url
     item.referer = resolved.referer
     item.headers = resolved.headers

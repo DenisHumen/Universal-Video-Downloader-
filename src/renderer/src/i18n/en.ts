@@ -568,6 +568,7 @@ export const en = {
   'err.unsupportedPlayer': 'this kind of Kodik player is not supported yet.',
   'err.notOnYummyAnime': 'this title isn’t on YummyAnime, which is where Shikimori links are downloaded from.',
   'err.engineMissing': 'the download engine couldn’t be installed — check your connection and try again.',
+  'err.needsPicker': 'this page has several streams to choose from. open it on the download screen and pick one.',
   'err.adultHidden': 'adult sites are turned off for search. you can turn them on in settings → detection.',
   'err.cookieHint': 'try switching on browser cookies in settings → access.',
   'common.save': 'save',

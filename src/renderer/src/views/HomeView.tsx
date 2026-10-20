@@ -22,7 +22,7 @@ import {
   type MediaInfo,
   type TrimRange
 } from '@shared/types'
-import { looksLikeCollection, needsCookiesOften, youtubeIdOf } from '@shared/urls'
+import { engineKnowsHost, looksLikeCollection, needsCookiesOften, youtubeIdOf } from '@shared/urls'
 import { detectCache, inflightDetects, useStore } from '../store'
 import { describeError, errorText } from '../lib/errors'
 import { formatBytes, formatCount, formatDuration, isProbablyUrl } from '../lib/format'
@@ -370,8 +370,13 @@ export default function HomeView(): JSX.Element {
     A result already on screen downloads what is selected on it, which starts
     out as those same defaults.
   */
+  /*
+    Only on hosts the engine reads by name. Anywhere else the link may need a
+    site resolver's picker or the universal pass to become a stream at all,
+    and queued as a bare page it would fail where waiting would have worked.
+  */
   const canDownloadNow = (link: string): boolean =>
-    Boolean(settings) && isProbablyUrl(link) && !looksLikeCollection(link)
+    Boolean(settings) && isProbablyUrl(link) && engineKnowsHost(link) && !looksLikeCollection(link)
 
   const downloadNow = async (): Promise<void> => {
     if (starting) return

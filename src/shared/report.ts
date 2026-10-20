@@ -79,6 +79,8 @@ const REPORTABLE: Record<AppErrorCode, boolean> = {
   badSetting: false,
   // A search for a service the user's own setting keeps hidden.
   adultHidden: false,
+  // The link was queued without its picker; Home is the fix, not a report.
+  needsPicker: false,
   // The engine could not be installed - nearly always the network, not a site.
   engineMissing: false,
   // A premiere that has not started, or a title the site does not carry.

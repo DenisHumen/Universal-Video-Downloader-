@@ -139,6 +139,8 @@ export type AppErrorCode =
   | 'notOnYummyAnime'
   | 'engineMissing'
   | 'adultHidden'
+  /** A queued page that needs its stream picked on Home: a series player or a listing. */
+  | 'needsPicker'
 
 export type DownloadState =
   | 'queued'
