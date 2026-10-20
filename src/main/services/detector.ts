@@ -8,7 +8,7 @@ import { withSignal } from '../resolvers/http'
 import { unreachableCode } from '../resolvers/neterror'
 import { engineKnowsHost, isAbsoluteUrl, looksLikeCollection, normalizeUrl } from '@shared/urls'
 import { reportDetectFailure, type DetectVerdict } from './report'
-import { infoKey } from './info-cache'
+import { infoKey, infoReusable } from './info-cache'
 import { infoCache } from './info-store'
 import type { DetectTrace } from '@shared/report'
 import type {
@@ -294,7 +294,9 @@ export async function detect(
     link no resolver rewrote: the download re-resolves the page and compares,
     and a rewritten one is fetched with headers this JSON knows nothing of.
   */
-  if (probe.ok && probe.json && !wasRewritten) infoCache.put(infoKey(url, settings), probe.json)
+  if (probe.ok && probe.json && !wasRewritten && infoReusable(url)) {
+    infoCache.put(infoKey(url, settings), probe.json)
+  }
   if (probe.ok && probe.info) {
     const info = probe.info
     info.webpageUrl = url

@@ -2,7 +2,7 @@ import { existsSync, mkdtempSync, readFileSync, readdirSync, writeFileSync } fro
 import { tmpdir } from 'os'
 import { join } from 'path'
 import { describe, expect, it } from 'vitest'
-import { INFO_TTL_MS, InfoCache, infoKey, isStaleInfoError } from './info-cache'
+import { INFO_TTL_MS, InfoCache, infoKey, infoReusable, isStaleInfoError } from './info-cache'
 
 const access = { cookiesFile: '', cookiesFromBrowser: '', proxy: '' }
 
@@ -30,6 +30,16 @@ describe('infoKey', () => {
 
   it('never carries the proxy itself, which may hold a password', () => {
     expect(infoKey('https://site.test/v/1', { ...access, proxy: 'http://user:secret@p:1' })).not.toContain('secret')
+  })
+})
+
+describe('infoReusable', () => {
+  it('is YouTube only', () => {
+    expect(infoReusable('https://youtu.be/dQw4w9WgXcQ')).toBe(true)
+    expect(infoReusable('https://m.youtube.com/watch?v=dQw4w9WgXcQ')).toBe(true)
+    expect(infoReusable('https://vimeo.com/1')).toBe(false)
+    expect(infoReusable('https://notyoutube.com/watch?v=x')).toBe(false)
+    expect(infoReusable('https://music.youtube.com/watch?v=x')).toBe(false)
   })
 })
 

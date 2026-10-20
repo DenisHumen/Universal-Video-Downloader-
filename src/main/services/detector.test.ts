@@ -220,21 +220,28 @@ describe('detect, keeping the answer for the download', () => {
   it("keeps a single video's JSON, keyed by its link", async () => {
     putInfo.mockClear()
     spawn.mockImplementationOnce(() => answering({ id: 'v', title: 'One', formats: [format] }))
-    const result = await detect('https://unknown-site.test/watch/keep')
+    const result = await detect('https://youtu.be/dQw4w9WgXcQ')
     expect(result.ok).toBe(true)
     expect(putInfo).toHaveBeenCalledTimes(1)
-    expect(putInfo.mock.calls[0][0]).toMatch(/^https:\/\/unknown-site\.test\/watch\/keep#/)
+    expect(putInfo.mock.calls[0][0]).toMatch(/^https:\/\/www\.youtube\.com\/watch\?v=dQw4w9WgXcQ#/)
     expect(JSON.parse(putInfo.mock.calls[0][1])).toMatchObject({ id: 'v' })
+  })
+
+  it('keeps nothing for a site whose signed addresses may not last fifteen minutes', async () => {
+    putInfo.mockClear()
+    spawn.mockImplementationOnce(() => answering({ id: 'v', title: 'One', formats: [format] }))
+    expect((await detect('https://unknown-site.test/watch/keep')).ok).toBe(true)
+    expect(putInfo).not.toHaveBeenCalled()
   })
 
   it('keeps nothing for a live stream or a playlist', async () => {
     putInfo.mockClear()
     spawn.mockImplementationOnce(() => answering({ id: 'l', is_live: true, formats: [format] }))
-    await detect('https://unknown-site.test/watch/live')
+    await detect('https://www.youtube.com/watch?v=liveliveliv')
     spawn.mockImplementationOnce(() =>
       answering({ _type: 'playlist', id: 'p', entries: [{ id: 'a', formats: [format] }] })
     )
-    await detect('https://unknown-site.test/watch/list')
+    await detect('https://www.youtube.com/watch?v=listlistlis')
     expect(putInfo).not.toHaveBeenCalled()
   })
 })

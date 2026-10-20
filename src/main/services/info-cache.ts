@@ -55,6 +55,22 @@ export function infoKey(
 }
 
 /**
+ * Whether a link's probe JSON may be reused at all: YouTube only.
+ *
+ * YouTube signs its stream addresses for hours, so fifteen minutes is safe
+ * there. Other sites sign for as little as a minute, or bind the address to
+ * the request that fetched the page, and a JSON reused past that fails in a
+ * way the stale-JSON retry can only partly hide.
+ */
+export function infoReusable(url: string): boolean {
+  try {
+    return /^(www\.|m\.)?youtube\.com$|^youtu\.be$/.test(new URL(normalizeUrl(url)).hostname)
+  } catch {
+    return false
+  }
+}
+
+/**
  * A failure that may be the reused JSON's fault rather than the video's: its
  * stream addresses expired (403, 410, "expired"), or the engine could not read
  * the file. Such a run is retried once as a normal one.
