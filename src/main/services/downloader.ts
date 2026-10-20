@@ -1161,6 +1161,18 @@ async function runDownload(item: DownloadItem): Promise<void> {
   emitUpdated(item)
   const abort = new AbortController()
   resolveAborts.set(item.id, abort)
+  /*
+    Whether this run has been superseded. Pause, cancel, retry and remove all
+    abort the controller, and the resolve can take seconds to notice. Pause
+    then resume inside that window started a second run, which marked the
+    item 'detecting' again - so the first run's abort, landing late, read as
+    a real failure and failed the second run, and its `finally` deleted the
+    second run's controller, leaving nothing for the next pause to stop. A
+    resolve that ignored the signal and succeeded late went on to start a
+    second engine beside the first. The controller is this run's identity:
+    once it is aborted, nothing the run learns is acted on.
+  */
+  const stale = (): boolean => abort.signal.aborted
   try {
     /*
       `universalFallback` was read when the link was first detected and then
@@ -1173,6 +1185,11 @@ async function runDownload(item: DownloadItem): Promise<void> {
       allowBrowser: getSettings().universalFallback,
       signal: abort.signal
     })
+    // A superseded run must not write over what the current one resolved.
+    if (stale()) {
+      processQueue()
+      return
+    }
     item.url = resolved.url
     item.referer = resolved.referer
     item.headers = resolved.headers
@@ -1192,17 +1209,18 @@ async function runDownload(item: DownloadItem): Promise<void> {
       Worse for a pause: the item was no longer 'paused', so nothing would ever
       resume it again.
     */
-    if (items.get(item.id)?.state !== 'detecting') {
+    if (stale() || items.get(item.id)?.state !== 'detecting') {
       processQueue()
       return
     }
     fail(item, err instanceof Error ? err.message : String(err))
     return
   } finally {
-    resolveAborts.delete(item.id)
+    // Only our own: a resumed run may already have put its controller here.
+    if (resolveAborts.get(item.id) === abort) resolveAborts.delete(item.id)
   }
   // Paused/canceled/removed while we were resolving — don't start the engine.
-  if (!items.has(item.id) || item.state !== 'detecting') {
+  if (stale() || !items.has(item.id) || item.state !== 'detecting') {
     processQueue()
     return
   }
