@@ -8,11 +8,13 @@ import {
   Settings as SettingsIcon
 } from 'lucide-react'
 import { useStore, type ViewId } from '../store'
-import { useT, type TranslationKey } from '../i18n'
+import { useI18n, useT, type TranslationKey } from '../i18n'
 import Logo from './Logo'
 import TabStrip from './TabStrip'
 import EngineBadge from './EngineBadge'
 import CaptionButtons from './CaptionButtons'
+import { useMediaQuery } from '../hooks/useMediaQuery'
+import { overallPercent } from '../lib/downloads'
 
 interface NavItem {
   id: ViewId
@@ -61,6 +63,21 @@ export default function TopBar(): JSX.Element {
     Selecting the number instead means zustand can see that nothing moved.
   */
   const active = useStore((s) => s.downloads.filter((d) => ACTIVE_STATES.includes(d.state)).length)
+  /*
+    The queue's overall progress while anything is downloading, in place of
+    the count: "3" says how many, "42%" answers what the tab is glanced at
+    for. A number, so the bar re-renders when it changes and not per tick.
+  */
+  const overall = useStore((s) => overallPercent(s.downloads))
+  /*
+    Icons only on a narrow window. Five labels and a badge need ~560px, in
+    Russian more, and below 760px the strip scrolled behind its arrows - so
+    half the app's navigation was out of sight. The label stays the button's
+    name and becomes its tooltip, since it is no longer on screen.
+  */
+  const language = useI18n((s) => s.language)
+  // Russian labels run about 30% longer; measured, they stop fitting at 940px.
+  const narrow = useMediaQuery(language === 'ru' ? '(max-width: 959px)' : '(max-width: 759px)')
   const openShortcuts = useStore((s) => s.setShortcutsOpen)
   const alerts = useStore((s) => s.watchAlerts)
   const isMac = appInfo?.platform === 'darwin'
@@ -98,8 +115,10 @@ export default function TopBar(): JSX.Element {
                   is showing.
                 */
                 aria-current={on ? 'page' : undefined}
+                aria-label={narrow ? t(item.label) : undefined}
+                title={narrow ? t(item.label) : undefined}
                 /*
-                  No `title`. The label is right there, so the tooltip added
+                  A `title` only when the label is not shown. Beside the label the tooltip added
                   nothing but a native black box that covers the tab next to it
                   the moment the pointer rests. The shortcut it used to mention
                   lives in the shortcuts overlay, which is what that list is for.
@@ -107,7 +126,7 @@ export default function TopBar(): JSX.Element {
                 className={`tab -mb-px ${on ? 'tab-on' : ''}`}
               >
                 {item.icon}
-                {t(item.label)}
+                {!narrow && t(item.label)}
                 {item.id === 'automation' && alerts > 0 && (
                   <span
                     className="h-1.5 w-1.5 rounded-full bg-bad"
@@ -122,7 +141,7 @@ export default function TopBar(): JSX.Element {
                       on ? 'bg-accent text-accent-fg' : 'bg-sink text-ink-2'
                     }`}
                   >
-                    {active}
+                    {overall != null ? `${overall}%` : active}
                   </span>
                 )}
               </button>

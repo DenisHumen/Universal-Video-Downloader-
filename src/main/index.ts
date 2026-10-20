@@ -27,6 +27,7 @@ import {
   shouldStartHidden
 } from './services/autostart'
 import {
+  listDownloads,
   loadHistory,
   pauseAll,
   resumeAll,
@@ -42,6 +43,7 @@ import type { AppSettings, PendingDelivery } from '@shared/types'
 import { cliArgvFrom } from './cli/format'
 import { startCli } from './cli/run'
 import { refreshCliScript } from './services/cli-install'
+import { taskbarProgress } from './services/taskbar'
 
 const isMac = process.platform === 'darwin'
 let mainWindow: BrowserWindow | null = null
@@ -153,6 +155,7 @@ function createWindow(hidden = false): void {
   mainWindow = new BrowserWindow({ ...windowOptions(1220, 820), minWidth: 940, minHeight: 640 })
   wireWindow(mainWindow, !hidden)
   loadRenderer(mainWindow)
+  const stopTaskbar = mirrorProgressOnTaskbar(mainWindow)
 
   mainWindow.on('close', (event) => {
     /*
@@ -175,10 +178,33 @@ function createWindow(hidden = false): void {
   mainWindow.on('show', () => startWatcher())
 
   mainWindow.on('closed', () => {
+    stopTaskbar()
     mainWindow = null
     // The next window has to ask for what it missed; this one cannot receive.
     rendererReady = false
   })
+}
+
+/**
+ * The queue's progress on the window's taskbar button or dock icon.
+ *
+ * Polled once a second rather than pushed from every progress line: the
+ * engine prints several a second per download, and the icon needs none of
+ * that resolution. Only a change is sent on, so an idle queue costs one small
+ * computation a second and no native call. A plain timer, not anything tied to
+ * the renderer's frames: this has to keep working while the window is hidden.
+ */
+function mirrorProgressOnTaskbar(win: BrowserWindow): () => void {
+  let last = ''
+  const timer = setInterval(() => {
+    if (win.isDestroyed()) return
+    const { value, mode } = taskbarProgress(listDownloads())
+    const key = `${mode}:${value.toFixed(3)}`
+    if (key === last) return
+    last = key
+    win.setProgressBar(value, { mode })
+  }, 1000)
+  return () => clearInterval(timer)
 }
 
 /*
