@@ -268,6 +268,29 @@ export function looksLikeCollection(url: string): boolean {
   )
 }
 
+/*
+  Hosts the engine has a dedicated extractor for and that people paste every
+  day. Not the engine's whole list - that is well over a thousand sites and
+  changes with every release - only the ones where fetching the page for a
+  scrape in parallel with the probe would be wasted traffic: the extractor
+  answers, and when it doesn't, the page has nothing a scrape could find.
+*/
+const ENGINE_HOSTS =
+  /(^|\.)(youtube\.com|youtu\.be|youtube-nocookie\.com|vimeo\.com|tiktok\.com|instagram\.com|facebook\.com|fb\.watch|twitter\.com|x\.com|reddit\.com|redd\.it|twitch\.tv|dailymotion\.com|dai\.ly|soundcloud\.com|bandcamp\.com|vk\.com|vk\.ru|vkvideo\.ru|ok\.ru|rutube\.ru|bilibili\.com|nicovideo\.jp|t\.me|kick\.com|rumble\.com|streamable\.com|imgur\.com|pinterest\.com|tumblr\.com|coub\.com|mixcloud\.com|archive\.org|ted\.com|bbc\.co\.uk|9gag\.com|threads\.net|bsky\.app)$/i
+
+/**
+ * Whether the link is on a host the engine is known to handle by name.
+ * Anything else is read by its generic extractor, which can take as long to
+ * give up as it takes the page scrape to find the video.
+ */
+export function engineKnowsHost(url: string): boolean {
+  try {
+    return ENGINE_HOSTS.test(new URL(normalizeUrl(url)).hostname)
+  } catch {
+    return false
+  }
+}
+
 /**
  * Sites that keep their videos behind a login or an age gate often enough that
  * "add cookies" is the first thing worth suggesting when one of them fails.

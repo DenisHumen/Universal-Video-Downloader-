@@ -172,6 +172,30 @@ describe('playlistEntries', () => {
   })
 })
 
+describe('detect, on a host the engine has no extractor for', () => {
+  it('has the page scrape running before the probe gives up', async () => {
+    spawn.mockImplementationOnce(() => engine('ERROR: Unsupported URL: https://unknown-site.test/v/1\n'))
+    resolveUniversal.mockClear()
+    resolveUniversal.mockResolvedValueOnce(null)
+
+    await detect('https://unknown-site.test/v/1')
+    const options = resolveUniversal.mock.calls.at(-1)?.[1] as { scraped?: Promise<unknown> }
+    expect(options.scraped).toBeInstanceOf(Promise)
+    await options.scraped?.catch(() => undefined)
+  })
+
+  it('leaves the page alone on a host the engine knows by name', async () => {
+    spawn.mockImplementationOnce(() => engine('ERROR: [dailymotion] x1: Unable to extract info\n'))
+    resolveUniversal.mockClear()
+    resolveUniversal.mockResolvedValueOnce(null)
+
+    await detect('https://www.dailymotion.com/video/x1')
+    expect(resolveUniversal).toHaveBeenCalledTimes(1)
+    const options = resolveUniversal.mock.calls.at(-1)?.[1] as { scraped?: Promise<unknown> }
+    expect(options.scraped).toBeUndefined()
+  })
+})
+
 describe('universalCanHelp', () => {
   it('skips the page scrape when the site already said no', () => {
     for (const errorCode of ['signIn', 'geo', 'drm', 'ageRestricted', 'upcoming', 'rateLimited', 'unavailable'] as const) {

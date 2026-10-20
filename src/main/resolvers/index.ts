@@ -13,7 +13,8 @@ import type { ResolveOptions, ResolvedUrl, SiteResolver } from './types'
 
 export type { ResolvedEntry, ResolveOptions, ResolvedUrl, SiteResolver } from './types'
 export { searchYummyani } from './sites/yummyani'
-export { resolveUniversal, sniffUrlFor, SNIFF_SCHEME } from './universal'
+export { resolveUniversal, scrapeStatic, sniffUrlFor, SNIFF_SCHEME } from './universal'
+export type { StaticScrape } from './universal'
 export type { UniversalStage } from './universal'
 export { directUrlFor, DIRECT_SCHEME } from './universal/direct'
 

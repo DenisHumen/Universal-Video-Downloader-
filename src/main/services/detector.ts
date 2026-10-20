@@ -3,9 +3,10 @@ import { ytdlpBinaryPath, ytdlpSpawnOptions } from './ytdlp'
 import { getSettings } from './settings'
 import { killTree } from './process'
 import { accessArgs, classifyYtdlpError, hasCookies, headerArgs, stalledConnecting } from './options'
-import { resolveUniversal, resolveUrl, type ResolvedUrl } from '../resolvers'
+import { resolveUniversal, resolveUrl, scrapeStatic, type ResolvedUrl, type StaticScrape } from '../resolvers'
+import { withSignal } from '../resolvers/http'
 import { unreachableCode } from '../resolvers/neterror'
-import { isAbsoluteUrl, looksLikeCollection, normalizeUrl } from '@shared/urls'
+import { engineKnowsHost, isAbsoluteUrl, looksLikeCollection, normalizeUrl } from '@shared/urls'
 import { reportDetectFailure, type DetectVerdict } from './report'
 import type { DetectTrace } from '@shared/report'
 import type {
@@ -280,7 +281,10 @@ export async function detect(
   }
 
   onStage(wasRewritten ? 'probing' : 'engine')
+  const head = wasRewritten ? null : headStartScrape(url, signal)
   const probe = await probeWithEngine(resolved, signal)
+  // The engine answered; the scrape it raced is not needed.
+  if (probe.ok && probe.info) head?.abort()
   if (probe.ok && probe.info) {
     const info = probe.info
     info.webpageUrl = url
@@ -301,6 +305,7 @@ export async function detect(
     let universal: ResolvedUrl | null = null
     try {
       universal = await resolveUniversal(url, {
+        scraped: head?.scrape,
         allowBrowser: settings.universalFallback,
         onStage: (stage) => {
           tried.stages.push(stage)
@@ -361,8 +366,38 @@ export async function detect(
     }
   }
 
+  head?.abort()
   onStage('done')
   return reportDetectFailure(probe, url, trace)
+}
+
+/**
+ * A page scrape started alongside the engine probe, for a host the engine has
+ * no extractor of its own for.
+ *
+ * There the probe is the generic extractor, and when it fails - most of the
+ * time, on the sites that get this far - the universal pass started only
+ * afterwards and fetched the page from scratch: two slow steps one after the
+ * other where nothing made the second wait for the first. The scrape is a
+ * single page fetch (and up to three player iframes), so starting it early
+ * costs little; whichever side is not needed is aborted, with its own
+ * controller so the detect's signal is left alone.
+ */
+function headStartScrape(
+  url: string,
+  signal: AbortSignal | undefined
+): { scrape: Promise<StaticScrape>; abort: () => void } | null {
+  if (signal?.aborted || !/^https?:\/\//i.test(url) || engineKnowsHost(url)) return null
+  const controller = new AbortController()
+  const forward = (): void => controller.abort()
+  signal?.addEventListener('abort', forward, { once: true })
+  const scrape = withSignal(controller.signal, () => scrapeStatic(url))
+  // Settled either way, so the listener goes and a rejection nobody awaits is not unhandled.
+  scrape.then(
+    () => signal?.removeEventListener('abort', forward),
+    () => signal?.removeEventListener('abort', forward)
+  )
+  return { scrape, abort: () => controller.abort() }
 }
 
 /**

@@ -39,7 +39,14 @@ export interface UniversalOptions {
    * page goes on to the browser as it always did.
    */
   needStream?: boolean
+  /**
+   * The page scrape, already started by the caller alongside its engine probe.
+   * Used in place of a fresh one; it may reject exactly as `scrapeStatic` does.
+   */
+  scraped?: Promise<StaticScrape>
 }
+
+export { scrapeStatic, type StaticScrape } from './static'
 
 export const SNIFF_SCHEME = 'uvd-sniff://'
 
@@ -93,7 +100,7 @@ export async function resolveUniversal(
   onStage?.('scraping')
   let scraped: StaticScrape | null = null
   try {
-    scraped = await withSignal(signal, () => scrapeStatic(pageUrl))
+    scraped = await (options.scraped ?? withSignal(signal, () => scrapeStatic(pageUrl)))
   } catch (err) {
     if (unreachableCode(err)) throw err
   }

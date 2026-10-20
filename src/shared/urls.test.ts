@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { isAbsoluteUrl, looksLikeCollection, needsCookiesOften, normalizeUrl } from './urls'
+import { engineKnowsHost, isAbsoluteUrl, looksLikeCollection, needsCookiesOften, normalizeUrl } from './urls'
 
 describe('normalizeUrl', () => {
   it('leaves internal and non-http links untouched', () => {
@@ -232,6 +232,21 @@ describe('looksLikeCollection', () => {
   it('still expands a real playlist page', () => {
     expect(looksLikeCollection('https://site.test/playlist/rock-classics')).toBe(true)
     expect(looksLikeCollection('https://site.test/playlists/42')).toBe(true)
+  })
+})
+
+describe('engineKnowsHost', () => {
+  it('knows the big extractor sites, subdomains and share hosts included', () => {
+    expect(engineKnowsHost('https://youtu.be/abc')).toBe(true)
+    expect(engineKnowsHost('https://m.youtube.com/watch?v=abc')).toBe(true)
+    expect(engineKnowsHost('https://player.vimeo.com/video/1')).toBe(true)
+    expect(engineKnowsHost('ok.ru/video/1')).toBe(true)
+  })
+
+  it('does not know a lookalike or an unknown site', () => {
+    expect(engineKnowsHost('https://notyoutube.com/v/1')).toBe(false)
+    expect(engineKnowsHost('https://some-tube.test/video/1')).toBe(false)
+    expect(engineKnowsHost('not a link')).toBe(false)
   })
 })
 
