@@ -20,6 +20,14 @@ describe('infoKey', () => {
     expect(infoKey('https://site.test/v/1', { ...access, proxy: 'http://p:1' })).not.toBe(base)
   })
 
+  it('changes when the cookies file is rewritten at the same path', () => {
+    const file = join(mkdtempSync(join(tmpdir(), 'uvd-cookies-')), 'cookies.txt')
+    writeFileSync(file, '# signed out\n')
+    const before = infoKey('https://site.test/v/1', { ...access, cookiesFile: file })
+    writeFileSync(file, '# signed in, with a session cookie\n')
+    expect(infoKey('https://site.test/v/1', { ...access, cookiesFile: file })).not.toBe(before)
+  })
+
   it('never carries the proxy itself, which may hold a password', () => {
     expect(infoKey('https://site.test/v/1', { ...access, proxy: 'http://user:secret@p:1' })).not.toContain('secret')
   })

@@ -1,5 +1,5 @@
 import { createHash, randomBytes } from 'crypto'
-import { existsSync, mkdirSync, readdirSync, rmSync, writeFileSync } from 'fs'
+import { existsSync, mkdirSync, readdirSync, rmSync, statSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import type { AppSettings } from '@shared/types'
 import { normalizeUrl } from '@shared/urls'
@@ -33,8 +33,22 @@ export function infoKey(
   url: string,
   settings: Pick<AppSettings, 'cookiesFile' | 'cookiesFromBrowser' | 'proxy'>
 ): string {
+  /*
+    The cookies file by what is in it, as near as a stat can say: exporting
+    fresh cookies after signing in rewrites the same path, and the old key
+    would have handed back what the signed-out visitor was shown.
+  */
+  let cookiesStamp = ''
+  if (settings.cookiesFile) {
+    try {
+      const st = statSync(settings.cookiesFile)
+      cookiesStamp = `${st.mtimeMs}:${st.size}`
+    } catch {
+      cookiesStamp = 'missing'
+    }
+  }
   const access = createHash('sha256')
-    .update(JSON.stringify([settings.cookiesFile, settings.cookiesFromBrowser, settings.proxy]))
+    .update(JSON.stringify([settings.cookiesFile, cookiesStamp, settings.cookiesFromBrowser, settings.proxy]))
     .digest('hex')
     .slice(0, 16)
   return `${normalizeUrl(url)}#${access}`
