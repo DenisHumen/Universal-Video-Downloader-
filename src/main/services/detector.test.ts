@@ -1,7 +1,7 @@
 import { EventEmitter } from 'events'
 import { PassThrough } from 'stream'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { detect, playlistEntries } from './detector'
+import { detect, flattenEntries, playlistEntries } from './detector'
 import { describeNetError } from '../resolvers/neterror'
 
 /*
@@ -167,5 +167,36 @@ describe('playlistEntries', () => {
     expect(entries).toEqual([
       { url: 'https://site.test/watch/1', title: 'Untitled', thumbnail: 'https://i.test/big.jpg' }
     ])
+  })
+})
+
+describe('flattenEntries', () => {
+  it("opens a channel's tab playlists into their videos", () => {
+    const entries = playlistEntries([
+      {
+        _type: 'playlist',
+        title: 'Channel - Videos',
+        webpage_url: 'https://www.youtube.com/@c/videos',
+        entries: [
+          { url: 'https://www.youtube.com/watch?v=a1', title: 'one', ie_key: 'Youtube' },
+          { url: 'https://www.youtube.com/watch?v=a2', title: 'two', ie_key: 'Youtube' }
+        ]
+      },
+      {
+        _type: 'playlist',
+        title: 'Channel - Shorts',
+        entries: [{ url: 'https://www.youtube.com/shorts/s1', title: 'short' }]
+      }
+    ])
+    expect(entries.map((e) => e.title)).toEqual(['one', 'two', 'short'])
+  })
+
+  it('stops at a bounded depth', () => {
+    type Nested = Parameters<typeof flattenEntries>[0][number]
+    let node: Nested = { url: 'https://site.test/v', title: 'deep' }
+    for (let i = 0; i < 10; i++) node = { _type: 'playlist', entries: [node] }
+    const flat = flattenEntries([node])
+    expect(flat).toHaveLength(1)
+    expect(flat[0]._type).toBe('playlist')
   })
 })

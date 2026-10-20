@@ -107,6 +107,18 @@ export function normalizeUrl(input: string): string {
       path = '/watch'
       params.set('v', short[2])
     }
+    /*
+      A channel's front page is a shelf of tabs, not a list of videos. The
+      engine's flat listing of it came back as nested tab playlists, the
+      collection probe found nothing it could pick from, and the full probe
+      then extracted the whole channel - 75 s and more before the universal
+      fallback took over. Its Videos tab is what a person pasting a channel
+      means, and the engine lists that in a couple of seconds.
+    */
+    const channel = path.match(
+      /^\/(@[\w.%-]+|channel\/UC[\w-]+|c\/[\w.%-]+|user\/[\w.%-]+)\/?(?:featured\/?)?$/
+    )
+    if (channel && !/^music\./.test(host)) path = `/${channel[1]}/videos`
     // `t=90` is "start playing here", never part of the file we fetch.
     params.delete('t')
     params.delete('start_radio')

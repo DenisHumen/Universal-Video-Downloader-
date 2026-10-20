@@ -474,7 +474,7 @@ function spawnJson(args: string[], signal: AbortSignal | undefined, timeoutMs: n
  * "URL" was `--config-locations=…` reached the engine as an option.
  */
 export function playlistEntries(raw: RawInfo[]): PlaylistEntry[] {
-  return raw.flatMap((e) => {
+  return flattenEntries(raw).flatMap((e) => {
     const url = e.webpage_url || e.url
     if (!url || !isAbsoluteUrl(url)) return []
     return [
@@ -493,6 +493,23 @@ export function playlistEntries(raw: RawInfo[]): PlaylistEntry[] {
       }
     ]
   })
+}
+
+/**
+ * A listing's entries with nested playlists opened up in place.
+ *
+ * A channel's front page lists as a playlist of its tabs - Videos, Shorts,
+ * Live - each a playlist of its own. Read flat, the listing had two or three
+ * "entries" and no videos in it, so the picker was skipped and the full probe
+ * went on to extract the whole channel. Bounded, because the nesting is the
+ * site's data too.
+ */
+export function flattenEntries(raw: RawInfo[], depth = 0): RawInfo[] {
+  return raw.flatMap((e) =>
+    e._type === 'playlist' && Array.isArray(e.entries) && depth < 3
+      ? flattenEntries(e.entries, depth + 1)
+      : [e]
+  )
 }
 
 /*
@@ -526,7 +543,8 @@ async function probeCollection(url: string, signal?: AbortSignal): Promise<Media
   const result = await spawnJson(args, signal, 120_000)
   if (!result.ok) return null
   const raw = result.raw
-  if (raw._type !== 'playlist' || !raw.entries || raw.entries.length < 2) return null
+  // The count is checked after flattening: a channel with one tab is one entry deep.
+  if (raw._type !== 'playlist' || !raw.entries) return null
 
   const entries = playlistEntries(raw.entries)
   if (entries.length < 2) return null

@@ -140,8 +140,41 @@ describe('normalizeUrl', () => {
     expect(normalizeUrl('https://telegram.me/c/1234567890/42')).toBe('https://t.me/c/1234567890/42')
   })
 
+  it("opens a YouTube channel's front page on its Videos tab", () => {
+    expect(normalizeUrl('https://www.youtube.com/@somechannel')).toBe(
+      'https://www.youtube.com/@somechannel/videos'
+    )
+    expect(normalizeUrl('https://youtube.com/@some.channel/')).toBe(
+      'https://www.youtube.com/@some.channel/videos'
+    )
+    expect(normalizeUrl('https://m.youtube.com/channel/UCabc_123-x')).toBe(
+      'https://www.youtube.com/channel/UCabc_123-x/videos'
+    )
+    expect(normalizeUrl('https://www.youtube.com/c/Name/featured')).toBe(
+      'https://www.youtube.com/c/Name/videos'
+    )
+    expect(normalizeUrl('https://www.youtube.com/user/name?si=abc')).toBe(
+      'https://www.youtube.com/user/name/videos'
+    )
+  })
+
+  it('leaves a channel tab that was asked for, and YouTube Music, alone', () => {
+    expect(normalizeUrl('https://www.youtube.com/@somechannel/shorts')).toBe(
+      'https://www.youtube.com/@somechannel/shorts'
+    )
+    expect(normalizeUrl('https://www.youtube.com/@somechannel/streams')).toBe(
+      'https://www.youtube.com/@somechannel/streams'
+    )
+    expect(normalizeUrl('https://music.youtube.com/channel/UCabc')).toBe(
+      'https://music.youtube.com/channel/UCabc'
+    )
+    // Not a channel: TikTok profiles share the @ shape.
+    expect(normalizeUrl('https://www.tiktok.com/@someone')).toBe('https://www.tiktok.com/@someone')
+  })
+
   it('is idempotent', () => {
     for (const url of [
+      'https://www.youtube.com/@somechannel',
       'https://youtu.be/dQw4w9WgXcQ?si=xyz',
       'https://www.tiktok.com/@user/video/7123?is_from_webapp=1',
       'https://site.test/#/watch/123',
