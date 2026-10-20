@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { AppSettings, VideoFormat } from '@shared/types'
 import {
+  outcomeSummary,
   availableHeights,
   heightLabel,
   initialMode,
@@ -176,5 +177,23 @@ describe('outcomeResolution', () => {
     expect(outcomeResolution({ height: 2160 })).toBe('4K')
     expect(outcomeResolution({})).toBeNull()
     expect(outcomeResolution(null)).toBeNull()
+  })
+})
+
+describe('outcomeSummary', () => {
+  const bytes = (n: number): string => `${Math.round(n / 1_000_000)} MB`
+
+  it('names resolution, container and size', () => {
+    expect(outcomeSummary({ height: 1080, fps: 60, ext: 'mp4', bytes: 412_000_000 }, bytes)).toEqual([
+      '1080p60',
+      'MP4',
+      '~412 MB'
+    ])
+  })
+
+  it('leaves out what the site never said', () => {
+    expect(outcomeSummary({ ext: 'mp3' }, bytes)).toEqual(['MP3'])
+    expect(outcomeSummary({ height: 720 }, bytes)).toEqual(['720p'])
+    expect(outcomeSummary(null, bytes)).toEqual([])
   })
 })

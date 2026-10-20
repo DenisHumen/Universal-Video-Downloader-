@@ -59,6 +59,7 @@ export const ru: Dictionary = {
   'home.linkLabel': 'ссылка на видео',
   'home.saveDefault': 'папка по умолчанию',
   'home.get': 'получить',
+  'home.downloadSummary': 'скачать · {details}',
   'home.downloadNow': 'скачать сейчас',
   'home.downloadNowHint': 'в качестве по умолчанию — список форматов можно не ждать.',
   'home.errorTitle': 'не удалось найти видео',

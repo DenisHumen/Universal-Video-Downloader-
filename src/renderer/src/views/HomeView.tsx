@@ -25,12 +25,13 @@ import {
 import { looksLikeCollection, needsCookiesOften, youtubeIdOf } from '@shared/urls'
 import { detectCache, inflightDetects, useStore } from '../store'
 import { describeError, errorText } from '../lib/errors'
-import { formatCount, formatDuration, isProbablyUrl } from '../lib/format'
+import { formatBytes, formatCount, formatDuration, isProbablyUrl } from '../lib/format'
 import {
   availableHeights,
   initialMode,
   initialQuality,
   maxHeightOf,
+  outcomeSummary,
   resolveSelection
 } from '../lib/quality'
 import { detectIsDone, errorLead } from '../lib/emphasis'
@@ -437,6 +438,14 @@ export default function HomeView(): JSX.Element {
     setView('downloads')
   }
 
+  /** What the download button restates: `1080p · MP4 · ~412 MB`. */
+  const summary = info
+    ? outcomeSummary(
+        resolveSelection(info.formats, selection, settings?.audioFormat),
+        (bytes) => formatBytes(bytes)
+      )
+    : []
+
   /** A cut is only real while a video is what we're fetching. */
   const cutting = selection.mode === 'video' && trimOpen && hasTrim(section)
   const isSearchQuery = url.trim().length > 0 && !isProbablyUrl(url)
@@ -451,7 +460,7 @@ export default function HomeView(): JSX.Element {
 
   return (
     <div className="h-full overflow-y-auto" ref={scrollRef}>
-      <div className="mx-auto flex w-full max-w-[680px] flex-col px-6 pb-16 pt-14">
+      <div className="mx-auto flex w-full max-w-[680px] flex-col px-6 pb-16 pt-6 min-[880px]:max-w-[840px]">
       {/* The focal control. Everything on this screen is downstream of it. */}
       <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={enter}>
         {/*
@@ -460,7 +469,7 @@ export default function HomeView(): JSX.Element {
           micro-label — visually quiet, and completely silent about what the
           window in front of you is for.
         */}
-        <h1 className="h1">{t('home.title')}</h1>
+        <h1 className="h1 text-[20px]">{t('home.title')}</h1>
         <p className="lead mt-2">{t('home.subtitle')}</p>
 
         <label className="label mb-2 mt-7 block" htmlFor="uvd-url">
@@ -713,11 +722,22 @@ export default function HomeView(): JSX.Element {
               initial={{ opacity: 0, y: 6 }}
               animate={{ opacity: 1, y: 0 }}
               transition={enter}
-              className="panel overflow-hidden"
+              /*
+                Two columns from 880px: what was found on the left, what to do
+                with it on the right, so the choice and the thing chosen are
+                side by side instead of the poster scrolling away above it.
+                Narrower, one column, with the download bar pinned to the
+                bottom of the view while the card is on screen.
+
+                `overflow-clip`, not `overflow-hidden`: it clips the corners
+                the same way but is not a scroll container, and a sticky bar
+                inside a scroll container that never scrolls sticks to nothing.
+              */
+              className="panel overflow-clip min-[880px]:grid min-[880px]:grid-cols-[240px_minmax(0,1fr)]"
             >
               {/* What was found */}
-              <div className="flex gap-4 border-b border-edge p-4">
-                <div className="relative aspect-video w-36 shrink-0 overflow-hidden rounded-2 bg-sink">
+              <div className="flex gap-4 border-b border-edge p-4 min-[880px]:flex-col min-[880px]:border-b-0 min-[880px]:border-r">
+                <div className="relative aspect-video w-36 shrink-0 overflow-hidden rounded-2 bg-sink min-[880px]:w-full">
                   <Thumbnail
                     src={info.thumbnail}
                     pageUrl={info.webpageUrl}
@@ -772,6 +792,7 @@ export default function HomeView(): JSX.Element {
               </div>
 
               {/* Choose, then commit */}
+              <div className="flex min-w-0 flex-col">
               <div className="p-4">
                 <FormatSelector
                   info={info}
@@ -861,15 +882,29 @@ export default function HomeView(): JSX.Element {
                   defaultDir={settings.downloadDir}
                   className="mt-5 border-t border-edge pt-4"
                 />
+              </div>
 
+              {/*
+                The button says what it will fetch. A cut keeps its own verb:
+                its size is a part of the file's, and a full-file figure next
+                to "trim" would be a number for something else.
+              */}
+              <div className="sticky bottom-0 mt-auto border-t border-edge bg-raise p-4">
                 <button
-                  className="btn-solid mt-4 w-full py-3.5 text-[14px]"
+                  className="btn-solid w-full py-3.5 text-[14px]"
                   onClick={start}
                   disabled={starting}
                 >
                   {starting ? <Loader2 size={16} className="animate-spin" /> : null}
-                  {cutting ? t('trim.apply') : t('common.download')}
+                  <span className="truncate">
+                    {cutting
+                      ? t('trim.apply')
+                      : summary.length
+                        ? t('home.downloadSummary', { details: summary.join(' · ') })
+                        : t('common.download')}
+                  </span>
                 </button>
+              </div>
               </div>
             </motion.div>
           )}

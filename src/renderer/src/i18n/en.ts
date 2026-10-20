@@ -66,6 +66,7 @@ export const en = {
   'home.linkLabel': 'video link',
   'home.saveDefault': 'use default folder',
   'home.get': 'get video',
+  'home.downloadSummary': 'download · {details}',
   'home.downloadNow': 'download now',
   'home.downloadNowHint': 'in your default quality — no need to wait for the format list.',
   'home.errorTitle': 'couldn’t detect a video',
