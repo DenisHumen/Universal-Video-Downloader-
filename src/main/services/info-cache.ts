@@ -70,15 +70,20 @@ export function infoReusable(url: string): boolean {
   }
 }
 
+/** The engine could not read the saved file: its path, or Python's JSON error, is in the message. */
+const INFO_LOAD_FAILED = /\.info\.json|load-info-json|JSONDecodeError|Expecting value/i
+/** The media itself refused with 403 or 410 - an expired signed address - not a page or an API. */
+const MEDIA_REFUSED = /(unable to download video data|Got error|fragment)[^\n]*HTTP Error 4(03|10)\b/i
+
 /**
- * A failure that may be the reused JSON's fault rather than the video's: its
- * stream addresses expired (403, 410, "expired"), or the engine could not read
- * the file. Such a run is retried once as a normal one.
+ * A failure that is the reused JSON's fault rather than the video's: the file
+ * would not load, or a stream address in it was refused as expired. Such a
+ * run is retried once as a normal one. Nothing broader: a 404, a geo block or
+ * a private video fails the fresh run just the same, and only costs a second
+ * attempt to rediscover.
  */
 export function isStaleInfoError(output: string): boolean {
-  return /HTTP Error 40[34]|HTTP Error 410|\b(expired|signature)\b|load-info-json|info\.json|JSONDecodeError|Expecting value/i.test(
-    output
-  )
+  return INFO_LOAD_FAILED.test(output) || MEDIA_REFUSED.test(output)
 }
 
 interface Entry {

@@ -44,15 +44,20 @@ describe('infoReusable', () => {
 })
 
 describe('isStaleInfoError', () => {
-  it('recognises expired addresses and a file the engine could not read', () => {
+  it('recognises an expired media address and a file the engine could not read', () => {
     expect(isStaleInfoError('ERROR: unable to download video data: HTTP Error 403: Forbidden')).toBe(true)
-    expect(isStaleInfoError('HTTP Error 410: Gone')).toBe(true)
+    expect(isStaleInfoError('[download] Got error: HTTP Error 410: Gone')).toBe(true)
+    expect(isStaleInfoError('[download] fragment 3 of 40: HTTP Error 403: Forbidden')).toBe(true)
     expect(isStaleInfoError('json.decoder.JSONDecodeError: Expecting value: line 1')).toBe(true)
+    expect(isStaleInfoError("ERROR: [Errno 2] No such file or directory: '/x/ab12.info.json'")).toBe(true)
   })
 
   it('leaves real failures alone', () => {
     expect(isStaleInfoError('ERROR: [youtube] x: Private video')).toBe(false)
     expect(isStaleInfoError('No space left on device')).toBe(false)
+    expect(isStaleInfoError('ERROR: unable to download video data: HTTP Error 404: Not Found')).toBe(false)
+    expect(isStaleInfoError('ERROR: Unable to download webpage: HTTP Error 403: Forbidden')).toBe(false)
+    expect(isStaleInfoError('the signature has expired')).toBe(false)
   })
 })
 
