@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { DownloadItem } from '@shared/types'
-import { applyDownloadsChanged } from './downloads'
+import { applyDownloadsChanged, liveDownloads, overallPercent, recentFinished } from './downloads'
 
 function item(id: string, createdAt: number, overrides: Partial<DownloadItem> = {}): DownloadItem {
   return {
@@ -76,5 +76,44 @@ describe('applyDownloadsChanged', () => {
     const next = applyDownloadsChanged(big, { updated: [], removed: doomed })
     expect(next).toHaveLength(40)
     expect(next[0].id).toBe('r0')
+  })
+})
+
+describe('liveDownloads', () => {
+  it('puts running jobs before waiting ones, oldest first, and stops at the limit', () => {
+    const list = [
+      item('q1', 1, { state: 'queued' }),
+      item('d2', 2, { state: 'downloading' }),
+      item('done', 3),
+      item('p3', 4, { state: 'processing' }),
+      item('q4', 5, { state: 'queued' })
+    ]
+    expect(ids(liveDownloads(list))).toEqual(['d2', 'p3', 'q1'])
+    expect(liveDownloads([item('done', 1)])).toEqual([])
+  })
+})
+
+describe('recentFinished', () => {
+  it('lists the newest finished first', () => {
+    const list = [
+      item('a', 1, { finishedAt: 10 }),
+      item('b', 2, { finishedAt: 30 }),
+      item('e', 3, { state: 'error' }),
+      item('c', 4, { finishedAt: 20 })
+    ]
+    expect(ids(recentFinished(list, 2))).toEqual(['b', 'c'])
+  })
+})
+
+describe('overallPercent', () => {
+  it('averages what is running, and is null when nothing is', () => {
+    expect(overallPercent([item('a', 1)])).toBeNull()
+    expect(
+      overallPercent([
+        item('a', 1, { state: 'downloading', percent: 20 }),
+        item('b', 2, { state: 'processing', percent: 100 }),
+        item('q', 3, { state: 'queued', percent: 0 })
+      ])
+    ).toBe(60)
   })
 })

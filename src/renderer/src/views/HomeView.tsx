@@ -45,6 +45,7 @@ import SaveLocation from '../components/SaveLocation'
 import StreamingCard from '../components/StreamingCard'
 import TrimEditor from '../components/TrimEditor'
 import CapabilitiesPanel from '../components/CapabilitiesPanel'
+import HomeActivity from '../components/HomeActivity'
 import Choice from '../components/Choice'
 import Thumbnail from '../components/Thumbnail'
 import ReportPrompt from '../components/ReportPrompt'
@@ -81,6 +82,7 @@ export default function HomeView(): JSX.Element {
   const saveSettings = useStore((s) => s.saveSettings)
   const detectStatus = useStore((s) => s.detect)
   const detectPreview = useStore((s) => s.detectPreview)
+  const hasHistory = useStore((s) => s.downloads.length > 0)
   const beginDetect = useStore((s) => s.beginDetect)
   const endDetect = useStore((s) => s.endDetect)
 
@@ -916,7 +918,8 @@ export default function HomeView(): JSX.Element {
               animate={{ opacity: 1 }}
               transition={enter}
             >
-              <CapabilitiesPanel />
+              {/* The introduction is for the first run; after that, what is happening. */}
+              {hasHistory ? <HomeActivity /> : <CapabilitiesPanel />}
             </motion.div>
           )}
         </>

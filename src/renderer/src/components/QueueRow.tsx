@@ -19,7 +19,8 @@ import {
 import type { DownloadItem } from '@shared/types'
 import { formatBytes, formatEta, formatSpeed, splitPath } from '../lib/format'
 import { errorReport, errorText } from '../lib/errors'
-import { useT, type TranslationKey } from '../i18n'
+import { useT } from '../i18n'
+import { STATE_META } from '../lib/states'
 import { toast } from '../lib/toast'
 import MediaJobModal, { type JobMode } from './MediaJobModal'
 import Thumbnail from './Thumbnail'
@@ -33,17 +34,6 @@ interface Props {
   animateIn?: boolean
 }
 
-const STATE_META: Record<DownloadItem['state'], { label: TranslationKey; dot: string; text: string }> =
-  {
-    queued: { label: 'state.queued', dot: 'bg-edge-strong', text: 'text-ink-3' },
-    detecting: { label: 'state.detecting', dot: 'bg-warn', text: 'text-warn' },
-    downloading: { label: 'state.downloading', dot: 'bg-accent', text: 'text-accent-ink' },
-    processing: { label: 'state.processing', dot: 'bg-accent', text: 'text-accent-ink' },
-    completed: { label: 'state.completed', dot: 'bg-good', text: 'text-good' },
-    error: { label: 'state.error', dot: 'bg-bad', text: 'text-bad' },
-    paused: { label: 'state.paused', dot: 'bg-edge-strong', text: 'text-ink-3' },
-    canceled: { label: 'state.canceled', dot: 'bg-edge-strong', text: 'text-ink-3' }
-  }
 
 /**
  * One queue entry, as a row in a ruled list.
