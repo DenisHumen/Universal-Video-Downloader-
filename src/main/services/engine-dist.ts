@@ -332,6 +332,11 @@ export interface CleanScope {
    * then the single file may be the only engine that runs.
    */
   onedirVerified: boolean
+  /**
+   * A download or unpack is running in this folder now, so its `.download`
+   * file and `.unpack-` folder are work in progress, not leftovers.
+   */
+  keepPartials?: boolean
 }
 
 /**
@@ -347,8 +352,9 @@ export function staleEntries(
   scope: CleanScope
 ): string[] {
   return names.filter((name) => {
-    if (name.startsWith(UNPACK_PREFIX) || name.endsWith('.download')) return true
-    if (name.startsWith(`${POINTER_FILE}.`)) return true
+    if (name.startsWith(UNPACK_PREFIX) || name.endsWith('.download') || name.startsWith(`${POINTER_FILE}.`)) {
+      return !scope.keepPartials
+    }
     if (!scope.onedirVerified || !pointer) return false
     if (name.startsWith(DIST_PREFIX)) return name !== pointer.dir
     return name === onefileName

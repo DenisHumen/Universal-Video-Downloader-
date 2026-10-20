@@ -206,6 +206,15 @@ describe('staging and activating a onedir copy', () => {
     expect(readdirSync(bin).sort()).toEqual(['current.json', pointer.dir].sort())
   })
 
+  it('leaves a download or unpack in progress alone', () => {
+    expect(
+      staleEntries(['yt-dlp.download', '.unpack-a', 'current.json.1'], null, 'yt-dlp', {
+        onedirVerified: true,
+        keepPartials: true
+      })
+    ).toEqual([])
+  })
+
   it('keeps the single file while no onedir copy is active', () => {
     expect(
       staleEntries(['yt-dlp', 'yt-dlp-dist-a', 'yt-dlp.download'], null, 'yt-dlp', { onedirVerified: true })
