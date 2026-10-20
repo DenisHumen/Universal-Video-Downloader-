@@ -573,6 +573,7 @@ export const en = {
   'common.save': 'save',
   'common.saved': 'saved',
   'nav.automation': 'watch',
+  'automation.lead': 'new episodes of the series you follow are found and downloaded for you, on a schedule.',
   'auto.title': 'watching',
   'auto.add': 'add',
   'auto.empty': 'nothing is being watched yet',

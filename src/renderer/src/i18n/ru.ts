@@ -559,6 +559,7 @@ export const ru: Dictionary = {
   'common.save': 'сохранить',
   'common.saved': 'сохранено',
   'nav.automation': 'слежение',
+  'automation.lead': 'новые серии того, за чем вы следите, находятся и скачиваются сами, по расписанию.',
   'auto.title': 'слежение',
   'auto.add': 'добавить',
   'auto.empty': 'пока ни за чем не следим',
