@@ -27,6 +27,7 @@ import {
   shouldStartHidden
 } from './services/autostart'
 import {
+  downloadEvents,
   listDownloads,
   loadHistory,
   pauseAll,
@@ -44,6 +45,7 @@ import { cliArgvFrom } from './cli/format'
 import { startCli } from './cli/run'
 import { refreshCliScript } from './services/cli-install'
 import { taskbarProgress } from './services/taskbar'
+import { coalesce } from './services/coalesce'
 
 const isMac = process.platform === 'darwin'
 let mainWindow: BrowserWindow | null = null
@@ -185,26 +187,35 @@ function createWindow(hidden = false): void {
   })
 }
 
+/** Events that can change what the taskbar shows. */
+const QUEUE_CHANGES = ['updated', 'progress', 'removed', 'restored'] as const
+
 /**
  * The queue's progress on the window's taskbar button or dock icon.
  *
- * Polled once a second rather than pushed from every progress line: the
- * engine prints several a second per download, and the icon needs none of
- * that resolution. Only a change is sent on, so an idle queue costs one small
- * computation a second and no native call. A plain timer, not anything tied to
- * the renderer's frames: this has to keep working while the window is hidden.
+ * Driven by the queue's own events, folded to at most one update per half
+ * second: the engine prints several progress lines a second per download and
+ * the icon needs none of that resolution, while an idle queue now costs
+ * nothing at all. Only a change reaches the native call. A plain timer, not
+ * anything tied to the renderer's frames: this has to keep working while the
+ * window is hidden.
  */
 function mirrorProgressOnTaskbar(win: BrowserWindow): () => void {
   let last = ''
-  const timer = setInterval(() => {
+  const update = coalesce(() => {
     if (win.isDestroyed()) return
     const { value, mode } = taskbarProgress(listDownloads())
     const key = `${mode}:${value.toFixed(3)}`
     if (key === last) return
     last = key
     win.setProgressBar(value, { mode })
-  }, 1000)
-  return () => clearInterval(timer)
+  }, 500)
+  for (const name of QUEUE_CHANGES) downloadEvents.on(name, update)
+  // What the queue already holds - history, items resumed at launch.
+  update()
+  return () => {
+    for (const name of QUEUE_CHANGES) downloadEvents.off(name, update)
+  }
 }
 
 /*
