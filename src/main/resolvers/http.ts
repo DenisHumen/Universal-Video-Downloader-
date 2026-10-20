@@ -35,6 +35,17 @@ export function withSignal<T>(signal: AbortSignal | undefined, fn: () => Promise
   return signal ? scoped.run(signal, fn) : fn()
 }
 
+/**
+ * Run `fn` outside any `withSignal` scope.
+ *
+ * For work shared between callers - a cached load that a second resolve may
+ * join while the first is still waiting on it. Run in the first caller's
+ * scope, its pause or cancel rejected the load for everyone sharing it.
+ */
+export function unscoped<T>(fn: () => Promise<T>): Promise<T> {
+  return scoped.exit(fn)
+}
+
 /** What a request abandoned by its signal rejects with. */
 export const REQUEST_CANCELED = 'Request canceled.'
 

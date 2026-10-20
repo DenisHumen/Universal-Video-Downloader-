@@ -19,7 +19,8 @@ vi.mock('electron', () => ({
 }))
 vi.mock('../services/proxy-auth', () => ({ withProxyAuth: <T>(req: T): T => req }))
 
-const { fetchText, netPost, REQUEST_CANCELED, withSignal } = await import('./http')
+const { fetchText, netPost, REQUEST_CANCELED, unscoped, withSignal } = await import('./http')
+const { shortLivedCache } = await import('./sites/yummyani')
 
 describe('withSignal', () => {
   it('abandons a request made deep inside the scoped call', async () => {
@@ -53,5 +54,32 @@ describe('withSignal', () => {
     )
     own.abort()
     await expect(pending).rejects.toThrow(REQUEST_CANCELED)
+  })
+})
+
+describe('unscoped', () => {
+  it("keeps a shared load running when the caller that started it cancels", async () => {
+    const first = new AbortController()
+    const before = made.length
+    const cache = shortLivedCache<string>(60_000, 4)
+    const load = (): Promise<string> => fetchText('https://site.test/shared')
+    const a = withSignal(first.signal, () => cache.get('k', load))
+    const b = withSignal(new AbortController().signal, () => cache.get('k', load))
+    await vi.waitFor(() => expect(made).toHaveLength(before + 1))
+    first.abort()
+    await Promise.resolve()
+    expect(made[before].abort).not.toHaveBeenCalled()
+    // Both callers still share the one pending request.
+    expect(a).toBe(b)
+  })
+
+  it('leaves nothing scoped inside it', async () => {
+    const controller = new AbortController()
+    const pending = withSignal(controller.signal, () => unscoped(() => fetchText('https://site.test/free')))
+    controller.abort()
+    let settled = false
+    pending.then(() => (settled = true), () => (settled = true))
+    await new Promise((resolve) => setImmediate(resolve))
+    expect(settled).toBe(false)
   })
 })
