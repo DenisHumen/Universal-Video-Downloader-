@@ -408,6 +408,20 @@ export default function HomeView(): JSX.Element {
               setUrl(link)
               void detect(link)
             }}
+            /*
+              The field is focused the moment Home opens, and usePasteDetect
+              leaves pastes into fields alone — so ⌘/Ctrl+V of a link, the
+              most common way in, only ever filled the field and waited for
+              Enter. A pasted link replaces the field and is detected; any
+              other text pastes at the caret as it always did.
+            */
+            onPaste={(e) => {
+              const link = linkIn(e.clipboardData.getData('text'))
+              if (!link) return
+              e.preventDefault()
+              setUrl(link)
+              void detect(link)
+            }}
             placeholder={t('home.placeholder')}
             aria-label={t('home.placeholder')}
             className="no-drag min-w-0 flex-1 bg-transparent px-2.5 py-2 text-[16px] text-ink outline-none placeholder:text-ink-3"
