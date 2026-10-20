@@ -14,6 +14,18 @@ import {
 } from 'fs'
 import { join } from 'path'
 import type { YtDlpStatus } from '@shared/types'
+import {
+  activate,
+  cleanEngineDir,
+  engineAssets,
+  onedirExe,
+  parseSums,
+  planEngine,
+  readPointer,
+  stageOnedir,
+  verifySum,
+  type EngineAssets
+} from './engine-dist'
 import { groupSpawnOptions } from './process'
 import { log } from './log'
 import { proxyEnv } from './options'
@@ -114,23 +126,52 @@ export function ytdlpSpawnOptions(): {
   return { windowsHide: true, env, ...groupSpawnOptions() }
 }
 
-function assetName(): string {
-  const platform = process.platform
-  const arch = process.arch
-  if (platform === 'win32') return 'yt-dlp.exe'
-  if (platform === 'darwin') return 'yt-dlp_macos'
-  // linux
-  if (arch === 'arm64') return 'yt-dlp_linux_aarch64'
-  if (arch === 'arm') return 'yt-dlp_linux_armv7l'
-  return 'yt-dlp_linux'
+/** What the release offers this machine; see engine-dist.ts. Read once: neither can change while running. */
+const ASSETS: EngineAssets = engineAssets(process.platform, process.arch)
+
+/** The single-file engine's own name in the engine folder. */
+function onefileName(): string {
+  return process.platform === 'win32' ? 'yt-dlp.exe' : 'yt-dlp'
 }
 
+/** Where the single-file engine lives, whether or not it is the one in use. */
+function onefilePath(): string {
+  return join(binDir(), onefileName())
+}
+
+/**
+ * The engine every spawn runs: the active onedir copy when there is one,
+ * otherwise the single file. Asked on every spawn, so a migration that
+ * finishes mid-session takes effect at the next detect or download without
+ * touching the ones already running.
+ */
 export function ytdlpBinaryPath(): string {
-  const name = process.platform === 'win32' ? 'yt-dlp.exe' : 'yt-dlp'
-  return join(binDir(), name)
+  return onedirExe(binDir()) ?? onefilePath()
 }
 
 const RELEASE_BASE = 'https://github.com/yt-dlp/yt-dlp/releases/latest/download'
+
+/** When a migration to the onedir build last failed, so the next try waits a day. */
+function migrationFailureFile(): string {
+  return join(binDir(), 'migration-failed')
+}
+
+function lastMigrationFailure(): number | undefined {
+  try {
+    const at = Number(readFileSync(migrationFailureFile(), 'utf-8'))
+    return Number.isFinite(at) ? at : undefined
+  } catch {
+    return undefined
+  }
+}
+
+function recordMigrationFailure(): void {
+  try {
+    writeFileSync(migrationFailureFile(), String(Date.now()), 'utf-8')
+  } catch {
+    /* the back-off is an optimisation */
+  }
+}
 
 function headerValue(value: string | string[] | undefined): string {
   if (Array.isArray(value)) return value[0] ?? ''
@@ -175,6 +216,36 @@ function fetchToFile(url: string, tmp: string): Promise<void> {
   })
 }
 
+/** A small text file from the release - the checksum list. */
+function fetchText(url: string): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const request = withProxyAuth(net.request({ url, redirect: 'follow' }), url)
+    request.on('response', (response) => {
+      if (response.statusCode >= 400) {
+        reject(new Error(`Failed to download the engine's checksums (HTTP ${response.statusCode})`))
+        return
+      }
+      const chunks: Buffer[] = []
+      response.on('data', (chunk: Buffer) => chunks.push(chunk))
+      response.on('end', () => resolve(Buffer.concat(chunks).toString('utf-8')))
+      response.on('error', reject)
+    })
+    request.on('error', reject)
+    request.end()
+  })
+}
+
+/**
+ * The release's published SHA-256 of every asset.
+ *
+ * Nothing used to check what came down: a truncated download, a captive
+ * portal's HTML page or a tampered proxy all landed as the engine, and only
+ * `--version` - which runs it - noticed some of them.
+ */
+async function releaseSums(): Promise<Map<string, string>> {
+  return parseSums(await fetchText(`${RELEASE_BASE}/SHA2-256SUMS`))
+}
+
 /** The binary download in flight, shared by everyone who asks for one meanwhile. */
 let downloading: Promise<void> | null = null
 
@@ -199,14 +270,86 @@ function downloadBinary(): Promise<void> {
   return downloading
 }
 
+/**
+ * The newest engine, as a onedir copy where the release has one.
+ *
+ * A onedir copy that fails - to download, to verify, to start - leaves the
+ * engine that was active where it was. Only with no engine at all to fall back
+ * on does the single file get fetched instead: a working app matters more than
+ * a faster one.
+ */
 async function fetchBinary(): Promise<void> {
-  const url = `${RELEASE_BASE}/${assetName()}`
-  const dest = ytdlpBinaryPath()
+  if (ASSETS.onedir) {
+    try {
+      await installOnedir(ASSETS.onedir)
+      return
+    } catch (err) {
+      recordMigrationFailure()
+      log.warn('engine', 'The onedir engine could not be installed', {
+        error: err instanceof Error ? err.message : String(err)
+      })
+      if (onedirExe(binDir()) || !ASSETS.onefile) throw err
+    }
+  }
+  await installOnefile()
+}
+
+/** Download, verify, unpack and start a onedir copy, and only then switch to it. */
+async function installOnedir(asset: { zip: string; exe: string }): Promise<void> {
+  emit({ state: 'downloading', percent: 0, message: 'Downloading download engine…' })
+  const sums = await releaseSums()
+  const dir = binDir()
+  const tmp = join(dir, `${asset.zip}.download`)
+  await fetchToFile(`${RELEASE_BASE}/${asset.zip}`, tmp)
+  let zip: Buffer
+  try {
+    zip = readFileSync(tmp)
+  } finally {
+    rmSync(tmp, { force: true })
+  }
+  const sum = verifySum(zip, asset.zip, sums)
+  const pointer = stageOnedir(zip, dir, asset.exe, sum)
+  const staged = join(dir, pointer.dir)
+  const exe = join(staged, pointer.exe)
+  if (process.platform === 'darwin') {
+    try {
+      execFileSync('/usr/bin/xattr', ['-dr', 'com.apple.quarantine', staged], { stdio: 'ignore' })
+    } catch {
+      /* nothing to strip */
+    }
+  }
+  let version = await versionOf(exe)
+  if (!version) {
+    repairMacSignature(exe)
+    version = await versionOf(exe)
+  }
+  if (!version) {
+    rmSync(staged, { recursive: true, force: true })
+    throw new Error('The onedir engine was unpacked but failed to start on this system.')
+  }
+  activate(dir, pointer)
+  rmSync(migrationFailureFile(), { force: true })
+  log.info('engine', 'Onedir engine active', { version })
+}
+
+/** The single-file engine, over the old one. */
+async function installOnefile(): Promise<void> {
+  const asset = ASSETS.onefile
+  if (!asset) throw new Error('No download engine is published for this system.')
+  const url = `${RELEASE_BASE}/${asset}`
+  const dest = onefilePath()
   const tmp = `${dest}.download`
 
   emit({ state: 'downloading', percent: 0, message: 'Downloading download engine…' })
 
+  const sums = await releaseSums()
   await fetchToFile(url, tmp)
+  try {
+    verifySum(readFileSync(tmp), asset, sums)
+  } catch (err) {
+    rmSync(tmp, { force: true })
+    throw err
+  }
 
   // Atomic-ish replace
   try {
@@ -249,9 +392,12 @@ function repairMacSignature(path: string): void {
   }
 }
 
-function spawnYtdlp(args: string[]): Promise<{ code: number; stdout: string; stderr: string }> {
+function spawnYtdlp(
+  args: string[],
+  bin: string = ytdlpBinaryPath()
+): Promise<{ code: number; stdout: string; stderr: string }> {
   return new Promise((resolve) => {
-    const child = spawn(ytdlpBinaryPath(), ['--encoding', 'utf-8', ...args], ytdlpSpawnOptions())
+    const child = spawn(bin, ['--encoding', 'utf-8', ...args], ytdlpSpawnOptions())
     let stdout = ''
     let stderr = ''
     child.stdout.setEncoding('utf8')
@@ -263,11 +409,33 @@ function spawnYtdlp(args: string[]): Promise<{ code: number; stdout: string; std
   })
 }
 
-export async function getVersion(): Promise<string | undefined> {
-  if (!existsSync(ytdlpBinaryPath())) return undefined
-  const { code, stdout } = await spawnYtdlp(['--version'])
+/** What `--version` says for this executable, or nothing when it will not start. */
+async function versionOf(bin: string): Promise<string | undefined> {
+  if (!existsSync(bin)) return undefined
+  const { code, stdout } = await spawnYtdlp(['--version'], bin)
   if (code === 0) return stdout.trim()
   return undefined
+}
+
+export async function getVersion(): Promise<string | undefined> {
+  return versionOf(ytdlpBinaryPath())
+}
+
+/**
+ * Move a working single-file install to the onedir build, behind its back.
+ *
+ * The single file stays active until the new copy has been unpacked and seen
+ * to start, and stays on disk until the next launch's clean-up, so a download
+ * running from it now is never pulled out from under. A failure is logged and
+ * tried again in a day; nothing is shown, since the engine in use still works.
+ */
+function migrateInBackground(): void {
+  void downloadBinary()
+    .then(async () => {
+      const version = await getVersion()
+      if (version && onedirExe(binDir())) emit({ state: 'ready', version, message: 'Ready' })
+    })
+    .catch(() => undefined)
 }
 
 /**
@@ -278,20 +446,43 @@ export function ensureYtdlp(): Promise<string> {
   if (ensurePromise) return ensurePromise
   ensurePromise = (async () => {
     try {
-      const path = ytdlpBinaryPath()
-      if (existsSync(path) && statSync(path).size > 1_000_000) {
-        emit({ state: 'checking', message: 'Checking download engine…' })
-        const version = await getVersion()
-        if (version) {
-          emit({ state: 'ready', version, message: 'Ready' })
-          log.info('engine', 'Ready', { version })
-          return path
-        }
-        // Present but won't run (e.g. a previously broken download) — replace it.
-        log.warn('engine', 'The installed engine does not start; fetching it again')
+      const dir = binDir()
+      // Copies replaced last session, half-finished unpacks, the old single file.
+      cleanEngineDir(dir, onefileName())
+      emit({ state: 'checking', message: 'Checking download engine…' })
+      const onedir = onedirExe(dir)
+      const onedirVersion = onedir ? await versionOf(onedir) : undefined
+      const onefile = onefilePath()
+      const onefileVersion =
+        !onedirVersion && existsSync(onefile) && statSync(onefile).size > 1_000_000
+          ? await versionOf(onefile)
+          : undefined
+      const plan = planEngine({
+        onedirRuns: Boolean(onedirVersion),
+        onefileRuns: Boolean(onefileVersion),
+        onedirAvailable: Boolean(ASSETS.onedir),
+        lastMigrationFailure: lastMigrationFailure(),
+        now: Date.now()
+      })
+      if (plan === 'use-onedir') {
+        emit({ state: 'ready', version: onedirVersion, message: 'Ready' })
+        log.info('engine', 'Ready', { version: onedirVersion, build: 'onedir' })
+        return onedir as string
       }
+      if (plan !== 'install') {
+        // A onedir copy that will not start must not shadow the single file that does.
+        if (readPointer(dir)) rmSync(join(dir, 'current.json'), { force: true })
+        emit({ state: 'ready', version: onefileVersion, message: 'Ready' })
+        log.info('engine', 'Ready', { version: onefileVersion, build: 'onefile' })
+        if (plan === 'use-onefile-then-migrate') migrateInBackground()
+        return onefile
+      }
+      // Nothing that runs (a first launch, a broken download): install.
+      if (onedir || existsSync(onefile)) log.warn('engine', 'The installed engine does not start; fetching it again')
+      if (readPointer(dir) && !onedirVersion) rmSync(join(dir, 'current.json'), { force: true })
       emit({ state: 'checking', message: 'Preparing download engine…' })
       await downloadBinary()
+      const path = ytdlpBinaryPath()
       let version = await getVersion()
       if (!version) {
         // The stock binary normally runs as-is; if not, try an ad-hoc re-sign.
@@ -354,8 +545,26 @@ let updating: Promise<string | undefined> | null = null
 /** The scheduled refresh while it runs; resolves to whether it brought the engine up to date. */
 let refreshing: Promise<boolean> | null = null
 
-/** The self-update keeps the same path and is fast when already current. */
+/**
+ * The self-update keeps the same path and is fast when already current.
+ *
+ * Only the single file can update itself. A onedir copy cannot (`-U` refuses),
+ * so it compares its zip's checksum with the latest release's instead: equal
+ * is "already current", anything else sends the refresh on to a fresh copy.
+ * A single file on a machine with a onedir build answers "not current" too,
+ * which is how an install that missed the launch migration moves over.
+ */
 async function selfUpdate(): Promise<number> {
+  const dir = binDir()
+  const pointer = onedirExe(dir) ? readPointer(dir) : null
+  if (pointer && ASSETS.onedir) {
+    try {
+      return (await releaseSums()).get(ASSETS.onedir.zip) === pointer.sha256 ? 0 : 1
+    } catch {
+      return 1
+    }
+  }
+  if (ASSETS.onedir) return 1
   return (await spawnYtdlp(['-U'])).code
 }
 
