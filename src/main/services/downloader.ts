@@ -46,6 +46,8 @@ import { resolveUrl } from '../resolvers'
 import { pageUrlFromSniffUrl, SNIFF_SCHEME } from '../resolvers/universal'
 import { DIRECT_SCHEME, parseDirectUrl } from '../resolvers/universal/direct'
 import { isAbsoluteUrl, normalizeUrl } from '@shared/urls'
+import { infoKey, isStaleInfoError } from './info-cache'
+import { infoCache } from './info-store'
 import { numberedName } from '@shared/playlist'
 import { hasTrim } from '@shared/types'
 import type {
@@ -92,6 +94,9 @@ const resolveAborts = new Map<string, AbortController>()
   everything from the toolbar did it to every running item at once.
 */
 const deliberateStops = new Set<string>()
+
+/** Items whose next run must extract afresh: the detect's JSON just failed them once. */
+const skipInfo = new Set<string>()
 
 /*
   What we told the engine to name each file, so the result can be found again.
@@ -500,7 +505,9 @@ export function buildArgs(
   item: DownloadItem,
   settings: AppSettings,
   dir: string,
-  ffmpeg?: string
+  ffmpeg?: string,
+  /** The detect's JSON for this link, read instead of extracting it again. */
+  infoJson?: string
 ): string[] {
   const args: string[] = [
     '--ignore-config',
@@ -633,7 +640,12 @@ export function buildArgs(
     it can come from places the user never typed: a playlist entry copied out of
     the site's JSON, or the decoded payload of a `uvd-direct://` link.
   */
-  args.push('--', item.url)
+  /*
+    Or the detect's own answer in place of the URL. The path is one this app
+    wrote into its own folder, never anything from the item.
+  */
+  if (infoJson) args.push('--load-info-json', infoJson)
+  else args.push('--', item.url)
   return args
 }
 
@@ -1161,6 +1173,18 @@ async function runDownload(item: DownloadItem): Promise<void> {
   emitUpdated(item)
   const abort = new AbortController()
   resolveAborts.set(item.id, abort)
+  /*
+    Whether this run has been superseded. Pause, cancel, retry and remove all
+    abort the controller, and the resolve can take seconds to notice. Pause
+    then resume inside that window started a second run, which marked the
+    item 'detecting' again - so the first run's abort, landing late, read as
+    a real failure and failed the second run, and its `finally` deleted the
+    second run's controller, leaving nothing for the next pause to stop. A
+    resolve that ignored the signal and succeeded late went on to start a
+    second engine beside the first. The controller is this run's identity:
+    once it is aborted, nothing the run learns is acted on.
+  */
+  const stale = (): boolean => abort.signal.aborted
   try {
     /*
       `universalFallback` was read when the link was first detected and then
@@ -1173,6 +1197,24 @@ async function runDownload(item: DownloadItem): Promise<void> {
       allowBrowser: getSettings().universalFallback,
       signal: abort.signal
     })
+    // A superseded run must not write over what the current one resolved.
+    if (stale()) {
+      processQueue()
+      return
+    }
+    /*
+      A page that resolves to a picker - a series player, a listing - has no
+      one stream to fetch. Handed to the engine as it is, it failed with the
+      engine's own "unsupported URL"; the choice belongs on Home, so say so.
+    */
+    if (resolved.streaming || resolved.isPlaylist) {
+      failWith(
+        item,
+        'needsPicker',
+        'This page has several streams to choose from. Open it on the download screen and pick one.'
+      )
+      return
+    }
     item.url = resolved.url
     item.referer = resolved.referer
     item.headers = resolved.headers
@@ -1192,17 +1234,18 @@ async function runDownload(item: DownloadItem): Promise<void> {
       Worse for a pause: the item was no longer 'paused', so nothing would ever
       resume it again.
     */
-    if (items.get(item.id)?.state !== 'detecting') {
+    if (stale() || items.get(item.id)?.state !== 'detecting') {
       processQueue()
       return
     }
     fail(item, err instanceof Error ? err.message : String(err))
     return
   } finally {
-    resolveAborts.delete(item.id)
+    // Only our own: a resumed run may already have put its controller here.
+    if (resolveAborts.get(item.id) === abort) resolveAborts.delete(item.id)
   }
   // Paused/canceled/removed while we were resolving — don't start the engine.
-  if (!items.has(item.id) || item.state !== 'detecting') {
+  if (stale() || !items.has(item.id) || item.state !== 'detecting') {
     processQueue()
     return
   }
@@ -1225,6 +1268,7 @@ async function runDownload(item: DownloadItem): Promise<void> {
     slot.
   */
   let child: ChildProcessWithoutNullStreams
+  let infoFile: string | null = null
   try {
     const settings = getSettings()
     const dir = outputDirFor(item, settings)
@@ -1232,9 +1276,23 @@ async function runDownload(item: DownloadItem): Promise<void> {
     expectedNames.delete(item.id)
     alreadyOnDisk.delete(item.id)
     if (stem) expectedNames.set(item.id, { dir, stem })
-    const args = buildArgs(item, settings, dir, ffmpegLocation())
+    /*
+      The detect's JSON, when this is the link it described and nothing has
+      changed it since: no resolver rewrote it (that brings headers the JSON
+      does not carry), and the cache is keyed by the access settings too.
+      Taken, not peeked: a retry, a resume or the second download of a link
+      extracts afresh.
+    */
+    const source = item.sourceUrl || item.url
+    const skip = skipInfo.delete(item.id)
+    infoFile =
+      !skip && item.url === source && !item.headers && !item.referer
+        ? infoCache.take(infoKey(source, settings))
+        : null
+    const args = buildArgs(item, settings, dir, ffmpegLocation(), infoFile ?? undefined)
     child = spawn(ytdlpBinaryPath(), args, ytdlpSpawnOptions())
   } catch (err) {
+    if (infoFile) infoCache.release(infoFile)
     expectedNames.delete(item.id)
     fail(item, err instanceof Error ? err.message : String(err))
     return
@@ -1303,6 +1361,7 @@ async function runDownload(item: DownloadItem): Promise<void> {
     if (settled) return
     settled = true
     procs.delete(item.id)
+    if (infoFile) infoCache.release(infoFile)
     fail(item, err.message)
   })
 
@@ -1320,6 +1379,8 @@ async function runDownload(item: DownloadItem): Promise<void> {
     */
     stdout.flush()
     stderr.flush()
+    // Read or not, the file has had its one use.
+    if (infoFile) infoCache.release(infoFile)
     const existing = alreadyOnDisk.get(item.id)
     alreadyOnDisk.delete(item.id)
     // If we deliberately stopped it, the state was already set — or has since
@@ -1350,6 +1411,31 @@ async function runDownload(item: DownloadItem): Promise<void> {
       finalPaths.delete(item.id)
       expectedNames.delete(item.id)
       log.info('download', 'Finished', downloadFields(item))
+      emitUpdated(item)
+      processQueue()
+      return
+    }
+    /*
+      A run from the detect's JSON that failed the way stale JSON fails - its
+      signed stream addresses expired, or the file would not load - gets one
+      ordinary run, extracting afresh. Not an automatic retry: it spends none
+      of the item's attempts, since the failure was this optimisation's, not
+      the download's.
+    */
+    if (infoFile && isStaleInfoError(stderrTail)) {
+      appendLog(item, 'The saved video details were out of date; asking the site again\n')
+      /*
+        What the failed run wrote goes first. The fresh extraction may pick
+        other formats, and `--continue` would otherwise append to a part file
+        fetched from an address that no longer exists.
+      */
+      cleanupPartials(item)
+      skipInfo.add(item.id)
+      item.state = 'queued'
+      item.speed = undefined
+      item.eta = undefined
+      resetProgress(item)
+      finalPaths.delete(item.id)
       emitUpdated(item)
       processQueue()
       return
@@ -1789,6 +1875,7 @@ export function removeDownload(id: string): void {
   items.delete(id)
   finalPaths.delete(id)
   alreadyOnDisk.delete(id)
+  skipInfo.delete(id)
   scheduleSave()
   downloadEvents.emit('removed', id)
 }
@@ -1819,6 +1906,7 @@ function forgetItem(id: string): void {
   forgetProgress(id)
   items.delete(id)
   finalPaths.delete(id)
+  skipInfo.delete(id)
   // Per-item 'removed' events. The automation pipeline needs each one;
   // ipc.ts folds them into a single message for the window.
   downloadEvents.emit('removed', id)

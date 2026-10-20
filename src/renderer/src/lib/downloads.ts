@@ -43,3 +43,60 @@ export function applyDownloadsChanged(
   const added = [...fresh.values()].sort((a, b) => b.createdAt - a.createdAt)
   return [...added, ...kept]
 }
+
+const LIVE: ReadonlySet<DownloadItem['state']> = new Set(['detecting', 'downloading', 'processing', 'queued'])
+
+/**
+ * What Home shows under its field once there is a history: the jobs moving
+ * now, running ones before the ones still waiting, at most `limit`.
+ */
+export function liveDownloads(list: DownloadItem[], limit = 3): DownloadItem[] {
+  const rank = (d: DownloadItem): number => (d.state === 'queued' ? 1 : 0)
+  return list
+    .filter((d) => LIVE.has(d.state))
+    .sort((a, b) => rank(a) - rank(b) || a.createdAt - b.createdAt)
+    .slice(0, limit)
+}
+
+/** The last `limit` finished downloads, newest first. */
+export function recentFinished(list: DownloadItem[], limit = 5): DownloadItem[] {
+  return list
+    .filter((d) => d.state === 'completed')
+    .sort((a, b) => (b.finishedAt ?? b.createdAt) - (a.finishedAt ?? a.createdAt))
+    .slice(0, limit)
+}
+
+/**
+ * The overall progress of what is downloading, 0-100, or null when nothing is.
+ * Each running item counts the same, whatever its size: the sizes are often
+ * unknown, and a single figure that jumps when one is learned reads as a bug.
+ */
+export function overallPercent(list: DownloadItem[]): number | null {
+  const running = list.filter((d) => d.state === 'downloading' || d.state === 'processing')
+  if (!running.length) return null
+  const sum = running.reduce((n, d) => n + Math.min(100, Math.max(0, d.percent || 0)), 0)
+  return Math.round(sum / running.length)
+}
+
+/** The sections the queue is drawn in when nothing is filtered out. */
+export type QueueGroup = 'active' | 'failed' | 'done'
+
+export function queueGroupOf(state: DownloadItem['state']): QueueGroup {
+  if (state === 'completed') return 'done'
+  if (state === 'error' || state === 'canceled') return 'failed'
+  return 'active'
+}
+
+const GROUP_ORDER: QueueGroup[] = ['active', 'failed', 'done']
+
+/**
+ * The queue in sections - what is moving, what needs a look, what is done -
+ * each in the order it was listed in. A finished download no longer sits
+ * between two running ones, and a failure no longer hides twenty rows down
+ * among the successes.
+ */
+export function groupQueue(list: DownloadItem[]): DownloadItem[] {
+  const rank = (d: DownloadItem): number => GROUP_ORDER.indexOf(queueGroupOf(d.state))
+  // Array.prototype.sort is stable, so each section keeps the list's own order.
+  return [...list].sort((a, b) => rank(a) - rank(b))
+}

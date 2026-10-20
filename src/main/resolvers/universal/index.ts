@@ -1,4 +1,4 @@
-import { b64urlDecode, b64urlEncode, hostOf } from '../http'
+import { b64urlDecode, b64urlEncode, hostOf, withSignal } from '../http'
 import { unreachableCode } from '../neterror'
 import { kodikOnPage, resolveKodikPlayer } from '../sites/kodik'
 import type { ResolveOptions, ResolvedUrl } from '../types'
@@ -39,7 +39,14 @@ export interface UniversalOptions {
    * page goes on to the browser as it always did.
    */
   needStream?: boolean
+  /**
+   * The page scrape, already started by the caller alongside its engine probe.
+   * Used in place of a fresh one; it may reject exactly as `scrapeStatic` does.
+   */
+  scraped?: Promise<StaticScrape>
 }
+
+export { scrapeStatic, type StaticScrape } from './static'
 
 export const SNIFF_SCHEME = 'uvd-sniff://'
 
@@ -93,7 +100,7 @@ export async function resolveUniversal(
   onStage?.('scraping')
   let scraped: StaticScrape | null = null
   try {
-    scraped = await scrapeStatic(pageUrl)
+    scraped = await (options.scraped ?? withSignal(signal, () => scrapeStatic(pageUrl)))
   } catch (err) {
     if (unreachableCode(err)) throw err
   }
@@ -112,7 +119,8 @@ export async function resolveUniversal(
     changed shape - falls through to the browser, as before.
   */
   if (scraped?.player && !signal?.aborted) {
-    const viaPlayer = await resolveKodikPlayer(scraped.player).catch(() => null)
+    const player = scraped.player
+    const viaPlayer = await withSignal(signal, () => resolveKodikPlayer(player)).catch(() => null)
     const onPage = viaPlayer && kodikOnPage(viaPlayer, scraped, needStream)
     if (onPage) return onPage
   }

@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest'
-import { isAbsoluteUrl, looksLikeCollection, needsCookiesOften, normalizeUrl } from './urls'
+import {
+  engineKnowsHost,
+  isAbsoluteUrl,
+  looksLikeCollection,
+  needsCookiesOften,
+  normalizeUrl,
+  youtubeIdOf
+} from './urls'
 
 describe('normalizeUrl', () => {
   it('leaves internal and non-http links untouched', () => {
@@ -140,8 +147,41 @@ describe('normalizeUrl', () => {
     expect(normalizeUrl('https://telegram.me/c/1234567890/42')).toBe('https://t.me/c/1234567890/42')
   })
 
+  it("opens a YouTube channel's front page on its Videos tab", () => {
+    expect(normalizeUrl('https://www.youtube.com/@somechannel')).toBe(
+      'https://www.youtube.com/@somechannel/videos'
+    )
+    expect(normalizeUrl('https://youtube.com/@some.channel/')).toBe(
+      'https://www.youtube.com/@some.channel/videos'
+    )
+    expect(normalizeUrl('https://m.youtube.com/channel/UCabc_123-x')).toBe(
+      'https://www.youtube.com/channel/UCabc_123-x/videos'
+    )
+    expect(normalizeUrl('https://www.youtube.com/c/Name/featured')).toBe(
+      'https://www.youtube.com/c/Name/videos'
+    )
+    expect(normalizeUrl('https://www.youtube.com/user/name?si=abc')).toBe(
+      'https://www.youtube.com/user/name/videos'
+    )
+  })
+
+  it('leaves a channel tab that was asked for, and YouTube Music, alone', () => {
+    expect(normalizeUrl('https://www.youtube.com/@somechannel/shorts')).toBe(
+      'https://www.youtube.com/@somechannel/shorts'
+    )
+    expect(normalizeUrl('https://www.youtube.com/@somechannel/streams')).toBe(
+      'https://www.youtube.com/@somechannel/streams'
+    )
+    expect(normalizeUrl('https://music.youtube.com/channel/UCabc')).toBe(
+      'https://music.youtube.com/channel/UCabc'
+    )
+    // Not a channel: TikTok profiles share the @ shape.
+    expect(normalizeUrl('https://www.tiktok.com/@someone')).toBe('https://www.tiktok.com/@someone')
+  })
+
   it('is idempotent', () => {
     for (const url of [
+      'https://www.youtube.com/@somechannel',
       'https://youtu.be/dQw4w9WgXcQ?si=xyz',
       'https://www.tiktok.com/@user/video/7123?is_from_webapp=1',
       'https://site.test/#/watch/123',
@@ -199,6 +239,39 @@ describe('looksLikeCollection', () => {
   it('still expands a real playlist page', () => {
     expect(looksLikeCollection('https://site.test/playlist/rock-classics')).toBe(true)
     expect(looksLikeCollection('https://site.test/playlists/42')).toBe(true)
+  })
+})
+
+describe('youtubeIdOf', () => {
+  it('reads the id from every shape a YouTube video link comes in', () => {
+    expect(youtubeIdOf('https://www.youtube.com/watch?v=dQw4w9WgXcQ&list=PL1')).toBe('dQw4w9WgXcQ')
+    expect(youtubeIdOf('https://youtu.be/dQw4w9WgXcQ?si=abc')).toBe('dQw4w9WgXcQ')
+    expect(youtubeIdOf('https://m.youtube.com/shorts/dQw4w9WgXcQ')).toBe('dQw4w9WgXcQ')
+    expect(youtubeIdOf('youtube.com/watch?v=dQw4w9WgXcQ')).toBe('dQw4w9WgXcQ')
+  })
+
+  it('has none for what is not one video', () => {
+    expect(youtubeIdOf('https://www.youtube.com/@channel')).toBeNull()
+    expect(youtubeIdOf('https://www.youtube.com/playlist?list=PL1')).toBeNull()
+    expect(youtubeIdOf('https://music.youtube.com/watch?v=dQw4w9WgXcQ')).toBeNull()
+    expect(youtubeIdOf('https://www.youtube.com/watch?v=short')).toBeNull()
+    expect(youtubeIdOf('https://vimeo.com/123')).toBeNull()
+    expect(youtubeIdOf('not a link')).toBeNull()
+  })
+})
+
+describe('engineKnowsHost', () => {
+  it('knows the big extractor sites, subdomains and share hosts included', () => {
+    expect(engineKnowsHost('https://youtu.be/abc')).toBe(true)
+    expect(engineKnowsHost('https://m.youtube.com/watch?v=abc')).toBe(true)
+    expect(engineKnowsHost('https://player.vimeo.com/video/1')).toBe(true)
+    expect(engineKnowsHost('ok.ru/video/1')).toBe(true)
+  })
+
+  it('does not know a lookalike or an unknown site', () => {
+    expect(engineKnowsHost('https://notyoutube.com/v/1')).toBe(false)
+    expect(engineKnowsHost('https://some-tube.test/video/1')).toBe(false)
+    expect(engineKnowsHost('not a link')).toBe(false)
   })
 })
 

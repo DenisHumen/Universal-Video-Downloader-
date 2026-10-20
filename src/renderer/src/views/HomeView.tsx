@@ -16,25 +16,27 @@ import {
 import {
   hasTrim,
   type AppErrorCode,
+  type DetectPreview,
   type DetectResult,
   type DetectStage,
   type MediaInfo,
   type TrimRange
 } from '@shared/types'
-import { needsCookiesOften } from '@shared/urls'
-import { useStore } from '../store'
+import { engineKnowsHost, looksLikeCollection, needsCookiesOften, youtubeIdOf } from '@shared/urls'
+import { detectCache, inflightDetects, useStore } from '../store'
 import { describeError, errorText } from '../lib/errors'
-import { formatCount, formatDuration, isProbablyUrl } from '../lib/format'
+import { formatBytes, formatCount, formatDuration, isProbablyUrl } from '../lib/format'
 import {
   availableHeights,
   initialMode,
   initialQuality,
   maxHeightOf,
+  outcomeSummary,
   resolveSelection
 } from '../lib/quality'
 import { detectIsDone, errorLead } from '../lib/emphasis'
 import { queueDownload, queueDownloads } from '../lib/queue'
-import { escapeClearsHome, linkIn } from '../lib/shortcuts'
+import { escapeClearsHome, isDownloadNowChord, linkIn } from '../lib/shortcuts'
 import { toClock } from '../lib/time'
 import { useT, useTp, type TranslationKey } from '../i18n'
 import FormatSelector, { type Selection } from '../components/FormatSelector'
@@ -43,6 +45,7 @@ import SaveLocation from '../components/SaveLocation'
 import StreamingCard from '../components/StreamingCard'
 import TrimEditor from '../components/TrimEditor'
 import CapabilitiesPanel from '../components/CapabilitiesPanel'
+import HomeActivity from '../components/HomeActivity'
 import Choice from '../components/Choice'
 import Thumbnail from '../components/Thumbnail'
 import ReportPrompt from '../components/ReportPrompt'
@@ -78,6 +81,10 @@ export default function HomeView(): JSX.Element {
   const takePendingUrl = useStore((s) => s.takePendingUrl)
   const saveSettings = useStore((s) => s.saveSettings)
   const detectStatus = useStore((s) => s.detect)
+  const detectPreview = useStore((s) => s.detectPreview)
+  const hasHistory = useStore((s) => s.downloads.length > 0)
+  const beginDetect = useStore((s) => s.beginDetect)
+  const endDetect = useStore((s) => s.endDetect)
 
   const [url, setUrl] = useState('')
   /** The link the result or error on screen came from; see `detectIsDone`. */
@@ -169,6 +176,7 @@ export default function HomeView(): JSX.Element {
   const dropRequest = (): void => {
     if (requestRef.current) void window.api.cancelDetect(requestRef.current)
     requestRef.current = null
+    endDetect()
   }
 
   const detect = async (value?: string): Promise<void> => {
@@ -181,22 +189,53 @@ export default function HomeView(): JSX.Element {
     }
     // A new link supersedes one still detecting; the engine can stop on that.
     dropRequest()
-    const requestId = `${Date.now()}-${Math.random().toString(36).slice(2)}`
-    requestRef.current = requestId
-    setStatus('detecting')
     setError('')
     setErrorCode(undefined)
     setCookieHint(false)
     setReported(null)
+    // The same link detected in the last few minutes: its card, at once.
+    const cached = detectCache.get(target)
+    if (cached) {
+      show(target, cached)
+      return
+    }
+    /*
+      The clipboard strip may have started this one already; waiting on that
+      run, under its request id, is both faster and one engine fewer. Its
+      stage and preview events then reach this card too.
+    */
+    const adopted = inflightDetects.take(target)
+    const requestId = adopted?.requestId ?? `${Date.now()}-${Math.random().toString(36).slice(2)}`
+    requestRef.current = requestId
+    beginDetect(target, requestId)
+    setStatus('detecting')
     setInfo(null)
     // Same reasoning as SearchView: main reports an engine that won't install
     // as a coded result, but any other rejected invoke would otherwise leave
     // the card in its skeleton.
-    const res: DetectResult = await window.api.detect(target, requestId).catch(
+    let res: DetectResult = await (adopted?.promise ?? window.api.detect(target, requestId)).catch(
       (err: unknown) => ({ ok: false, error: describeError(err) })
     )
     if (requestRef.current !== requestId) return
+    /*
+      A prefetch is the engine probe alone, with no page scrape or browser
+      behind it. When that was not enough, run the whole detect now that
+      someone is actually waiting for it.
+    */
+    if (adopted && !res.ok && res.errorCode !== 'canceled') {
+      res = await window.api.detect(target, requestId).catch(
+        (err: unknown) => ({ ok: false, error: describeError(err) })
+      )
+      if (requestRef.current !== requestId) return
+    }
     requestRef.current = null
+    endDetect()
+    detectCache.set(target, res)
+    show(target, res)
+  }
+
+  /** Put a detect's outcome on screen, whether it just ran or came from the cache. */
+  const show = (target: string, res: DetectResult): void => {
     setDetectedUrl(target)
     if (res.ok && res.info) {
       setInfo(res.info)
@@ -251,6 +290,15 @@ export default function HomeView(): JSX.Element {
   useEffect(() => {
     const onKey = (e: KeyboardEvent): void => {
       if (escapeClearsHome(e, useStore.getState().shortcutsOpen)) reset()
+      // Not from the batch list: there Ctrl+Enter is a newline, or the batch's own business.
+      else if (
+        isDownloadNowChord(e) &&
+        !useStore.getState().shortcutsOpen &&
+        (e.target as HTMLElement | null)?.tagName !== 'TEXTAREA'
+      ) {
+        e.preventDefault()
+        void downloadNowRef.current()
+      }
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
@@ -326,6 +374,71 @@ export default function HomeView(): JSX.Element {
     setView('downloads')
   }
 
+  /*
+    Download without waiting for the format list.
+
+    Detection is for choosing; most of the time the choice is the one in
+    Settings, and the downloader resolves the link again on its own when the
+    item starts. So while the card is still detecting - or straight from the
+    field - the link can be queued with the default quality, under whatever
+    title and poster are already known. A collection is the exception: queued
+    whole it would fetch every video on a channel, so it waits for the picker.
+    A result already on screen downloads what is selected on it, which starts
+    out as those same defaults.
+  */
+  /*
+    Only on hosts the engine reads by name. Anywhere else the link may need a
+    site resolver's picker or the universal pass to become a stream at all,
+    and queued as a bare page it would fail where waiting would have worked.
+  */
+  const canDownloadNow = (link: string): boolean =>
+    Boolean(settings) && isProbablyUrl(link) && engineKnowsHost(link) && !looksLikeCollection(link)
+
+  const downloadNow = async (): Promise<void> => {
+    if (starting) return
+    const target = url.trim()
+    /*
+      The card on screen only while the field still holds its link. Edited to
+      another, the chord is about the new one: queuing the old result under
+      it downloaded a video the field no longer named.
+    */
+    if (info && target === detectedUrl) {
+      if (!info.isPlaylist && !info.streaming && status === 'idle') await start()
+      return
+    }
+    if (!settings) return
+    // A link that has to be detected first is detected, rather than nothing happening.
+    if (!canDownloadNow(target)) {
+      if (target && target !== detectedUrl) void detect(target)
+      return
+    }
+    // The preview belongs to whichever link is detecting, which may not be this one.
+    const preview = useStore.getState().detect?.url === target ? useStore.getState().detectPreview : null
+    const ytId = youtubeIdOf(target)
+    const mode = initialMode(settings)
+    setStarting(true)
+    let ok = false
+    try {
+      ok = await queueDownload({
+        url: target,
+        title: preview?.title || target,
+        thumbnail: preview?.thumbnail ?? (ytId ? `https://i.ytimg.com/vi/${ytId}/mqdefault.jpg` : undefined),
+        mode,
+        quality: mode === 'audio' ? 'audio' : initialQuality(settings),
+        outputDir: saveDir || undefined
+      })
+    } finally {
+      setStarting(false)
+    }
+    if (!ok) return
+    // Stops the detect too: the queue resolves the link for itself.
+    reset()
+    setView('downloads')
+  }
+  // The window listener is registered once; it calls whatever this render's is.
+  const downloadNowRef = useRef(downloadNow)
+  downloadNowRef.current = downloadNow
+
   const batchLinks = useMemo(
     () =>
       batchText
@@ -359,6 +472,14 @@ export default function HomeView(): JSX.Element {
     setView('downloads')
   }
 
+  /** What the download button restates: `1080p · MP4 · ~412 MB`. */
+  const summary = info
+    ? outcomeSummary(
+        resolveSelection(info.formats, selection, settings?.audioFormat),
+        (bytes) => formatBytes(bytes)
+      )
+    : []
+
   /** A cut is only real while a video is what we're fetching. */
   const cutting = selection.mode === 'video' && trimOpen && hasTrim(section)
   const isSearchQuery = url.trim().length > 0 && !isProbablyUrl(url)
@@ -373,7 +494,7 @@ export default function HomeView(): JSX.Element {
 
   return (
     <div className="h-full overflow-y-auto" ref={scrollRef}>
-      <div className="mx-auto flex w-full max-w-[680px] flex-col px-6 pb-16 pt-14">
+      <div className="mx-auto flex w-full max-w-[680px] flex-col px-6 pb-16 pt-6 min-[880px]:max-w-[840px]">
       {/* The focal control. Everything on this screen is downstream of it. */}
       <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={enter}>
         {/*
@@ -382,7 +503,7 @@ export default function HomeView(): JSX.Element {
           micro-label — visually quiet, and completely silent about what the
           window in front of you is for.
         */}
-        <h1 className="h1">{t('home.title')}</h1>
+        <h1 className="h1 text-[20px]">{t('home.title')}</h1>
         <p className="lead mt-2">{t('home.subtitle')}</p>
 
         <label className="label mb-2 mt-7 block" htmlFor="uvd-url">
@@ -394,7 +515,8 @@ export default function HomeView(): JSX.Element {
             ref={inputRef}
             value={url}
             onChange={(e) => setUrl(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && detect()}
+            // ⌘/Ctrl+Enter is "download now", answered by the window listener above.
+            onKeyDown={(e) => e.key === 'Enter' && !e.metaKey && !e.ctrlKey && detect()}
             /*
               Fields take dropped text at the caret, and usePasteDetect leaves
               them to it — which here would splice a second link into the
@@ -403,6 +525,20 @@ export default function HomeView(): JSX.Element {
             */
             onDrop={(e) => {
               const link = linkIn(e.dataTransfer.getData('text'))
+              if (!link) return
+              e.preventDefault()
+              setUrl(link)
+              void detect(link)
+            }}
+            /*
+              The field is focused the moment Home opens, and usePasteDetect
+              leaves pastes into fields alone — so ⌘/Ctrl+V of a link, the
+              most common way in, only ever filled the field and waited for
+              Enter. A pasted link replaces the field and is detected; any
+              other text pastes at the caret as it always did.
+            */
+            onPaste={(e) => {
+              const link = linkIn(e.clipboardData.getData('text'))
               if (!link) return
               e.preventDefault()
               setUrl(link)
@@ -509,6 +645,10 @@ export default function HomeView(): JSX.Element {
               key="skeleton"
               stage={detectStatus?.stage ?? 'resolving'}
               label={t(STAGE_LABEL[detectStatus?.stage ?? 'resolving'])}
+              url={detectStatus?.url ?? url}
+              preview={detectPreview}
+              onDownloadNow={canDownloadNow(url.trim()) ? () => void downloadNow() : undefined}
+              starting={starting}
               slowHint={t('detect.slowHint')}
               cancelLabel={t('common.cancel')}
               onCancel={cancelDetect}
@@ -616,11 +756,22 @@ export default function HomeView(): JSX.Element {
               initial={{ opacity: 0, y: 6 }}
               animate={{ opacity: 1, y: 0 }}
               transition={enter}
-              className="panel overflow-hidden"
+              /*
+                Two columns from 880px: what was found on the left, what to do
+                with it on the right, so the choice and the thing chosen are
+                side by side instead of the poster scrolling away above it.
+                Narrower, one column, with the download bar pinned to the
+                bottom of the view while the card is on screen.
+
+                `overflow-clip`, not `overflow-hidden`: it clips the corners
+                the same way but is not a scroll container, and a sticky bar
+                inside a scroll container that never scrolls sticks to nothing.
+              */
+              className="panel overflow-clip min-[880px]:grid min-[880px]:grid-cols-[240px_minmax(0,1fr)]"
             >
               {/* What was found */}
-              <div className="flex gap-4 border-b border-edge p-4">
-                <div className="relative aspect-video w-36 shrink-0 overflow-hidden rounded-2 bg-sink">
+              <div className="flex gap-4 border-b border-edge p-4 min-[880px]:flex-col min-[880px]:border-b-0 min-[880px]:border-r">
+                <div className="relative aspect-video w-36 shrink-0 overflow-hidden rounded-2 bg-sink min-[880px]:w-full">
                   <Thumbnail
                     src={info.thumbnail}
                     pageUrl={info.webpageUrl}
@@ -675,6 +826,7 @@ export default function HomeView(): JSX.Element {
               </div>
 
               {/* Choose, then commit */}
+              <div className="flex min-w-0 flex-col">
               <div className="p-4">
                 <FormatSelector
                   info={info}
@@ -764,15 +916,29 @@ export default function HomeView(): JSX.Element {
                   defaultDir={settings.downloadDir}
                   className="mt-5 border-t border-edge pt-4"
                 />
+              </div>
 
+              {/*
+                The button says what it will fetch. A cut keeps its own verb:
+                its size is a part of the file's, and a full-file figure next
+                to "trim" would be a number for something else.
+              */}
+              <div className="sticky bottom-0 mt-auto border-t border-edge bg-raise p-4">
                 <button
-                  className="btn-solid mt-4 w-full py-3.5 text-[14px]"
+                  className="btn-solid w-full py-3.5 text-[14px]"
                   onClick={start}
                   disabled={starting}
                 >
                   {starting ? <Loader2 size={16} className="animate-spin" /> : null}
-                  {cutting ? t('trim.apply') : t('common.download')}
+                  <span className="truncate">
+                    {cutting
+                      ? t('trim.apply')
+                      : summary.length
+                        ? t('home.downloadSummary', { details: summary.join(' · ') })
+                        : t('common.download')}
+                  </span>
                 </button>
+              </div>
               </div>
             </motion.div>
           )}
@@ -784,7 +950,8 @@ export default function HomeView(): JSX.Element {
               animate={{ opacity: 1 }}
               transition={enter}
             >
-              <CapabilitiesPanel />
+              {/* The introduction is for the first run; after that, what is happening. */}
+              {hasHistory ? <HomeActivity /> : <CapabilitiesPanel />}
             </motion.div>
           )}
         </>
@@ -794,25 +961,67 @@ export default function HomeView(): JSX.Element {
   )
 }
 
+/** The host a link is on, for the card's site tag while the extractor is not known yet. */
+function hostLabel(link: string): string {
+  try {
+    return new URL(link).hostname.replace(/^www\./, '')
+  } catch {
+    return ''
+  }
+}
+
 /**
- * The waiting state. Blocks pulse in place rather than sweeping a gradient
- * across themselves — a shimmer repaints every frame to communicate nothing the
- * pulse doesn't, and detection can run for half a minute on an unknown site.
+ * The waiting state, shaped like the result it is waiting for.
+ *
+ * Blocks pulse in place rather than sweeping a gradient across themselves — a
+ * shimmer repaints every frame to communicate nothing the pulse doesn't, and
+ * detection can run for half a minute on an unknown site.
+ *
+ * What is already known is drawn for real: a YouTube video's poster comes
+ * straight from its id, and a title, uploader and poster from the site's
+ * oEmbed answer replace their skeletons when it lands, usually well before
+ * the engine is done. After a few seconds a counter says how long it has
+ * been, so a slow site reads as working rather than stuck. The counter is a
+ * one-second interval, not a frame loop: it has to keep counting in a window
+ * the compositor has throttled.
  */
 function DetectingCard({
   stage,
   label,
+  url,
+  preview,
   slowHint,
   cancelLabel,
-  onCancel
+  onCancel,
+  onDownloadNow,
+  starting
 }: {
   stage: DetectStage
   label: string
+  url: string
+  preview: DetectPreview | null
   slowHint: string
   cancelLabel: string
   onCancel: () => void
+  /** Absent for a link that has to be detected first - a playlist or channel. */
+  onDownloadNow?: () => void
+  starting: boolean
 }): JSX.Element {
+  const t = useT()
   const slow = stage === 'scraping' || stage === 'browsing'
+  const [elapsed, setElapsed] = useState(0)
+  useEffect(() => {
+    const started = Date.now()
+    setElapsed(0)
+    const timer = window.setInterval(() => setElapsed(Math.floor((Date.now() - started) / 1000)), 1000)
+    return () => window.clearInterval(timer)
+  }, [url])
+
+  const ytId = youtubeIdOf(url)
+  const poster = preview?.thumbnail ?? (ytId ? `https://i.ytimg.com/vi/${ytId}/mqdefault.jpg` : undefined)
+  const host = hostLabel(url)
+  const skeletonThumb = <div className="skeleton h-full w-full" />
+
   return (
     <motion.div
       initial={{ opacity: 0 }}
@@ -820,6 +1029,7 @@ function DetectingCard({
       exit={{ opacity: 0 }}
       transition={enter}
       className="panel overflow-hidden"
+      aria-busy="true"
     >
       <div className="flex items-center gap-2.5 border-b border-edge px-4 py-3">
         <span className="h-1.5 w-1.5 shrink-0 animate-idle-pulse rounded-full bg-accent" />
@@ -827,16 +1037,42 @@ function DetectingCard({
           <p className="h2 truncate">{label}</p>
           {slow && <p className="hint mt-1 truncate">{slowHint}</p>}
         </div>
+        {elapsed >= 3 && (
+          <span className="mono shrink-0 text-[12px] tabular-nums text-ink-3" aria-hidden="true">
+            {t('detect.elapsed', { seconds: elapsed })}
+          </span>
+        )}
         <button className="btn-quiet shrink-0 px-3 py-1.5" onClick={onCancel}>
           <X size={13} /> {cancelLabel}
         </button>
       </div>
       <div className="flex gap-4 p-4">
-        <div className="skeleton aspect-video w-36 shrink-0 rounded-2" />
-        <div className="flex-1 space-y-2 py-1">
-          <div className="skeleton h-3.5 w-3/4 rounded-1" />
-          <div className="skeleton h-3 w-1/2 rounded-1" />
-          <div className="skeleton h-4 w-20 rounded-1" />
+        <div className="relative aspect-video w-36 shrink-0 overflow-hidden rounded-2 bg-sink">
+          {poster ? (
+            <Thumbnail
+              src={poster}
+              pageUrl={url}
+              className="h-full w-full object-cover"
+              loading="eager"
+              fallback={skeletonThumb}
+            />
+          ) : (
+            skeletonThumb
+          )}
+        </div>
+        <div className="min-w-0 flex-1 space-y-2 py-1">
+          {preview?.title ? (
+            <p className="h2 line-clamp-2" title={preview.title}>
+              {preview.title}
+            </p>
+          ) : (
+            <>
+              <div className="skeleton h-3.5 w-3/4 rounded-1" />
+              <div className="skeleton h-3 w-1/2 rounded-1" />
+            </>
+          )}
+          {preview?.author && <p className="mono truncate text-[12px] text-ink-2">{preview.author}</p>}
+          {host && <span className="tag">{host}</span>}
         </div>
       </div>
       <div className="space-y-2 px-4 pb-4">
@@ -847,6 +1083,19 @@ function DetectingCard({
           ))}
         </div>
       </div>
+      {onDownloadNow && (
+        <div className="border-t border-edge p-4">
+          <button
+            className="btn-solid w-full py-3 text-[14px]"
+            onClick={onDownloadNow}
+            disabled={starting}
+          >
+            {starting ? <Loader2 size={16} className="animate-spin" /> : null}
+            {t('home.downloadNow')}
+          </button>
+          <p className="hint mt-2 text-center">{t('home.downloadNowHint')}</p>
+        </div>
+      )}
     </motion.div>
   )
 }

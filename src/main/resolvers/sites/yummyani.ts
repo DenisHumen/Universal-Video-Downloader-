@@ -1,4 +1,4 @@
-import { b64urlDecode, b64urlEncode, fetchText, pick } from '../http'
+import { b64urlDecode, b64urlEncode, fetchText, pick, unscoped } from '../http'
 import type { ResolvedUrl, SiteResolver } from '../types'
 import { NotReleasedError, releaseAtFrom } from '../upcoming'
 import { AKSOR_REFERER, aksorEpisode, aksorHash, pickAksorTier } from './aksor'
@@ -223,7 +223,8 @@ export function shortLivedCache<T>(
     get(key, load, fresh = false) {
       const hit = entries.get(key)
       if (!fresh && hit && now() - hit.at < ttl) return hit.value
-      return put(key, load())
+      // Shared with whoever asks next, so no one caller's cancel may end it.
+      return put(key, unscoped(load))
     },
     set(key, value) {
       put(key, Promise.resolve(value))

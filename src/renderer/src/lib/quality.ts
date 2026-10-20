@@ -176,3 +176,23 @@ export function outcomeResolution(outcome: SelectionOutcome | null): string | nu
   const fps = outcome.fps && outcome.fps > 30 ? Math.round(outcome.fps) : ''
   return `${heightLabel(outcome.height)}${fps}`
 }
+
+/**
+ * What the download button says it will fetch: `1080p60`, `MP4`, `~412 MB`.
+ *
+ * The button used to read "download" whatever was chosen, so the one control
+ * that commits the choice was also the one place on the card that never
+ * restated it. Three facts at most - a label, not a spec sheet - and only the
+ * ones the site actually gave: an unknown size is left out, not guessed.
+ */
+export function outcomeSummary(
+  outcome: SelectionOutcome | null,
+  bytesLabel: (bytes: number) => string
+): string[] {
+  if (!outcome) return []
+  return [
+    outcomeResolution(outcome),
+    outcome.ext?.toUpperCase(),
+    outcome.bytes ? `~${bytesLabel(outcome.bytes)}` : null
+  ].filter((part): part is string => Boolean(part))
+}

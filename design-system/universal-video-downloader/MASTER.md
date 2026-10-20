@@ -57,6 +57,7 @@ theme swap is one attribute on `<html>`. Two themes, no accent picker.
 | `--bad` | failure | `#FB7185` | `#B81C24` |
 | `--bad-fg` | label on a solid `bad` fill (the live badge) | `#09090B` | `#FFFFFF` |
 | `--control-edge` | hairline round quiet and icon buttons | none | `--line` |
+| `--skeleton` | loading placeholder plane (`.skeleton`) | `#2C2C32` | `#DEDEE4` |
 
 **Why `--accent-ink` exists:** the fill colour never clears 4.5:1 as text on its
 own canvas. Accent text uses a lighter (Night) or darker (Day) cut of the same
@@ -68,6 +69,13 @@ planes in both themes, `--accent-fg` on `--accent` and `--bad-fg` on `--bad`,
 pairings, all ≥ 4.5:1. Tightest today: Day `--bad` on `--bad/12` over `--bg` at
 4.70:1. It also holds Day's button hairline (`--line`) to 1.12:1 against each
 plane: not text, so not 4.5:1, but enough that the edge can't quietly vanish.
+And it holds the one non-text plane that has to be *seen*, `--skeleton`, to
+1.3:1 against `--surface` (flattest today: Night at 1.33:1).
+
+> **Correction.** Skeletons were `--surface-2`, 1.1:1 on a panel, and at the
+> low point of their pulse a detecting card read as empty rather than busy.
+> The first proposed values (`42 42 48` / `226 226 232`) measured 1.29:1 in
+> both themes — just under the floor — and were nudged one step.
 
 > **Correction.** White on Night's `--bad` is 2.69:1, and the live badge was
 > exactly that, at 9px. `--bad-fg` is the one label token that flips between
@@ -97,7 +105,7 @@ sizes:
 
 | Role | Size | Use |
 |---|---|---|
-| `.h1` | 24px / 600 | The one heading per screen |
+| `.h1` | 24px / 600 | The one heading per screen (Home sets it at 20px: the field, not the heading, is that screen's subject) |
 | `.h2` | 15px / 600 | A section inside a screen |
 | `.lead` | 14px, `--text-2`, max 62ch | The sentence under an `h1` |
 | `.hint` | 12px, `--text-2`, max 62ch | Explanation under a control |
@@ -124,12 +132,16 @@ Four steps, no in-between values.
 
 | Token | Value | Used for |
 |---|---|---|
-| `--r-1` | 8px | tags, icon buttons, episode toggles |
-| `--r-2` | 14px | fields, list rows, thumbnails |
-| `--r-3` | 22px | blocks, dialogs, the focal input |
+| `--r-1` | 6px | tags, icon buttons, episode toggles |
+| `--r-2` | 10px | fields, list rows, thumbnails |
+| `--r-3` | 16px | blocks, dialogs, the focal input |
 | `--r-pill` | 999px | buttons, choices, filter fields |
 
 Tailwind: `rounded-1` · `rounded-2` · `rounded-3` · `rounded-full`.
+
+> **Correction.** The ladder was 8/14/22. A thumbnail inside a field inside a
+> panel then read as three soft shapes rather than one structure, and nested
+> corners fought their parents; 6/10/16 keeps the steps distinct.
 
 ## 5. Components
 
@@ -148,16 +160,19 @@ Tailwind: `rounded-1` · `rounded-2` · `rounded-3` · `rounded-full`.
 | `.tab` / `.tab-on` | Top-bar navigation; active marked by a 2px accent rule sitting on the bar's own hairline |
 | `.tag` | Read-only fact (extractor, container, count) |
 | `.kbd` | Keyboard key |
-| `.skeleton` | Placeholder plane; pulses in place |
+| `.skeleton` | Placeholder plane in `--skeleton`; pulses in place |
 | `EmptyState` | The one "nothing here" layout: icon, heading, hint, and always a way out |
 | `TabStrip` | A tab row that scrolls with arrows, never a scrollbar. A `<nav>` with `aria-current`, not a tab list: it switches pages and has no tab panels |
 | `CaptionButtons` | Minimise, maximise/restore, close for Windows and Linux: full bar height, 46px wide, flush to the corner, close hover in the system's `#C42B1C` |
+| `RowMenu` | A row's secondary actions behind "⋯": `aria-haspopup="menu"`, focus into the menu on open and back on Esc, arrows/Home/End between items, Tab or an outside click closes. Opens upwards near the bottom of the window |
+| `DropOverlay` | Full-window 2px dashed accent frame, inset 8px, `bg-accent/6`, while a link is dragged over the window. Takes no pointer events: the drop lands on the window's own handler |
 | `Modal` | The one dialog shell: role and name on the panel, focus in on open and back on close, Tab kept inside, Esc for the top dialog only. Every dialog is built on it |
 
 React: `components/Choice.tsx` (choice row), `components/EmptyState.tsx`, and
 `Switch` inside `SettingsView` (booleans).
 
-**Minimum sizes.** Buttons 38px, icon buttons and choices 36px, fields 42px.
+**Minimum sizes.** Buttons 38px (`.btn-solid` 40px: the one loud control is
+also the easiest to hit), icon buttons and choices 36px, fields 42px.
 This sits under the 44px touch floor on purpose — the app is pointer-only
 Electron — but nothing goes below 36.
 
@@ -187,6 +202,14 @@ One curve, three durations. Defined in `src/renderer/src/lib/motion.ts`.
   `damping 32 / stiffness 340`.
 - **The app's one entrance:** fade + 6px rise.
 - **Stagger:** 30ms per item, 8px rise. A longer cascade reads as slowness.
+- **Screen swaps:** the view host fades in on a CSS keyframe, `animate-view-in`
+  — opacity only, `--t-view` 120ms, no fill mode. Never framer-motion there:
+  its values step on `requestAnimationFrame`, and a tab switch in a throttled
+  window held the new view at opacity 0, a blank window, until the frame clock
+  came back. A keyframe with no fill mode leaves the element at full opacity
+  the moment it ends or is skipped.
+- **Timers that count** (the detect card's elapsed seconds, the taskbar
+  progress) are `setInterval`, for the same reason.
 - `prefers-reduced-motion: reduce` collapses every animation and transition.
 
 > **Nothing load-bearing may depend on the frame clock.** A throttled window —
@@ -220,24 +243,59 @@ One curve, three durations. Defined in `src/renderer/src/lib/motion.ts`.
   that push content down — never floating cards.
 - **Each view owns its own scrolling**, so it can pin its header and keep a
   sticky index in sync.
-- **Measures:** 680px home · 720px settings · 860px queue · 1080px search.
+- **Measures:** 680px home (840px from 880px wide, for the two-column result
+  card) · 720px settings · 860px queue · 1080px search.
+- **Home result card:** from 880px, two columns — left 240px (16:9 poster,
+  title, uploader · duration, tags), right the choices (format, quality, exact
+  stream, cut, save location). Narrower, one column. Either way the download
+  bar is `sticky bottom-0` inside the card (`overflow-clip`, not
+  `overflow-hidden`, so the card is not a scroll container), and its label
+  states the outcome: "download · 1080p · MP4 · ~412 MB".
+- **Home while detecting:** the card is drawn in the result's shape at once —
+  a YouTube poster straight from the video id, title/uploader/poster from the
+  site's oEmbed when it answers (≤2s, five allowlisted hosts), skeletons for
+  the rest — with an elapsed counter after 3s and a "download now" button that
+  queues with the default quality without waiting for the format list
+  (⌘/Ctrl+Enter does the same). Not for collections, which need the picker.
+- **Home below the card:** on first run, the capability list. Once there is a
+  history, "active" (up to 3 compact live rows with a 2px track) and "recent"
+  (the last 5 finished, play / show in folder), then "open the queue".
 - **Search results:** a 2/3/4-column grid of frameless tiles; the gaps do the
   separating.
-- **Settings:** one scrolling document with a sticky **underline** index driven
-  by an `IntersectionObserver` — not nine mutually exclusive panes, and not
-  pills, which would look identical to the `.choice` groups it scrolls to.
+- **Settings:** one scrolling document with a sticky index rail driven by an
+  `IntersectionObserver` — not nine mutually exclusive panes, and not pills,
+  which would look identical to the `.choice` groups it scrolls to. The rail
+  opens with a search field (matches every word of the query against each
+  row's label and hint in the language on screen, folding case, accents and
+  ё; a section whose name matches shows whole; empty sections hide, via
+  `:has()` on the rows' own `hidden`), then two `.label`-headed tiers:
+  **essentials** (appearance, downloads, post-processing, watching, system)
+  and **advanced** (detection, access & cookies, network, updates, backup,
+  about). The page runs in the rail's order.
+- **Navigation tabs** go icon-only — the label becomes `aria-label` and
+  `title` — below 760px, or 960px in Russian, whose labels run ~30% longer.
+  The queue tab's badge shows the overall % while anything is downloading, the
+  count otherwise; the taskbar/dock icon mirrors the same figure.
 - **Overflowing tab rows** use `TabStrip`: the scrollbar is hidden and arrows
   appear on whichever side still has content. A 10px scrollbar inside a 48px
   bar of chrome is a band of grey noise, and it is the one affordance you
   cannot use before noticing it.
-- **When a row runs out of width, secondary actions yield first.** Measured at
-  660px, six buttons plus the progress block left a queue row's title 86px —
-  about ten characters. Link actions hide below `lg` and the percent readout
-  below `md`; pause, cancel, remove and "next" never hide, and nothing is ever
-  hidden behind hover.
-- **Queue:** one ruled list. Per-row actions are **always visible** and progress
-  is a real bar with a track — an action the user cannot see is an action they
-  do not have, and nobody reads a hairline as "62% downloaded".
+- **Queue row anatomy.** Two lines. Line 1: mono index, 64×36 poster, title.
+  Line 2, mono `text-ink-2`: status dot + label · 42% · 3.1 MB/s · 1:12 left ·
+  1080p. A 3px track runs the full width of the row along its bottom edge —
+  accent while running, `edge-strong` while paused, an indeterminate band when
+  no total is known, and absent for queued and finished rows. A failed row
+  prints its error inline in `text-bad`.
+- **Queue row actions:** the state's one primary action (pause · resume ·
+  retry · play + show in folder), then remove (cancel while still working),
+  then a `RowMenu` with the rest (copy link, open source, move up, trim,
+  convert, copy error). All always visible; nothing is hidden behind hover.
+  Eight equal icons made the row's own action one square among many and left
+  the title ten characters at 660px.
+- **Queue list:** unfiltered, it is drawn in sections — active, failed, done —
+  under `.label` headers, each in list order. The header carries the totals
+  (count, combined speed, what is left) and labelled "pause all" / "clear
+  finished" beside the icon-only rest.
 
 ## 8. Pre-delivery checklist
 

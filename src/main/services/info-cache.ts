@@ -1,0 +1,169 @@
+import { createHash, randomBytes } from 'crypto'
+import { existsSync, mkdirSync, readdirSync, rmSync, statSync, writeFileSync } from 'fs'
+import { join } from 'path'
+import type { AppSettings } from '@shared/types'
+import { normalizeUrl } from '@shared/urls'
+
+/*
+  The detect's answer, handed to the download that follows it.
+
+  Detecting a video runs the engine's whole extraction (`-J`), and pressing
+  download then ran all of it again - for YouTube about 1.3 s of extraction
+  plus another engine start before the first byte. The probe's JSON is what
+  `--load-info-json` takes in place of a URL, so a download started soon
+  after its detect skips straight to fetching.
+
+  Soon, because the stream addresses inside it are signed and expire: fifteen
+  minutes, comfortably inside YouTube's few hours and short enough that most
+  sites' tokens still hold. A run that finds them expired anyway gets one
+  ordinary retry; see `isStaleInfoError`.
+*/
+
+export const INFO_TTL_MS = 15 * 60_000
+const SUFFIX = '.info.json'
+
+/**
+ * What the cache is keyed by: the canonical link, and every setting that
+ * changes what the site shows the engine. Cookies decide which formats - or
+ * whether any - a signed-in viewer gets, and a proxy can put the request in
+ * another country. Format choices are not in it: the JSON lists every format,
+ * and the download picks from it with `-f` either way.
+ */
+export function infoKey(
+  url: string,
+  settings: Pick<AppSettings, 'cookiesFile' | 'cookiesFromBrowser' | 'proxy'>
+): string {
+  /*
+    The cookies file by what is in it, as near as a stat can say: exporting
+    fresh cookies after signing in rewrites the same path, and the old key
+    would have handed back what the signed-out visitor was shown.
+  */
+  let cookiesStamp = ''
+  if (settings.cookiesFile) {
+    try {
+      const st = statSync(settings.cookiesFile)
+      cookiesStamp = `${st.mtimeMs}:${st.size}`
+    } catch {
+      cookiesStamp = 'missing'
+    }
+  }
+  const access = createHash('sha256')
+    .update(JSON.stringify([settings.cookiesFile, cookiesStamp, settings.cookiesFromBrowser, settings.proxy]))
+    .digest('hex')
+    .slice(0, 16)
+  return `${normalizeUrl(url)}#${access}`
+}
+
+/**
+ * Whether a link's probe JSON may be reused at all: YouTube only.
+ *
+ * YouTube signs its stream addresses for hours, so fifteen minutes is safe
+ * there. Other sites sign for as little as a minute, or bind the address to
+ * the request that fetched the page, and a JSON reused past that fails in a
+ * way the stale-JSON retry can only partly hide.
+ */
+export function infoReusable(url: string): boolean {
+  try {
+    return /^(www\.|m\.)?youtube\.com$|^youtu\.be$/.test(new URL(normalizeUrl(url)).hostname)
+  } catch {
+    return false
+  }
+}
+
+/** The engine could not read the saved file: its path, or Python's JSON error, is in the message. */
+const INFO_LOAD_FAILED = /\.info\.json|load-info-json|JSONDecodeError|Expecting value/i
+/** The media itself refused with 403 or 410 - an expired signed address - not a page or an API. */
+const MEDIA_REFUSED = /(unable to download video data|Got error|fragment)[^\n]*HTTP Error 4(03|10)\b/i
+
+/**
+ * A failure that is the reused JSON's fault rather than the video's: the file
+ * would not load, or a stream address in it was refused as expired. Such a
+ * run is retried once as a normal one. Nothing broader: a 404, a geo block or
+ * a private video fails the fresh run just the same, and only costs a second
+ * attempt to rediscover.
+ */
+export function isStaleInfoError(output: string): boolean {
+  return INFO_LOAD_FAILED.test(output) || MEDIA_REFUSED.test(output)
+}
+
+interface Entry {
+  file: string
+  at: number
+}
+
+export class InfoCache {
+  private readonly entries = new Map<string, Entry>()
+
+  constructor(
+    private readonly dir: () => string,
+    private readonly ttl = INFO_TTL_MS,
+    private readonly now: () => number = Date.now
+  ) {}
+
+  /** Keep a probe's raw JSON for `key`, replacing any older one. */
+  put(key: string, json: string): void {
+    this.sweep()
+    this.drop(key)
+    try {
+      const dir = this.dir()
+      mkdirSync(dir, { recursive: true })
+      const file = join(dir, `${randomBytes(8).toString('hex')}${SUFFIX}`)
+      writeFileSync(file, json, 'utf-8')
+      this.entries.set(key, { file, at: this.now() })
+    } catch {
+      /* a cache that cannot write is just a miss */
+    }
+  }
+
+  /**
+   * The file for `key` if it is still fresh, handed over: the entry is gone
+   * from the cache, and the file is the caller's to `release` once the run
+   * that reads it is over. One use only - a retry, a resume or a second
+   * download of the same link extracts afresh.
+   */
+  take(key: string): string | null {
+    this.sweep()
+    const entry = this.entries.get(key)
+    if (!entry) return null
+    this.entries.delete(key)
+    return existsSync(entry.file) ? entry.file : null
+  }
+
+  /** Delete a file `take` handed out. */
+  release(file: string): void {
+    rmSync(file, { force: true })
+  }
+
+  /** Forget everything past its time. */
+  sweep(): void {
+    const cutoff = this.now() - this.ttl
+    for (const [key, entry] of this.entries) {
+      if (entry.at < cutoff) this.drop(key)
+    }
+  }
+
+  /** At launch: whatever a previous session left behind is stale by definition. */
+  clearDir(): void {
+    this.entries.clear()
+    let names: string[]
+    try {
+      names = readdirSync(this.dir())
+    } catch {
+      return
+    }
+    for (const name of names) {
+      if (name.endsWith(SUFFIX)) rmSync(join(this.dir(), name), { force: true })
+    }
+  }
+
+  get size(): number {
+    return this.entries.size
+  }
+
+  private drop(key: string): void {
+    const entry = this.entries.get(key)
+    if (!entry) return
+    this.entries.delete(key)
+    rmSync(entry.file, { force: true })
+  }
+}

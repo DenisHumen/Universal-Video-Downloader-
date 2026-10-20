@@ -52,5 +52,9 @@ export interface SiteResolver {
   /** Stable id, also used as the extractor label when the site doesn't set one. */
   id: string
   match: RegExp
-  resolve: (url: string) => Promise<ResolvedUrl>
+  /**
+   * `options.signal` also reaches every request the resolver makes through
+   * `../http`, however deep, because `resolveUrl` runs it under `withSignal`.
+   */
+  resolve: (url: string, options?: ResolveOptions) => Promise<ResolvedUrl>
 }

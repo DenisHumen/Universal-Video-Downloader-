@@ -71,6 +71,8 @@ export const IPC = {
   evtWindowState: 'event:window-state',
   evtSearchQuery: 'event:search-query',
   evtDetectStatus: 'event:detect-status',
+  /** Title, uploader and poster from oEmbed, ahead of the detect: DetectPreview. */
+  evtDetectPreview: 'event:detect-preview',
   evtBrowserState: 'event:browser-state',
   evtBrowserMedia: 'event:browser-media',
   /** A download the page itself started went to the queue. */

@@ -3,13 +3,17 @@ import { ytdlpBinaryPath, ytdlpSpawnOptions } from './ytdlp'
 import { getSettings } from './settings'
 import { killTree } from './process'
 import { accessArgs, classifyYtdlpError, hasCookies, headerArgs, stalledConnecting } from './options'
-import { resolveUniversal, resolveUrl, type ResolvedUrl } from '../resolvers'
+import { resolveUniversal, resolveUrl, scrapeStatic, type ResolvedUrl, type StaticScrape } from '../resolvers'
+import { withSignal } from '../resolvers/http'
 import { unreachableCode } from '../resolvers/neterror'
-import { isAbsoluteUrl, looksLikeCollection, normalizeUrl } from '@shared/urls'
+import { engineKnowsHost, isAbsoluteUrl, looksLikeCollection, normalizeUrl } from '@shared/urls'
 import { reportDetectFailure, type DetectVerdict } from './report'
+import { infoKey, infoReusable } from './info-cache'
+import { infoCache } from './info-store'
 import type { DetectTrace } from '@shared/report'
 import type {
   AppErrorCode,
+  DetectOptions,
   DetectResult,
   DetectStage,
   FormatKind,
@@ -189,7 +193,8 @@ function pickerInfo(
 export async function detect(
   input: string,
   onStage: StageReporter = () => undefined,
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  options: DetectOptions = {}
 ): Promise<DetectResult> {
   const settings = getSettings()
   /*
@@ -280,7 +285,18 @@ export async function detect(
   }
 
   onStage(wasRewritten ? 'probing' : 'engine')
+  const head = wasRewritten || options.prefetch ? null : headStartScrape(url, signal)
   const probe = await probeWithEngine(resolved, signal)
+  // The engine answered; the scrape it raced is not needed.
+  if (probe.ok && probe.info) head?.abort()
+  /*
+    Kept for the download that usually follows; see info-cache.ts. Only for a
+    link no resolver rewrote: the download re-resolves the page and compares,
+    and a rewritten one is fetched with headers this JSON knows nothing of.
+  */
+  if (probe.ok && probe.json && !wasRewritten && infoReusable(url)) {
+    infoCache.put(infoKey(url, settings), probe.json)
+  }
   if (probe.ok && probe.info) {
     const info = probe.info
     info.webpageUrl = url
@@ -295,12 +311,14 @@ export async function detect(
 
   // The engine gave up. Fall back to universal detection: scrape the page, and
   // if that isn't enough, open it in a hidden browser and watch for the stream.
-  if (!wasRewritten && !signal?.aborted) {
+  // Never for a prefetch: see DetectOptions. Home detects again if the probe alone was not enough.
+  if (!wasRewritten && !options.prefetch && !signal?.aborted && universalCanHelp(probe, { url, browserAllowed: settings.universalFallback })) {
     const tried = { browserAllowed: settings.universalFallback, stages: [] as string[] }
     trace.universal = tried
     let universal: ResolvedUrl | null = null
     try {
       universal = await resolveUniversal(url, {
+        scraped: head?.scrape,
         allowBrowser: settings.universalFallback,
         onStage: (stage) => {
           tried.stages.push(stage)
@@ -361,8 +379,106 @@ export async function detect(
     }
   }
 
+  head?.abort()
   onStage('done')
   return reportDetectFailure(probe, url, trace)
+}
+
+/**
+ * A page scrape started alongside the engine probe, for a host the engine has
+ * no extractor of its own for.
+ *
+ * There the probe is the generic extractor, and when it fails - most of the
+ * time, on the sites that get this far - the universal pass started only
+ * afterwards and fetched the page from scratch: two slow steps one after the
+ * other where nothing made the second wait for the first. The scrape is a
+ * single page fetch (and up to three player iframes), so starting it early
+ * costs little; whichever side is not needed is aborted, with its own
+ * controller so the detect's signal is left alone.
+ */
+function headStartScrape(
+  url: string,
+  signal: AbortSignal | undefined
+): { scrape: Promise<StaticScrape>; abort: () => void } | null {
+  if (signal?.aborted || !/^https?:\/\//i.test(url) || engineKnowsHost(url)) return null
+  const controller = new AbortController()
+  const forward = (): void => controller.abort()
+  signal?.addEventListener('abort', forward, { once: true })
+  const scrape = withSignal(controller.signal, () => scrapeStatic(url))
+  // Settled either way, so the listener goes and a rejection nobody awaits is not unhandled.
+  scrape.then(
+    () => signal?.removeEventListener('abort', forward),
+    () => signal?.removeEventListener('abort', forward)
+  )
+  return { scrape, abort: () => controller.abort() }
+}
+
+/**
+ * Failures that are the site's answer about this video, not the engine's
+ * inability to read the page. Scraping the page again can't sign the user in,
+ * move them to another country or make a premiere start any sooner.
+ */
+const DEFINITIVE: ReadonlySet<AppErrorCode> = new Set<AppErrorCode>([
+  'unavailable',
+  'ageRestricted',
+  'rateLimited',
+  'signIn',
+  'geo',
+  'drm',
+  'upcoming',
+  'adultHidden'
+])
+
+/** Whether the failure is YouTube's, by the engine's extractor name or by the link's host. */
+function isYoutube(probe: { output?: string; error?: string }, url?: string): boolean {
+  if (/ERROR: \[youtube[\w:]*\]/i.test(probe.output ?? probe.error ?? '')) return true
+  try {
+    return url ? /(^|\.)(youtube\.com|youtu\.be|youtube-nocookie\.com)$/i.test(new URL(url).hostname) : false
+  } catch {
+    return false
+  }
+}
+
+/** An engine error that comes from a named site extractor, and says why. */
+const NAMED_EXTRACTOR = /ERROR: \[([\w:.-]+)\]/
+/** …unless the why is that the extractor itself no longer understands the page. */
+const EXTRACTOR_BROKE = /Unable to extract|Unsupported URL|Failed to parse|No video formats found/i
+
+/**
+ * Whether the universal pass - a page scrape, then a hidden browser - is worth
+ * running after the engine's probe failed.
+ *
+ * It ran after every failure, so a private or region-locked YouTube video
+ * spent another 15-45 s scraping a page that had already said no, and then
+ * reported the scrape's vaguer result. It stays for what it is for: a link
+ * the engine has no extractor for (`Unsupported URL`, `[generic]`), and an
+ * extractor broken by a site redesign, where the stream is still on the page.
+ */
+export function universalCanHelp(
+  probe: { errorCode?: AppErrorCode; output?: string; error?: string },
+  context: { url?: string; browserAllowed?: boolean } = {}
+): boolean {
+  /*
+    Behind a login or an age gate the hidden browser is a different visitor
+    from the engine: it carries the in-app browser's session, so a site the
+    user has signed in to there shows it the video the engine was refused.
+    Not YouTube, whose gate the browser meets just the same, and only while
+    the browser pass is allowed to run at all.
+  */
+  if (
+    (probe.errorCode === 'signIn' || probe.errorCode === 'ageRestricted') &&
+    context.browserAllowed &&
+    !isYoutube(probe, context.url)
+  ) {
+    return true
+  }
+  if (probe.errorCode && DEFINITIVE.has(probe.errorCode)) return false
+  // Unreachable is checked by the pass itself, which can name the host it couldn't reach.
+  if (probe.errorCode === 'network' || probe.errorCode === 'timeout') return true
+  const said = probe.output ?? probe.error ?? ''
+  const named = NAMED_EXTRACTOR.exec(said)?.[1]
+  if (named && named.toLowerCase() !== 'generic' && !EXTRACTOR_BROKE.test(said)) return false
+  return true
 }
 
 /** A minimal MediaInfo for a stream we found but the engine couldn't describe. */
@@ -392,7 +508,8 @@ function syntheticInfo(pageUrl: string, resolved: ResolvedUrl): MediaInfo {
 }
 
 type JsonProbe =
-  | { ok: true; raw: RawInfo }
+  /** `text` is the engine's JSON as printed, for `--load-info-json`. */
+  | { ok: true; raw: RawInfo; text: string }
   /** `output` is what the engine printed, kept for the error report. */
   | { ok: false; error: string; errorCode?: AppErrorCode; cookieHint?: boolean; output?: string }
 
@@ -458,7 +575,7 @@ function spawnJson(args: string[], signal: AbortSignal | undefined, timeoutMs: n
         return
       }
       try {
-        done({ ok: true, raw: JSON.parse(stdout) as RawInfo })
+        done({ ok: true, raw: JSON.parse(stdout) as RawInfo, text: stdout })
       } catch (err) {
         done({ ok: false, error: err instanceof Error ? err.message : 'Failed to parse media info.' })
       }
@@ -474,7 +591,7 @@ function spawnJson(args: string[], signal: AbortSignal | undefined, timeoutMs: n
  * "URL" was `--config-locations=…` reached the engine as an option.
  */
 export function playlistEntries(raw: RawInfo[]): PlaylistEntry[] {
-  return raw.flatMap((e) => {
+  return flattenEntries(raw).flatMap((e) => {
     const url = e.webpage_url || e.url
     if (!url || !isAbsoluteUrl(url)) return []
     return [
@@ -493,6 +610,23 @@ export function playlistEntries(raw: RawInfo[]): PlaylistEntry[] {
       }
     ]
   })
+}
+
+/**
+ * A listing's entries with nested playlists opened up in place.
+ *
+ * A channel's front page lists as a playlist of its tabs - Videos, Shorts,
+ * Live - each a playlist of its own. Read flat, the listing had two or three
+ * "entries" and no videos in it, so the picker was skipped and the full probe
+ * went on to extract the whole channel. Bounded, because the nesting is the
+ * site's data too.
+ */
+export function flattenEntries(raw: RawInfo[], depth = 0): RawInfo[] {
+  return raw.flatMap((e) =>
+    e._type === 'playlist' && Array.isArray(e.entries) && depth < 3
+      ? flattenEntries(e.entries, depth + 1)
+      : [e]
+  )
 }
 
 /*
@@ -526,7 +660,8 @@ async function probeCollection(url: string, signal?: AbortSignal): Promise<Media
   const result = await spawnJson(args, signal, 120_000)
   if (!result.ok) return null
   const raw = result.raw
-  if (raw._type !== 'playlist' || !raw.entries || raw.entries.length < 2) return null
+  // The count is checked after flattening: a channel with one tab is one entry deep.
+  if (raw._type !== 'playlist' || !raw.entries) return null
 
   const entries = playlistEntries(raw.entries)
   if (entries.length < 2) return null
@@ -546,7 +681,10 @@ async function probeCollection(url: string, signal?: AbortSignal): Promise<Media
   }
 }
 
-async function probeWithEngine(resolved: ResolvedUrl, signal?: AbortSignal): Promise<DetectVerdict> {
+async function probeWithEngine(
+  resolved: ResolvedUrl,
+  signal?: AbortSignal
+): Promise<DetectVerdict & { json?: string }> {
   const settings = getSettings()
   const args = [
     '-J',
@@ -613,5 +751,11 @@ async function probeWithEngine(resolved: ResolvedUrl, signal?: AbortSignal): Pro
     isPlaylist,
     playlistCount: isPlaylist ? raw.playlist_count || raw.entries?.length : undefined
   }
-  return { ok: true, info }
+  /*
+    One video, not live: the only answer a download can be started from as it
+    stands. A playlist's JSON describes its first entry, and a live stream's
+    manifest is a moving target.
+  */
+  const reusable = !isPlaylist && !primary.is_live
+  return { ok: true, info, json: reusable ? result.text : undefined }
 }

@@ -16,6 +16,7 @@ import { useStore } from '../store'
 import { formatBytes, formatEta, formatSpeed } from '../lib/format'
 import { useT, useTp, type TranslationKey } from '../i18n'
 import QueueRow from '../components/QueueRow'
+import { groupQueue, queueGroupOf, type QueueGroup } from '../lib/downloads'
 import Choice from '../components/Choice'
 import EmptyState from '../components/EmptyState'
 import ConfirmDialog from '../components/ConfirmDialog'
@@ -28,6 +29,12 @@ const FILTERS: { value: Filter; label: TranslationKey }[] = [
   { value: 'done', label: 'queue.filterDone' },
   { value: 'failed', label: 'queue.filterFailed' }
 ]
+
+const GROUP_LABEL: Record<QueueGroup, TranslationKey> = {
+  active: 'queue.filterActive',
+  failed: 'queue.filterFailed',
+  done: 'queue.filterDone'
+}
 
 const ACTIVE_STATES: DownloadItem['state'][] = [
   'queued',
@@ -103,9 +110,11 @@ export default function DownloadsView(): JSX.Element {
 
   const visible = useMemo(() => {
     const needle = query.trim().toLowerCase()
-    return downloads.filter(
+    const found = downloads.filter(
       (d) => matches(d, filter) && (!needle || d.title.toLowerCase().includes(needle))
     )
+    // Sections only for the unfiltered list; a filter is a section already.
+    return filter === 'all' ? groupQueue(found) : found
   }, [downloads, filter, query])
 
   const hasMore = visible.length > limit
@@ -170,7 +179,7 @@ export default function DownloadsView(): JSX.Element {
           <h1 className="h1">{t('queue.title')}</h1>
           <p className="mono mt-1.5 truncate text-[12px] text-ink-2">{summary.join('  ·  ')}</p>
         </div>
-        <div className="flex shrink-0 items-center gap-0.5">
+        <div className="flex shrink-0 items-center gap-1">
           {settings?.downloadDir && (
             <button
               className="btn-icon"
@@ -180,9 +189,14 @@ export default function DownloadsView(): JSX.Element {
               <FolderOpen size={16} />
             </button>
           )}
+          {/* The two bulk actions people reach for most say what they do. */}
           {hasRunning && (
-            <button className="btn-icon" title={t('queue.pauseAll')} aria-label={t('queue.pauseAll')} onClick={() => window.api.pauseAll()}>
-              <Pause size={16} />
+            <button
+              className="btn-quiet px-3 py-1.5"
+              title={t('queue.pauseAll')}
+              onClick={() => window.api.pauseAll()}
+            >
+              <Pause size={14} /> <span className="hidden sm:inline">{t('queue.pauseAll')}</span>
             </button>
           )}
           {hasPaused && (
@@ -200,8 +214,12 @@ export default function DownloadsView(): JSX.Element {
             </button>
           )}
           {hasFinished && (
-            <button className="btn-icon" title={t('queue.clearFinished')} aria-label={t('queue.clearFinished')} onClick={clearFinished}>
-              <Trash2 size={16} />
+            <button
+              className="btn-quiet px-3 py-1.5"
+              title={t('queue.clearFinished')}
+              onClick={clearFinished}
+            >
+              <Trash2 size={14} /> <span className="hidden sm:inline">{t('queue.clearFinished')}</span>
             </button>
           )}
           {hasErrors && (
@@ -282,14 +300,19 @@ export default function DownloadsView(): JSX.Element {
               120 ms fade on the row being removed; a removed row now simply
               goes, and the rows below still slide up into its place.
             */}
-            {visible.slice(0, limit).map((item, i) => (
-              <QueueRow
-                key={item.id}
-                item={item}
-                index={i}
-                animateIn={!presentAtOpen.has(item.id)}
-              />
-            ))}
+            {visible.slice(0, limit).map((item, i, shown) => {
+              const group = queueGroupOf(item.state)
+              const heads = filter === 'all' && (i === 0 || queueGroupOf(shown[i - 1].state) !== group)
+              return (
+                <QueueRow
+                  key={item.id}
+                  item={item}
+                  index={i}
+                  animateIn={!presentAtOpen.has(item.id)}
+                  heading={heads ? t(GROUP_LABEL[group]) : undefined}
+                />
+              )
+            })}
             {hasMore && <li ref={sentinelRef} aria-hidden className="h-px" />}
           </ul>
         )}

@@ -11,6 +11,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
   made with no network counted as the day's refresh.
 */
 
+/** SHA-256 of `fresh!\n`, the body the pretend GitHub serves. */
+const FRESH_SUM = 'e812e784bc0c8a6990a960e2e507369f4f048e382197696585f071197a2d10a5'
+
 const h = vi.hoisted(() => ({
   dir: '',
   online: true,
@@ -31,9 +34,19 @@ vi.mock('electron', () => ({
   app: { getPath: () => h.dir },
   net: {
     isOnline: () => h.online,
-    request: () => {
+    request: ({ url }: { url: string }) => {
       const req = Object.assign(new EventEmitter(), { end: vi.fn() })
       req.end.mockImplementation(() => {
+        // The checksum list answers at once, and lists the one body this GitHub serves.
+        if (url.endsWith('/SHA2-256SUMS')) {
+          const sums = Object.assign(new EventEmitter(), { statusCode: 200, headers: {} })
+          queueMicrotask(() => {
+            req.emit('response', sums)
+            sums.emit('data', Buffer.from(`${FRESH_SUM}  yt-dlp_linux\n`))
+            sums.emit('end')
+          })
+          return
+        }
         h.requests++
         const res = Object.assign(new EventEmitter(), {
           statusCode: h.download,
@@ -76,6 +89,14 @@ vi.mock('child_process', async (importOriginal) => {
     })
   }
 })
+/*
+  The single-file engine only: these tests are about the refresh's ordering,
+  and the onedir install has tests of its own (ytdlp-onedir.test.ts).
+*/
+vi.mock('./engine-dist', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('./engine-dist')>()),
+  engineAssets: () => ({ onefile: 'yt-dlp_linux' })
+}))
 vi.mock('./log', () => ({ log: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() } }))
 vi.mock('./settings', () => ({ getSettings: () => ({}) }))
 vi.mock('./proxy-auth', () => ({ proxyUrl: () => '', withProxyAuth: <T>(req: T) => req }))

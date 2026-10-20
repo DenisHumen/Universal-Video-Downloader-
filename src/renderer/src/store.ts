@@ -1,18 +1,43 @@
 import { create } from 'zustand'
 import type {
   AppSettings,
+  DetectPreview,
+  DetectResult,
   DetectStatus,
   DownloadItem,
   DownloadProgress,
   UpdateStatus,
   YtDlpStatus
 } from '@shared/types'
-import { normalizeUrl } from '@shared/urls'
+import { engineKnowsHost, normalizeUrl } from '@shared/urls'
 import { watchFailing } from '@shared/automation'
 import type { ImportOutcome } from '@shared/backup'
 import type { AppInfo } from '../../preload/index'
 import { applyDownloadsChanged } from './lib/downloads'
+import { accessChanged, DetectCache, InflightDetects } from './lib/detectCache'
+import { isProbablyUrl } from './lib/format'
 import { applyAppearance } from './lib/theme'
+
+/** Recent successful detects; see lib/detectCache.ts. Not state: nothing renders from it. */
+export const detectCache = new DetectCache()
+
+/** Adopt new settings' effect on remembered detects: cookies or a proxy can change the answer. */
+function forgetDetectsIfAccessChanged(prev: AppSettings | null, next: AppSettings): void {
+  if (prev && accessChanged(prev, next)) detectCache.clear()
+}
+/** Speculative detects Home can adopt rather than start again. */
+export const inflightDetects = new InflightDetects()
+
+/** The last oEmbed preview of each recent detect, by request id; see onDetectPreview. */
+const previews = new Map<string, DetectPreview>()
+
+function rememberPreview(p: DetectPreview): void {
+  if (!p.requestId) return
+  previews.delete(p.requestId)
+  previews.set(p.requestId, p)
+  // A handful: only a run still waiting to be adopted ever reads one back.
+  while (previews.size > 8) previews.delete(previews.keys().next().value as string)
+}
 
 export type ViewId = 'home' | 'search' | 'downloads' | 'automation' | 'settings'
 
@@ -65,6 +90,8 @@ interface AppState {
   watchAlerts: number
   /** Live progress of the detector, so the UI can narrate the slow parts. */
   detect: DetectStatus | null
+  /** The site's own title and poster for the link being detected, when it has one. */
+  detectPreview: DetectPreview | null
   shortcutsOpen: boolean
 
   init: () => Promise<void>
@@ -77,6 +104,14 @@ interface AppState {
   dismissUpdate: () => void
   dismissClipboardLink: () => void
   setShortcutsOpen: (open: boolean) => void
+  /** Home started detecting this link: its stage starts over, from resolving. */
+  beginDetect: (url: string, requestId: string) => void
+  /** Home stopped waiting - a result, an error, a cancel, or it went away. */
+  endDetect: () => void
+  /** Start detecting a link nobody has asked for yet, silently, so it is ready if they do. */
+  prefetchDetect: (url: string) => void
+  /** The link was turned down: stop the engine working on it. */
+  cancelPrefetch: (url: string) => void
   /** Go to Home and detect this link. */
   requestDetect: (url: string) => void
   /** Go to Search and run this query. */
@@ -155,7 +190,31 @@ async function runInit(set: SetState, get: GetState): Promise<void> {
         s.state === 'available' && prev.version !== s.version ? false : get().updateDismissed
     })
   })
-  window.api.onDetectStatus((s) => set({ detect: s.stage === 'done' ? null : s }))
+  /*
+    Only for the detect Home is waiting on. The stage used to be cleared on
+    'done' alone, which most failure exits and every cancel never send - so
+    the next link opened on the last one's "opening in the browser", and a
+    cancelled detect still working its way out kept narrating over the new.
+  */
+  window.api.onDetectStatus((s) => {
+    /*
+      By request id alone. The url was compared too, but the field holds what
+      was typed while an adopted prefetch was asked for in the clipboard's
+      spelling of the same link, so its stages never matched. Ids are unique
+      per run; an event without one belongs to no detect on screen.
+    */
+    const current = get().detect
+    if (!current?.requestId || current.requestId !== s.requestId) return
+    set({ detect: s.stage === 'done' ? null : { ...s, url: current.url } })
+  })
+  window.api.onDetectPreview((p) => {
+    // Kept even when nobody is showing it yet: a prefetch's preview arrives
+    // before Home adopts the run, and would otherwise be lost to skeletons.
+    rememberPreview(p)
+    const current = get().detect
+    if (!current?.requestId || current.requestId !== p.requestId) return
+    set({ detectPreview: p })
+  })
   window.api.onClipboardLink((url) => {
     /*
       Ignore a link that's already in the queue — nothing new to offer.
@@ -223,6 +282,7 @@ export const useStore = create<AppState>((set, get) => ({
   pendingWatch: null,
   watchAlerts: 0,
   detect: null,
+  detectPreview: null,
   shortcutsOpen: false,
 
   init: () => {
@@ -234,12 +294,14 @@ export const useStore = create<AppState>((set, get) => ({
 
   saveSettings: async (partial) => {
     const next = await window.api.setSettings(partial)
+    forgetDetectsIfAccessChanged(get().settings, next)
     applyAppearance(next, get().appInfo?.locale ?? 'en')
     set({ settings: next })
   },
 
   resetSettings: async () => {
     const next = await window.api.resetSettings()
+    forgetDetectsIfAccessChanged(get().settings, next)
     applyAppearance(next, get().appInfo?.locale ?? 'en')
     set({ settings: next })
   },
@@ -252,6 +314,7 @@ export const useStore = create<AppState>((set, get) => ({
   importBackup: async () => {
     const outcome = await window.api.importBackup()
     if (outcome.ok) {
+      forgetDetectsIfAccessChanged(get().settings, outcome.settings)
       applyAppearance(outcome.settings, get().appInfo?.locale ?? 'en')
       set({ settings: outcome.settings })
     }
@@ -266,6 +329,36 @@ export const useStore = create<AppState>((set, get) => ({
   dismissUpdate: () => set({ updateDismissed: true }),
   dismissClipboardLink: () => set({ clipboardLink: null }),
   setShortcutsOpen: (open) => set({ shortcutsOpen: open }),
+  beginDetect: (url, requestId) =>
+    set({ detect: { stage: 'resolving', url, requestId }, detectPreview: previews.get(requestId) ?? null }),
+  endDetect: () => {
+    if (get().detect || get().detectPreview) set({ detect: null, detectPreview: null })
+  },
+  /*
+    The clipboard strip is a strong hint the link is about to be wanted, and
+    it sits on screen for as long as the user takes to read it. Detecting in
+    that time means "use it" opens on a finished card. The engine run is the
+    same one Home would have started; nothing is downloaded, and the stage
+    and preview events it sends are ignored, because no detect on screen
+    carries its request id until Home adopts it.
+  */
+  prefetchDetect: (url) => {
+    // Hosts the engine reads by name only: anywhere else a detect may scrape or browse the page.
+    if (!isProbablyUrl(url) || !engineKnowsHost(url) || detectCache.get(url) || inflightDetects.has(url)) return
+    const requestId = `pre-${Date.now()}-${Math.random().toString(36).slice(2)}`
+    const promise = window.api
+      .detect(url, requestId, { prefetch: true })
+      .catch((err: unknown): DetectResult => ({ ok: false, error: String(err) }))
+      .then((res) => {
+        detectCache.set(url, res)
+        return res
+      })
+    inflightDetects.add(url, { requestId, promise })
+  },
+  cancelPrefetch: (url) => {
+    const pending = inflightDetects.take(url)
+    if (pending) void window.api.cancelDetect(pending.requestId)
+  },
 
   requestDetect: (url) => set({ pendingUrl: url, view: 'home' }),
   requestSearch: (query) => set({ pendingQuery: query, view: 'search' }),

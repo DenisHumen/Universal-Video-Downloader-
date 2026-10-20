@@ -107,6 +107,18 @@ export function normalizeUrl(input: string): string {
       path = '/watch'
       params.set('v', short[2])
     }
+    /*
+      A channel's front page is a shelf of tabs, not a list of videos. The
+      engine's flat listing of it came back as nested tab playlists, the
+      collection probe found nothing it could pick from, and the full probe
+      then extracted the whole channel - 75 s and more before the universal
+      fallback took over. Its Videos tab is what a person pasting a channel
+      means, and the engine lists that in a couple of seconds.
+    */
+    const channel = path.match(
+      /^\/(@[\w.%-]+|channel\/UC[\w-]+|c\/[\w.%-]+|user\/[\w.%-]+)\/?(?:featured\/?)?$/
+    )
+    if (channel && !/^music\./.test(host)) path = `/${channel[1]}/videos`
     // `t=90` is "start playing here", never part of the file we fetch.
     params.delete('t')
     params.delete('start_radio')
@@ -204,6 +216,26 @@ export function normalizeUrl(input: string): string {
 }
 
 /**
+ * The video id of a YouTube watch, share or shorts link, or null.
+ *
+ * Enough to draw the video's poster - `i.ytimg.com/vi/<id>/…` is public and
+ * needs no request of ours - the moment the link is pasted, while the engine
+ * spends its several seconds on the rest. Channels, playlists and YouTube
+ * Music are not one video and have no such poster.
+ */
+export function youtubeIdOf(input: string): string | null {
+  let url: URL
+  try {
+    url = new URL(normalizeUrl(input))
+  } catch {
+    return null
+  }
+  if (url.hostname !== 'www.youtube.com' || url.pathname !== '/watch') return null
+  const id = url.searchParams.get('v')
+  return id && /^[\w-]{11}$/.test(id) ? id : null
+}
+
+/**
  * Whether a string is a `scheme://` address, and so safe to hand the engine as
  * the thing to download.
  *
@@ -254,6 +286,29 @@ export function looksLikeCollection(url: string): boolean {
   return /[?&]list=|\/playlists?(?:[/?#]|$)|\/channel\/|\/@[\w.-]+\/?$|\/user\/[\w.-]+\/?$|\/(c|channels)\/[\w.-]+\/?$|\/sets\/|\/album\/|\/videos\/?$|\/streams\/?$/i.test(
     normalized
   )
+}
+
+/*
+  Hosts the engine has a dedicated extractor for and that people paste every
+  day. Not the engine's whole list - that is well over a thousand sites and
+  changes with every release - only the ones where fetching the page for a
+  scrape in parallel with the probe would be wasted traffic: the extractor
+  answers, and when it doesn't, the page has nothing a scrape could find.
+*/
+const ENGINE_HOSTS =
+  /(^|\.)(youtube\.com|youtu\.be|youtube-nocookie\.com|vimeo\.com|tiktok\.com|instagram\.com|facebook\.com|fb\.watch|twitter\.com|x\.com|reddit\.com|redd\.it|twitch\.tv|dailymotion\.com|dai\.ly|soundcloud\.com|bandcamp\.com|vk\.com|vk\.ru|vkvideo\.ru|ok\.ru|rutube\.ru|bilibili\.com|nicovideo\.jp|t\.me|kick\.com|rumble\.com|streamable\.com|imgur\.com|pinterest\.com|tumblr\.com|coub\.com|mixcloud\.com|archive\.org|ted\.com|bbc\.co\.uk|9gag\.com|threads\.net|bsky\.app)$/i
+
+/**
+ * Whether the link is on a host the engine is known to handle by name.
+ * Anything else is read by its generic extractor, which can take as long to
+ * give up as it takes the page scrape to find the video.
+ */
+export function engineKnowsHost(url: string): boolean {
+  try {
+    return ENGINE_HOSTS.test(new URL(normalizeUrl(url)).hostname)
+  } catch {
+    return false
+  }
 }
 
 /**

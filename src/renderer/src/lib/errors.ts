@@ -42,7 +42,8 @@ const KEYS: Record<AppErrorCode, TranslationKey> = {
   unsupportedPlayer: 'err.unsupportedPlayer',
   notOnYummyAnime: 'err.notOnYummyAnime',
   engineMissing: 'err.engineMissing',
-  adultHidden: 'err.adultHidden'
+  adultHidden: 'err.adultHidden',
+  needsPicker: 'err.needsPicker'
 }
 
 export interface FailureLike {

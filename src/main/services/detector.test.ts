@@ -1,7 +1,7 @@
 import { EventEmitter } from 'events'
 import { PassThrough } from 'stream'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { detect, playlistEntries } from './detector'
+import { detect, flattenEntries, playlistEntries, universalCanHelp } from './detector'
 import { describeNetError } from '../resolvers/neterror'
 
 /*
@@ -29,6 +29,8 @@ vi.mock('./ytdlp', () => ({
   ytdlpBinaryPath: () => 'yt-dlp',
   ytdlpSpawnOptions: () => ({ windowsHide: true, env: {} })
 }))
+const putInfo = vi.hoisted(() => vi.fn())
+vi.mock('./info-store', () => ({ infoCache: { put: putInfo } }))
 const resolveUrl = vi.hoisted(() => vi.fn())
 const resolveUniversal = vi.hoisted(() => vi.fn())
 vi.mock('../resolvers', async (importOriginal) => {
@@ -119,9 +121,11 @@ describe('detect, when the host cannot be reached', () => {
     spawn.mockImplementationOnce(() =>
       engine('ERROR: [youtube] abc: The uploader has not made this video available in your country\n')
     )
-    resolveUniversal.mockRejectedValueOnce(describeNetError(new Error('net::ERR_CONNECTION_TIMED_OUT'), PAGE))
+    resolveUniversal.mockClear()
 
     expect(await detect(PAGE)).toMatchObject({ ok: false, errorCode: 'geo' })
+    // …and stands without a page scrape: no other route around a region lock.
+    expect(resolveUniversal).not.toHaveBeenCalled()
   })
 
   it('says the engine could not connect when it is cut off mid-attempt', async () => {
@@ -167,5 +171,146 @@ describe('playlistEntries', () => {
     expect(entries).toEqual([
       { url: 'https://site.test/watch/1', title: 'Untitled', thumbnail: 'https://i.test/big.jpg' }
     ])
+  })
+})
+
+describe('detect, on a host the engine has no extractor for', () => {
+  it('has the page scrape running before the probe gives up', async () => {
+    spawn.mockImplementationOnce(() => engine('ERROR: Unsupported URL: https://unknown-site.test/v/1\n'))
+    resolveUniversal.mockClear()
+    resolveUniversal.mockResolvedValueOnce(null)
+
+    await detect('https://unknown-site.test/v/1')
+    const options = resolveUniversal.mock.calls.at(-1)?.[1] as { scraped?: Promise<unknown> }
+    expect(options.scraped).toBeInstanceOf(Promise)
+    await options.scraped?.catch(() => undefined)
+  })
+
+  it('neither scrapes nor browses for a prefetch', async () => {
+    spawn.mockImplementationOnce(() => engine('ERROR: Unsupported URL: https://unknown-site.test/v/2\n'))
+    resolveUniversal.mockClear()
+
+    const result = await detect('https://unknown-site.test/v/2', undefined, undefined, { prefetch: true })
+    expect(result.ok).toBe(false)
+    expect(resolveUniversal).not.toHaveBeenCalled()
+  })
+
+  it('leaves the page alone on a host the engine knows by name', async () => {
+    spawn.mockImplementationOnce(() => engine('ERROR: [dailymotion] x1: Unable to extract info\n'))
+    resolveUniversal.mockClear()
+    resolveUniversal.mockResolvedValueOnce(null)
+
+    await detect('https://www.dailymotion.com/video/x1')
+    expect(resolveUniversal).toHaveBeenCalledTimes(1)
+    const options = resolveUniversal.mock.calls.at(-1)?.[1] as { scraped?: Promise<unknown> }
+    expect(options.scraped).toBeUndefined()
+  })
+})
+
+describe('detect, keeping the answer for the download', () => {
+  /** An engine run that prints `json` and exits 0. */
+  function answering(json: object): EventEmitter {
+    const child = Object.assign(new EventEmitter(), { stdout: new PassThrough(), stderr: new PassThrough() })
+    child.stdout.write(JSON.stringify(json))
+    setImmediate(() => child.emit('close', 0))
+    return child
+  }
+  const format = { format_id: '18', ext: 'mp4', vcodec: 'avc1', acodec: 'mp4a', height: 360 }
+
+  it("keeps a single video's JSON, keyed by its link", async () => {
+    putInfo.mockClear()
+    spawn.mockImplementationOnce(() => answering({ id: 'v', title: 'One', formats: [format] }))
+    const result = await detect('https://youtu.be/dQw4w9WgXcQ')
+    expect(result.ok).toBe(true)
+    expect(putInfo).toHaveBeenCalledTimes(1)
+    expect(putInfo.mock.calls[0][0]).toMatch(/^https:\/\/www\.youtube\.com\/watch\?v=dQw4w9WgXcQ#/)
+    expect(JSON.parse(putInfo.mock.calls[0][1])).toMatchObject({ id: 'v' })
+  })
+
+  it('keeps nothing for a site whose signed addresses may not last fifteen minutes', async () => {
+    putInfo.mockClear()
+    spawn.mockImplementationOnce(() => answering({ id: 'v', title: 'One', formats: [format] }))
+    expect((await detect('https://unknown-site.test/watch/keep')).ok).toBe(true)
+    expect(putInfo).not.toHaveBeenCalled()
+  })
+
+  it('keeps nothing for a live stream or a playlist', async () => {
+    putInfo.mockClear()
+    spawn.mockImplementationOnce(() => answering({ id: 'l', is_live: true, formats: [format] }))
+    await detect('https://www.youtube.com/watch?v=liveliveliv')
+    spawn.mockImplementationOnce(() =>
+      answering({ _type: 'playlist', id: 'p', entries: [{ id: 'a', formats: [format] }] })
+    )
+    await detect('https://www.youtube.com/watch?v=listlistlis')
+    expect(putInfo).not.toHaveBeenCalled()
+  })
+})
+
+describe('universalCanHelp', () => {
+  it('lets the signed-in browser try a login or age gate, except on YouTube', () => {
+    const insta = { url: 'https://www.instagram.com/p/x', browserAllowed: true }
+    for (const errorCode of ['signIn', 'ageRestricted'] as const) {
+      expect(universalCanHelp({ errorCode, output: 'ERROR: [Instagram] x: login required' }, insta)).toBe(true)
+      expect(universalCanHelp({ errorCode }, { ...insta, browserAllowed: false })).toBe(false)
+      expect(
+        universalCanHelp({ errorCode, output: 'ERROR: [youtube] x: Sign in to confirm your age' }, insta)
+      ).toBe(false)
+      expect(
+        universalCanHelp({ errorCode }, { url: 'https://www.youtube.com/watch?v=x', browserAllowed: true })
+      ).toBe(false)
+    }
+  })
+
+  it('skips the page scrape when the site already said no', () => {
+    for (const errorCode of ['signIn', 'geo', 'drm', 'ageRestricted', 'upcoming', 'rateLimited', 'unavailable'] as const) {
+      expect(universalCanHelp({ errorCode }), errorCode).toBe(false)
+    }
+  })
+
+  it('skips it when a named extractor explains the failure', () => {
+    expect(
+      universalCanHelp({ output: 'ERROR: [youtube] abc: Private video. Sign in if you have access' })
+    ).toBe(false)
+    expect(universalCanHelp({ output: 'ERROR: [youtube:tab] @x: This channel does not exist.' })).toBe(false)
+  })
+
+  it('keeps it for unknown pages and broken extractors', () => {
+    expect(universalCanHelp({ output: 'ERROR: Unsupported URL: https://site.test/x' })).toBe(true)
+    expect(universalCanHelp({ output: 'ERROR: [generic] Unable to find video in page' })).toBe(true)
+    expect(universalCanHelp({ output: 'ERROR: [SomeSite] 42: Unable to extract video url' })).toBe(true)
+    expect(universalCanHelp({ errorCode: 'noFormats' })).toBe(true)
+    expect(universalCanHelp({ errorCode: 'network', output: 'ERROR: [youtube] x: timed out' })).toBe(true)
+    expect(universalCanHelp({})).toBe(true)
+  })
+})
+
+describe('flattenEntries', () => {
+  it("opens a channel's tab playlists into their videos", () => {
+    const entries = playlistEntries([
+      {
+        _type: 'playlist',
+        title: 'Channel - Videos',
+        webpage_url: 'https://www.youtube.com/@c/videos',
+        entries: [
+          { url: 'https://www.youtube.com/watch?v=a1', title: 'one', ie_key: 'Youtube' },
+          { url: 'https://www.youtube.com/watch?v=a2', title: 'two', ie_key: 'Youtube' }
+        ]
+      },
+      {
+        _type: 'playlist',
+        title: 'Channel - Shorts',
+        entries: [{ url: 'https://www.youtube.com/shorts/s1', title: 'short' }]
+      }
+    ])
+    expect(entries.map((e) => e.title)).toEqual(['one', 'two', 'short'])
+  })
+
+  it('stops at a bounded depth', () => {
+    type Nested = Parameters<typeof flattenEntries>[0][number]
+    let node: Nested = { url: 'https://site.test/v', title: 'deep' }
+    for (let i = 0; i < 10; i++) node = { _type: 'playlist', entries: [node] }
+    const flat = flattenEntries([node])
+    expect(flat).toHaveLength(1)
+    expect(flat[0]._type).toBe('playlist')
   })
 })

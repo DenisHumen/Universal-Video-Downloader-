@@ -11,6 +11,7 @@ import {
 import { IPC } from '@shared/ipc'
 import type {
   AppSettings,
+  DetectOptions,
   DetectResult,
   DetectStage,
   DownloadItem,
@@ -20,6 +21,7 @@ import type {
   SearchScope
 } from '@shared/types'
 import { detect } from './services/detector'
+import { fetchOembed } from './services/oembed'
 import { searchVideos } from './services/search'
 import { probeMedia } from './services/ffmpeg'
 import { fetchThumbnail } from './services/thumbnails'
@@ -107,7 +109,7 @@ export function registerIpc({ getWindow, openSearchWindow, onSettingsChanged }: 
   }
 
   // ---- Media detection & search ----
-  ipcMain.handle(IPC.detect, async (event, url: string, requestId?: string): Promise<DetectResult> => {
+  ipcMain.handle(IPC.detect, async (event, url: string, requestId?: string, options?: DetectOptions): Promise<DetectResult> => {
     /*
       Registered before the engine check, not after it. On first launch that
       check downloads the engine, and a cancel pressed meanwhile looked up an id
@@ -118,17 +120,30 @@ export function registerIpc({ getWindow, openSearchWindow, onSettingsChanged }: 
     if (requestId) detections.set(requestId, controller)
     const report = (stage: DetectStage): void => {
       if (!event.sender.isDestroyed()) {
-        event.sender.send(IPC.evtDetectStatus, { stage, url })
+        event.sender.send(IPC.evtDetectStatus, { stage, url, requestId })
       }
     }
+    /*
+      The card's top half, from the site itself, while the engine is still
+      starting: a title and a poster in a few hundred ms instead of a
+      skeleton for several seconds. Fire-and-forget, cancelled with the
+      detect, and silent when it has nothing.
+    */
+    void fetchOembed(url, controller.signal).then((preview) => {
+      if (preview && !controller.signal.aborted && !event.sender.isDestroyed()) {
+        event.sender.send(IPC.evtDetectPreview, { ...preview, url, requestId })
+      }
+    })
     try {
       // A missing or broken engine is said in words, not thrown across IPC.
       const engineFailure = await engineUnavailable()
       if (engineFailure) return engineFailure
       if (controller.signal.aborted) return { ok: false, error: 'Detection canceled.', errorCode: 'canceled' }
-      return await detect(url, report, controller.signal)
+      return await detect(url, report, controller.signal, { prefetch: options?.prefetch === true })
     } finally {
       if (requestId) detections.delete(requestId)
+      // Every exit ends the narration, not only the ones the detector marks 'done'.
+      report('done')
     }
   })
   ipcMain.handle(IPC.detectCancel, (_e, requestId: string) => {

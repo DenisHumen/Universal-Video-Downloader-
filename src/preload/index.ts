@@ -11,6 +11,8 @@ import type {
   CliInstallResult,
   CliStatus,
   DetectResult,
+  DetectOptions,
+  DetectPreview,
   DetectStatus,
   DownloadItem,
   DownloadProgress,
@@ -46,8 +48,8 @@ function on<T>(channel: string, cb: (payload: T) => void): () => void {
 
 const api = {
   // Detection
-  detect: (url: string, requestId?: string): Promise<DetectResult> =>
-    ipcRenderer.invoke(IPC.detect, url, requestId),
+  detect: (url: string, requestId?: string, options?: DetectOptions): Promise<DetectResult> =>
+    ipcRenderer.invoke(IPC.detect, url, requestId, options),
   cancelDetect: (requestId: string): Promise<void> => ipcRenderer.invoke(IPC.detectCancel, requestId),
 
   // Title search
@@ -185,6 +187,7 @@ const api = {
   onYtdlpStatus: (cb: (s: YtDlpStatus) => void) => on<YtDlpStatus>(IPC.evtYtdlpStatus, cb),
   onUpdateStatus: (cb: (s: UpdateStatus) => void) => on<UpdateStatus>(IPC.evtUpdateStatus, cb),
   onDetectStatus: (cb: (s: DetectStatus) => void) => on<DetectStatus>(IPC.evtDetectStatus, cb),
+  onDetectPreview: (cb: (p: DetectPreview) => void) => on<DetectPreview>(IPC.evtDetectPreview, cb),
   onClipboardLink: (cb: (url: string) => void) => on<string>(IPC.evtClipboardLink, cb),
   onNavigate: (cb: (view: string) => void) => on<string>(IPC.evtNavigate, cb)
 }

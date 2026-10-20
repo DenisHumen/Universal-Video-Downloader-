@@ -1,3 +1,4 @@
+import { AsyncLocalStorage } from 'async_hooks'
 import { net } from 'electron'
 import { describeNetError, describeProxyRefusal, REQUEST_TIMED_OUT } from './neterror'
 import { withProxyAuth } from '../services/proxy-auth'
@@ -12,6 +13,50 @@ interface RequestOptions {
   timeout?: number
   /** Stop reading after this many bytes — pages can be huge. */
   maxBytes?: number
+  /** Abandons the request; defaults to the one `withSignal` scoped this call under. */
+  signal?: AbortSignal
+}
+
+/*
+  The cancel of the detect or download a resolver is working for.
+
+  Site resolvers fetch through layers of helpers - a page, its API, the
+  player behind it, each episode's tiers - and none of them took a signal, so
+  a cancelled detect left them fetching until their own 20 s timeouts. Every
+  helper taking one by hand would mean threading it through a dozen
+  signatures shared with automation and the stream picker; instead the
+  resolver entry points run under `withSignal`, and every request made on
+  their behalf, however deep, picks it up here. An explicit `signal` wins.
+*/
+const scoped = new AsyncLocalStorage<AbortSignal | undefined>()
+
+/** Run `fn` with every request it makes abandoned when `signal` aborts. */
+export function withSignal<T>(signal: AbortSignal | undefined, fn: () => Promise<T>): Promise<T> {
+  return signal ? scoped.run(signal, fn) : fn()
+}
+
+/**
+ * Run `fn` outside any `withSignal` scope.
+ *
+ * For work shared between callers - a cached load that a second resolve may
+ * join while the first is still waiting on it. Run in the first caller's
+ * scope, its pause or cancel rejected the load for everyone sharing it.
+ */
+export function unscoped<T>(fn: () => Promise<T>): Promise<T> {
+  return scoped.exit(fn)
+}
+
+/** What a request abandoned by its signal rejects with. */
+export const REQUEST_CANCELED = 'Request canceled.'
+
+/**
+ * Wire `signal` to a request: `cancel` runs once when it aborts, and the
+ * returned function detaches the listener when the request is done anyway.
+ */
+function onCancel(signal: AbortSignal | undefined, cancel: () => void): () => void {
+  if (!signal) return () => undefined
+  signal.addEventListener('abort', cancel, { once: true })
+  return () => signal.removeEventListener('abort', cancel)
 }
 
 function request(
@@ -21,12 +66,18 @@ function request(
   options: RequestOptions
 ): Promise<string> {
   const { headers = {}, timeout = 20_000, maxBytes = 8_000_000 } = options
+  const signal = options.signal ?? scoped.getStore()
   return new Promise((resolve, reject) => {
+    if (signal?.aborted) {
+      reject(new Error(REQUEST_CANCELED))
+      return
+    }
     let settled = false
     const finish = (fn: () => void): void => {
       if (settled) return
       settled = true
       clearTimeout(timer)
+      detach()
       fn()
     }
 
@@ -39,6 +90,14 @@ function request(
         /* already gone */
       }
     }, timeout)
+    const detach = onCancel(signal, () => {
+      finish(() => reject(new Error(REQUEST_CANCELED)))
+      try {
+        req?.abort()
+      } catch {
+        /* already gone */
+      }
+    })
 
     try {
       req = withProxyAuth(net.request({ url, method, redirect: 'follow' }), url)
@@ -101,12 +160,18 @@ export function fetchBinary(
   options: Omit<RequestOptions, 'headers'> = {}
 ): Promise<BinaryResponse> {
   const { timeout = 15_000, maxBytes = 6_000_000 } = options
+  const signal = options.signal ?? scoped.getStore()
   return new Promise((resolve, reject) => {
+    if (signal?.aborted) {
+      reject(new Error(REQUEST_CANCELED))
+      return
+    }
     let settled = false
     const finish = (fn: () => void): void => {
       if (settled) return
       settled = true
       clearTimeout(timer)
+      detach()
       fn()
     }
 
@@ -119,6 +184,14 @@ export function fetchBinary(
         /* already gone */
       }
     }, timeout)
+    const detach = onCancel(signal, () => {
+      finish(() => reject(new Error(REQUEST_CANCELED)))
+      try {
+        req?.abort()
+      } catch {
+        /* already gone */
+      }
+    })
 
     try {
       req = withProxyAuth(net.request({ url, method: 'GET', redirect: 'follow' }), url)

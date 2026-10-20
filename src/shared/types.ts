@@ -139,6 +139,8 @@ export type AppErrorCode =
   | 'notOnYummyAnime'
   | 'engineMissing'
   | 'adultHidden'
+  /** A queued page that needs its stream picked on Home: a series player or a listing. */
+  | 'needsPicker'
 
 export type DownloadState =
   | 'queued'
@@ -655,6 +657,16 @@ export interface BrowserState {
 }
 
 /** What the detector is currently doing, streamed to the UI while it works. */
+/** How a detect was asked for. */
+export interface DetectOptions {
+  /**
+   * Speculative: nobody is waiting on it yet. The engine probe only - no page
+   * scrape, no hidden browser - so a link that is merely sitting on the
+   * clipboard never opens a window or fetches a page behind the user's back.
+   */
+  prefetch?: boolean
+}
+
 export type DetectStage =
   | 'idle'
   | 'resolving'
@@ -667,6 +679,20 @@ export type DetectStage =
 export interface DetectStatus {
   stage: DetectStage
   url: string
+  /** The request this stage belongs to: the same link detected twice is two requests. */
+  requestId?: string
+}
+
+/**
+ * What a link is, from its site's oEmbed endpoint, ahead of the detect: enough
+ * to draw the result card's top while the engine works out the formats.
+ */
+export interface DetectPreview {
+  url: string
+  requestId?: string
+  title?: string
+  author?: string
+  thumbnail?: string
 }
 
 // ---- Title search ----

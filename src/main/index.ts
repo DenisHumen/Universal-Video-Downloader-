@@ -27,6 +27,8 @@ import {
   shouldStartHidden
 } from './services/autostart'
 import {
+  downloadEvents,
+  listDownloads,
   loadHistory,
   pauseAll,
   resumeAll,
@@ -42,6 +44,9 @@ import type { AppSettings, PendingDelivery } from '@shared/types'
 import { cliArgvFrom } from './cli/format'
 import { startCli } from './cli/run'
 import { refreshCliScript } from './services/cli-install'
+import { taskbarProgress } from './services/taskbar'
+import { coalesce } from './services/coalesce'
+import { infoCache } from './services/info-store'
 
 const isMac = process.platform === 'darwin'
 let mainWindow: BrowserWindow | null = null
@@ -150,9 +155,10 @@ function loadRenderer(win: BrowserWindow, hash?: string): void {
  * `showMainWindow`, which shows it like any window hidden to the tray.
  */
 function createWindow(hidden = false): void {
-  mainWindow = new BrowserWindow({ ...windowOptions(1220, 820), minWidth: 940, minHeight: 640 })
+  mainWindow = new BrowserWindow({ ...windowOptions(1220, 820), minWidth: 720, minHeight: 640 })
   wireWindow(mainWindow, !hidden)
   loadRenderer(mainWindow)
+  const stopTaskbar = mirrorProgressOnTaskbar(mainWindow)
 
   mainWindow.on('close', (event) => {
     /*
@@ -175,10 +181,42 @@ function createWindow(hidden = false): void {
   mainWindow.on('show', () => startWatcher())
 
   mainWindow.on('closed', () => {
+    stopTaskbar()
     mainWindow = null
     // The next window has to ask for what it missed; this one cannot receive.
     rendererReady = false
   })
+}
+
+/** Events that can change what the taskbar shows. */
+const QUEUE_CHANGES = ['updated', 'progress', 'removed', 'restored'] as const
+
+/**
+ * The queue's progress on the window's taskbar button or dock icon.
+ *
+ * Driven by the queue's own events, folded to at most one update per half
+ * second: the engine prints several progress lines a second per download and
+ * the icon needs none of that resolution, while an idle queue now costs
+ * nothing at all. Only a change reaches the native call. A plain timer, not
+ * anything tied to the renderer's frames: this has to keep working while the
+ * window is hidden.
+ */
+function mirrorProgressOnTaskbar(win: BrowserWindow): () => void {
+  let last = ''
+  const update = coalesce(() => {
+    if (win.isDestroyed()) return
+    const { value, mode } = taskbarProgress(listDownloads())
+    const key = `${mode}:${value.toFixed(3)}`
+    if (key === last) return
+    last = key
+    win.setProgressBar(value, { mode })
+  }, 500)
+  for (const name of QUEUE_CHANGES) downloadEvents.on(name, update)
+  // What the queue already holds - history, items resumed at launch.
+  update()
+  return () => {
+    for (const name of QUEUE_CHANGES) downloadEvents.off(name, update)
+  }
 }
 
 /*
@@ -556,6 +594,8 @@ if (cliArgs) {
       this cannot happen at module load.
     */
     initLog(getSettings().logVerbose ? 'debug' : 'info')
+    // Probe JSON a previous session kept for its downloads; the addresses in it have expired.
+    infoCache.clearDir()
 
     // Before any request is made: the proxy the user set applies to our own too.
     void applyProxy(getSettings())
