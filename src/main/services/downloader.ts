@@ -1869,6 +1869,7 @@ export function removeDownload(id: string): void {
   items.delete(id)
   finalPaths.delete(id)
   alreadyOnDisk.delete(id)
+  skipInfo.delete(id)
   scheduleSave()
   downloadEvents.emit('removed', id)
 }
@@ -1899,6 +1900,7 @@ function forgetItem(id: string): void {
   forgetProgress(id)
   items.delete(id)
   finalPaths.delete(id)
+  skipInfo.delete(id)
   // Per-item 'removed' events. The automation pipeline needs each one;
   // ipc.ts folds them into a single message for the window.
   downloadEvents.emit('removed', id)
