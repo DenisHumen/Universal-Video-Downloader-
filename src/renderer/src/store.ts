@@ -23,6 +23,17 @@ export const detectCache = new DetectCache()
 /** Speculative detects Home can adopt rather than start again. */
 export const inflightDetects = new InflightDetects()
 
+/** The last oEmbed preview of each recent detect, by request id; see onDetectPreview. */
+const previews = new Map<string, DetectPreview>()
+
+function rememberPreview(p: DetectPreview): void {
+  if (!p.requestId) return
+  previews.delete(p.requestId)
+  previews.set(p.requestId, p)
+  // A handful: only a run still waiting to be adopted ever reads one back.
+  while (previews.size > 8) previews.delete(previews.keys().next().value as string)
+}
+
 export type ViewId = 'home' | 'search' | 'downloads' | 'automation' | 'settings'
 
 export interface WatchIntent {
@@ -186,6 +197,9 @@ async function runInit(set: SetState, get: GetState): Promise<void> {
     set({ detect: s.stage === 'done' ? null : s })
   })
   window.api.onDetectPreview((p) => {
+    // Kept even when nobody is showing it yet: a prefetch's preview arrives
+    // before Home adopts the run, and would otherwise be lost to skeletons.
+    rememberPreview(p)
     const current = get().detect
     if (!current || current.url !== p.url || current.requestId !== p.requestId) return
     set({ detectPreview: p })
@@ -302,7 +316,7 @@ export const useStore = create<AppState>((set, get) => ({
   dismissClipboardLink: () => set({ clipboardLink: null }),
   setShortcutsOpen: (open) => set({ shortcutsOpen: open }),
   beginDetect: (url, requestId) =>
-    set({ detect: { stage: 'resolving', url, requestId }, detectPreview: null }),
+    set({ detect: { stage: 'resolving', url, requestId }, detectPreview: previews.get(requestId) ?? null }),
   endDetect: () => {
     if (get().detect || get().detectPreview) set({ detect: null, detectPreview: null })
   },
