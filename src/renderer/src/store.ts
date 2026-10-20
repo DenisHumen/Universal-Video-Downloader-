@@ -14,12 +14,17 @@ import { watchFailing } from '@shared/automation'
 import type { ImportOutcome } from '@shared/backup'
 import type { AppInfo } from '../../preload/index'
 import { applyDownloadsChanged } from './lib/downloads'
-import { DetectCache, InflightDetects } from './lib/detectCache'
+import { accessChanged, DetectCache, InflightDetects } from './lib/detectCache'
 import { isProbablyUrl } from './lib/format'
 import { applyAppearance } from './lib/theme'
 
 /** Recent successful detects; see lib/detectCache.ts. Not state: nothing renders from it. */
 export const detectCache = new DetectCache()
+
+/** Adopt new settings' effect on remembered detects: cookies or a proxy can change the answer. */
+function forgetDetectsIfAccessChanged(prev: AppSettings | null, next: AppSettings): void {
+  if (prev && accessChanged(prev, next)) detectCache.clear()
+}
 /** Speculative detects Home can adopt rather than start again. */
 export const inflightDetects = new InflightDetects()
 
@@ -289,12 +294,14 @@ export const useStore = create<AppState>((set, get) => ({
 
   saveSettings: async (partial) => {
     const next = await window.api.setSettings(partial)
+    forgetDetectsIfAccessChanged(get().settings, next)
     applyAppearance(next, get().appInfo?.locale ?? 'en')
     set({ settings: next })
   },
 
   resetSettings: async () => {
     const next = await window.api.resetSettings()
+    forgetDetectsIfAccessChanged(get().settings, next)
     applyAppearance(next, get().appInfo?.locale ?? 'en')
     set({ settings: next })
   },
@@ -307,6 +314,7 @@ export const useStore = create<AppState>((set, get) => ({
   importBackup: async () => {
     const outcome = await window.api.importBackup()
     if (outcome.ok) {
+      forgetDetectsIfAccessChanged(get().settings, outcome.settings)
       applyAppearance(outcome.settings, get().appInfo?.locale ?? 'en')
       set({ settings: outcome.settings })
     }

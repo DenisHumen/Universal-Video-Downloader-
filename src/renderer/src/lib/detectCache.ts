@@ -1,4 +1,4 @@
-import type { DetectResult } from '@shared/types'
+import type { AppSettings, DetectResult } from '@shared/types'
 import { normalizeUrl } from '@shared/urls'
 
 /** How long a detected link stays answered without asking the engine again. */
@@ -53,6 +53,22 @@ export class DetectCache {
   delete(url: string): void {
     this.entries.delete(normalizeUrl(url))
   }
+
+  clear(): void {
+    this.entries.clear()
+  }
+}
+
+/** Settings that change what a detect can see: who the engine is to the site, and how it gets there. */
+const ACCESS_KEYS = ['cookiesFile', 'cookiesFromBrowser', 'proxy', 'universalFallback'] as const
+
+/**
+ * Whether a settings change makes remembered detects stale. A link that came
+ * back without its 1080p because the site saw a visitor without cookies must
+ * not keep coming back that way once cookies are set up.
+ */
+export function accessChanged(prev: AppSettings | null, next: AppSettings): boolean {
+  return !prev || ACCESS_KEYS.some((key) => prev[key] !== next[key])
 }
 
 /** A detect started before anyone asked for it, which Home can adopt instead of starting its own. */

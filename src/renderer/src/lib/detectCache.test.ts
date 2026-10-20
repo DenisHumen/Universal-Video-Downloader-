@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import type { DetectResult, MediaInfo } from '@shared/types'
-import { DETECT_TTL_MS, DetectCache, InflightDetects } from './detectCache'
+import type { AppSettings, DetectResult, MediaInfo } from '@shared/types'
+import { accessChanged, DETECT_TTL_MS, DetectCache, InflightDetects } from './detectCache'
 
 const ok = (id: string): DetectResult => ({ ok: true, info: { id } as MediaInfo })
 
@@ -55,5 +55,17 @@ describe('InflightDetects', () => {
     await Promise.resolve()
     expect(inflight.has('https://site.test/v/2')).toBe(false)
     settle(ok('a'))
+  })
+})
+
+describe('accessChanged', () => {
+  const base = { cookiesFile: '', cookiesFromBrowser: '', proxy: '', universalFallback: true, theme: 'night' } as AppSettings
+
+  it('is true for cookies, proxy or the browser fallback, not for anything else', () => {
+    expect(accessChanged(base, { ...base, cookiesFromBrowser: 'firefox' })).toBe(true)
+    expect(accessChanged(base, { ...base, proxy: 'http://p:1' })).toBe(true)
+    expect(accessChanged(base, { ...base, universalFallback: false })).toBe(true)
+    expect(accessChanged(base, { ...base, theme: 'day' })).toBe(false)
+    expect(accessChanged(null, base)).toBe(true)
   })
 })
