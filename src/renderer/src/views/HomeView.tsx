@@ -290,7 +290,12 @@ export default function HomeView(): JSX.Element {
   useEffect(() => {
     const onKey = (e: KeyboardEvent): void => {
       if (escapeClearsHome(e, useStore.getState().shortcutsOpen)) reset()
-      else if (isDownloadNowChord(e) && !useStore.getState().shortcutsOpen) {
+      // Not from the batch list: there Ctrl+Enter is a newline, or the batch's own business.
+      else if (
+        isDownloadNowChord(e) &&
+        !useStore.getState().shortcutsOpen &&
+        (e.target as HTMLElement | null)?.tagName !== 'TEXTAREA'
+      ) {
         e.preventDefault()
         void downloadNowRef.current()
       }
