@@ -396,13 +396,24 @@ export default function HomeView(): JSX.Element {
 
   const downloadNow = async (): Promise<void> => {
     if (starting) return
-    if (info) {
+    const target = url.trim()
+    /*
+      The card on screen only while the field still holds its link. Edited to
+      another, the chord is about the new one: queuing the old result under
+      it downloaded a video the field no longer named.
+    */
+    if (info && target === detectedUrl) {
       if (!info.isPlaylist && !info.streaming && status === 'idle') await start()
       return
     }
-    const target = url.trim()
-    if (!settings || !canDownloadNow(target)) return
-    const preview = useStore.getState().detectPreview
+    if (!settings) return
+    // A link that has to be detected first is detected, rather than nothing happening.
+    if (!canDownloadNow(target)) {
+      if (target && target !== detectedUrl) void detect(target)
+      return
+    }
+    // The preview belongs to whichever link is detecting, which may not be this one.
+    const preview = useStore.getState().detect?.url === target ? useStore.getState().detectPreview : null
     const ytId = youtubeIdOf(target)
     const mode = initialMode(settings)
     setStarting(true)
