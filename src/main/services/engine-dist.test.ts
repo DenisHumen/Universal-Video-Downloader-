@@ -21,6 +21,7 @@ import {
   stageOnedir,
   staleEntries,
   unpackZip,
+  verifyHash,
   verifySum
 } from './engine-dist'
 
@@ -103,6 +104,7 @@ describe('checksums', () => {
     expect(verifySum(data, 'yt-dlp_linux.zip', sums)).toBe(sha256(data))
     expect(() => verifySum(Buffer.from('tampered'), 'yt-dlp_linux.zip', sums)).toThrow(/checksum/)
     expect(() => verifySum(data, 'missing.zip', sums)).toThrow(/no checksum/)
+    expect(verifyHash(sha256(data).toUpperCase(), 'yt-dlp_linux.zip', sums)).toBe(sha256(data))
   })
 })
 
@@ -119,9 +121,9 @@ describe('safeTarget', () => {
 })
 
 describe('unpackZip', () => {
-  it('writes files and folders, inflated and stored, with their executable bits', () => {
+  it('writes files and folders, inflated and stored, with their executable bits', async () => {
     const dest = fresh()
-    unpackZip(
+    await unpackZip(
       makeZip([
         { name: '_internal/' },
         { name: '_internal/lib.so', data: 'x'.repeat(1000), deflate: true },
@@ -134,17 +136,22 @@ describe('unpackZip', () => {
     if (process.platform !== 'win32') expect(statSync(join(dest, 'yt-dlp_linux')).mode & 0o111).not.toBe(0)
   })
 
-  it('refuses path traversal and symlinks', () => {
-    expect(() => unpackZip(makeZip([{ name: '../escape', data: 'x' }]), fresh())).toThrow(/unsafe path/)
-    expect(() =>
-      unpackZip(makeZip([{ name: 'link', data: '/etc', mode: 0o120777 }]), fresh())
-    ).toThrow(/not a file/)
+  it('refuses path traversal and symlinks, before writing anything', async () => {
+    await expect(unpackZip(makeZip([{ name: '../escape', data: 'x' }]), fresh())).rejects.toThrow(/unsafe path/)
+    await expect(unpackZip(makeZip([{ name: 'link', data: '/etc', mode: 0o120777 }]), fresh())).rejects.toThrow(
+      /not a file/
+    )
+    const dest = fresh()
+    await expect(
+      unpackZip(makeZip([{ name: 'fine', data: 'x' }, { name: '../late-escape', data: 'x' }]), dest)
+    ).rejects.toThrow(/unsafe path/)
+    expect(readdirSync(dest)).toEqual([])
   })
 
-  it('refuses an entry whose bytes do not match its CRC', () => {
+  it('refuses an entry whose bytes do not match its CRC', async () => {
     const zip = makeZip([{ name: 'a', data: 'hello' }])
     zip[30 + 1] = 'X'.charCodeAt(0) // the data byte right after the one-letter name
-    expect(() => unpackZip(zip, fresh())).toThrow(/integrity/)
+    await expect(unpackZip(zip, fresh())).rejects.toThrow(/integrity/)
   })
 
   it('reads a central directory', () => {
@@ -159,9 +166,9 @@ describe('unpackZip', () => {
 describe('staging and activating a onedir copy', () => {
   const zip = makeZip([{ name: '_internal/' }, { name: 'yt-dlp_linux', data: '#!', mode: 0o100755 }])
 
-  it('unpacks beside the active copy and switches only on activate', () => {
+  it('unpacks beside the active copy and switches only on activate', async () => {
     const bin = fresh()
-    const pointer = stageOnedir(zip, bin, 'yt-dlp_linux', sha256(zip))
+    const pointer = await stageOnedir(zip, bin, 'yt-dlp_linux', sha256(zip))
     expect(onedirExe(bin)).toBeNull()
     activate(bin, pointer)
     expect(onedirExe(bin)).toBe(join(bin, pointer.dir, 'yt-dlp_linux'))
@@ -170,9 +177,9 @@ describe('staging and activating a onedir copy', () => {
     expect(readdirSync(bin).filter((n) => n.startsWith('.unpack-'))).toEqual([])
   })
 
-  it('leaves nothing behind when the archive is bad', () => {
+  it('leaves nothing behind when the archive is bad', async () => {
     const bin = fresh()
-    expect(() => stageOnedir(makeZip([{ name: 'other' }]), bin, 'yt-dlp_linux', 'f'.repeat(64))).toThrow()
+    await expect(stageOnedir(makeZip([{ name: 'other' }]), bin, 'yt-dlp_linux', 'f'.repeat(64))).rejects.toThrow()
     expect(readdirSync(bin)).toEqual([])
   })
 
@@ -182,9 +189,9 @@ describe('staging and activating a onedir copy', () => {
     expect(readPointer(bin)).toBeNull()
   })
 
-  it('cleans up other copies, leftovers and the single file once onedir is active', () => {
+  it('cleans up other copies, leftovers and the single file once onedir is active', async () => {
     const bin = fresh()
-    const pointer = stageOnedir(zip, bin, 'yt-dlp_linux', sha256(zip))
+    const pointer = await stageOnedir(zip, bin, 'yt-dlp_linux', sha256(zip))
     activate(bin, pointer)
     mkdirSync(join(bin, 'yt-dlp-dist-old'))
     mkdirSync(join(bin, '.unpack-abc'))

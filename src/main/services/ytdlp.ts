@@ -12,6 +12,8 @@ import {
   rmSync,
   writeFileSync
 } from 'fs'
+import { readFile, rm } from 'fs/promises'
+import { createHash } from 'crypto'
 import { join } from 'path'
 import type { YtDlpStatus } from '@shared/types'
 import {
@@ -25,7 +27,7 @@ import {
   planEngine,
   readPointer,
   stageOnedir,
-  verifySum,
+  verifyHash,
   type EngineAssets,
   type MigrationFailure
 } from './engine-dist'
@@ -192,8 +194,10 @@ function headerValue(value: string | string[] | undefined): string {
  * fetch (which can hang there) and transparently honours system proxies and
  * GitHub's redirect to the release asset.
  */
-function fetchToFile(url: string, tmp: string): Promise<void> {
+function fetchToFile(url: string, tmp: string): Promise<string> {
   return new Promise((resolve, reject) => {
+    // Hashed as it arrives, so verifying a 60 MB zip never reads it whole on the main thread.
+    const hash = createHash('sha256')
     const request = withProxyAuth(net.request({ url, redirect: 'follow' }), url)
     request.on('response', (response) => {
       const status = response.statusCode
@@ -207,6 +211,7 @@ function fetchToFile(url: string, tmp: string): Promise<void> {
       out.on('error', reject)
       response.on('data', (chunk: Buffer) => {
         received += chunk.length
+        hash.update(chunk)
         out.write(chunk)
         if (total) {
           emit({
@@ -216,7 +221,7 @@ function fetchToFile(url: string, tmp: string): Promise<void> {
           })
         }
       })
-      response.on('end', () => out.end(() => resolve()))
+      response.on('end', () => out.end(() => resolve(hash.digest('hex'))))
       response.on('error', reject)
     })
     request.on('error', reject)
@@ -315,15 +320,15 @@ async function installOnedir(asset: { zip: string; exe: string }): Promise<void>
   const sums = await releaseSums()
   const dir = binDir()
   const tmp = join(dir, `${asset.zip}.download`)
-  await fetchToFile(`${RELEASE_BASE}/${asset.zip}`, tmp)
   let zip: Buffer
+  let sum: string
   try {
-    zip = readFileSync(tmp)
+    sum = verifyHash(await fetchToFile(`${RELEASE_BASE}/${asset.zip}`, tmp), asset.zip, sums)
+    zip = await readFile(tmp)
   } finally {
-    rmSync(tmp, { force: true })
+    await rm(tmp, { force: true })
   }
-  const sum = verifySum(zip, asset.zip, sums)
-  const pointer = stageOnedir(zip, dir, asset.exe, sum)
+  const pointer = await stageOnedir(zip, dir, asset.exe, sum)
   const staged = join(dir, pointer.dir)
   const exe = join(staged, pointer.exe)
   if (process.platform === 'darwin') {
@@ -358,9 +363,9 @@ async function installOnefile(): Promise<void> {
   emit({ state: 'downloading', percent: 0, message: 'Downloading download engine…' })
 
   const sums = await releaseSums()
-  await fetchToFile(url, tmp)
+  const hash = await fetchToFile(url, tmp)
   try {
-    verifySum(readFileSync(tmp), asset, sums)
+    verifyHash(hash, asset, sums)
   } catch (err) {
     rmSync(tmp, { force: true })
     throw err

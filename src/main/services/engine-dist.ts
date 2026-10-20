@@ -1,16 +1,18 @@
 import { createHash, randomBytes } from 'crypto'
 import {
-  chmodSync,
   existsSync,
-  mkdirSync,
   readFileSync,
   readdirSync,
   renameSync,
   rmSync,
   writeFileSync
 } from 'fs'
+import { chmod, mkdir, rename, rm, writeFile } from 'fs/promises'
 import { dirname, isAbsolute, join, normalize, relative } from 'path'
-import { inflateRawSync } from 'zlib'
+import { promisify } from 'util'
+import * as zlib from 'zlib'
+
+const inflateRaw = promisify(zlib.inflateRaw)
 
 /*
   The engine as a directory rather than a single file.
@@ -73,13 +75,19 @@ export function sha256(data: Buffer): string {
   return createHash('sha256').update(data).digest('hex')
 }
 
-/** Refuse an asset whose bytes are not the ones the release lists. */
-export function verifySum(data: Buffer, asset: string, sums: Map<string, string>): string {
+/** Refuse an asset whose SHA-256, worked out as it downloaded, is not the one the release lists. */
+export function verifyHash(actual: string, asset: string, sums: Map<string, string>): string {
   const expected = sums.get(asset)
   if (!expected) throw new Error(`The engine release lists no checksum for ${asset}.`)
-  const actual = sha256(data)
-  if (actual !== expected) throw new Error(`The downloaded ${asset} does not match its published checksum.`)
-  return actual
+  if (actual.toLowerCase() !== expected) {
+    throw new Error(`The downloaded ${asset} does not match its published checksum.`)
+  }
+  return expected
+}
+
+/** `verifyHash` for bytes already in hand. */
+export function verifySum(data: Buffer, asset: string, sums: Map<string, string>): string {
+  return verifyHash(sha256(data), asset, sums)
 }
 
 // ---- Zip -----------------------------------------------------------------
@@ -94,7 +102,11 @@ const CRC_TABLE = (() => {
   return table
 })()
 
+/** Node's own CRC-32 where it has one (20.15+), which is native and so does not hold the thread. */
+const nativeCrc32 = (zlib as unknown as { crc32?: (data: Buffer) => number }).crc32
+
 export function crc32(data: Buffer): number {
+  if (nativeCrc32) return nativeCrc32(data) >>> 0
   let c = 0xffffffff
   for (let i = 0; i < data.length; i++) c = CRC_TABLE[(c ^ data[i]) & 0xff] ^ (c >>> 8)
   return (c ^ 0xffffffff) >>> 0
@@ -163,15 +175,15 @@ export function readZip(buf: Buffer): ZipEntry[] {
   return entries
 }
 
-/** One entry's bytes, checked against its CRC. */
-export function entryData(buf: Buffer, entry: ZipEntry): Buffer {
+/** One entry's bytes, checked against its CRC. Inflated on the thread pool, not the main thread. */
+export async function entryData(buf: Buffer, entry: ZipEntry): Promise<Buffer> {
   const p = entry.offset
   if (buf.readUInt32LE(p) !== 0x04034b50) throw new Error(`The zip entry ${entry.name} is damaged.`)
   const start = p + 30 + buf.readUInt16LE(p + 26) + buf.readUInt16LE(p + 28)
   const raw = buf.subarray(start, start + entry.compressedSize)
   let data: Buffer
   if (entry.method === 0) data = Buffer.from(raw)
-  else if (entry.method === 8) data = inflateRawSync(raw)
+  else if (entry.method === 8) data = await inflateRaw(raw)
   else throw new Error(`The zip entry ${entry.name} uses an unsupported compression method.`)
   if (data.length !== entry.size || crc32(data) !== entry.crc) {
     throw new Error(`The zip entry ${entry.name} failed its integrity check.`)
@@ -205,25 +217,34 @@ export function safeTarget(root: string, name: string): string | null {
  * pointing out of the folder would let a later entry write through it - and
  * so is anything else that is not a regular file. Executable bits come from
  * the archive where it has Unix modes; `exe` is always made executable.
+ *
+ * Asynchronous throughout, one entry at a time: done synchronously, the
+ * engine's 175 files took half a second of the main process, during which the
+ * window's every IPC call waited. Every path is checked before anything is
+ * written, so a hostile entry late in the archive cannot leave a half-written
+ * tree for the caller to clean up first.
  */
-export function unpackZip(buf: Buffer, dest: string, exe?: string): void {
+export async function unpackZip(buf: Buffer, dest: string, exe?: string): Promise<void> {
   const entries = readZip(buf)
-  for (const entry of entries) {
+  const plan = entries.map((entry) => {
     const target = safeTarget(dest, entry.name)
     if (!target) throw new Error(`The engine archive has an unsafe path: ${entry.name}`)
     const type = entry.mode & S_IFMT
     if (entry.mode && type !== 0 && type !== S_IFREG && type !== S_IFDIR) {
       throw new Error(`The engine archive has an entry that is not a file: ${entry.name}`)
     }
+    return { entry, target }
+  })
+  for (const { entry, target } of plan) {
     if (entry.isDir) {
-      mkdirSync(target, { recursive: true })
+      await mkdir(target, { recursive: true })
       continue
     }
-    mkdirSync(dirname(target), { recursive: true })
-    writeFileSync(target, entryData(buf, entry), { flag: 'wx' })
+    await mkdir(dirname(target), { recursive: true })
+    await writeFile(target, await entryData(buf, entry), { flag: 'wx' })
     if (process.platform !== 'win32') {
       const executable = (entry.mode & 0o111) !== 0 || entry.name === exe
-      chmodSync(target, executable ? 0o755 : 0o644)
+      await chmod(target, executable ? 0o755 : 0o644)
     }
   }
 }
@@ -278,20 +299,20 @@ export function onedirExe(binDir: string): string | null {
  * pointer is not touched here: the caller switches it with `activate` only
  * once the new copy has been seen to start.
  */
-export function stageOnedir(zip: Buffer, binDir: string, exe: string, sum: string): EnginePointer {
+export async function stageOnedir(zip: Buffer, binDir: string, exe: string, sum: string): Promise<EnginePointer> {
   const scratch = join(binDir, `${UNPACK_PREFIX}${randomBytes(6).toString('hex')}`)
-  mkdirSync(scratch, { recursive: false })
+  await mkdir(scratch, { recursive: false })
   try {
-    unpackZip(zip, scratch, exe)
+    await unpackZip(zip, scratch, exe)
     if (!existsSync(join(scratch, exe))) throw new Error(`The engine archive has no ${exe} in it.`)
     const dir = `${DIST_PREFIX}${sum.slice(0, 16)}`
     const final = join(binDir, dir)
     // The same release unpacked before: the fresh copy replaces it.
-    if (existsSync(final)) rmSync(final, { recursive: true, force: true })
-    renameSync(scratch, final)
+    if (existsSync(final)) await rm(final, { recursive: true, force: true })
+    await rename(scratch, final)
     return { dir, exe, sha256: sum }
   } catch (err) {
-    rmSync(scratch, { recursive: true, force: true })
+    await rm(scratch, { recursive: true, force: true })
     throw err
   }
 }
