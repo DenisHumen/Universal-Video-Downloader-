@@ -8,6 +8,7 @@ import { yummyaniResolvers, resolveYummyaniItem, resolveYummyaniStream } from '.
 import { resolveSniffUrl, SNIFF_SCHEME } from './universal'
 import { DIRECT_SCHEME, resolveDirectUrl } from './universal/direct'
 import { normalizeUrl } from '@shared/urls'
+import { withSignal } from './http'
 import type { ResolveOptions, ResolvedUrl, SiteResolver } from './types'
 
 export type { ResolvedEntry, ResolveOptions, ResolvedUrl, SiteResolver } from './types'
@@ -67,8 +68,14 @@ export async function resolveUrl(
 ): Promise<ResolvedUrl> {
   const raw = input.trim()
 
+  /*
+    The signal travels two ways: as an option, to the resolvers that act on it
+    themselves (the sniffer tears its window down), and as the scope of every
+    HTTP request made on the way. Without the second, cancelling a detect on a
+    resolver-backed site changed nothing until the site answered or timed out.
+  */
   for (const scheme of internalSchemes) {
-    if (raw.startsWith(scheme.prefix)) return scheme.resolve(raw, options)
+    if (raw.startsWith(scheme.prefix)) return withSignal(options.signal, () => scheme.resolve(raw, options))
   }
 
   // Callers normalise before queueing, but history written by an older build
@@ -79,9 +86,11 @@ export async function resolveUrl(
   for (const r of resolvers) {
     if (!r.match.test(trimmed)) continue
     try {
-      const resolved = await r.resolve(trimmed)
+      const resolved = await withSignal(options.signal, () => r.resolve(trimmed, options))
       return { extractor: r.id, ...resolved }
     } catch (err) {
+      // A cancel is the caller's answer, not a reason to hand the engine the page.
+      if (options.signal?.aborted) throw err
       // A resolver that throws for a real reason (premium content, removed
       // video) should surface that reason rather than silently degrading.
       if (err instanceof Error && !/HTTP \d{3}|timed out/i.test(err.message)) throw err
