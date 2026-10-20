@@ -43,6 +43,14 @@ const FILL_PAIRS = [
  * to --line or a plane that makes the edge vanish again.
  */
 const HAIRLINE_MIN = 1.12
+/**
+ * Planes that are not text but must still be seen against the panel they are
+ * drawn on: the loading skeleton. At --surface-2 it was 1.1:1 on a panel and
+ * faded to nothing at the low point of its pulse, so a detecting card looked
+ * empty rather than busy.
+ */
+const PLANE_PAIRS = [['--skeleton', '--surface']]
+const PLANE_MIN = 1.3
 
 const THEMES = [
   { name: 'night', selector: "\\[data-theme='night'\\]" },
@@ -81,6 +89,8 @@ let checks = 0
 let worst = { ratio: Infinity, what: '' }
 let hairlines = 0
 let faintest = { ratio: Infinity, what: '' }
+let planes = 0
+let flattest = { ratio: Infinity, what: '' }
 
 for (const { name, selector } of THEMES) {
   const vars = readTheme(selector)
@@ -153,6 +163,20 @@ for (const { name, selector } of THEMES) {
     }
   }
 
+  for (const [fillVar, planeVar] of PLANE_PAIRS) {
+    const fill = vars[fillVar]
+    const plane = vars[planeVar]
+    if (!fill || !plane) {
+      fail(`theme "${name}" is missing ${fill ? planeVar : fillVar}`)
+      continue
+    }
+    const ratio = contrast(fill, plane)
+    planes++
+    const what = `${name} · ${fillVar} on ${planeVar}`
+    if (ratio < flattest.ratio) flattest = { ratio, what }
+    if (ratio < PLANE_MIN) fail(`${what} → ${ratio.toFixed(2)}:1 (needs ${PLANE_MIN}:1)`)
+  }
+
   if (name === 'day') {
     const line = vars['--line']
     if (!line) {
@@ -173,7 +197,7 @@ for (const { name, selector } of THEMES) {
 }
 
 if (process.exitCode) {
-  console.error(`\n${checks + hairlines} pairings checked — see failures above.`)
+  console.error(`\n${checks + hairlines + planes} pairings checked — see failures above.`)
 } else {
   console.log(
     `✓ ${checks} theme/text/plane pairings all clear ${AA_NORMAL}:1 ` +
@@ -182,5 +206,9 @@ if (process.exitCode) {
   console.log(
     `✓ ${hairlines} day hairlines all clear ${HAIRLINE_MIN}:1 ` +
       `(faintest: ${faintest.what} at ${faintest.ratio.toFixed(2)}:1)`
+  )
+  console.log(
+    `✓ ${planes} non-text planes all clear ${PLANE_MIN}:1 ` +
+      `(flattest: ${flattest.what} at ${flattest.ratio.toFixed(2)}:1)`
   )
 }

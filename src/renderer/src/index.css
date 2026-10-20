@@ -60,6 +60,10 @@
   --bg: 9 9 11;
   --surface: 20 20 23;
   --surface-2: 28 28 32;
+  /* Placeholder blocks. --surface-2 is 1.1:1 on a panel, and at the bottom of
+     its pulse the skeleton all but vanished - the card read as empty, not as
+     loading. Checked against --surface by check-contrast.mjs. */
+  --skeleton: 44 44 50;
   --line: 39 39 44;
   --line-strong: 63 63 70;
   --text: 244 244 245;
@@ -91,6 +95,7 @@
   --bg: 240 240 243;
   --surface: 255 255 255;
   --surface-2: 248 248 250;
+  --skeleton: 222 222 228;
   --line: 224 224 229;
   --line-strong: 198 198 206;
   --text: 9 9 11;
@@ -494,7 +499,7 @@ select.field {
   }
 }
 .skeleton {
-  background-color: rgb(var(--surface-2));
+  background-color: rgb(var(--skeleton));
   animation: idle-pulse 1.6s var(--ease) infinite;
 }
 
