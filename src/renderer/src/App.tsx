@@ -1,6 +1,4 @@
 import { useEffect } from 'react'
-import { motion } from 'framer-motion'
-import { enter } from './lib/motion'
 import { useStore } from './store'
 import TopBar from './components/TopBar'
 import UpdateBanner from './components/UpdateBanner'
@@ -54,7 +52,7 @@ export default function App(): JSX.Element {
 
       <main className="relative flex min-h-0 flex-1 flex-col">
         {ready ? (
-          <motion.div
+          <div
             key={view}
             /*
               Opacity only — no transform.
@@ -63,27 +61,28 @@ export default function App(): JSX.Element {
               6px of phantom document scroll) and leaves the entire screen
               offset if the animation ever stalls. Each view animates its own
               content instead.
-            */
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={enter}
-            /*
-              Views swap instantly and only animate *in*. An AnimatePresence
-              with mode="wait" holds the incoming view back until the outgoing
-              one reports its exit finished — so any stall in the animation loop
-              (a throttled background window, a GPU hiccup) leaves the window
-              blank. Navigation must never depend on that.
+
+              A CSS keyframe, not framer-motion. The library steps its values
+              from requestAnimationFrame, which does not tick in a throttled
+              window: a tab switch in a backgrounded app held the new view at
+              opacity 0 - a blank window - until the frame clock came back. A
+              keyframe runs on the compositor's own timeline and, with no fill
+              mode, leaves the element at full opacity the moment it ends or
+              is skipped (reduced motion shortens it to nothing).
+
+              Views swap instantly and only animate *in*: an exit animation
+              would hold the incoming view back on the same clock.
             */
             /* Each view owns its own scrolling, so it can pin its header and
                keep a sticky rail in sync with the content underneath it. */
-            className="min-h-0 flex-1 overflow-hidden"
+            className="min-h-0 flex-1 animate-view-in overflow-hidden"
           >
             {view === 'home' && <HomeView />}
             {view === 'search' && <SearchView settings={settings} embedded />}
             {view === 'downloads' && <DownloadsView />}
             {view === 'automation' && <AutomationView />}
             {view === 'settings' && <SettingsView />}
-          </motion.div>
+          </div>
         ) : (
           <div className="flex h-full flex-col items-center justify-center gap-4">
             <Logo className="h-7 w-7 animate-idle-pulse text-ink-3" />

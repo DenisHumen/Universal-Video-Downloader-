@@ -90,11 +90,17 @@ module.exports = {
         rise: {
           '0%': { opacity: '0', transform: 'translateY(6px)' },
           '100%': { opacity: '1', transform: 'translateY(0)' }
+        },
+        // Opacity only: see App.tsx for why the view host never transforms.
+        'view-in': {
+          '0%': { opacity: '0' },
+          '100%': { opacity: '1' }
         }
       },
       animation: {
         'idle-pulse': 'idle-pulse 1.6s cubic-bezier(0.2, 0, 0, 1) infinite',
-        rise: 'rise 240ms cubic-bezier(0.2, 0, 0, 1)'
+        rise: 'rise 240ms cubic-bezier(0.2, 0, 0, 1)',
+        'view-in': 'view-in var(--t-view) var(--ease)'
       }
     }
   },

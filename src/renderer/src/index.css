@@ -37,6 +37,9 @@
   --t-fast: 160ms;
   --t-base: 240ms;
   --t-slow: 320ms;
+  /* A screen swap: long enough to read as a change, short enough that a
+     paused compositor shows the view, not a blank, for no more than this. */
+  --t-view: 120ms;
 
   /* ---- Depth ladder. A fixed ladder beats ad-hoc z-indexes. ---- */
   --z-nav: 20;
