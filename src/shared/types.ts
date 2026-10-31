@@ -358,6 +358,12 @@ export interface DownloadItem {
    */
   copySuffix?: string
   /**
+   * Fetch this item's HLS stream with ffmpeg instead of the engine's own
+   * fragment downloader. Set when that downloader refused the playlist, and
+   * kept, so a pause, a retry or a restart does not run into the same refusal.
+   */
+  hlsViaFfmpeg?: boolean
+  /**
    * Where an automated episode was uploaded, as `share/folder/name`. With no
    * `filepath`, the local copy was deleted afterwards and this is the only copy.
    */

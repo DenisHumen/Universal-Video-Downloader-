@@ -8,7 +8,8 @@ import {
   humanizeYtdlpError,
   isTransientError,
   stalledConnecting,
-  proxyEnv
+  proxyEnv,
+  refusesMidStreamInit
 } from './options'
 
 function settings(overrides: Partial<AppSettings> = {}): AppSettings {
@@ -561,5 +562,18 @@ describe('classifyYtdlpError, when the engine refuses a setting', () => {
 
   it('does not retry it, since every attempt would fail the same way', () => {
     expect(isTransientError(USAGE + 'yt-dlp.exe: error: invalid rate limit "2MB" given')).toBe(false)
+  })
+})
+
+describe('refusesMidStreamInit', () => {
+  // A Twitch VOD whose stream reconnected: the native HLS downloader gives up on all of it.
+  it('recognises the native downloader refusing a playlist with a second init segment', () => {
+    const raw = '[hlsnative] Total fragments: 3257\nERROR: Initialization fragment found after media fragments, unable to download'
+    expect(refusesMidStreamInit(raw)).toBe(true)
+  })
+
+  it('leaves every other failure alone', () => {
+    expect(refusesMidStreamInit('ERROR: Unsupported URL: https://example.com/')).toBe(false)
+    expect(refusesMidStreamInit('ERROR: unable to download video data: HTTP Error 403: Forbidden')).toBe(false)
   })
 })

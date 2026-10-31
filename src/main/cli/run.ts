@@ -3,7 +3,7 @@ import { spawn } from 'child_process'
 import { randomUUID } from 'crypto'
 import { existsSync, mkdirSync } from 'fs'
 import { join, resolve } from 'path'
-import type { DownloadItem } from '@shared/types'
+import type { AppSettings, DownloadItem } from '@shared/types'
 import { normalizeUrl } from '@shared/urls'
 import { getSettings } from '../services/settings'
 import { applyProxy } from '../services/proxy'
@@ -16,13 +16,14 @@ import {
   POSTPROCESS_PREFIX,
   PROGRESS_PREFIX
 } from '../services/downloader'
-import { classifyYtdlpError, hasCookies } from '../services/options'
+import { classifyYtdlpError, hasCookies, refusesMidStreamInit } from '../services/options'
 import { killTree } from '../services/process'
 import { lineReader } from '../services/engine-output'
-import { splitOutputLines } from '../services/ffmpeg-output'
+import { ffmpegProgressSeconds, splitOutputLines } from '../services/ffmpeg-output'
 import { flushLog, initLog, log } from '../services/log'
 import {
   describeFailure,
+  ffmpegProgressLine,
   displayName,
   parseCliArgs,
   parseProgress,
@@ -150,7 +151,7 @@ async function run(options: CliOptions): Promise<number> {
   return worst
 }
 
-function download(link: string, outputDir: string, audio: boolean, quality: CliQuality): Promise<number> {
+async function download(link: string, outputDir: string, audio: boolean, quality: CliQuality): Promise<number> {
   const settings = getSettings()
   const item: DownloadItem = {
     id: randomUUID(),
@@ -170,6 +171,46 @@ function download(link: string, outputDir: string, audio: boolean, quality: CliQ
   say(`↓ ${item.url}`)
   log.info('cli', 'Download started', { url: item.url, dir })
 
+  let result = await runEngine(item, settings, dir)
+  /*
+    The window's queue does the same: a stream that restarted partway through,
+    which the engine's own HLS downloader refuses, is fetched again by ffmpeg.
+  */
+  if (result.code !== 0 && !stopping && !item.hlsViaFfmpeg && refusesMidStreamInit(result.stderrTail)) {
+    say('  the stream restarts partway through; fetching it with ffmpeg instead')
+    log.info('cli', 'Fetching the HLS stream with ffmpeg', { url: item.url })
+    item.hlsViaFfmpeg = true
+    result = await runEngine(item, settings, dir)
+  }
+
+  if (stopping) return 130
+  if (result.startError) {
+    say(`✗ Could not start the download engine: ${result.startError}`)
+    return 1
+  }
+  if (result.code === 0) {
+    const path = result.finalPath
+    say(path && existsSync(path) ? `✓ Saved to ${path}` : `✓ Done. Saved in ${dir}`)
+    log.info('cli', 'Download finished', { url: item.url, path })
+    return 0
+  }
+  const classified = classifyYtdlpError(result.stderrTail, hasCookies(settings))
+  const failure = describeFailure(classified.code, classified.message, Boolean(classified.cookieHint))
+  for (const line of failure.lines) say(line)
+  log.warn('cli', 'Download failed', { url: item.url, code: classified.code, error: result.stderrTail.slice(-600) })
+  return failure.exitCode
+}
+
+interface EngineRun {
+  code: number | null
+  stderrTail: string
+  finalPath?: string
+  /** The engine could not be started at all. */
+  startError?: string
+}
+
+/** One run of the engine for one item, with its progress drawn as it goes. */
+function runEngine(item: DownloadItem, settings: AppSettings, dir: string): Promise<EngineRun> {
   return new Promise((done) => {
     const child = spawn(ytdlpBinaryPath(), buildArgs(item, settings, dir, ffmpegLocation()), ytdlpSpawnOptions())
     live = child
@@ -198,38 +239,27 @@ function download(link: string, outputDir: string, audio: boolean, quality: CliQ
       }
     )
     const stderr = lineReader(splitOutputLines, (line) => {
+      // ffmpeg fetching an HLS stream says how far it has got here, and nowhere else.
+      const seconds = ffmpegProgressSeconds(line)
+      if (seconds != null) return status(ffmpegProgressLine(seconds))
       stderrTail = (stderrTail + line + '\n').slice(-4000)
     })
     child.stdout?.on('data', (chunk: Buffer) => stdout.push(chunk))
     child.stderr?.on('data', (chunk: Buffer) => stderr.push(chunk))
 
     let settled = false
-    const settle = (code: number): void => {
+    const settle = (run: EngineRun): void => {
       if (settled) return
       settled = true
       live = null
-      done(code)
+      done(run)
     }
 
-    child.on('error', (error) => {
-      say(`✗ Could not start the download engine: ${error.message}`)
-      settle(1)
-    })
+    child.on('error', (error) => settle({ code: null, stderrTail, startError: error.message }))
     child.on('close', (code) => {
       stdout.flush()
       stderr.flush()
-      if (stopping) return settle(130)
-      if (code === 0) {
-        const path = finalPath?.path
-        say(path && existsSync(path) ? `✓ Saved to ${path}` : `✓ Done. Saved in ${dir}`)
-        log.info('cli', 'Download finished', { url: item.url, path })
-        return settle(0)
-      }
-      const classified = classifyYtdlpError(stderrTail, hasCookies(settings))
-      const failure = describeFailure(classified.code, classified.message, Boolean(classified.cookieHint))
-      for (const line of failure.lines) say(line)
-      log.warn('cli', 'Download failed', { url: item.url, code: classified.code, error: stderrTail.slice(-600) })
-      settle(failure.exitCode)
+      settle({ code, stderrTail, finalPath: finalPath?.path })
     })
   })
 }

@@ -22,7 +22,14 @@ import { log } from './log'
 import { failure, noteRefusedWrite, ReadFailure, readJsonStore, writeJsonAtomic } from './json-store'
 import { finishedBeyond, forHistory, isFinished, isHistoryEntry } from './history'
 import { downloadFields } from './log-fields'
-import { accessArgs, classifyYtdlpError, hasCookies, headerArgs, isTransientError } from './options'
+import {
+  accessArgs,
+  classifyYtdlpError,
+  hasCookies,
+  headerArgs,
+  isTransientError,
+  refusesMidStreamInit
+} from './options'
 import { IN_FLIGHT_STATES, isSameDownload } from './dedupe'
 import {
   freeCopySuffix,
@@ -538,6 +545,12 @@ export function buildArgs(
   ]
 
   if (ffmpeg) args.push('--ffmpeg-location', ffmpeg)
+  /*
+    Only for an item whose playlist the engine's own HLS downloader has already
+    refused (see refusesMidStreamInit). It stays the default otherwise: it
+    fetches five fragments at a time and reports bytes, and ffmpeg does neither.
+  */
+  if (item.hlsViaFfmpeg) args.push('--downloader', 'm3u8:ffmpeg')
   args.push(...accessArgs(settings))
   args.push(...headerArgs(item.headers))
   if (item.referer) args.push('--referer', item.referer)
@@ -1431,6 +1444,26 @@ async function runDownload(item: DownloadItem): Promise<void> {
       */
       cleanupPartials(item)
       skipInfo.add(item.id)
+      item.state = 'queued'
+      item.speed = undefined
+      item.eta = undefined
+      resetProgress(item)
+      finalPaths.delete(item.id)
+      emitUpdated(item)
+      processQueue()
+      return
+    }
+    /*
+      A stream that restarted partway through - a Twitch VOD whose broadcast
+      reconnected - which the engine's own HLS downloader will not join. One
+      more run with ffmpeg fetching it, spending none of the item's attempts:
+      nothing was wrong with the download, only with the downloader.
+    */
+    if (!item.hlsViaFfmpeg && refusesMidStreamInit(stderrTail)) {
+      appendLog(item, 'The stream restarts partway through; fetching it with ffmpeg instead\n')
+      log.info('download', 'Fetching the HLS stream with ffmpeg', downloadFields(item))
+      cleanupPartials(item)
+      item.hlsViaFfmpeg = true
       item.state = 'queued'
       item.speed = undefined
       item.eta = undefined

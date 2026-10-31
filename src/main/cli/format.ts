@@ -207,6 +207,15 @@ export function displayName(path: string): string {
   return name.replace(/\.f\d+(?=\.\w+$)/, '')
 }
 
+/**
+ * Progress while ffmpeg fetches the stream. It reports how much of the video
+ * it has, never bytes or a total, and the terminal knows no duration to set
+ * that against - so it says the position, which still shows it is moving.
+ */
+export function ffmpegProgressLine(seconds: number): string {
+  return `  downloading with ffmpeg  ${formatEta(seconds)} of the video so far`
+}
+
 /** What a post-processing step is doing, as a person would say it. */
 export function postprocessLine(postprocessor: string | undefined): string {
   const name = (postprocessor ?? '').toLowerCase()

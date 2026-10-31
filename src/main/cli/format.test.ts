@@ -9,6 +9,7 @@ import {
   parseCliArgs,
   parseProgress,
   parseQuality,
+  ffmpegProgressLine,
   postprocessLine,
   progressLine,
   USAGE
@@ -122,6 +123,11 @@ describe('progress', () => {
     expect(formatBytes(1_234_567_890)).toBe('1.2 GB')
     expect(formatEta(59)).toBe('0:59')
     expect(formatEta(3725)).toBe('1:02:05')
+  })
+
+  it('says how much of the video ffmpeg has, when it is the one fetching', () => {
+    expect(ffmpegProgressLine(754)).toBe('  downloading with ffmpeg  12:34 of the video so far')
+    expect(ffmpegProgressLine(3725)).toMatch(/1:02:05 of the video/)
   })
 
   it('names the post-processing step', () => {

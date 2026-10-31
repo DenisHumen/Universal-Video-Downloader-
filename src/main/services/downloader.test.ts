@@ -86,6 +86,17 @@ describe('buildArgs', () => {
     }
   })
 
+  it('hands the HLS stream to ffmpeg only once the native downloader has refused it', () => {
+    // A Twitch VOD whose stream reconnected names a second init segment, which
+    // the engine's own downloader refuses outright; ffmpeg reads it.
+    const usual = buildArgs(item(), settings(), '/downloads', '/ffmpeg')
+    expect(usual).not.toContain('--downloader')
+    const twitch = buildArgs(item({ hlsViaFfmpeg: true }), settings(), '/downloads', '/ffmpeg')
+    const at = twitch.indexOf('--downloader')
+    expect(twitch[at + 1]).toBe('m3u8:ffmpeg')
+    expect(twitch.slice(-2)).toEqual(['--', 'https://www.youtube.com/watch?v=abc123'])
+  })
+
   it('keeps the URL last when a trim adds its own flags', () => {
     const args = buildArgs(item({ range: { start: 10, end: 20 } }), settings(), '/downloads', '/ffmpeg')
     expect(args.slice(-2)).toEqual(['--', 'https://www.youtube.com/watch?v=abc123'])

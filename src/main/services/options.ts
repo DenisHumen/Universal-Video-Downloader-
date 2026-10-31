@@ -383,6 +383,20 @@ function failureTail(raw: string): string {
 }
 
 /**
+ * The engine's own HLS downloader refused a playlist that names a new
+ * initialisation segment partway through.
+ *
+ * Twitch writes one whenever a stream reconnects: the VOD's playlist carries
+ * `#EXT-X-DISCONTINUITY` and a fresh `#EXT-X-MAP` at each restart, and the
+ * native downloader gives up on the whole video rather than on the restart.
+ * ffmpeg reads such a playlist from start to finish, so this is a failure the
+ * app can get past by itself rather than one to report.
+ */
+export function refusesMidStreamInit(raw: string): boolean {
+  return /initialization fragment found after media fragments/i.test(raw)
+}
+
+/**
  * Transient failures worth retrying automatically before bothering the user.
  *
  * Read from the end of the output only, and a 5xx only where it is an HTTP
