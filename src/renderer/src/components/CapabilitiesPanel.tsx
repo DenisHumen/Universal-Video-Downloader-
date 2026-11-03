@@ -7,7 +7,7 @@ import {
   Radar,
   Scissors,
   Search
-} from 'lucide-react'
+} from '../ui/icons'
 import { useStore } from '../store'
 import { useT, type TranslationKey } from '../i18n'
 
@@ -63,12 +63,12 @@ export default function CapabilitiesPanel(): JSX.Element {
 
   return (
     <section>
-      <p className="label mb-1">{t('cap.title')}</p>
-      <ul className="border-t border-edge">
+      <h3 className="mb-3 text-heading text-ink">{t('cap.title')}</h3>
+      <ul className="ui-boxed-list">
         {items.map((item) => {
           const interactive = Boolean(item.action)
           return (
-            <li key={item.title} className="border-b border-edge">
+            <li key={item.title} className="border-b border-edge-soft px-3 last:border-b-0">
               <div
                 role={interactive ? 'button' : undefined}
                 tabIndex={interactive ? 0 : undefined}
@@ -88,13 +88,13 @@ export default function CapabilitiesPanel(): JSX.Element {
                 {/* An icon, not just an index: it is recognised before the
                     heading is read, which is what makes a list of six things
                     scannable rather than six paragraphs to work through. */}
-                <span className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-1 bg-sink text-ink-2">
+                <span className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center text-ink">
                   {item.icon}
                 </span>
                 <span className="min-w-0 flex-1">
                   <span className="flex items-center gap-1.5">
                     <span
-                      className={`text-[14px] font-medium text-ink ${
+                      className={`text-body font-medium text-ink ${
                         interactive ? 'group-hover:text-accent-ink' : ''
                       }`}
                     >
@@ -107,7 +107,7 @@ export default function CapabilitiesPanel(): JSX.Element {
                       />
                     )}
                   </span>
-                  <span className="hint mt-1 block">{t(item.body)}</span>
+                  <span className="mt-0.5 block text-meta text-ink-2">{t(item.body)}</span>
                 </span>
               </div>
             </li>

@@ -40,3 +40,6 @@ Thumbs.db
 
 # /brag video work (the finished video is copied into docs/assets)
 brag-output*/
+
+# Visual-diff harness output (baselines in tests/visual/baseline are committed)
+tests/visual/.out/

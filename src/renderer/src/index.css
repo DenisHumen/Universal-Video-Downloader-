@@ -1,9 +1,26 @@
-/* Bundled, never fetched: the window's CSP blocks remote stylesheets and the
-   app must look identical offline. Inter carries the interface; JetBrains Mono
-   carries every number, path and identifier — in this design, data is always
-   set in mono so you can tell a measurement from a label at a glance. */
-@import '@fontsource-variable/inter';
-@import '@fontsource-variable/jetbrains-mono';
+/* The user's GNOME font (A1.2 Y3, L1): Ubuntu Sans and Ubuntu Sans Mono
+   v1.006, upright variable fonts, shipped as the upstream files, unmodified
+   and unsubset, under the Ubuntu Font Licence 1.0 (assets/fonts/UFL-1.0.txt;
+   cited in About › Legal and THIRD_PARTY_NOTICES.txt). Bundled, never fetched
+   and never taken from the system: the CSP blocks remote fonts, and a font
+   that follows `system-ui` would break the visual diffs. Sans carries the
+   interface and its numbers (`.numeric`, tabular figures); Mono is for paths,
+   URLs and identifiers only. */
+@font-face {
+  font-family: 'Ubuntu Sans';
+  src: url('./assets/fonts/UbuntuSans-wdth-wght.ttf') format('truetype');
+  font-weight: 100 800;
+  font-stretch: 75% 100%;
+  font-style: normal;
+  font-display: block;
+}
+@font-face {
+  font-family: 'Ubuntu Sans Mono';
+  src: url('./assets/fonts/UbuntuSansMono-wght.ttf') format('truetype');
+  font-weight: 400 700;
+  font-style: normal;
+  font-display: block;
+}
 
 @tailwind base;
 @tailwind components;
@@ -26,20 +43,33 @@
  * ==================================================================== */
 
 :root {
-  /* ---- Shape. Four steps, no in-between values. ---- */
-  /* Tightened one step: at 8/14/22 a thumbnail, a field and the panel round
-     it read as three soft shapes rather than one structure; at 6/10/16 the
-     ladder still reads, and nested corners stop fighting their parents. */
-  --r-1: 6px; /* tags, swatches, icon buttons */
-  --r-2: 10px; /* fields, buttons, list rows */
-  --r-3: 16px; /* blocks, dialogs */
+  /* ---- Shape: 6 / 12 / 16, as the user's GNOME draws it (D0). ----
+     6 for buttons, entries, rows and menu items (r-2 is the same 6: A1 merged
+     it), 12 for cards, boxed lists, popovers and the sheet, 16 for dialogs.
+     The pill is for the main call to action, toasts, badges and the switch. */
+  --r-1: 6px;
+  --r-2: 6px;
+  --r-3: 12px;
+  --r-4: 16px;
   --r-pill: 999px;
 
-  /* ---- Motion. Decelerate-emphasised: starts immediately, lands soft. ---- */
+  /* ---- Motion (4.0, plan 2.6). CSS only. ----
+     --ease is the app's curve (decelerate-emphasised: off the mark at once,
+     lands soft); --ease-spring is a damped overshoot for things that *arrive*
+     (a menu, a toast), never for colour. Durations: press for the down state
+     of a control, fast for hover and colour, base for entrances, slow for
+     height reveals. Every one collapses under prefers-reduced-motion (end of
+     this file), and nothing depends on animation-fill-mode: an element at
+     rest is at its final state whether the animation ran or not. */
   --ease: cubic-bezier(0.2, 0, 0, 1);
-  --t-fast: 160ms;
-  --t-base: 240ms;
-  --t-slow: 320ms;
+  /* libadwaita's navigation spring (damping 1, mass 1, stiffness 1000):
+     critically damped, no overshoot, ~250 ms, sampled into CSS linear(). */
+  --ease-spring: linear(0, 0.142, 0.379, 0.588, 0.739, 0.841, 0.905, 0.944, 0.968, 0.982, 0.99, 0.994, 1);
+  --t-spring: 250ms;
+  --t-press: 90ms;
+  --t-fast: 140ms;
+  --t-base: 200ms;
+  --t-slow: 260ms;
   /* A screen swap: long enough to read as a change, short enough that a
      paused compositor shows the view, not a blank, for no more than this. */
   --t-view: 120ms;
@@ -53,65 +83,217 @@
   --z-modal: 70;
 }
 
-/* ---- Night (default) ----
-   Bottoms out at #09090B rather than pure black: on OLED panels #000 smears
-   during motion, and a true-black canvas gives raised planes nothing to sit
-   against. */
+/* ---- Night: Yaru dark, as the user's GNOME renders it (docs/design/calibration.md) ----
+   Window 44, sidebar 48 (lighter, as libadwaita draws it), cards 61. The
+   v4 depth stays: the sheet keeps its edge and the v4 shadows. */
 :root,
 [data-theme='night'] {
   color-scheme: dark;
-  --bg: 9 9 11;
-  --surface: 20 20 23;
-  --surface-2: 28 28 32;
-  /* Placeholder blocks. --surface-2 is 1.1:1 on a panel, and at the bottom of
-     its pulse the skeleton all but vanished - the card read as empty, not as
-     loading. Checked against --surface by check-contrast.mjs. */
-  --skeleton: 44 44 50;
-  --line: 39 39 44;
-  --line-strong: 63 63 70;
-  --text: 244 244 245;
-  --text-2: 168 168 178;
-  --text-3: 135 135 146;
-  --accent: 47 91 255;
+  --bg: 44 44 44;
+  /* The content sheet and every header bar (window_bg / headerbar_bg). */
+  --surface: 44 44 44;
+  /* An opaque stand-in for the .10 fill, for the few planes that cannot be an alpha. */
+  --surface-2: 64 64 64;
+  /* Popovers, menus, dialogs. */
+  --surface-3: 56 56 56;
+  --card: 61 61 61;
+  --sidebar: 48 48 48;
+  /* Settings' panel list (libadwaita's secondary sidebar): between window and sidebar. */
+  --sidebar-2: 46 46 46;
+  /* Buttons, entries, toggles and selected rows are this colour at .10 / .15 / .30. */
+  --fill: 247 247 247;
+  --skeleton: 66 66 66;
+  --line: 31 31 31;
+  --line-soft: 39 39 39;
+  --line-strong: 89 89 89;
+  --text: 247 247 247;
+  /* Yaru's 55% dim label is 4.0:1 on a card; corrected for AA. */
+  --text-2: 172 172 172;
+  --text-3: 172 172 172;
+  /* Yaru orange (the default accent); the others are under [data-accent]. */
+  --accent: 213 65 0;
+  /* The accent as GNOME paints shapes that carry no text (switch track, progress):
+     Yaru's own #E95420, as on the user's desktop. Text never sits on it. */
+  --accent-bright: 233 84 32;
   --accent-fg: 255 255 255;
-  --accent-ink: 138 168 255;
-  --good: 74 222 128;
-  --warn: 250 204 21;
-  --bad: 251 113 133;
-  --bad-fg: 9 9 11;
+  --accent-ink: 255 154 106;
+  --good: 120 233 171;
+  --warn: 255 194 82;
+  /* Kept crimson, well clear of the orange accent: a failure must never read as "accent". */
+  --bad: 255 170 190;
+  /* A label on a solid --bad fill (the live badge): dark, since this pink is light. */
+  --bad-fg: 30 30 30;
+  /* The destructive fill (white label). */
+  --destructive: 192 28 72;
+  --destructive-fg: 255 255 255;
+  /* On-screen display: tooltips and toasts, dark in both schemes (GTK's .osd). */
+  --osd: 30 30 30;
+  --osd-fg: 255 255 255;
   --control-edge: transparent;
+  /* Elevation (4.0). Night leans on the plane step (--surface-3) and a top
+     highlight; the drop shadow only has to separate, not to be seen. */
+  --shadow-1: inset 0 1px 0 rgb(255 255 255 / 0.04), 0 1px 2px rgb(0 0 0 / 0.4);
+  --shadow-2: 0 8px 24px -4px rgb(0 0 0 / 0.5), 0 2px 6px rgb(0 0 0 / 0.3);
+  --shadow-3: 0 24px 64px -12px rgb(0 0 0 / 0.6), 0 8px 16px -8px rgb(0 0 0 / 0.4);
+  /* Cards and boxed lists (A1.1): Night keeps v4's depth on top of the card plane. */
+  --shadow-card: var(--shadow-1);
+  /* What sits behind a dialog. */
+  --scrim: 0 0 0;
+  /* The content sheet's top and left edge: the pane divider. */
+  --sheet-edge: rgb(var(--line));
 }
 
-/* ---- Day ----
-   Not a tint-inverted Night: light interfaces need a canvas *darker* than the
-   raised planes, otherwise every block dissolves into the page.
-
-   --control-edge: the neutral buttons are a --surface-2 fill, which here sits
-   at 1.06:1 on a white panel and 1.07:1 on the canvas — the "change" button on
-   a result card was a pill you had to know was there. Darkening the fill
-   instead sinks every button on the canvas, so the plane stays and gains a
-   hairline. A token rather than a `[data-theme='day'] .btn-icon` rule because
-   `@apply btn-icon` copies such a rule into `.btn-icon-bare`, whose whole point
-   is having no surface; a token it can simply override. */
+/* ---- Day: Yaru light, as rendered ---- */
 [data-theme='day'] {
   color-scheme: light;
-  --bg: 240 240 243;
-  --surface: 255 255 255;
-  --surface-2: 248 248 250;
-  --skeleton: 222 222 228;
-  --line: 224 224 229;
-  --line-strong: 198 198 206;
-  --text: 9 9 11;
-  --text-2: 82 82 91;
-  --text-3: 100 100 110;
-  --accent: 37 78 235;
+  --bg: 250 250 250;
+  --surface: 250 250 250;
+  --surface-2: 231 231 231;
+  --surface-3: 255 255 255;
+  --card: 255 255 255;
+  --sidebar: 235 235 235;
+  --sidebar-2: 243 243 243;
+  --fill: 61 61 61;
+  --skeleton: 216 216 216;
+  --line: 219 219 219;
+  --line-soft: 237 237 237;
+  --line-strong: 198 198 198;
+  /* Yaru's #3D3D3D. */
+  --text: 61 61 61;
+  /* Yaru's dim label is 2.8-3.0:1; corrected for AA. */
+  --text-2: 92 92 92;
+  --text-3: 92 92 92;
+  --accent: 213 65 0;
   --accent-fg: 255 255 255;
-  --accent-ink: 30 64 214;
+  --accent-ink: 183 31 0;
   --good: 20 107 53;
   --warn: 134 84 6;
-  --bad: 184 28 36;
+  --bad: 192 28 72;
   --bad-fg: 255 255 255;
-  --control-edge: rgb(var(--line));
+  --destructive: 192 28 72;
+  --destructive-fg: 255 255 255;
+  --osd: 30 30 30;
+  --osd-fg: 255 255 255;
+  --control-edge: transparent;
+  --shadow-1: 0 1px 2px rgb(0 0 0 / 0.06);
+  --shadow-2: 0 8px 24px -4px rgb(0 0 0 / 0.16), 0 2px 6px rgb(0 0 0 / 0.08);
+  --shadow-3: 0 24px 64px -12px rgb(0 0 0 / 0.28), 0 8px 16px -8px rgb(0 0 0 / 0.12);
+  /* libadwaita's light card: a hairline ring and two soft layers. */
+  --shadow-card: 0 0 0 1px rgb(0 0 6 / 0.03), 0 1px 3px 1px rgb(0 0 6 / 0.07), 0 2px 6px 2px rgb(0 0 6 / 0.03);
+  --scrim: 0 0 6;
+  --sheet-edge: rgb(var(--line));
+}
+
+/* ---- Accents (A1 / Y1): GNOME's nine, Yaru orange in the orange slot ----
+   Generated by scripts/accents.mjs (OKLab: fills darkened until white reads
+   at 4.5:1, inks clamped per theme). Orange is the default and lives in the
+   theme blocks above. Gated by scripts/check-contrast.mjs. */
+/* Orange restated, so an element can carry data-accent='orange' (the swatch)
+   whatever accent the window uses. Same values as the theme blocks. */
+[data-accent='orange'] {
+  --accent: 213 65 0;
+  --accent-bright: 233 84 32;
+  --accent-ink: 255 154 106;
+  --accent-fg: 255 255 255;
+}
+[data-theme='day'][data-accent='orange'] {
+  --accent-ink: 183 31 0;
+}
+[data-accent='blue'] {
+  --accent: 37 118 213;
+  --accent-bright: 53 132 228;
+  --accent-ink: 129 208 255;
+  --accent-fg: 255 255 255;
+}
+[data-accent='teal'] {
+  --accent: 0 130 150;
+  --accent-bright: 33 144 164;
+  --accent-ink: 123 223 244;
+  --accent-fg: 255 255 255;
+}
+[data-accent='green'] {
+  --accent: 42 134 61;
+  --accent-bright: 58 148 74;
+  --accent-ink: 141 230 152;
+  --accent-fg: 255 255 255;
+}
+[data-accent='yellow'] {
+  --accent: 166 104 0;
+  --accent-bright: 200 136 0;
+  --accent-ink: 255 192 87;
+  --accent-fg: 255 255 255;
+}
+[data-accent='red'] {
+  --accent: 226 40 63;
+  --accent-bright: 230 45 66;
+  --accent-ink: 255 136 140;
+  --accent-fg: 255 255 255;
+}
+[data-accent='pink'] {
+  --accent: 191 77 133;
+  --accent-bright: 213 97 153;
+  --accent-ink: 255 160 216;
+  --accent-fg: 255 255 255;
+}
+[data-accent='purple'] {
+  --accent: 145 65 172;
+  --accent-bright: 145 65 172;
+  --accent-ink: 251 167 255;
+  --accent-fg: 255 255 255;
+}
+[data-accent='slate'] {
+  --accent: 101 121 139;
+  --accent-bright: 111 131 150;
+  --accent-ink: 187 209 229;
+  --accent-fg: 255 255 255;
+}
+[data-theme='day'][data-accent='blue'] {
+  --accent: 37 118 213;
+  --accent-bright: 53 132 228;
+  --accent-ink: 4 97 190;
+  --accent-fg: 255 255 255;
+}
+[data-theme='day'][data-accent='teal'] {
+  --accent: 0 130 150;
+  --accent-bright: 33 144 164;
+  --accent-ink: 0 113 132;
+  --accent-fg: 255 255 255;
+}
+[data-theme='day'][data-accent='green'] {
+  --accent: 42 134 61;
+  --accent-bright: 58 148 74;
+  --accent-ink: 21 119 46;
+  --accent-fg: 255 255 255;
+}
+[data-theme='day'][data-accent='yellow'] {
+  --accent: 166 104 0;
+  --accent-bright: 200 136 0;
+  --accent-ink: 144 83 0;
+  --accent-fg: 255 255 255;
+}
+[data-theme='day'][data-accent='red'] {
+  --accent: 226 40 63;
+  --accent-bright: 230 45 66;
+  --accent-ink: 192 0 35;
+  --accent-fg: 255 255 255;
+}
+[data-theme='day'][data-accent='pink'] {
+  --accent: 191 77 133;
+  --accent-bright: 213 97 153;
+  --accent-ink: 162 50 108;
+  --accent-fg: 255 255 255;
+}
+[data-theme='day'][data-accent='purple'] {
+  --accent: 145 65 172;
+  --accent-bright: 145 65 172;
+  --accent-ink: 137 57 164;
+  --accent-fg: 255 255 255;
+}
+[data-theme='day'][data-accent='slate'] {
+  --accent: 101 121 139;
+  --accent-bright: 111 131 150;
+  --accent-ink: 82 102 120;
+  --accent-fg: 255 255 255;
 }
 
 * {
@@ -136,7 +318,7 @@ body {
   /* 14px base. The first cut of this system ran on 13px with 10–11px meta,
      which read as "designed" in a screenshot and as squinting in daily use.
      Restraint is a job for colour and spacing, never for legibility. */
-  font-size: 14px;
+  font-size: theme('fontSize.body');
   line-height: 1.5;
   overflow: hidden;
   -webkit-font-smoothing: antialiased;
@@ -157,7 +339,24 @@ body {
   -webkit-app-region: no-drag;
 }
 
-/* Every measurement, path, URL and identifier. Tabular figures so a column of
+/* A symbolic icon (ui/icons.tsx): the SVG as a mask, painted in the text colour. */
+.uvd-icon {
+  display: inline-block;
+  flex-shrink: 0;
+  background-color: currentColor;
+  -webkit-mask: var(--icon) center / contain no-repeat;
+  mask: var(--icon) center / contain no-repeat;
+}
+
+/* Numbers in the interface font, with tabular figures so a column of
+   percentages, speeds or times never shifts (A1: they leave mono). */
+@layer utilities {
+  .numeric {
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+/* Paths, URLs and identifiers. (A1 narrows mono to these; numbers use .numeric.) Tabular figures so a column of
    percentages or byte counts never shifts as the digits change. */
 .mono {
   font-family: theme('fontFamily.mono');
@@ -182,7 +381,7 @@ body {
 @layer components {
   /* The one heading per screen. */
   .h1 {
-    font-size: 24px;
+    font-size: theme('fontSize.title.0');
     line-height: 1.2;
     font-weight: 600;
     letter-spacing: -0.02em;
@@ -191,7 +390,7 @@ body {
 
   /* A section inside a screen. */
   .h2 {
-    font-size: 15px;
+    font-size: theme('fontSize.section.0');
     line-height: 1.35;
     font-weight: 600;
     color: rgb(var(--text));
@@ -200,7 +399,7 @@ body {
   /* The sentence under an h1 that says what the screen is for. Measure-capped:
      past ~65 characters the eye loses the line it was on. */
   .lead {
-    font-size: 14px;
+    font-size: theme('fontSize.body');
     line-height: 1.6;
     color: rgb(var(--text-2));
     max-width: 62ch;
@@ -208,22 +407,20 @@ body {
 
   /* Explanatory text under a control. */
   .hint {
-    font-size: 12px;
+    font-size: theme('fontSize.meta');
     line-height: 1.5;
     color: rgb(var(--text-2));
     max-width: 62ch;
   }
 
-  /* Marks a group of controls. Small and uppercase, but no longer *tiny*: at
-     10px in the third text tier this was decorative rather than readable. */
+  /* Marks a group of controls: GNOME's group title (heading 14/700, the text
+     colour). 5.8 dropped the mono uppercase label; mono is for numbers, paths
+     and ids only. */
   .label {
-    font-family: theme('fontFamily.mono');
-    font-size: 11px;
-    line-height: 1.2;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
-    color: rgb(var(--text-2));
+    font-size: theme('fontSize.heading');
+    line-height: 1.3;
+    font-weight: 700;
+    color: rgb(var(--text));
   }
 }
 
@@ -235,164 +432,139 @@ textarea,
 }
 
 @layer components {
-  /* ---------------- Planes ---------------- */
+  /* ==================================================================== *
+   * Planes, controls and lists in the user's GNOME (A1 + A1.1, values from
+   * docs/design/calibration.md). Controls are the text colour at .10 (rest),
+   * .15 (hover) and .25 (checked/pressed); a selected sidebar row is .10,
+   * .07 on hover and .13 when both. Labels on buttons are bold, as GTK's.
+   * ==================================================================== */
 
   /*
-   * A raised plane. One hairline, one flat fill, no shadow — elevation reads
-   * from the rule, which stays crisp at any scale factor.
-   *
-   * Named `.panel`, never `.block`: Tailwind ships `.block` as the
-   * `display: block` utility, so a component class of that name silently
-   * painted a bordered card onto every element that merely wanted to be a
-   * block — labels, hints, the search thumbnail. Component classes must not
-   * collide with utility names.
+   * A card / boxed list (Named `.panel`, never `.block`: Tailwind ships
+   * `.block` as a utility). Day: libadwaita's ring-and-two-layers shadow;
+   * Night: the card plane plus v4's highlight-and-drop (A1.1 keeps depth).
    */
   .panel {
     border-radius: var(--r-3);
-    @apply border border-edge bg-raise;
+    background-color: rgb(var(--card));
+    box-shadow: var(--shadow-card);
   }
-  /* An inset plane: nests inside .panel for secondary content. */
+  /* Popovers, menus and toasts' plane; dialogs. The only things with v4's shadow-2/3. */
+  .surface-float {
+    border-radius: var(--r-3);
+    background-color: rgb(var(--surface-3));
+    box-shadow:
+      0 0 0 1px rgb(var(--line)),
+      var(--shadow-2);
+  }
+  .surface-dialog {
+    border-radius: var(--r-4);
+    background-color: rgb(var(--surface-3));
+    box-shadow:
+      0 0 0 1px rgb(var(--line)),
+      var(--shadow-3);
+  }
+  /* Behind a dialog. */
+  .scrim {
+    background-color: rgb(var(--scrim) / 0.25);
+  }
+  [data-theme='night'] .scrim {
+    background-color: rgb(var(--scrim) / 0.5);
+  }
+  /* A recessed area inside a card. */
   .well {
     border-radius: var(--r-2);
-    @apply border border-edge bg-sink;
+    @apply bg-fill/10;
   }
 
-  /* ---------------- Buttons ---------------- */
+  /* ---------------- Buttons (GTK button) ---------------- */
 
-  /*
-   * Shape and behaviour only — no fill, no colour. Never a button on its own:
-   * it is what the three below are built from, and what a one-off state
-   * (`btn-base bg-good/12 text-good`) builds on when it brings its own fill.
-   *
-   * It was called `.btn`, which is exactly what anyone reaches for, and fourteen
-   * places across Automation, the dialogs and the update strip did: they
-   * rendered as bare words beside filled fields, and a disabled one read as
-   * grey body text. `stylesheet.test.ts` fails on a bare one now.
-   */
+  /* Shape and behaviour only; stylesheet.test.ts refuses it without a fill. */
   .btn-base {
-    border-radius: var(--r-pill);
-    /* 38px minimum. Desktop pointing is more forgiving than touch, so this
-       sits under the 44px touch floor by design — but 32px, which is where
-       these started, is small for anyone whose hands aren't steady. */
-    min-height: 38px;
+    border-radius: var(--r-1);
+    min-height: 34px;
     transition:
       background-color var(--t-fast) var(--ease),
       color var(--t-fast) var(--ease),
-      border-color var(--t-fast) var(--ease),
-      transform var(--t-fast) var(--ease);
-    @apply no-drag inline-flex cursor-pointer select-none items-center justify-center gap-2 whitespace-nowrap px-4 py-2 text-[13px] font-medium active:scale-[0.97] disabled:pointer-events-none disabled:opacity-40;
+      transform var(--t-press) var(--ease);
+    @apply no-drag inline-flex cursor-pointer select-none items-center justify-center gap-2 whitespace-nowrap px-3.5 py-1.5 text-control font-bold active:scale-[0.97] disabled:pointer-events-none disabled:opacity-50;
   }
-  /* The single loud element on any screen. There is never more than one. */
+  /* .suggested-action: the one loud action per screen, in the accent. */
   .btn-solid {
-    @apply btn-base bg-accent text-accent-fg hover:bg-accent/90;
-    /* The one loud control is also the easiest to hit. */
-    min-height: 40px;
+    box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.12);
+    @apply btn-base bg-accent text-accent-fg hover:bg-accent/90 active:bg-accent/80;
   }
-  /* Everything else: a filled neutral that reads as a control, not a link. */
+  /* The default button: the text colour at .10. */
   .btn-quiet {
-    @apply btn-base bg-sink text-ink-2 hover:bg-edge hover:text-ink;
-    /* Day's hairline (see --control-edge). An inset shadow takes no room, so a
-       button that swaps to a solid or a tinted state doesn't move a pixel; on
-       hover the fill becomes the same --line and the ring melts into it. */
-    box-shadow: inset 0 0 0 1px var(--control-edge);
+    @apply btn-base bg-fill/10 text-ink hover:bg-fill/15 active:bg-fill/25;
   }
+  /* .destructive-action. */
   .btn-danger {
-    @apply btn-base bg-bad/12 text-bad hover:bg-bad/20;
+    @apply btn-base bg-destructive text-destructive-fg hover:bg-destructive/90 active:bg-destructive/80;
   }
-  /*
-   * Icon-only buttons. 36px, and they carry a visible surface rather than
-   * appearing only on hover — an action the user can't see is an action they
-   * don't have. Every one of these needs an `aria-label`, since the glyph is
-   * the only thing naming it.
-   */
+  /* An image button (34 px, the GTK size; every one needs an aria-label). */
   .btn-icon {
     border-radius: var(--r-1);
+    height: 34px;
+    width: 34px;
     transition:
       background-color var(--t-fast) var(--ease),
-      color var(--t-fast) var(--ease),
-      border-color var(--t-fast) var(--ease);
-    @apply no-drag inline-flex h-9 w-9 shrink-0 cursor-pointer items-center justify-center border bg-sink text-ink-2 hover:border-edge-strong hover:text-ink disabled:pointer-events-none disabled:opacity-30;
-    border-color: var(--control-edge);
+      color var(--t-fast) var(--ease);
+    @apply no-drag relative inline-flex shrink-0 cursor-pointer items-center justify-center bg-fill/10 text-ink hover:bg-fill/15 active:bg-fill/25 disabled:pointer-events-none disabled:opacity-50;
   }
-  /* For dense toolbars sitting on their own plane, where a filled square per
-     action would read as a wall of chips. */
+  /* .flat: no fill until hovered. */
   .btn-icon-bare {
-    @apply btn-icon border-transparent bg-transparent hover:bg-sink;
+    @apply btn-icon bg-transparent hover:bg-fill/10;
   }
 
-  /* ---------------- Fields ---------------- */
+  /* ---------------- Entries ---------------- */
 
-  /* Text entry. Solid fill, hairline border, and on focus the border takes the
-     accent and grows a soft ring — no glow, no colour shift in the fill. */
+  /* GTK entry: a .10 fill, no border; focus is a 2 px accent/.5 outline drawn inside. */
   .field {
-    border-radius: var(--r-2);
-    min-height: 42px;
-    transition:
-      border-color var(--t-fast) var(--ease),
-      box-shadow var(--t-fast) var(--ease);
-    @apply no-drag w-full border border-edge bg-sink px-3.5 py-2.5 text-[14px] text-ink outline-none placeholder:text-ink-3;
+    border-radius: var(--r-1);
+    min-height: 34px;
+    @apply no-drag w-full bg-fill/10 px-3 py-1.5 text-body text-ink outline-none placeholder:text-ink-3;
   }
   .field:focus,
   .field:focus-within {
-    @apply border-accent;
-    box-shadow: 0 0 0 3px rgb(var(--accent) / 0.16);
+    outline: 2px solid rgb(var(--accent) / 0.5);
+    outline-offset: -2px;
   }
-  /* The home screen's focal input: the same field at display scale. */
+  /* Download's hero entry. */
   .field-lg {
-    @apply field px-5 py-4 text-[16px];
+    @apply field px-4 py-3;
+    min-height: 52px;
     border-radius: var(--r-3);
   }
 
-  /* ---------------- Choices ---------------- */
+  /* ---------------- Choices (GTK toggle buttons) ---------------- */
 
-  /*
-   * Replaces the old segmented control everywhere: a row of independent pills.
-   * Selected is a solid accent fill — no sliding indicator, so a choice that
-   * re-renders (quality lists rebuild per video) can't animate from nowhere.
-   *
-   * Unselected pills carry a real fill. They were transparent-with-a-hairline
-   * at first, which looked composed and read as decoration: nothing about an
-   * outlined word says "this is a button you may press".
-   */
+  /* Independent toggle buttons that wrap (quality lists, episodes): neutral, as GNOME's. */
   .choice {
-    border-radius: var(--r-pill);
-    min-height: 36px;
+    border-radius: var(--r-1);
+    min-height: 34px;
     transition:
       background-color var(--t-fast) var(--ease),
-      color var(--t-fast) var(--ease),
-      border-color var(--t-fast) var(--ease);
-    @apply no-drag inline-flex cursor-pointer select-none items-center justify-center gap-1.5 whitespace-nowrap border border-edge bg-sink px-3.5 py-2 text-[13px] font-medium text-ink-2 hover:border-edge-strong hover:bg-edge hover:text-ink;
+      color var(--t-fast) var(--ease);
+    @apply no-drag inline-flex cursor-pointer select-none items-center justify-center gap-1.5 whitespace-nowrap bg-fill/10 px-3 py-1.5 text-control font-bold text-ink hover:bg-fill/15;
   }
   .choice-on {
-    @apply border-accent bg-accent text-accent-fg hover:border-accent hover:bg-accent hover:text-accent-fg;
+    @apply bg-fill/25 hover:bg-fill/25;
   }
   .choice-off {
-    @apply opacity-40;
+    @apply opacity-50;
   }
 
-  /* ---------------- Navigation ---------------- */
-
-  /* Top-bar tabs. The active one is marked by a 2px accent rule sitting on the
-     bar's own bottom hairline — the indicator is part of the structure rather
-     than a shape floating behind the label. */
   .tab {
-    transition:
-      color var(--t-fast) var(--ease),
-      border-color var(--t-fast) var(--ease);
-    @apply no-drag relative inline-flex cursor-pointer select-none items-center gap-2 border-b-2 border-transparent px-3.5 pb-2.5 pt-3 text-[13px] font-medium text-ink-2 hover:text-ink;
+    transition: color var(--t-fast) var(--ease);
+    @apply no-drag relative inline-flex cursor-pointer select-none items-center gap-2 px-3 py-2 text-control font-bold text-ink-2 hover:text-ink;
   }
   .tab-on {
-    @apply border-accent font-semibold text-ink;
+    @apply text-ink;
   }
 
   /* ---------------- Small parts ---------------- */
 
-  /*
-   * A strip that scrolls sideways without ever showing a scrollbar.
-   * A 10px scrollbar inside a 48px bar of chrome is a hairline of grey noise
-   * across the top of the window; the arrows on either end say "there is more"
-   * far better, and they can be clicked.
-   */
   .no-scrollbar {
     scrollbar-width: none;
     -ms-overflow-style: none;
@@ -400,33 +572,501 @@ textarea,
   .no-scrollbar::-webkit-scrollbar {
     display: none;
   }
-
-  /* A read-only fact: extractor name, container, count. Never interactive. */
+  /* A read-only fact (extractor, container, count). */
   .tag {
     border-radius: var(--r-1);
-    @apply inline-flex items-center gap-1 bg-sink px-2 py-1 font-mono text-[11px] leading-none text-ink-2;
+    @apply numeric inline-flex items-center gap-1 bg-fill/10 px-2 py-1 text-caption leading-none text-ink-2;
   }
+  /* A keycap, as GNOME's shortcuts window draws one. */
   .kbd {
     border-radius: var(--r-1);
-    @apply inline-flex items-center border border-edge-strong bg-sink px-2 py-1 font-mono text-[11px] leading-none text-ink-2;
+    box-shadow: inset 0 -2px 0 rgb(var(--fill) / 0.15);
+    @apply inline-flex min-w-[24px] items-center justify-center bg-fill/10 px-2 py-1 text-caption font-bold leading-none text-ink;
   }
 
-  /*
-   * Focus must survive every hover style above it.
-   *
-   * `outline` rather than a ring with an offset colour: a ring offset has to
-   * name the surface behind it, and these controls sit on three different
-   * planes — so any single offset colour paints a wrong-coloured halo on two
-   * of them. An outline just draws over whatever is there.
-   */
   .btn-base:focus-visible,
   .btn-icon:focus-visible,
   .choice:focus-visible,
-  .tab:focus-visible,
-  .field:focus-visible,
-  .field:has(:focus-visible) {
-    outline: 2px solid rgb(var(--accent));
+  .tab:focus-visible {
+    outline: 2px solid rgb(var(--accent) / 0.5);
     outline-offset: 2px;
+  }
+}
+
+/* ==================================================================== *
+ * Primitives (src/renderer/src/ui/): the same GTK look, token-only.
+ * Heights 28 / 34 / 40; no hit area under 36 px (::before extends one).
+ * ==================================================================== */
+@layer components {
+  .ui-btn {
+    border-radius: var(--r-1);
+    gap: 6px;
+    transition:
+      background-color var(--t-fast) var(--ease),
+      color var(--t-fast) var(--ease),
+      transform var(--t-press) var(--ease);
+    @apply no-drag relative inline-flex shrink-0 cursor-pointer select-none items-center justify-center whitespace-nowrap font-bold active:scale-[0.97] disabled:pointer-events-none disabled:opacity-50;
+  }
+  .ui-btn::before,
+  .ui-icon-btn::before {
+    content: '';
+    position: absolute;
+    inset: 50% auto auto 50%;
+    width: max(100%, 36px);
+    height: max(100%, 36px);
+    transform: translate(-50%, -50%);
+  }
+  .ui-h-sm {
+    height: 28px;
+    @apply px-2.5 text-meta;
+  }
+  .ui-h-md {
+    height: 34px;
+    @apply px-3.5 text-control;
+  }
+  .ui-h-lg {
+    height: 40px;
+    @apply px-5 text-body;
+  }
+  .ui-btn-primary {
+    box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.12);
+    @apply bg-accent text-accent-fg hover:bg-accent/90 active:bg-accent/80;
+  }
+  .ui-btn-quiet {
+    @apply bg-fill/10 text-ink hover:bg-fill/15 active:bg-fill/25;
+  }
+  .ui-btn-ghost {
+    @apply bg-transparent text-ink hover:bg-fill/10 active:bg-fill/25;
+  }
+  .ui-btn-danger {
+    @apply bg-destructive text-destructive-fg hover:bg-destructive/90 active:bg-destructive/80;
+  }
+  /* .pill: the main call to action. */
+  .ui-btn-pill {
+    border-radius: var(--r-pill);
+    @apply px-6;
+  }
+
+  /* Image buttons: flat by default, as in header bars and rows. */
+  .ui-icon-btn {
+    border-radius: var(--r-1);
+    transition:
+      background-color var(--t-fast) var(--ease),
+      color var(--t-fast) var(--ease);
+    @apply no-drag relative inline-flex shrink-0 cursor-pointer items-center justify-center bg-transparent text-ink hover:bg-fill/10 active:bg-fill/25 disabled:pointer-events-none disabled:opacity-50;
+  }
+  .ui-icon-btn-sm {
+    @apply h-7 w-7;
+  }
+  .ui-icon-btn-md {
+    height: 34px;
+    width: 34px;
+  }
+  .ui-icon-btn-circular {
+    border-radius: var(--r-pill);
+  }
+  .ui-icon-btn[aria-pressed='true'],
+  .ui-icon-btn[aria-expanded='true'] {
+    @apply bg-fill/25;
+  }
+
+  .ui-field {
+    border-radius: var(--r-1);
+    @apply no-drag w-full bg-fill/10 px-3 text-body text-ink outline-none placeholder:text-ink-3 disabled:opacity-50;
+  }
+  .ui-field:not(textarea) {
+    height: 34px;
+  }
+  textarea.ui-field {
+    @apply py-2;
+    min-height: 80px;
+    resize: vertical;
+  }
+  .ui-field-lg:not(textarea) {
+    height: 40px;
+  }
+  .ui-field:focus,
+  .ui-field:focus-within {
+    outline: 2px solid rgb(var(--accent) / 0.5);
+    outline-offset: -2px;
+  }
+  select.ui-field {
+    -webkit-appearance: none;
+    appearance: none;
+    padding-right: 2rem;
+  }
+
+  /* GTK switch, measured: 46 x 26, white knob, the track at .15 off and accent on. */
+  .ui-switch {
+    width: 46px;
+    height: 26px;
+    transition: background-color var(--t-fast) var(--ease);
+    @apply no-drag relative inline-flex shrink-0 cursor-pointer items-center rounded-pill bg-fill/15 disabled:cursor-not-allowed disabled:opacity-50;
+  }
+  .ui-switch::before {
+    content: '';
+    position: absolute;
+    inset: -5px 0;
+  }
+  .ui-switch[aria-checked='true'] {
+    background-color: rgb(var(--accent-bright));
+  }
+  .ui-switch-knob {
+    left: 3px;
+    width: 20px;
+    height: 20px;
+    background-color: rgb(255 255 255);
+    box-shadow: 0 2px 4px rgb(0 0 0 / 0.2);
+    transition: transform var(--t-base) var(--ease-spring);
+    @apply absolute rounded-pill;
+  }
+  .ui-switch[aria-checked='true'] .ui-switch-knob {
+    transform: translateX(20px);
+  }
+
+  .ui-check {
+    border-radius: var(--r-1);
+    width: 18px;
+    height: 18px;
+    box-shadow: inset 0 0 0 2px rgb(var(--fill) / 0.25);
+    transition: background-color var(--t-fast) var(--ease);
+    @apply no-drag relative inline-flex shrink-0 cursor-pointer items-center justify-center text-accent-fg disabled:cursor-not-allowed disabled:opacity-50;
+  }
+  .ui-check::before {
+    content: '';
+    position: absolute;
+    inset: -9px;
+  }
+  .ui-check[aria-checked='true'],
+  .ui-check[aria-checked='mixed'] {
+    box-shadow: none;
+    @apply bg-accent;
+  }
+
+  /* GNOME 46's toggle group: linked toggle buttons, 1 px apart, the checked one at .25. */
+  .ui-segmented {
+    @apply inline-flex shrink-0 gap-px;
+  }
+  .ui-segment {
+    height: 34px;
+    transition: background-color var(--t-fast) var(--ease);
+    @apply no-drag relative inline-flex cursor-pointer select-none items-center justify-center gap-1.5 whitespace-nowrap bg-fill/10 px-3.5 text-control font-bold text-ink hover:bg-fill/15 disabled:cursor-not-allowed disabled:opacity-50;
+  }
+  .ui-segment:first-child {
+    border-start-start-radius: var(--r-1);
+    border-end-start-radius: var(--r-1);
+  }
+  .ui-segment:last-child {
+    border-start-end-radius: var(--r-1);
+    border-end-end-radius: var(--r-1);
+  }
+  .ui-segment::before {
+    content: '';
+    position: absolute;
+    inset: -1px 0;
+  }
+  .ui-segment[aria-checked='true'] {
+    @apply bg-fill/25 hover:bg-fill/25;
+  }
+
+  .ui-menu {
+    @apply surface-float min-w-[200px] p-1.5;
+  }
+  .ui-menu-item {
+    border-radius: var(--r-1);
+    height: 32px;
+    @apply flex w-full cursor-pointer items-center gap-2.5 px-2.5 text-left text-body text-ink outline-none hover:bg-fill/10 focus:bg-fill/10 disabled:cursor-not-allowed disabled:opacity-50;
+  }
+  .ui-menu-item-danger {
+    @apply text-bad;
+  }
+  .ui-menu-sep {
+    @apply mx-1 my-1.5 h-px bg-edge-soft;
+  }
+
+  /* An OSD tooltip, as GTK's. */
+  .ui-tooltip {
+    border-radius: var(--r-1);
+    @apply pointer-events-none fixed max-w-[280px] bg-osd px-2.5 py-1.5 text-caption text-osd-fg;
+  }
+
+  /* ---- Boxed lists and rows (AdwPreferencesGroup / ActionRow) ---- */
+  .ui-boxed-list {
+    @apply panel overflow-hidden;
+  }
+  .ui-row {
+    min-height: 50px;
+    @apply flex items-center gap-3 border-b border-edge-soft px-3 py-2 last:border-b-0;
+  }
+  .ui-row-activatable {
+    transition: background-color var(--t-fast) var(--ease);
+    @apply no-drag w-full cursor-pointer text-left hover:bg-fill/[0.04] active:bg-fill/10;
+  }
+  .ui-row-title {
+    @apply text-body text-ink;
+  }
+  .ui-row-subtitle {
+    @apply text-meta text-ink-2;
+  }
+  /* Back-compat names for the 4.0 primitives. */
+  .ui-settings-group {
+    @apply ui-boxed-list;
+  }
+  .ui-settings-row {
+    @apply ui-row;
+  }
+
+  /* A badge (counts, queue %): an accent pill in tabular figures. */
+  .ui-badge {
+    min-width: 20px;
+    @apply numeric inline-flex h-5 items-center justify-center rounded-pill bg-accent px-1.5 text-caption font-bold leading-none text-accent-fg;
+  }
+
+  /* An AdwBanner: a full-width strip under the header bar. */
+  .ui-banner {
+    @apply flex min-h-[46px] items-center justify-center gap-3 bg-accent/12 px-4 py-2 text-center text-body text-ink;
+  }
+
+
+  /* ---- Header bars (AdwHeaderBar, 46 px) ---- */
+  .ui-headerbar {
+    height: 46px;
+    transition: box-shadow var(--t-fast) var(--ease);
+    @apply relative flex shrink-0 items-center gap-1.5 px-1.5;
+  }
+  .ui-headerbar-shade {
+    box-shadow: 0 1px 0 rgb(var(--line));
+  }
+  .ui-headerbar-start,
+  .ui-headerbar-end {
+    @apply flex min-w-0 flex-1 items-center gap-1.5;
+  }
+  .ui-headerbar-end {
+    @apply justify-end;
+  }
+  /* A header action never shrinks or ellipsises: a view gives a short label,
+     or an icon with a tooltip where the bar is narrow (HeaderSlot). */
+  .ui-headerbar-start > *,
+  .ui-headerbar-end > *,
+  .ui-headerbar-end > * > * {
+    @apply shrink-0 whitespace-nowrap;
+  }
+  /* A control in the middle of the bar (Search's entry): clear of both ends. */
+  .ui-headerbar-center {
+    width: min(440px, calc(100% - 300px));
+    @apply no-drag absolute left-1/2 top-1/2 flex -translate-x-1/2 -translate-y-1/2 items-center;
+  }
+  .ui-headerbar-title {
+    max-width: calc(100% - 120px);
+    @apply pointer-events-none absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 truncate text-heading text-ink;
+  }
+
+  /* ---- Row parts ---- */
+  .ui-combo {
+    border-radius: var(--r-1);
+    -webkit-appearance: none;
+    appearance: none;
+    @apply no-drag max-w-[220px] cursor-pointer bg-transparent py-1.5 pl-2 pr-7 text-right text-body text-ink-2 outline-none hover:bg-fill/10;
+  }
+  .ui-combo:focus-visible {
+    outline: 2px solid rgb(var(--accent) / 0.5);
+    outline-offset: -2px;
+  }
+  .ui-combo option {
+    @apply bg-float text-ink;
+  }
+  .ui-entry-row:focus-within {
+    outline: 2px solid rgb(var(--accent) / 0.5);
+    outline-offset: -2px;
+  }
+  .ui-entry-row-invalid {
+    box-shadow: inset 3px 0 0 rgb(var(--bad));
+  }
+  .ui-expander-children {
+    @apply border-t border-edge-soft bg-fill/[0.03];
+  }
+  .ui-expander-children > * {
+    @apply pl-6;
+  }
+  .ui-expander-children[aria-disabled='true'] {
+    @apply pointer-events-none opacity-50;
+  }
+
+  /* A deep-linked row (settings/<panel>#<row>): a 1.2 s accent outline pulse.
+     A keyframe with no fill mode: at rest the row has no outline either way. */
+  .ui-row-pulse {
+    animation: ui-row-pulse 1.2s var(--ease);
+  }
+
+  /* ---- Navigation stack pages (AdwNavigationView), CSS only ---- */
+  .ui-page-push {
+    animation: ui-page-in var(--t-spring) var(--ease-spring);
+  }
+  .ui-page-pop {
+    animation: ui-page-back var(--t-spring) var(--ease-spring);
+  }
+
+  /* ---- Appearance pickers ---- */
+  .ui-style-tile {
+    @apply no-drag flex cursor-pointer flex-col items-center gap-2 rounded-3 p-1 outline-none;
+  }
+  .ui-tile-frame {
+    width: 96px;
+    height: 64px;
+    border-radius: var(--r-2);
+    box-shadow: 0 0 0 1px rgb(var(--line));
+    @apply relative flex overflow-hidden;
+  }
+  .ui-style-tile[aria-checked='true'] .ui-tile-frame {
+    box-shadow: 0 0 0 3px rgb(var(--accent-bright));
+  }
+  .ui-style-tile:focus-visible .ui-tile-frame {
+    outline: 2px solid rgb(var(--accent) / 0.5);
+    outline-offset: 4px;
+  }
+  .ui-tile-window {
+    @apply flex h-full w-full;
+    background-color: rgb(var(--surface));
+  }
+  .ui-tile-left {
+    clip-path: inset(0 50% 0 0);
+    @apply absolute inset-0;
+  }
+  .ui-tile-right {
+    clip-path: inset(0 0 0 50%);
+    @apply absolute inset-0;
+  }
+  .ui-tile-sidebar {
+    width: 28px;
+    background-color: rgb(var(--sidebar));
+  }
+  .ui-tile-content {
+    @apply flex flex-1 flex-col gap-1.5 p-2;
+  }
+  .ui-tile-line {
+    @apply h-1.5 w-2/3 rounded-pill bg-fill/25;
+  }
+  .ui-tile-card {
+    border-radius: 3px;
+    background-color: rgb(var(--card));
+    box-shadow: var(--shadow-card);
+    @apply h-4 w-full;
+  }
+  .ui-tile-accent {
+    @apply h-2 w-1/3 rounded-pill;
+    background-color: rgb(var(--accent-bright));
+  }
+  .ui-tile-check {
+    @apply absolute -bottom-1.5 -right-1.5 flex h-5 w-5 items-center justify-center rounded-pill bg-accent text-accent-fg;
+  }
+
+  .ui-swatch {
+    width: 32px;
+    height: 32px;
+    background-color: rgb(var(--accent-bright));
+    @apply no-drag relative inline-flex shrink-0 cursor-pointer items-center justify-center rounded-pill outline-none;
+  }
+  .ui-swatch::before {
+    content: '';
+    position: absolute;
+    inset: -3px;
+  }
+  .ui-swatch[aria-checked='true'] {
+    box-shadow:
+      0 0 0 2px rgb(var(--surface)),
+      0 0 0 4px rgb(var(--text));
+  }
+  .ui-swatch:focus-visible {
+    outline: 2px solid rgb(var(--accent) / 0.5);
+    outline-offset: 5px;
+  }
+  .ui-swatch-system {
+    background: conic-gradient(
+      rgb(53 132 228),
+      rgb(33 144 164),
+      rgb(58 148 74),
+      rgb(200 136 0),
+      rgb(233 84 32),
+      rgb(230 45 66),
+      rgb(213 97 153),
+      rgb(145 65 172),
+      rgb(53 132 228)
+    );
+  }
+
+  .ui-toast {
+    border-radius: var(--r-pill);
+    box-shadow: var(--shadow-2);
+    @apply bg-osd;
+  }
+
+  .ui-banner-bad {
+    @apply bg-bad/12;
+  }
+  .ui-spinner {
+    border-radius: var(--r-pill);
+    border: 2px solid rgb(var(--fill) / 0.15);
+    border-top-color: rgb(var(--text));
+    animation: ui-spin 0.8s linear infinite;
+    @apply inline-block shrink-0;
+  }
+
+  /* ---- Shell (D5) ---- */
+  .ui-app-sidebar {
+    background-color: rgb(var(--sidebar));
+  }
+  /* Below 860 px (or folded by Settings): over the sheet, with a scrim behind. */
+  .ui-app-sidebar-overlay {
+    box-shadow: var(--shadow-3);
+    @apply absolute inset-y-0 left-0;
+  }
+  /* A GNOME caption button: a 24 px circle at .10 inside a 36 px target. */
+  .ui-caption {
+    @apply no-drag inline-flex h-9 w-9 cursor-pointer items-center justify-center text-ink outline-none;
+  }
+  .ui-caption-circle {
+    transition: background-color var(--t-fast) var(--ease);
+    @apply inline-flex h-6 w-6 items-center justify-center rounded-pill bg-fill/10;
+  }
+  .ui-caption:hover .ui-caption-circle {
+    @apply bg-fill/15;
+  }
+  .ui-caption:active .ui-caption-circle {
+    @apply bg-fill/25;
+  }
+  .ui-caption:focus-visible .ui-caption-circle {
+    outline: 2px solid rgb(var(--accent) / 0.5);
+    outline-offset: 1px;
+  }
+  /* Windows' caption overlay (titleBarOverlay) owns this corner. */
+  .ui-titlebar-overlay-space {
+    width: calc(100vw - env(titlebar-area-x, 0px) - env(titlebar-area-width, calc(100vw - 138px)));
+    @apply h-full shrink-0;
+  }
+  /* ---- Shell ---- */
+  .app-sheet {
+    border-top: 1px solid var(--sheet-edge);
+    border-left: 1px solid var(--sheet-edge);
+  }
+  /* A navigation-sidebar row: 36 px, measured. */
+  .ui-nav-item {
+    transition: background-color var(--t-fast) var(--ease);
+    @apply cursor-pointer select-none text-ink hover:bg-fill/[0.07];
+  }
+  .ui-nav-item-on {
+    @apply bg-fill/10 hover:bg-fill/[0.13];
+  }
+
+  .ui-nav-item:focus-visible,
+  .ui-btn:focus-visible,
+  .ui-icon-btn:focus-visible,
+  .ui-switch:focus-visible,
+  .ui-check:focus-visible,
+  .ui-segment:focus-visible,
+  .ui-row-activatable:focus-visible,
+  .ui-menu-item:focus-visible {
+    outline: 2px solid rgb(var(--accent) / 0.5);
+    outline-offset: -2px;
   }
 }
 
@@ -468,7 +1108,8 @@ input[type='range']::-webkit-slider-thumb {
   border: 3px solid rgb(var(--surface));
 }
 
-select.field {
+select.field,
+select.ui-field {
   -webkit-appearance: none;
   appearance: none;
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23888' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
@@ -506,6 +1147,42 @@ select.field {
 .skeleton {
   background-color: rgb(var(--skeleton));
   animation: idle-pulse 1.6s var(--ease) infinite;
+}
+
+
+@keyframes ui-page-in {
+  from {
+    transform: translateX(100%);
+  }
+  to {
+    transform: none;
+  }
+}
+@keyframes ui-page-back {
+  from {
+    transform: translateX(-30%);
+    opacity: 0.6;
+  }
+  to {
+    transform: none;
+    opacity: 1;
+  }
+}
+@keyframes ui-row-pulse {
+  0%,
+  60% {
+    outline: 2px solid rgb(var(--accent-bright));
+    outline-offset: -2px;
+  }
+  100% {
+    outline: 2px solid rgb(var(--accent-bright) / 0);
+    outline-offset: -2px;
+  }
+}
+@keyframes ui-spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {

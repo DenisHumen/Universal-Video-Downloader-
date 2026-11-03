@@ -183,7 +183,7 @@ export default function TrimEditor({ duration, value, onChange, hint }: Props): 
             onFocus={() => setDragging(null)}
             placeholder="0:00"
             spellCheck={false}
-            className="field mono text-[13px]"
+            className="field mono text-control"
           />
         </label>
         <label className="min-w-[96px] flex-1">
@@ -196,7 +196,7 @@ export default function TrimEditor({ duration, value, onChange, hint }: Props): 
             onFocus={() => setDragging(null)}
             placeholder={total != null ? toClock(total) : t('trim.end.full')}
             spellCheck={false}
-            className="field mono text-[13px]"
+            className="field mono text-control"
           />
         </label>
         <button className="btn-quiet px-3 py-2" onClick={() => onChange({ start: 0, end: undefined })}>
@@ -204,7 +204,7 @@ export default function TrimEditor({ duration, value, onChange, hint }: Props): 
         </button>
       </div>
 
-      <p className="mono text-[12px] text-ink-2">
+      <p className="mono text-meta text-ink-2">
         {invalid ? (
           <span className="text-bad">{t('trim.invalid')}</span>
         ) : (

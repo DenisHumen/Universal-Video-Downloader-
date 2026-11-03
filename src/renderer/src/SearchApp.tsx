@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import type { AppSettings } from '@shared/types'
 import Logo from './components/Logo'
-import Toasts from './components/Toasts'
+import { ToastViewport as Toasts } from './ui'
 import CaptionButtons from './components/CaptionButtons'
 import SearchView from './views/SearchView'
 import { useStore } from './store'
@@ -17,9 +17,11 @@ export default function SearchApp(): JSX.Element {
   useEffect(() => {
     void (async () => {
       const [next, info] = await Promise.all([window.api.getSettings(), window.api.getAppInfo()])
-      applyAppearance(next, info.locale)
+      applyAppearance(next, info.locale, info.systemAccent)
       setSettings(next)
       setIsMac(info.platform === 'darwin')
+      // The caption buttons read the platform and GNOME's button order from the store.
+      useStore.setState({ appInfo: info })
       // Share settings with the store so the embedded StreamingCard (anime
       // picker) honours the user's default quality.
       useStore.setState({ settings: next, appInfo: info })
@@ -36,7 +38,7 @@ export default function SearchApp(): JSX.Element {
     const refresh = (): void => {
       void window.api.getSettings().then((next) => {
         const info = useStore.getState().appInfo
-        if (info) applyAppearance(next, info.locale)
+        if (info) applyAppearance(next, info.locale, info.systemAccent)
         setSettings(next)
         useStore.setState({ settings: next })
       })
@@ -61,7 +63,7 @@ export default function SearchApp(): JSX.Element {
       >
         <div className="flex items-center gap-2.5">
           <Logo className="h-[18px] w-[18px] text-ink" />
-          <span className="mono text-[12px] font-semibold uppercase tracking-[0.16em] text-ink">
+          <span className="text-heading text-ink">
             {t('nav.search')}
           </span>
         </div>

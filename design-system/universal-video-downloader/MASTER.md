@@ -1,4 +1,4 @@
-# UVD — Precision · Design System (MASTER)
+# UVD · v4 + Adwaita (Yaru) · Design System (MASTER)
 
 > **LOGIC:** When building a specific page, first check `pages/<page-name>.md`.
 > If that file exists, its rules **override** this Master file.
@@ -12,228 +12,114 @@ Generated from the `ui-ux-pro-max` database, then reconciled with what actually
 shipped — every value below is the implemented one, not the generator's default.
 The generator proposed a navy/green enterprise palette on a "documentation
 landing" pattern; the app is a desktop tool, so the palette was rebuilt as
-monochrome + a single blue and the pattern discarded.
+monochrome + a single accent and the pattern discarded. §1–6 were rewritten
+for 4.0 (coalition plan, item 2.8); §7–8 describe the 3.x shell until the
+4.0 shell (plan 4.2) replaces it.
 
 **Implementation:** `src/renderer/src/index.css` (tokens + component classes) ·
-`tailwind.config.js` (token → utility mapping) · `src/renderer/src/lib/motion.ts`
-(motion vocabulary). `npm run check:contrast` gates the palette.
+`tailwind.config.js` (token → utility mapping, type scale) ·
+`src/shared/accent.ts` (accents, system-accent clamp) ·
+`src/shared/theme-boot.ts` (theme before first paint). `npm run check:contrast`
+gates the palette, `npm run visual` diffs every view against committed
+baselines.
 
 ---
 
-## 1. Principles
+## 1. Principles (4.0 + Adwaita/Yaru, amendments A1, A1.1, A1.2)
 
-1. **One saturated colour.** Everything else is a neutral plane or a text tier.
-   The accent appears at full strength in exactly one place per screen.
-2. **Rules, not shadows.** Elevation is a hairline plus a flat fill. No blur, no
-   glow, no gradient, no ambient light source.
-3. **Data is mono.** Every measurement, path, identifier and count is set in
-   JetBrains Mono with tabular figures. Prose and labels are Inter.
-4. **Structure over decoration.** Indicators are part of the layout — the active
-   tab's rule sits on the bar's own hairline — not shapes floating behind
-   content. Where structure would be *too quiet to read*, it loses: queue
-   progress is a real bar, not the row's border.
-5. **Motion explains, never decorates.** Nothing animates while idle.
+The user runs Ubuntu 24.04 GNOME with Yaru, and asked for the app to look
+like it. 4.0 keeps what the v4 demo got right (the inset content sheet, its
+depth, its density) and takes GNOME's *shape*: header bars, a sidebar of
+rows, boxed lists, GNOME Settings' layout, Yaru's palette, Ubuntu Sans and
+Yaru's icons. Every value was measured on the user's machine
+(`docs/design/calibration.md`); none is from memory.
 
-## 2. Colour tokens
+1. **The user's desktop is the reference.** Colours, sizes and radii come
+   from D0 and the user's own Settings screenshot; where they disagree the
+   screenshot wins, unless the contrast gate forbids it.
+2. **AA everywhere.** Yaru's dim text, its orange as a text fill, and a
+   checked toggle on a dark card all fail 4.5:1 as drawn; ours are corrected
+   (`--text-2`, the OKLab-darkened accent fill, a .25 checked fill). The raw
+   orange stays for shapes that carry no text (`--accent-bright`).
+3. **Neutral controls, one accent.** Buttons, entries, toggles and selected
+   rows are the text colour at an alpha, as libadwaita draws them. The accent
+   is for the suggested action, switches, progress and the selection ring.
+4. **Floating things cast shadows; nothing blurs.** Cards use libadwaita's
+   light ring shadow (Night: v4's depth); popovers and dialogs v4's
+   shadow-2/3. A1 removed the blur material and its machinery.
+5. **Motion is CSS.** Pages slide on libadwaita's critically damped spring in
+   `linear()`; no `requestAnimationFrame`, no view-host transforms, no
+   fill-mode dependence, reduced motion respected.
+6. **Tokens only**, gated by `npm run check:contrast`, pinned by the
+   visual-diff harness (`npm run visual`).
 
-Declared as `R G B` triples on `[data-theme]` so Tailwind can alpha them and a
-theme swap is one attribute on `<html>`. Two themes, no accent picker.
+## 2. Colour (Yaru, measured; R G B)
 
 | Token | Role | Night | Day |
 |---|---|---|---|
-| `--bg` | window canvas | `#09090B` | `#F0F0F3` |
-| `--surface` | raised plane (`.block`) | `#141417` | `#FFFFFF` |
-| `--surface-2` | inset plane (`.field`, `.well`) | `#1C1C20` | `#F8F8FA` |
-| `--line` | hairline | `#27272C` | `#E0E0E5` |
-| `--line-strong` | emphasised border | `#3F3F46` | `#C6C6CE` |
-| `--text` | primary | `#F4F4F5` | `#09090B` |
-| `--text-2` | secondary | `#A8A8B2` | `#52525B` |
-| `--text-3` | tertiary / meta | `#878792` | `#64646E` |
-| `--accent` | brand fill | `#2F5BFF` | `#254EEB` |
-| `--accent-fg` | label on accent fill | `#FFFFFF` | `#FFFFFF` |
-| `--accent-ink` | accent-coloured **text** | `#8AA8FF` | `#1E40D6` |
-| `--good` | success | `#4ADE80` | `#146B35` |
-| `--warn` | caution | `#FACC15` | `#865406` |
-| `--bad` | failure | `#FB7185` | `#B81C24` |
-| `--bad-fg` | label on a solid `bad` fill (the live badge) | `#09090B` | `#FFFFFF` |
-| `--control-edge` | hairline round quiet and icon buttons | none | `--line` |
-| `--skeleton` | loading placeholder plane (`.skeleton`) | `#2C2C32` | `#DEDEE4` |
+| `--bg` / `--surface` | window, sheet, header bars | 44 44 44 | 250 250 250 |
+| `--sidebar` | app sidebar | 48 48 48 | 235 235 235 |
+| `--sidebar-2` | Settings' panel list | 46 46 46 | 243 243 243 |
+| `--card` | cards, boxed lists | 61 61 61 | 255 255 255 |
+| `--surface-3` | popovers, dialogs | 56 56 56 | 255 255 255 |
+| `--fill` | control colour (used at .10 / .15 / .25) | 247 247 247 | 61 61 61 |
+| `--line` / `--line-soft` | pane divider / row separator | 31 / 39 | 219 / 237 |
+| `--text` / `--text-2` | text / dim (AA-corrected) | 247 / 172 | 61 / 92 |
+| `--accent` / `--accent-ink` | Yaru orange fill (AA) / text | 213 65 0 / 255 154 106 | 213 65 0 / 183 31 0 |
+| `--accent-bright` | raw #E95420 for non-text shapes | 233 84 32 | 233 84 32 |
+| `--destructive` | destructive fill (white label) | 192 28 72 | 192 28 72 |
+| `--bad` | failure text, kept off the orange's hue | 255 170 190 | 192 28 72 |
+| `--osd` / `--osd-fg` | tooltips, toasts | 30 / 255 | 30 / 255 |
 
-**Why `--accent-ink` exists:** the fill colour never clears 4.5:1 as text on its
-own canvas. Accent text uses a lighter (Night) or darker (Day) cut of the same
-hue. **Never write text in `--accent`.**
+**Accents:** GNOME's nine (orange = Yaru's, default; blue, teal, green,
+yellow, red, pink, purple, slate), each derived by `scripts/accents.mjs`.
+"System" follows the desktop where it answers (portal, getAccentColor, or
+the Yaru variant from the GTK theme) and is hidden where it does not.
 
-**Gate:** `npm run check:contrast` verifies all 7 text colours against all 3
-planes in both themes, `--accent-fg` on `--accent` and `--bad-fg` on `--bad`,
-**and each status colour on a 12% tint of itself over each plane** — 64
-pairings, all ≥ 4.5:1. Tightest today: Day `--bad` on `--bad/12` over `--bg` at
-4.70:1. It also holds Day's button hairline (`--line`) to 1.12:1 against each
-plane: not text, so not 4.5:1, but enough that the edge can't quietly vanish.
-And it holds the one non-text plane that has to be *seen*, `--skeleton`, to
-1.3:1 against `--surface` (flattest today: Night at 1.33:1).
+**Gate:** text on all planes, every accent in both themes, text on the
+control fills, the destructive and OSD labels, a hue gap so a failure never
+reads as the accent, Day hairlines and the skeleton.
 
-> **Correction.** Skeletons were `--surface-2`, 1.1:1 on a panel, and at the
-> low point of their pulse a detecting card read as empty rather than busy.
-> The first proposed values (`42 42 48` / `226 226 232`) measured 1.29:1 in
-> both themes — just under the floor — and were nudged one step.
+## 3. Type
 
-> **Correction.** White on Night's `--bad` is 2.69:1, and the live badge was
-> exactly that, at 9px. `--bad-fg` is the one label token that flips between
-> themes. Day's quiet buttons were a `--surface-2` fill at 1.06:1 on a white
-> panel — present, and invisible; `--control-edge` gives them a hairline there
-> instead of a darker fill, which would sink every button on the canvas.
+Ubuntu Sans and Ubuntu Sans Mono v1.006 (UFL 1.0), bundled unmodified.
+libadwaita's classes at v4's density: title-1 26.67/800, title-2 20/800,
+title-3 20/700, title-4 17.33/700, heading 14/700, body 14, control 13,
+caption 12 (`text-*` in Tailwind). `.numeric` is tabular figures in the
+sans; mono is for paths, URLs and ids. English titles, buttons and menu
+items use HIG header capitalisation, descriptions sentence case; Russian is
+sentence case; a label that opens more input ends in "…".
 
-> **Correction.** The tint checks were added after a live measurement caught
-> `.btn-danger` at 4.14:1 in Day while the gate reported the palette clean:
-> `bad` text on a `bad/12` fill puts the colour on *both* sides, so the margin
-> is far thinner than the same text on a plain plane. Checking text-on-plane
-> alone will never see it. Adding the case immediately turned up a second one
-> (`--warn` at 4.47:1); both colours were darkened.
+## 4. Shape and size
 
-Tailwind names: `canvas` · `raise` · `sink` · `edge` · `edge-strong` · `ink` ·
-`ink-2` · `ink-3` · `accent` · `accent-fg` · `accent-ink` · `good` · `warn` ·
-`bad` · `bad-fg`.
+Radii 6 (buttons, entries, rows, menu items) / 12 (cards, boxed lists,
+popovers, the sheet) / 16 (dialogs); pills for the main call to action,
+toasts, badges and the switch. Header bars 46, sidebar rows 44, boxed rows
+≥ 50, controls 34, switch 46 × 26, caption buttons 24 px circles in 36 px
+targets; no hit area under 36.
 
-## 3. Typography
+## 5. Components (`src/renderer/src/ui/`)
 
-- **Inter Variable** — interface. Bundled via `@fontsource-variable/inter`.
-- **JetBrains Mono Variable** — all data. Bundled via
-  `@fontsource-variable/jetbrains-mono`. Applied with `.mono`, which sets
-  `font-variant-numeric: tabular-nums` so a column of percentages never shifts.
-**Five type roles**, and every screen is built from these rather than ad-hoc
-sizes:
+HeaderBar · Button / IconButton · Field · Switch · Checkbox ·
+SegmentedControl (GNOME 46 linked toggles) · Menu / Popover · Dialog
+(AdwAlertDialog) · Toast (OSD pill) · Tooltip (OSD) · PreferencesPage /
+PreferencesGroup · Action / Switch / Combo / Entry / PasswordEntry /
+Expander rows · NavigationStack · StyleTiles · AccentSwatches · Badge ·
+Banner · Spinner · EmptyState (AdwStatusPage) · Icon (Yaru symbolics,
+CC-BY-SA-4.0, separate SVG files painted in currentColor).
 
-| Role | Size | Use |
-|---|---|---|
-| `.h1` | 24px / 600 | The one heading per screen (Home sets it at 20px: the field, not the heading, is that screen's subject) |
-| `.h2` | 15px / 600 | A section inside a screen |
-| `.lead` | 14px, `--text-2`, max 62ch | The sentence under an `h1` |
-| `.hint` | 12px, `--text-2`, max 62ch | Explanation under a control |
-| `.label` | 11px mono, uppercase, 0.08em, `--text-2` | Marks a **group of controls** — never what a screen is |
-
-The roles live in the components layer, so a colour utility beside one wins
-(`label text-accent-ink`, `hint text-bad`). They used to sit after the
-utilities, and every such stamp and warning rendered in the role's own grey.
-
-Base body text is **14px / 1.5**. Nothing carrying prose goes below 12px; 11px
-is reserved for tags, badges, keys and short numerics.
-
-> **Correction.** The first cut ran on 13px body with 10px labels in `--text-3`,
-> and used `.label` as the home screen's headline — so the app's main question
-> was set smaller than its own metadata. Restraint is a job for colour and
-> spacing, never for legibility.
-
-Both faces are bundled, never fetched: the window's CSP blocks remote
-stylesheets and the app must look identical offline.
-
-## 4. Shape
-
-Four steps, no in-between values.
-
-| Token | Value | Used for |
-|---|---|---|
-| `--r-1` | 6px | tags, icon buttons, episode toggles |
-| `--r-2` | 10px | fields, list rows, thumbnails |
-| `--r-3` | 16px | blocks, dialogs, the focal input |
-| `--r-pill` | 999px | buttons, choices, filter fields |
-
-Tailwind: `rounded-1` · `rounded-2` · `rounded-3` · `rounded-full`.
-
-> **Correction.** The ladder was 8/14/22. A thumbnail inside a field inside a
-> panel then read as three soft shapes rather than one structure, and nested
-> corners fought their parents; 6/10/16 keeps the steps distinct.
-
-## 5. Components
-
-| Class | What it is |
-|---|---|
-| `.panel` | Raised plane: one hairline, one flat fill, no shadow |
-| `.well` | Inset plane, nests inside `.panel` |
-| `.btn-solid` | The one loud action per screen — accent fill, pill. A button whose job is done steps down to quiet (Home's "get" once its result is showing) |
-| `.btn-quiet` | Neutral filled control; in Day it carries a `--control-edge` hairline |
-| `.btn-base` | Shape only, never on its own — for a one-off state that brings its own fill (`btn-base bg-good/12 text-good`). It was `.btn`, and fourteen buttons used it bare and rendered as plain words; `stylesheet.test.ts` now fails on that |
-| `.btn-danger` | Destructive — `bad` at 12% |
-| `.btn-icon` | 36px square, filled surface, always visible |
-| `.btn-icon-bare` | 36px square, transparent — for toolbars on their own plane |
-| `.field` / `.field-lg` | Text entry; focus = accent border + 3px accent ring at 16% |
-| `.choice` / `.choice-on` | **The only single-select control.** A wrapping row of pills, min 36px; unselected carries a real fill, selected is solid accent |
-| `.tab` / `.tab-on` | Top-bar navigation; active marked by a 2px accent rule sitting on the bar's own hairline |
-| `.tag` | Read-only fact (extractor, container, count) |
-| `.kbd` | Keyboard key |
-| `.skeleton` | Placeholder plane in `--skeleton`; pulses in place |
-| `EmptyState` | The one "nothing here" layout: icon, heading, hint, and always a way out |
-| `TabStrip` | A tab row that scrolls with arrows, never a scrollbar. A `<nav>` with `aria-current`, not a tab list: it switches pages and has no tab panels |
-| `CaptionButtons` | Minimise, maximise/restore, close for Windows and Linux: full bar height, 46px wide, flush to the corner, close hover in the system's `#C42B1C` |
-| `RowMenu` | A row's secondary actions behind "⋯": `aria-haspopup="menu"`, focus into the menu on open and back on Esc, arrows/Home/End between items, Tab or an outside click closes. Opens upwards near the bottom of the window |
-| `DropOverlay` | Full-window 2px dashed accent frame, inset 8px, `bg-accent/6`, while a link is dragged over the window. Takes no pointer events: the drop lands on the window's own handler |
-| `Modal` | The one dialog shell: role and name on the panel, focus in on open and back on close, Tab kept inside, Esc for the top dialog only. Every dialog is built on it |
-
-React: `components/Choice.tsx` (choice row), `components/EmptyState.tsx`, and
-`Switch` inside `SettingsView` (booleans).
-
-**Minimum sizes.** Buttons 38px (`.btn-solid` 40px: the one loud control is
-also the easiest to hit), icon buttons and choices 36px, fields 42px.
-This sits under the 44px touch floor on purpose — the app is pointer-only
-Electron — but nothing goes below 36.
-
-**Focus** is an `outline`, not a ring with an offset colour: these controls sit
-on three different planes, so any single offset colour paints a wrong-coloured
-halo on two of them.
-
-> **Rule: component classes must not collide with utility names.** The raised
-> plane was called `.block` at first — and Tailwind ships `.block` as the
-> `display: block` utility, so every element that merely wanted to be a block
-> silently gained a bordered, rounded, filled card. Field labels, capability
-> hints and the search thumbnail all rendered inside a stray panel. Check a
-> proposed class against Tailwind's utility names before adding it.
-
-**Deliberately absent:** segmented controls with a sliding indicator · sweeping
-shimmer gradients · hover lift · card borders inside grids · an icon on every
-list row · gradient text · glassmorphism · ambient light blobs · film grain.
+The shell: the app sidebar (header with the app name and primary menu, 44 px
+rows, the Activity badge) beside the inset sheet, each pane with its own
+header bar; below 860 px the sidebar is an overlay; Settings follows GNOME
+Settings (three columns from 1100, one rail at 860-1099, a stack below 860)
+with deep links `settings/<panel>[/<subpage>][#row]`.
 
 ## 6. Motion
 
-One curve, three durations. Defined in `src/renderer/src/lib/motion.ts`.
-
-- **Ease:** `cubic-bezier(0.2, 0, 0, 1)` — decelerate-emphasised.
-- **Durations:** `--t-fast` 160ms (hover, colour) · `--t-base` 240ms (entrances)
-  · `--t-slow` 320ms (height reveals).
-- **Springs:** dialogs `damping 30 / stiffness 320`; queue reorder
-  `damping 32 / stiffness 340`.
-- **The app's one entrance:** fade + 6px rise.
-- **Stagger:** 30ms per item, 8px rise. A longer cascade reads as slowness.
-- **Screen swaps:** the view host fades in on a CSS keyframe, `animate-view-in`
-  — opacity only, `--t-view` 120ms, no fill mode. Never framer-motion there:
-  its values step on `requestAnimationFrame`, and a tab switch in a throttled
-  window held the new view at opacity 0, a blank window, until the frame clock
-  came back. A keyframe with no fill mode leaves the element at full opacity
-  the moment it ends or is skipped.
-- **Timers that count** (the detect card's elapsed seconds, the taskbar
-  progress) are `setInterval`, for the same reason.
-- `prefers-reduced-motion: reduce` collapses every animation and transition.
-
-> **Nothing load-bearing may depend on the frame clock.** A throttled window —
-> a backgrounded downloader, which is the normal case here — stops firing
-> `requestAnimationFrame`, and with it framer-motion's `animate`, CSS
-> `scroll-behavior: smooth`, and the `scroll` event. Measured with the clock
-> stalled: progress bars froze at their initial width, smooth `scrollIntoView`
-> and `scrollBy` moved nothing, and tab arrows never updated. Progress,
-> scrolling a result into view, and arrow state are all plain styles, instant
-> scrolls and synchronous measurements now. Motion is for entrances only.
->
-> Related: `AnimatePresence mode="popLayout"` needs a ref on each child to
-> measure it. Function components cannot take one, so it silently failed to lift
-> exiting children out of flow — the reason three home-screen states once
-> stacked on top of each other. Exit animations were dropped from the state
-> swaps entirely.
->
-> **Anything dismissed by an external event must not have an exit animation.**
-> An `AnimatePresence` child stays mounted until its exit reports finished, so
-> a click-dismissed banner self-heals — you cannot click in a stalled window —
-> but state-dismissed ones do not. The engine-setup strip is hidden by the
-> engine becoming ready, and with animations frozen it went on announcing
-> "getting the download engine ready" indefinitely. Render those on state, and
-> animate only the appearing, in CSS.
+`--t-press` 90, `--t-fast` 140, `--t-base` 200, `--t-slow` 260 ms;
+`--ease` for widgets; `--ease-spring` = libadwaita's damping-1 /
+stiffness-1000 spring as `linear()`, over `--t-spring` 250 ms, for page
+slides. Everything collapses under `prefers-reduced-motion`.
 
 ## 7. Layout
 

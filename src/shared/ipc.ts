@@ -15,6 +15,12 @@ export const IPC = {
   downloadClearFinished: 'download:clear-finished',
   downloadClearFailed: 'download:clear-failed',
   downloadList: 'download:list',
+  /** The Library (plan 5.3): a page of finished files, which are gone, trash one, forget one. */
+  libraryList: 'library:list',
+  libraryMissing: 'library:missing',
+  libraryTrash: 'library:trash',
+  libraryForget: 'library:forget',
+  evtLibraryChanged: 'library:changed',
   mediaJobStart: 'media:job-start',
   mediaProbe: 'media:probe',
   mediaThumbnail: 'media:thumbnail',
@@ -69,6 +75,8 @@ export const IPC = {
   evtUpdateStatus: 'event:update-status',
   /** Whether the receiving window is maximised, after any change: boolean. */
   evtWindowState: 'event:window-state',
+  /** The OS colour scheme changed; a "system" theme repaints. */
+  evtNativeTheme: 'event:native-theme',
   evtSearchQuery: 'event:search-query',
   evtDetectStatus: 'event:detect-status',
   /** Title, uploader and poster from oEmbed, ahead of the detect: DetectPreview. */
@@ -79,6 +87,8 @@ export const IPC = {
   evtBrowserQueued: 'event:browser-queued',
   evtClipboardLink: 'event:clipboard-link',
   evtNavigate: 'event:navigate',
+  /** A notification was clicked: show this queue row (6.4). */
+  evtFocusRow: 'event:focus-row',
   /** What main tried to hand the window before it was listening. */
   takePending: 'app:take-pending',
 

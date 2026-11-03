@@ -1,4 +1,4 @@
-import { ArrowRight, FolderOpen, Play } from 'lucide-react'
+import { ArrowRight, FolderOpen, Play } from '../ui/icons'
 import type { DownloadItem } from '@shared/types'
 import { useStore } from '../store'
 import { useT } from '../i18n'
@@ -27,8 +27,8 @@ export default function HomeActivity(): JSX.Element {
     <div className="space-y-6">
       {live.length > 0 && (
         <section>
-          <p className="label mb-2">{t('home.active')}</p>
-          <ul className="divide-y divide-edge border-y border-edge">
+          <h3 className="mb-3 text-heading text-ink">{t('home.active')}</h3>
+          <ul className="ui-boxed-list">
             {live.map((item) => (
               <LiveRow key={item.id} item={item} />
             ))}
@@ -38,12 +38,12 @@ export default function HomeActivity(): JSX.Element {
 
       {recent.length > 0 && (
         <section>
-          <p className="label mb-2">{t('home.recent')}</p>
-          <ul className="divide-y divide-edge border-y border-edge">
+          <h3 className="mb-3 text-heading text-ink">{t('home.recent')}</h3>
+          <ul className="ui-boxed-list">
             {recent.map((item) => (
-              <li key={item.id} className="flex items-center gap-2 py-2">
+              <li key={item.id} className="ui-row min-h-[50px]">
                 <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-good" aria-hidden="true" />
-                <span className="min-w-0 flex-1 truncate text-[13px] text-ink" title={item.title}>
+                <span className="min-w-0 flex-1 truncate text-control text-ink" title={item.title}>
                   {item.title}
                 </span>
                 {item.filepath && (
@@ -94,18 +94,18 @@ function LiveRow({ item }: { item: DownloadItem }): JSX.Element {
     item.speed ? formatSpeed(item.speed) : null
   ].filter(Boolean)
   return (
-    <li className="relative py-2">
+    <li className="ui-row min-h-[50px] flex-wrap">
       <div className="flex items-center gap-2">
         <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${meta.dot}`} aria-hidden="true" />
-        <span className="min-w-0 flex-1 truncate text-[13px] text-ink" title={item.title}>
+        <span className="min-w-0 flex-1 truncate text-control text-ink" title={item.title}>
           {item.title}
         </span>
-        <span className="mono shrink-0 text-[12px] text-ink-2">{facts.join(' · ')}</span>
+        <span className="mono shrink-0 text-meta text-ink-2">{facts.join(' · ')}</span>
       </div>
       {item.state !== 'queued' && (
         <div className="absolute inset-x-0 bottom-0 h-[2px] bg-edge" aria-hidden="true">
           <div
-            className="h-full bg-accent transition-[width] duration-base ease-ease"
+            className="h-full bg-accent-bright transition-[width] duration-base ease-ease"
             style={{ width: `${item.indeterminate ? 0 : percent}%` }}
           />
         </div>

@@ -3,7 +3,7 @@ import type { AppSettings } from '@shared/types'
 import { withProxyPassword } from '@shared/proxy'
 import { describeProxyRefusal } from '../resolvers/neterror'
 import { getSettings } from './settings'
-import { getSecret, SECRET } from './secrets'
+import { getSecret, SECRET, secretsAreReady, secretsReady } from './secrets'
 import { createProxyLogin, proxyCredentials, type ProxyCredentials } from './proxy-rules'
 
 /**
@@ -45,6 +45,17 @@ export function proxyUrl(settings: Pick<AppSettings, 'proxy'>): string {
 export function withProxyAuth(request: ClientRequest, url: string): ClientRequest {
   const decide = createProxyLogin(current)
   request.on('login', (authInfo, callback) => {
+    /*
+      The store may still be opening (startup no longer waits for a locked
+      keyring): a proxy challenge waits for the password rather than failing.
+    */
+    if (authInfo.isProxy && !secretsAreReady()) {
+      void secretsReady.then(() => answer(authInfo, callback))
+      return
+    }
+    answer(authInfo, callback)
+  })
+  const answer = (authInfo: Electron.AuthInfo, callback: (username?: string, password?: string) => void): void => {
     const decision = decide(authInfo)
     if (decision.kind === 'answer') {
       callback(decision.username, decision.password)
@@ -58,7 +69,7 @@ export function withProxyAuth(request: ClientRequest, url: string): ClientReques
     if (request.listenerCount('error') > 0) {
       request.emit('error', describeProxyRefusal(url, decision.kind === 'unknown'))
     }
-  })
+  }
   return request
 }
 
@@ -71,6 +82,16 @@ export function withProxyAuth(request: ClientRequest, url: string): ClientReques
 export function answerProxyLoginsForPages(): void {
   const decide = createProxyLogin(current)
   app.on('login', (event, webContents, details, authInfo, callback) => {
+    // Still opening the store: hold the challenge and answer it once the password is known.
+    if (authInfo.isProxy && !secretsAreReady()) {
+      event.preventDefault()
+      void secretsReady.then(() => {
+        const decision = decide(authInfo, `${webContents?.id} ${details.url}`)
+        if (decision.kind === 'answer') callback(decision.username, decision.password)
+        else callback()
+      })
+      return
+    }
     const decision = decide(authInfo, `${webContents?.id} ${details.url}`)
     if (decision.kind !== 'answer') return
     event.preventDefault()

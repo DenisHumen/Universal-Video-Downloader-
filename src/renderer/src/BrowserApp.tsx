@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
-import { AnimatePresence, motion } from 'framer-motion'
+import { AnimatePresence, m } from 'framer-motion'
 import {
   ArrowLeft,
   ArrowRight,
@@ -11,15 +11,16 @@ import {
   RotateCw,
   Trash2,
   X
-} from 'lucide-react'
+} from './ui/icons'
 import type { BrowserMedia, BrowserState } from '@shared/types'
-import Toasts from './components/Toasts'
+import { ToastViewport as Toasts } from './ui'
 import Logo from './components/Logo'
 import CaptionButtons from './components/CaptionButtons'
 import { enter } from './lib/motion'
 import { toast } from './lib/toast'
 import { formatBytes } from './lib/format'
 import { applyAppearance } from './lib/theme'
+import { useStore } from './store'
 import { t as tNow, useT } from './i18n'
 
 const PANEL_WIDTH = 300
@@ -52,8 +53,10 @@ export default function BrowserApp(): JSX.Element {
   useEffect(() => {
     void (async () => {
       const [settings, info] = await Promise.all([window.api.getSettings(), window.api.getAppInfo()])
-      applyAppearance(settings, info.locale)
+      applyAppearance(settings, info.locale, info.systemAccent)
       setIsMac(info.platform === 'darwin')
+      // The caption buttons read the platform and GNOME's button order from the store.
+      useStore.setState({ appInfo: info })
     })()
     const offState = window.api.onBrowserState(setState)
     const offMedia = window.api.onBrowserMedia(setMedia)
@@ -141,7 +144,7 @@ export default function BrowserApp(): JSX.Element {
       >
         <div className="flex shrink-0 items-center gap-2.5 pr-1">
           <Logo className="h-[18px] w-[18px] text-ink" />
-          <span className="mono hidden text-[12px] font-semibold uppercase tracking-[0.16em] text-ink sm:inline">
+          <span className="hidden text-heading text-ink sm:inline">
             {t('browser.title')}
           </span>
         </div>
@@ -172,7 +175,7 @@ export default function BrowserApp(): JSX.Element {
           </button>
         </div>
 
-        <label className="field flex min-w-0 flex-1 cursor-text items-center gap-2 rounded-full px-3 py-1.5">
+        <label className="field flex min-w-0 flex-1 cursor-text items-center gap-2 px-3 py-1.5">
           {state.loading && <Loader2 size={12} className="shrink-0 animate-spin text-ink-3" />}
           <input
             value={address}
@@ -184,7 +187,7 @@ export default function BrowserApp(): JSX.Element {
             onKeyDown={(e) => e.key === 'Enter' && go()}
             placeholder={t('browser.urlPlaceholder')}
             spellCheck={false}
-            className="no-drag mono min-w-0 flex-1 self-stretch bg-transparent text-[13px] text-ink outline-none placeholder:text-ink-3"
+            className="no-drag mono min-w-0 flex-1 self-stretch bg-transparent text-control text-ink outline-none placeholder:text-ink-3"
           />
         </label>
 
@@ -228,7 +231,7 @@ export default function BrowserApp(): JSX.Element {
           <div className="min-h-0 flex-1 overflow-y-auto">
             <AnimatePresence initial={false}>
               {media.map((entry) => (
-                <motion.div
+                <m.div
                   key={entry.id}
                   layout
                   initial={{ opacity: 0 }}
@@ -237,10 +240,10 @@ export default function BrowserApp(): JSX.Element {
                   transition={enter}
                   className="border-b border-edge px-4 py-3"
                 >
-                  <p className="truncate text-[13px] font-medium text-ink" title={entry.url}>
+                  <p className="truncate text-control font-medium text-ink" title={entry.url}>
                     {entry.label}
                   </p>
-                  <p className="mono mt-1 text-[11px] uppercase tracking-[0.08em] text-ink-2">
+                  <p className="mt-1 text-meta font-bold text-ink-2">
                     {[entry.kind, entry.bytes ? formatBytes(entry.bytes) : null]
                       .filter(Boolean)
                       .join('  ·  ')}
@@ -255,13 +258,13 @@ export default function BrowserApp(): JSX.Element {
                     {queued.has(entry.id) ? <Check size={12} /> : <Download size={12} />}
                     {queued.has(entry.id) ? t('search.queued') : t('common.download')}
                   </button>
-                </motion.div>
+                </m.div>
               ))}
             </AnimatePresence>
 
             {media.length === 0 && (
               <div className="px-4 py-10 text-center">
-                <p className="text-[13px] font-medium text-ink">{t('browser.foundNone')}</p>
+                <p className="text-control font-medium text-ink">{t('browser.foundNone')}</p>
                 <p className="hint mt-2">
                   {t('browser.foundHint')}
                 </p>

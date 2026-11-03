@@ -10,30 +10,31 @@ import {
   Search,
   SearchX,
   Trash2
-} from 'lucide-react'
+} from '../ui/icons'
 import type { DownloadItem } from '@shared/types'
 import { useStore } from '../store'
 import { formatBytes, formatEta, formatSpeed } from '../lib/format'
 import { useT, useTp, type TranslationKey } from '../i18n'
 import QueueRow from '../components/QueueRow'
 import { groupQueue, queueGroupOf, type QueueGroup } from '../lib/downloads'
-import Choice from '../components/Choice'
-import EmptyState from '../components/EmptyState'
+import { EmptyState, Icon } from '../ui'
 import ConfirmDialog from '../components/ConfirmDialog'
+import HeaderSlot from '../shell/HeaderSlot'
+import { SegmentedControl } from '../ui'
 
 type Filter = 'all' | 'active' | 'done' | 'failed'
 
 const FILTERS: { value: Filter; label: TranslationKey }[] = [
   { value: 'all', label: 'queue.filterAll' },
   { value: 'active', label: 'queue.filterActive' },
-  { value: 'done', label: 'queue.filterDone' },
+  { value: 'done', label: 'queue.finishedToday' },
   { value: 'failed', label: 'queue.filterFailed' }
 ]
 
 const GROUP_LABEL: Record<QueueGroup, TranslationKey> = {
   active: 'queue.filterActive',
   failed: 'queue.filterFailed',
-  done: 'queue.filterDone'
+  done: 'queue.finishedToday'
 }
 
 const ACTIVE_STATES: DownloadItem['state'][] = [
@@ -44,7 +45,15 @@ const ACTIVE_STATES: DownloadItem['state'][] = [
   'paused'
 ]
 
+/** Finished since midnight. Older finished rows live in the Library (5.2 + 5.3). */
+function finishedToday(item: DownloadItem): boolean {
+  const start = new Date()
+  start.setHours(0, 0, 0, 0)
+  return (item.finishedAt ?? item.createdAt) >= start.getTime()
+}
+
 function matches(item: DownloadItem, filter: Filter): boolean {
+  if (item.state === 'completed' && !finishedToday(item)) return false
   if (filter === 'all') return true
   if (filter === 'active') return ACTIVE_STATES.includes(item.state)
   if (filter === 'done') return item.state === 'completed'
@@ -117,6 +126,30 @@ export default function DownloadsView(): JSX.Element {
     return filter === 'all' ? groupQueue(found) : found
   }, [downloads, filter, query])
 
+  /*
+    6.4: a notification was clicked. Show everything, bring its row into view
+    (instantly: smooth scrolling rides the frame clock) and pulse it once.
+  */
+  const focusedRow = useStore((s) => s.focusedRow)
+  const focusRow = useStore((s) => s.focusRow)
+  useEffect(() => {
+    if (!focusedRow) return
+    changeFilter('all')
+    changeQuery('')
+    const id = focusedRow
+    const timer = window.setTimeout(() => {
+      const row = scrollRef.current?.querySelector<HTMLElement>(`[data-row="${id.replace(/["\\]/g, '\\$&')}"]`)
+      if (row) {
+        row.scrollIntoView?.({ block: 'center' })
+        row.classList.add('ui-row-pulse')
+        window.setTimeout(() => row.classList.remove('ui-row-pulse'), 1300)
+      }
+      focusRow(null)
+    }, 60)
+    return () => window.clearTimeout(timer)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [focusedRow])
+
   const hasMore = visible.length > limit
   useEffect(() => {
     const root = scrollRef.current
@@ -173,11 +206,25 @@ export default function DownloadsView(): JSX.Element {
   ].filter(Boolean)
 
   return (
-    <div className="mx-auto flex h-full w-full max-w-[860px] flex-col px-6 pb-8 pt-10">
-      <header className="flex items-end justify-between gap-4">
+    <div className="mx-auto flex h-full w-full max-w-[800px] flex-col px-6 pb-8 pt-4">
+      {/* GNOME keeps the view's main bulk action in its header bar (A1.1 §3). */}
+      <HeaderSlot>
+        {hasRunning && (
+          <button className="btn-quiet" onClick={() => window.api.pauseAll()}>
+            {t('queue.pauseAll')}
+          </button>
+        )}
+        {!hasRunning && hasPaused && (
+          <button className="btn-quiet" onClick={() => window.api.resumeAll()}>
+            {t('queue.resumeAll')}
+          </button>
+        )}
+      </HeaderSlot>
+      <header className="flex items-center justify-between gap-4">
         <div className="min-w-0">
-          <h1 className="h1">{t('queue.title')}</h1>
-          <p className="mono mt-1.5 truncate text-[12px] text-ink-2">{summary.join('  ·  ')}</p>
+          {/* The title is the header bar's now; this says how the queue stands. */}
+          <h2 className="sr-only">{t('queue.title')}</h2>
+          <p className="numeric truncate text-meta text-ink-2">{summary.join('  ·  ')}</p>
         </div>
         <div className="flex shrink-0 items-center gap-1">
           {settings?.downloadDir && (
@@ -189,18 +236,8 @@ export default function DownloadsView(): JSX.Element {
               <FolderOpen size={16} />
             </button>
           )}
-          {/* The two bulk actions people reach for most say what they do. */}
-          {hasRunning && (
-            <button
-              className="btn-quiet px-3 py-1.5"
-              title={t('queue.pauseAll')}
-              onClick={() => window.api.pauseAll()}
-            >
-              <Pause size={14} /> <span className="hidden sm:inline">{t('queue.pauseAll')}</span>
-            </button>
-          )}
-          {hasPaused && (
-            <button className="btn-icon" title={t('queue.resumeAll')} aria-label={t('queue.resumeAll')} onClick={() => window.api.resumeAll()}>
+          {hasRunning && hasPaused && (
+            <button className="btn-icon-bare" title={t('queue.resumeAll')} aria-label={t('queue.resumeAll')} onClick={() => window.api.resumeAll()}>
               <Play size={16} />
             </button>
           )}
@@ -227,6 +264,7 @@ export default function DownloadsView(): JSX.Element {
               className="btn-icon"
               title={t('queue.clearFailed')}
               aria-label={t('queue.clearFailed')}
+              data-uvd="clear-failed"
               onClick={() => setConfirmClearFailed(true)}
             >
               <CircleX size={16} />
@@ -237,7 +275,7 @@ export default function DownloadsView(): JSX.Element {
 
       {downloads.length > 0 && (
         <div className="mt-6 flex flex-wrap items-center gap-3">
-          <Choice
+          <SegmentedControl
             label={t('queue.title')}
             value={filter}
             onChange={(v) => changeFilter(v as Filter)}
@@ -245,13 +283,13 @@ export default function DownloadsView(): JSX.Element {
           />
           {/* A label, so the whole pill is the target — the padding around a bare
               input is dead to the pointer. */}
-          <label className="field ml-auto flex min-w-[220px] max-w-[300px] flex-1 cursor-text items-center gap-2 rounded-full px-4 py-1.5">
+          <label className="field ml-auto flex min-w-[220px] max-w-[300px] flex-1 cursor-text items-center gap-2 px-4 py-1.5">
             <Search size={15} className="shrink-0 text-ink-3" />
             <input
               value={query}
               onChange={(e) => changeQuery(e.target.value)}
               placeholder={t('queue.searchPlaceholder')}
-              className="no-drag min-w-0 flex-1 self-stretch bg-transparent text-[13px] text-ink outline-none placeholder:text-ink-3"
+              className="no-drag min-w-0 flex-1 self-stretch bg-transparent text-control text-ink outline-none placeholder:text-ink-3"
               spellCheck={false}
             />
           </label>
@@ -261,18 +299,18 @@ export default function DownloadsView(): JSX.Element {
       <div ref={scrollRef} className="mt-5 min-h-0 flex-1 overflow-y-auto">
         {downloads.length === 0 ? (
           <EmptyState
-            icon={<Inbox size={24} />}
+            icon={<Icon icon={Inbox} size="xl" />}
             title={t('queue.empty')}
             hint={t('queue.emptyHint')}
             action={
-              <button className="btn-solid" onClick={() => setView('home')}>
+              <button className="btn-solid rounded-pill px-6" onClick={() => setView('home')}>
                 <Plus size={15} /> {t('queue.add')}
               </button>
             }
           />
         ) : visible.length === 0 ? (
           <EmptyState
-            icon={<SearchX size={24} />}
+            icon={<Icon icon={SearchX} size="xl" />}
             title={t('queue.emptyFiltered')}
             hint={t('queue.emptyFilteredHint')}
             action={

@@ -1,5 +1,5 @@
 import { useEffect, useRef, type ReactNode, type RefObject } from 'react'
-import { motion, useIsPresent } from 'framer-motion'
+import { m, useIsPresent } from 'framer-motion'
 import { dialog, overlay } from '../lib/motion'
 import {
   claimsEscape,
@@ -203,9 +203,9 @@ export default function Modal({
   }, [present])
 
   return (
-    <motion.div
+    <m.div
       {...overlay}
-      className="fixed inset-0 flex items-center justify-center bg-canvas/80 p-6"
+      className="scrim fixed inset-0 flex items-center justify-center p-6"
       style={{ zIndex: `var(--z-${layer})` }}
       onPointerDown={(e) => {
         pressedBackdrop.current = e.target === e.currentTarget
@@ -221,7 +221,7 @@ export default function Modal({
         pressedBackdrop.current = false
       }}
     >
-      <motion.div
+      <m.div
         {...dialog}
         ref={panel}
         role={role}
@@ -235,7 +235,7 @@ export default function Modal({
         onClick={(e) => e.stopPropagation()}
       >
         {children}
-      </motion.div>
-    </motion.div>
+      </m.div>
+    </m.div>
   )
 }

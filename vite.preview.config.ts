@@ -14,5 +14,7 @@ export default defineConfig({
     }
   },
   plugins: [react()],
+  // As in electron.vite.config.ts: icons are never inlined.
+  build: { assetsInlineLimit: (file: string) => (file.endsWith('.svg') ? false : undefined) },
   server: { port: 5174 }
 })

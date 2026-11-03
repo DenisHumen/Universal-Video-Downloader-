@@ -23,6 +23,7 @@ export function useShortcuts(): void {
       if (!action) return
       e.preventDefault()
       if (action === 'help') setShortcutsOpen(!useStore.getState().shortcutsOpen)
+      else if (action === 'palette') useStore.getState().setPaletteOpen(!useStore.getState().paletteOpen)
       else setView(action)
     }
     window.addEventListener('keydown', onKey, { capture: true })

@@ -1,10 +1,10 @@
 import { memo, useId, useState } from 'react'
-import { AnimatePresence, motion } from 'framer-motion'
+import { AnimatePresence, m } from 'framer-motion'
 import { collapse, listItem } from '../lib/motion'
 import {
   ArrowUp,
   ChevronDown,
-  Copy,
+  MoreHorizontal,
   ExternalLink,
   Link2,
   FileVideo,
@@ -15,7 +15,7 @@ import {
   Scissors,
   Trash2,
   X
-} from 'lucide-react'
+} from '../ui/icons'
 import type { DownloadItem } from '@shared/types'
 import { formatBytes, formatEta, formatSpeed, splitPath } from '../lib/format'
 import { errorReport, errorText } from '../lib/errors'
@@ -25,7 +25,9 @@ import { toast } from '../lib/toast'
 import MediaJobModal, { type JobMode } from './MediaJobModal'
 import Thumbnail from './Thumbnail'
 import ReportPrompt, { useReportOffer } from './ReportPrompt'
-import RowMenu, { type RowMenuItem } from './RowMenu'
+import FixBar from './FixBar'
+import { queueDownload } from '../lib/queue'
+import { IconButton, Menu, type MenuItem } from '../ui'
 
 interface Props {
   item: DownloadItem
@@ -162,13 +164,27 @@ function QueueRow({ item, index, animateIn = true, heading }: Props): JSX.Elemen
 
   const savedAt = splitPath(item.filepath ?? '')
 
-  const copyError = async (): Promise<void> => {
-    try {
-      await navigator.clipboard.writeText(errorReport(t, item))
-      toast(t('common.copied'), 'success')
-    } catch {
-      /* clipboard unavailable */
-    }
+  /*
+    6.2: a fix that changes the request (audio only, another folder) queues
+    it afresh in place of this row; the row goes first, so the new one is not
+    taken for a duplicate of it.
+  */
+  const requeue = async (change: { mode?: 'audio'; outputDir?: string }): Promise<void> => {
+    await window.api.removeDownload(item.id)
+    await queueDownload({
+      url: item.url,
+      title: item.title,
+      thumbnail: item.thumbnail,
+      mode: change.mode ?? item.mode,
+      quality: change.mode === 'audio' ? 'audio' : item.quality,
+      formatId: change.mode === 'audio' ? undefined : item.formatId,
+      targetHeight: change.mode === 'audio' ? undefined : item.targetHeight,
+      duration: item.duration,
+      extractor: item.extractor,
+      section: item.range,
+      preciseSection: item.precise,
+      outputDir: change.outputDir ?? item.outputDir
+    })
   }
 
   const running =
@@ -183,7 +199,7 @@ function QueueRow({ item, index, animateIn = true, heading }: Props): JSX.Elemen
     the action the row was about was one square among many, and a narrow
     window left the title ten characters.
   */
-  const menu: RowMenuItem[] = [
+  const menu: MenuItem[] = [
     ...(hasWebLink
       ? [
           { label: t('queue.copyLink'), icon: <Link2 size={14} />, onSelect: () => void copyLink() },
@@ -209,9 +225,6 @@ function QueueRow({ item, index, animateIn = true, heading }: Props): JSX.Elemen
           { label: t('convert.open'), icon: <FileVideo size={14} />, onSelect: () => setJobModal('convert') }
         ]
       : []),
-    ...(item.state === 'error'
-      ? [{ label: t('queue.copyError'), icon: <Copy size={14} />, onSelect: () => void copyError() }]
-      : [])
   ]
 
   /* What the second line says, after the state: progress, speed, time left, quality. */
@@ -229,7 +242,8 @@ function QueueRow({ item, index, animateIn = true, heading }: Props): JSX.Elemen
   const showTrack = ['downloading', 'processing', 'detecting', 'paused'].includes(item.state)
 
   return (
-    <motion.li
+    <m.li
+      data-row={item.id}
       /*
         Measured only when the row moves or changes state. With no dependency,
         framer measured the layout on every render, and a running download
@@ -247,7 +261,7 @@ function QueueRow({ item, index, animateIn = true, heading }: Props): JSX.Elemen
       {/* In the row rather than between rows, so the list stays one <ul> of <li>s. */}
       {heading && <p className="label border-b border-edge pb-2 pt-5">{heading}</p>}
       <div className="flex items-center gap-3 py-2.5 pl-1 pr-1 transition-colors duration-fast ease-ease group-hover:bg-raise">
-        <span className="mono w-6 shrink-0 text-center text-[12px] tabular-nums text-ink-3">
+        <span className="mono w-6 shrink-0 text-center text-meta tabular-nums text-ink-3">
           {String(index + 1).padStart(2, '0')}
         </span>
 
@@ -261,10 +275,10 @@ function QueueRow({ item, index, animateIn = true, heading }: Props): JSX.Elemen
         </div>
 
         <div className="min-w-0 flex-1">
-          <p className="truncate text-[14px] font-medium text-ink" title={item.title}>
+          <p className="truncate text-body font-medium text-ink" title={item.title}>
             {item.title}
           </p>
-          <p className="mono mt-0.5 flex items-center gap-2 truncate text-[12px] text-ink-2">
+          <p className="mono mt-0.5 flex items-center gap-2 truncate text-meta text-ink-2">
             <span className={`inline-flex shrink-0 items-center gap-1.5 ${meta.text}`}>
               <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${meta.dot}`} />
               {t(meta.label)}
@@ -366,7 +380,13 @@ function QueueRow({ item, index, animateIn = true, heading }: Props): JSX.Elemen
               <Trash2 size={15} />
             </button>
           )}
-          <RowMenu label={t('queue.more')} items={menu} />
+          {menu.length > 0 && (
+            <Menu
+              label={t('queue.more')}
+              items={menu}
+              trigger={(p) => <IconButton {...p} label={t('queue.more')} icon={<MoreHorizontal size={16} />} />}
+            />
+          )}
         </div>
       </div>
 
@@ -393,12 +413,12 @@ function QueueRow({ item, index, animateIn = true, heading }: Props): JSX.Elemen
           aria-label={phaseLabel ?? t(meta.label)}
         >
           <div
-            className={`h-full transition-[width] duration-base ease-ease ${item.state === 'paused' ? 'bg-edge-strong' : 'bg-accent'}`}
+            className={`h-full transition-[width] duration-base ease-ease ${item.state === 'paused' ? 'bg-edge-strong' : 'bg-accent-bright'}`}
             style={{ width: `${percent}%` }}
           />
           {indeterminate && percent < 100 && (
             <div className="absolute inset-y-0 right-0 overflow-hidden" style={{ left: `${percent}%` }}>
-              <div className="progress-indeterminate h-full bg-accent/45" />
+              <div className="progress-indeterminate h-full bg-accent-bright/45" />
             </div>
           )}
         </div>
@@ -418,19 +438,19 @@ function QueueRow({ item, index, animateIn = true, heading }: Props): JSX.Elemen
           */}
           {item.state === 'error' ? (
             <p
-              className="selectable line-clamp-3 break-words text-[12px] text-bad"
+              className="selectable line-clamp-3 break-words text-meta text-bad"
               title={errorText(t, item)}
             >
               {errorText(t, item)}
             </p>
           ) : (
             item.filepath ? (
-              <p className="selectable mono flex min-w-0 text-[12px]" title={item.filepath}>
+              <p className="selectable mono flex min-w-0 text-meta" title={item.filepath}>
                 <span className="min-w-0 shrink truncate text-ink-3">{savedAt.dir}</span>
                 <span className="max-w-full shrink-0 truncate text-ink-2">{savedAt.base}</span>
               </p>
             ) : (
-              <p className="selectable mono truncate text-[12px] text-ink-3" title={landed}>
+              <p className="selectable mono truncate text-meta text-ink-3" title={landed}>
                 {landed}
               </p>
             )
@@ -441,37 +461,42 @@ function QueueRow({ item, index, animateIn = true, heading }: Props): JSX.Elemen
                 onClick={() => setLogOpen((v) => !v)}
                 aria-expanded={logOpen}
                 aria-controls={logOpen ? logId : undefined}
-                className="mono mt-2 flex items-center gap-1 text-[11px] uppercase tracking-[0.08em] text-ink-2 transition-colors duration-fast ease-ease hover:text-ink"
+                className="mt-2 flex items-center gap-1 text-meta font-bold text-ink-2 transition-colors duration-fast ease-ease hover:text-ink"
               >
                 {t('queue.log')}
-                <motion.span animate={{ rotate: logOpen ? 180 : 0 }} transition={{ duration: 0.16 }}>
+                <m.span animate={{ rotate: logOpen ? 180 : 0 }} transition={{ duration: 0.16 }}>
                   <ChevronDown size={12} />
-                </motion.span>
+                </m.span>
               </button>
               <AnimatePresence initial={false}>
                 {logOpen && (
-                  <motion.pre
+                  <m.pre
                     {...collapse}
                     id={logId}
-                    className="selectable mono mt-2 max-h-48 overflow-auto whitespace-pre-wrap break-all rounded-1 bg-sink px-3 py-2.5 text-[11px] leading-relaxed text-ink-2"
+                    className="selectable mono mt-2 max-h-48 overflow-auto whitespace-pre-wrap break-all rounded-1 bg-sink px-3 py-2.5 text-caption leading-relaxed text-ink-2"
                   >
                     {item.log}
-                  </motion.pre>
+                  </m.pre>
                 )}
               </AnimatePresence>
             </>
           )}
-          {canReport && (
-            <button
-              onClick={() => setReportOpenFor(reportOpen ? null : (failure.reportId ?? null))}
-              aria-expanded={reportOpen}
-              className="mono mt-2 flex items-center gap-1 text-[11px] uppercase tracking-[0.08em] text-accent-ink transition-colors duration-fast ease-ease hover:text-ink"
-            >
-              {t('report.open')}
-              <motion.span animate={{ rotate: reportOpen ? 180 : 0 }} transition={{ duration: 0.16 }}>
-                <ChevronDown size={12} />
-              </motion.span>
-            </button>
+          {item.state === 'error' && (
+            <FixBar
+              errorCode={item.errorCode}
+              cookieHint={item.cookieHint}
+              url={hasWebLink ? sourceLink : ''}
+              retryKey={item.id}
+              copyText={errorReport(t, item)}
+              onRetry={() => void window.api.retryDownload(item.id)}
+              onAudioOnly={() => void requeue({ mode: 'audio' })}
+              onChangeFolder={(dir) => void requeue({ outputDir: dir })}
+              report={
+                canReport
+                  ? { open: reportOpen, onToggle: () => setReportOpenFor(reportOpen ? null : (failure.reportId ?? null)) }
+                  : undefined
+              }
+            />
           )}
           {/* Stays mounted once answered, so it can say how sending went. */}
           {reportOpen && <ReportPrompt key={failure.reportId} {...failure} />}
@@ -479,7 +504,7 @@ function QueueRow({ item, index, animateIn = true, heading }: Props): JSX.Elemen
       )}
 
       {jobModal && <MediaJobModal item={item} mode={jobModal} onClose={() => setJobModal(null)} />}
-    </motion.li>
+    </m.li>
   )
 }
 

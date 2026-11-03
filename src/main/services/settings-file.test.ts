@@ -25,9 +25,12 @@ vi.mock('electron', () => ({
     }
   },
   safeStorage: {
-    isEncryptionAvailable: () => h.keyStore,
-    encryptString: (value: string) => Buffer.from(`sealed:${value}`),
-    decryptString: (blob: Buffer) => blob.toString().slice('sealed:'.length)
+    isAsyncEncryptionAvailable: async () => h.keyStore,
+    encryptStringAsync: async (value: string) => Buffer.from(`sealed:${value}`),
+    decryptStringAsync: async (blob: Buffer) => ({
+      result: blob.toString().slice('sealed:'.length),
+      shouldReEncrypt: false
+    })
   }
 }))
 
@@ -55,6 +58,8 @@ describe('settings.json', () => {
 
   const load = async (): Promise<Settings> => {
     vi.resetModules()
+    // As at startup: the secret store opens before settings are first read.
+    await (await import('./secrets')).initSecrets()
     settings = await import('./settings')
     return settings
   }

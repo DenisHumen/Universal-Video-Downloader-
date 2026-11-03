@@ -72,7 +72,11 @@ jobs:
             fi
             echo "The draft for $GITHUB_REF_NAME already exists; the runners will upload into it."
           else
-            gh release create "$GITHUB_REF_NAME" --draft --verify-tag --title "${GITHUB_REF_NAME#v}" --notes ""
+            # The macOS floor goes in at creation, so it survives even if the
+            # (continue-on-error) body step below fails. Electron 45's own
+            # Info.plist and binaries say 13.0; updater-rules.ts reads this line
+            # back (offeredToThisMac), and release-notes.test.ts keeps both equal.
+            gh release create "$GITHUB_REF_NAME" --draft --verify-tag --title "${GITHUB_REF_NAME#v}" --notes "Requires macOS 13 or later."
           fi
 
   build:
@@ -275,6 +279,9 @@ jobs:
           BASE="https://github.com/$REPO/releases/download/$TAG"
 
           {
+            # Kept from draft creation above: the updater reads it (offeredToThisMac).
+            echo "Requires macOS 13 or later."
+            echo
             echo "### Which file do I need?"
             echo
             echo "| Your computer | Download |"
@@ -304,6 +311,10 @@ jobs:
             # to be `xattr -cr`, which also wipes every other attribute on
             # every file in the bundle; only the quarantine flag is in the way.
             echo "### If macOS says the app is damaged"
+            echo
+            echo "The disk image now carries two helpers next to the app: double-click"
+            echo "**Fix App Is Damaged.command** to do it for you, or open"
+            echo "**How to open on macOS.pdf** (English and Russian) for the steps."
             echo
             echo "It is not damaged. The app is not signed with a paid Apple developer"
             echo "certificate, so macOS quarantines it. Copy it into Applications, then"

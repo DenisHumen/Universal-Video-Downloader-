@@ -1,3 +1,4 @@
+import type { AccentChoice } from './accent'
 import type { SmbTarget } from './automation'
 // Shared types used by the main process, preload bridge and renderer.
 
@@ -410,14 +411,14 @@ export interface DownloadProgress {
 }
 
 /**
- * Two themes, one accent.
+ * Night, Day, or System (4.0, plan 4.4), which follows the OS (Electron's
+ * nativeTheme, i.e. `prefers-color-scheme` in the renderer) and switches live.
+ * Only Night and Day are ever painted; see `PaintedTheme` in theme-boot.ts.
  *
- * The previous build shipped four palettes and seven accents — 28 combinations,
- * of which only the default was ever really designed. The system now carries a
- * single saturated colour, so the only choice left is the one that depends on
- * the room you're sitting in.
+ * 3.x had collapsed four palettes into these two because only the default had
+ * ever been designed; System adds no palette, it picks one of the two.
  */
-export const THEMES = ['night', 'day'] as const
+export const THEMES = ['night', 'day', 'system'] as const
 export type ThemeId = (typeof THEMES)[number]
 
 /** Palettes that existed before the redesign, mapped onto the two that remain. */
@@ -489,6 +490,8 @@ export interface AppSettings {
    */
   keepFinished: number
   theme: ThemeId
+  /** The accent colour (see shared/accent.ts); `system` follows the OS where it reports one. */
+  accent: AccentChoice
   language: LanguageId
   /** Show a desktop notification when a download finishes. */
   notifications: boolean
@@ -513,6 +516,12 @@ export interface AppSettings {
    * every time — there is deliberately no setting that sends on its own.
    */
   errorReports: 'ask' | 'off'
+  /**
+   * The first-run setup (6.3) was finished or skipped. It shows once; the
+   * primary menu opens it again. Not carried in a backup: it is about this
+   * install, not about the user's choices.
+   */
+  setupDone: boolean
 }
 
 export const SUPPORTED_COOKIE_BROWSERS = [

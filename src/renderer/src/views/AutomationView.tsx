@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { motion } from 'framer-motion'
+import { m } from 'framer-motion'
 import {
   Check,
   Clock,
@@ -15,19 +15,20 @@ import {
   Send,
   Trash2,
   X
-} from 'lucide-react'
+} from '../ui/icons'
 import { enter } from '../lib/motion'
 import { useStore } from '../store'
 import { resolveLanguage, useT, type TranslateFn, type TranslationKey } from '../i18n'
 import { toast } from '../lib/toast'
 import { describeCheck } from '../lib/checkSummary'
-import Thumbnail from '../components/Thumbnail'
-import EmptyState from '../components/EmptyState'
+import AutomationSettings from '../components/AutomationSettings'
+import HeaderSlot from '../shell/HeaderSlot'
+import { ActionRow, ComboRow, EmptyState, Icon, IconButton, PreferencesGroup, PreferencesPage, Switch, SwitchRow } from '../ui'
 import { span, type SpanUnit } from '../lib/span'
 import { releaseDate, releaseText } from '../lib/release'
 import type { WatchIntent } from '../store'
 import ConfirmDialog from '../components/ConfirmDialog'
-import AddWatchDialog from '../components/AddWatchDialog'
+import AddWatchDialog, { Poster } from '../components/AddWatchDialog'
 import StepEditor from '../components/StepEditor'
 import { RUN_LABEL, STEP_LABEL } from '../lib/automationLabels'
 import {
@@ -145,11 +146,11 @@ function QueueLink({ id }: { id: string }): JSX.Element | null {
   return (
     <div className="mt-1.5 flex items-center gap-2">
       <span
-        className={`mono min-w-0 flex-1 truncate text-[11px] ${paused ? 'text-warn' : 'text-ink-2'}`}
+        className={`mono min-w-0 flex-1 truncate text-caption ${paused ? 'text-warn' : 'text-ink-2'}`}
       >
         {text}
       </span>
-      <button className="btn-quiet px-3 py-1 text-[12px]" onClick={() => setView('downloads')}>
+      <button className="btn-quiet px-3 py-1 text-meta" onClick={() => setView('downloads')}>
         {t('auto.showInQueue')}
       </button>
     </div>
@@ -295,347 +296,246 @@ export default function AutomationView(): JSX.Element {
   */
   const empty = loaded && watches.length === 0
 
+  /** "S01E05": the newest episode this watch has seen, i.e. the last new one. */
+  const lastEpisode = (w: Watch): string | null => {
+    if (!w.seen.length) return null
+    const top = w.seen.reduce((a, e) => (e.season > a.season || (e.season === a.season && e.episode > a.episode) ? e : a))
+    return `S${String(top.season).padStart(2, '0')}E${String(top.episode).padStart(2, '0')}`
+  }
+
+  const statusLine = (w: Watch): string =>
+    w.enabled
+      ? w.lastError
+        ? t('auto.failing')
+        : w.lastRunError
+          ? t('auto.runFailing')
+          : w.pending
+            ? releaseText(w.releaseAt, t)
+            : `${t('auto.nextCheck')} ${relative(w.nextCheckAt, t)}`
+      : t('auto.paused')
+
   return (
-    <div className="flex h-full min-h-0">
-      {/* ---- the list ---- */}
-      {!empty && (
-        <aside className="flex w-[300px] shrink-0 flex-col border-r border-edge">
-          <div className="border-b border-edge px-3 pb-3 pt-8">
-            <div className="flex items-center gap-2">
-              <h1 className="h1 min-w-0 flex-1 truncate">{t('auto.title')}</h1>
-              <button className="btn-solid px-2.5 py-1.5" onClick={() => setAdding(true)}>
-                <Plus size={14} /> {t('auto.add')}
-              </button>
-            </div>
-            {/* The one word "watching" never said what the screen does. */}
-            <p className="hint mt-1.5">{t('automation.lead')}</p>
-          </div>
+    <div className="h-full min-h-0 overflow-y-auto">
+      {/* A1 §3: a header "+" opens the add dialog. */}
+      <HeaderSlot>
+        <IconButton label={t('auto.addTitle')} icon={<Plus size={16} />} onClick={() => setAdding(true)} data-uvd="watch-add" />
+      </HeaderSlot>
 
-          <div className="min-h-0 flex-1 overflow-y-auto">
-            {watches.map((w) => (
-              <button
-                key={w.id}
-                onClick={() => setSelectedId(w.id)}
-                className={`flex w-full items-center gap-3 border-b border-edge px-3 py-2.5 text-left transition-colors ${
-                  w.id === selectedId ? 'bg-raise' : 'hover:bg-raise/60'
-                }`}
-              >
-                <Thumbnail
-                  src={w.thumbnail}
-                  alt=""
-                  className="h-12 w-9 shrink-0 rounded"
-                  fallback={<Film size={14} className="text-ink-3" />}
-                />
-                <span className="min-w-0 flex-1">
-                  <span className="block truncate text-[13px] text-ink" title={w.title}>
-                    {w.title}
-                  </span>
-                  <span className="mono block truncate text-[11px] text-ink-2">
-                    {w.enabled
-                      ? w.lastError
-                        ? t('auto.failing')
-                        : w.lastRunError
-                          ? t('auto.runFailing')
-                          : w.pending
-                            ? releaseText(w.releaseAt, t)
-                            : relative(w.nextCheckAt, t)
-                      : t('auto.paused')}
-                  </span>
-                </span>
-                {!w.enabled && <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-ink-3" />}
-                {watchFailing(w) && (
-                  <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-bad" />
-                )}
-              </button>
-            ))}
-          </div>
-        </aside>
-      )}
-
-      {/* ---- the selected series ---- */}
-      <motion.section
-        key={selectedId ?? 'none'}
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={enter}
-        className="min-h-0 flex-1 overflow-y-auto"
-      >
-        {empty ? (
-          <div className="mx-auto flex h-full w-full max-w-[860px] flex-col px-6 pb-8 pt-10">
-            <h1 className="h1">{t('auto.title')}</h1>
-            <p className="lead mt-2">{t('automation.lead')}</p>
-            <div className="min-h-0 flex-1">
-              <EmptyState
-                icon={<Radar size={22} />}
-                title={t('auto.empty')}
-                hint={t('auto.emptyHint')}
-                action={
-                  <button className="btn-solid" onClick={() => setAdding(true)}>
-                    <Plus size={14} /> {t('auto.add')}
+      {empty ? (
+        <EmptyState
+          icon={<Icon icon={Radar} size="xl" />}
+          title={t('auto.empty')}
+          hint={t('auto.emptyHint')}
+          action={
+            <button type="button" className="btn-solid rounded-pill px-6" onClick={() => setAdding(true)}>
+              <Plus size={14} /> {t('auto.addTitle')}
+            </button>
+          }
+        />
+      ) : !loaded ? null : (
+        <PreferencesPage width="medium">
+          {/* ---- every series: poster, dub, next check, last new episode, a pause switch ---- */}
+          <PreferencesGroup title={t('auto.series')} description={t('automation.lead')}>
+            {watches.map((w) => {
+              const on = w.id === selectedId
+              const last = lastEpisode(w)
+              return (
+                <div key={w.id} data-row={`watch-${w.id}`} className={`ui-row gap-0 p-0 ${on ? 'bg-fill/10' : ''}`}>
+                  <button
+                    type="button"
+                    aria-pressed={on}
+                    onClick={() => setSelectedId(w.id)}
+                    className="no-drag flex min-w-0 flex-1 items-center gap-3 self-stretch px-3 py-2 text-left hover:bg-fill/[0.04]"
+                  >
+                    <Poster src={w.thumbnail} />
+                    <span className="min-w-0 flex-1">
+                      <span className="ui-row-title block truncate" title={w.title}>
+                        {w.title}
+                      </span>
+                      <span className="ui-row-subtitle block truncate">
+                        {[w.translatorName, w.quality].filter(Boolean).join(' · ')}
+                      </span>
+                      <span className={`numeric block truncate text-meta ${watchFailing(w) ? 'text-bad' : 'text-ink-2'}`}>
+                        {statusLine(w)}
+                        {last ? ` · ${t('auto.lastNew', { episode: last })}` : ''}
+                      </span>
+                    </span>
                   </button>
+                  <span className="px-3">
+                    <Switch
+                      aria-label={`${t('auto.watchSwitch')}: ${w.title}`}
+                      checked={w.enabled}
+                      onChange={(enabled) => void window.api.autoUpdate(w.id, { enabled }).then(refresh)}
+                    />
+                  </span>
+                </div>
+              )
+            })}
+          </PreferencesGroup>
+
+          {!selected ? null : (
+            <m.div key={selected.id} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={enter} className="space-y-6">
+              {/* ---- the selected series ---- */}
+              <PreferencesGroup
+                title={selected.title}
+                suffix={
+                  <div className="flex items-center gap-1.5">
+                    <button type="button" className="btn-quiet" onClick={() => void checkNow()} disabled={checking.has(selected.id)}>
+                      {checking.has(selected.id) ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
+                      {t('auto.checkNow')}
+                    </button>
+                    <button type="button" className="btn-danger" onClick={() => setConfirmRemove(true)}>
+                      <Trash2 size={14} /> {t('auto.remove')}
+                    </button>
+                  </div>
                 }
-              />
-            </div>
-          </div>
-        ) : !loaded ? null : !selected ? (
-          <div className="flex h-full items-center justify-center">
-            <p className="hint">{t('auto.pickOne')}</p>
-          </div>
-        ) : (
-          <div className="mx-auto w-full max-w-[720px] px-6 py-6">
-            <header className="flex gap-4">
-              <Thumbnail
-                src={selected.thumbnail}
-                alt=""
-                className="h-28 w-20 shrink-0 rounded"
-                fallback={<Film size={20} className="text-ink-3" />}
-              />
-              <div className="min-w-0 flex-1">
-                <h2 className="h2 truncate" title={selected.title}>
-                  {selected.title}
-                </h2>
-                <p className="hint mt-1 truncate">
-                  {[selected.translatorName, selected.quality].filter(Boolean).join(' · ')}
-                </p>
-                {selected.pending && (
-                  <p className="mt-1 text-[13px] text-ink">
-                    {releaseText(selected.releaseAt, t)}
-                    {selected.releaseAt
-                      ? ` · ${t('auto.releaseOn', {
-                          date: releaseDate(selected.releaseAt, locale)
-                        })}`
-                      : ''}
-                  </p>
-                )}
-                <p className="mono mt-1 text-[12px] text-ink-2">
-                  <Clock size={11} className="mr-1 inline" />
-                  {selected.enabled
-                    ? `${t('auto.nextCheck')} ${relative(selected.nextCheckAt, t)}`
-                    : t('auto.paused')}
-                  {' · '}
-                  {/* While it is waiting, the pace is the waiting pace - say that one. */}
-                  {every(
+              >
+                <ActionRow
+                  title={[selected.translatorName, selected.quality].filter(Boolean).join(' · ') || selected.title}
+                  subtitle={
                     selected.pending
-                      ? upcomingDelayMinutes(selected.releaseAt, selected.intervalMinutes, Date.now())
-                      : selected.intervalMinutes,
-                    t
-                  )}
-                </p>
-                {selected.lastError && (
-                  <p className="hint mt-1 text-bad">{selected.lastError}</p>
-                )}
+                      ? `${releaseText(selected.releaseAt, t)}${selected.releaseAt ? ` · ${t('auto.releaseOn', { date: releaseDate(selected.releaseAt, locale) })}` : ''}`
+                      : statusLine(selected)
+                  }
+                  prefix={<Poster src={selected.thumbnail} size="lg" />}
+                />
+                <ComboRow
+                  title={t('auto.interval')}
+                  subtitle={
+                    selected.pending
+                      ? every(upcomingDelayMinutes(selected.releaseAt, selected.intervalMinutes, Date.now()), t)
+                      : undefined
+                  }
+                  value={String(selected.intervalMinutes)}
+                  onChange={(v) => void patch({ intervalMinutes: Number(v) })}
+                  options={[15, 30, 60, 180, 360, 720, 1440].map((n) => ({ value: String(n), label: every(n, t) }))}
+                />
+                {selected.lastError && <ActionRow title={t('auto.failing')} subtitle={<span className="text-bad">{selected.lastError}</span>} />}
                 {/*
-                  Only an episode that gets all the way through clears this, and
-                  one that has been given up on never will, so it can be put
-                  away by hand once it has been seen.
+                  Only an episode that gets all the way through clears this, and one
+                  that has been given up on never will, so it can be put away by hand.
                 */}
                 {selected.lastRunError && (
-                  <div className="mt-1 flex items-start gap-1">
-                    <p className="hint min-w-0 flex-1 text-bad">
-                      {selected.lastRunFailedAt
-                        ? t('auto.runFailedAt', { when: ago(selected.lastRunFailedAt, t) })
-                        : t('auto.runFailing')}
-                      {': '}
-                      {selected.lastRunError}
-                    </p>
-                    <button
-                      className="btn-icon-bare -my-1 h-7 w-7"
-                      aria-label={t('auto.dismissRunError')}
-                      title={t('auto.dismissRunError')}
-                      onClick={() =>
-                        void patch({ lastRunError: undefined, lastRunFailedAt: undefined })
-                      }
-                    >
-                      <X size={13} />
-                    </button>
-                  </div>
+                  <ActionRow
+                    title={selected.lastRunFailedAt ? t('auto.runFailedAt', { when: ago(selected.lastRunFailedAt, t) }) : t('auto.runFailing')}
+                    subtitle={<span className="text-bad">{selected.lastRunError}</span>}
+                    suffix={
+                      <IconButton
+                        label={t('auto.dismissRunError')}
+                        icon={<X size={16} />}
+                        onClick={() => void patch({ lastRunError: undefined, lastRunFailedAt: undefined })}
+                      />
+                    }
+                  />
                 )}
-              </div>
-            </header>
+              </PreferencesGroup>
 
-            <div className="mt-4 flex flex-wrap gap-2">
-              <button
-                className="btn-quiet"
-                onClick={() => void patch({ enabled: !selected.enabled })}
-              >
-                {selected.enabled ? t('auto.pause') : t('auto.resume')}
-              </button>
-              <button
-                className="btn-quiet"
-                onClick={() => void checkNow()}
-                disabled={checking.has(selected.id)}
-              >
-                {checking.has(selected.id) ? (
-                  <Loader2 size={14} className="animate-spin" />
-                ) : (
-                  <RefreshCw size={14} />
-                )}
-                {t('auto.checkNow')}
-              </button>
-              <select
-                className="field w-auto text-[13px]"
-                aria-label={t('auto.interval')}
-                value={String(selected.intervalMinutes)}
-                onChange={(e) => void patch({ intervalMinutes: Number(e.target.value) })}
-              >
-                {[15, 30, 60, 180, 360, 720, 1440].map((n) => (
-                  <option key={n} value={n}>
-                    {every(n, t)}
-                  </option>
-                ))}
-              </select>
-              <button className="btn-danger ml-auto" onClick={() => setConfirmRemove(true)}>
-                <Trash2 size={14} /> {t('auto.remove')}
-              </button>
-            </div>
-
-            {/* ---- the chain ---- */}
-            <h3 className="label mt-8 border-b border-edge pb-2">{t('auto.pipeline')}</h3>
-            <div className="mt-3 space-y-2">
-              <div className="panel flex items-center gap-3 px-3 py-2.5 opacity-80">
-                {STEP_ICON.download}
-                <span className="flex-1 text-[13px] text-ink">{t('auto.step.download')}</span>
-                <span className="hint">{t('auto.always')}</span>
-              </div>
-
-              {/* In the order they run, which a watch saved before this need not be stored in. */}
-              {selected.steps
-                .filter((s) => s.kind !== 'download')
-                .sort(byStepOrder)
-                .map((step) => (
-                  <div key={step.id}>
-                    <button
-                      onClick={() => setEditing(step)}
-                      className="panel flex w-full items-center gap-3 px-3 py-2.5 text-left transition-colors hover:bg-raise"
-                    >
-                      {STEP_ICON[step.kind]}
-                      <span className="min-w-0 flex-1">
-                        <span className="block text-[13px] text-ink">
-                          {t(STEP_LABEL[step.kind])}
-                        </span>
-                        <span className="mono block truncate text-[11px] text-ink-2">
-                          {step.kind === 'rename' && step.template}
-                          {step.kind === 'upload' &&
-                            `${step.remotePath} · ${t(step.deleteLocalAfter ? 'auto.localDeleted' : 'auto.localKept')}`}
-                          {step.kind === 'notify' &&
-                            settings?.telegramChatId &&
-                            t('auto.notifyTo', { id: settings.telegramChatId })}
-                        </span>
-                      </span>
-                      {step.enabled ? (
-                        <Check size={14} className="text-good" />
-                      ) : (
-                        <X size={14} className="text-ink-3" />
-                      )}
-                    </button>
-                    {/*
-                      On the screen, not only inside the editor: tucked away there,
-                      nobody found it, and every episode stayed on the computer as
-                      well as on the share.
-                    */}
-                    {step.kind === 'upload' && (
-                      <label className="mt-1.5 flex cursor-pointer items-center gap-2.5 px-3 text-[13px] text-ink-2">
-                        <input
-                          type="checkbox"
-                          checked={step.deleteLocalAfter}
-                          onChange={(e) => void saveStep({ ...step, deleteLocalAfter: e.target.checked })}
-                        />
-                        {t('auto.deleteLocal')}
-                      </label>
-                    )}
-                  </div>
-                ))}
-
-              {missing.length > 0 && (
-                <div className="flex flex-wrap gap-2 pt-1">
-                  {missing.map((kind) => (
-                    <button key={kind} className="btn-quiet" onClick={() => setEditing(kind)}>
-                      <Plus size={14} /> {t(STEP_LABEL[kind])}
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            {/* ---- what has happened ---- */}
-            <h3 className="label mt-8 border-b border-edge pb-2">{t('auto.history')}</h3>
-            {runs.length === 0 ? (
-              <p className="hint mt-3">{t('auto.noRuns')}</p>
-            ) : (
-              <ul className="mt-3 space-y-1.5">
-                {runs.map((run) => (
-                  <li key={run.id} className="panel px-3 py-2">
-                    <div className="flex items-center gap-2">
-                      <span className="mono text-[12px] text-ink">
-                        S{String(run.season).padStart(2, '0')}E
-                        {String(run.episode).padStart(2, '0')}
-                      </span>
-                      <span
-                        className={`label ${
-                          run.state === 'failed'
-                            ? 'text-bad'
-                            : run.state === 'done'
-                              ? 'text-good'
-                              : 'text-ink-2'
-                        }`}
-                      >
-                        {t(RUN_LABEL[run.state])}
-                      </span>
-                      <span className="mono ml-auto text-[11px] text-ink-3">
-                        {ago(run.startedAt, t)}
-                      </span>
-                    </div>
-                    <div className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5">
-                      {/* A copy: runs recorded before steps were kept in order are shown in it too. */}
-                      {[...run.steps].sort(byStepOrder).map((s, i) => (
-                        <span
-                          key={i}
-                          className={`mono text-[11px] ${
-                            s.state === 'failed'
-                              ? 'text-bad'
-                              : s.state === 'done'
-                                ? 'text-ink-2'
-                                : 'text-ink-3'
-                          }`}
-                          title={s.message}
-                        >
-                          {t(STEP_LABEL[s.kind])}
-                          {(s.state === 'failed' || (run.state === 'skipped' && s.state === 'skipped')) &&
-                          s.message
-                            ? `: ${s.message}`
-                            : ''}
-                        </span>
+              {/* ---- the chain ---- */}
+              <PreferencesGroup
+                title={t('auto.pipeline')}
+                footer={
+                  missing.length > 0 ? (
+                    <div className="flex flex-wrap gap-2 pt-1">
+                      {missing.map((kind) => (
+                        <button key={kind} type="button" className="btn-quiet" onClick={() => setEditing(kind)}>
+                          <Plus size={14} /> {t(STEP_LABEL[kind])}
+                        </button>
                       ))}
                     </div>
-                    {run.state === 'running' && run.downloadId && (
-                      <QueueLink id={run.downloadId} />
-                    )}
-                    {(run.state === 'failed' || run.state === 'skipped') && (
-                      <div className="mt-1.5 flex items-center gap-2">
-                        <span className="mono min-w-0 flex-1 truncate text-[11px] text-ink-2">
-                          {/* Counted on the watch only while the schedule still means to try again. */}
-                          {run.state === 'failed' && attemptsAt(selected, run) > 0
-                            ? t('auto.runWillRetry', {
-                                n: attemptsAt(selected, run),
-                                max: MAX_ATTEMPTS
-                              })
-                            : ''}
+                  ) : undefined
+                }
+              >
+                <ActionRow title={t('auto.step.download')} prefix={STEP_ICON.download} value={t('auto.always')} />
+                {/* In the order they run, which a watch saved before this need not be stored in. */}
+                {selected.steps
+                  .filter((s) => s.kind !== 'download')
+                  .sort(byStepOrder)
+                  .map((step) => (
+                    <div key={step.id}>
+                      <ActionRow
+                        title={t(STEP_LABEL[step.kind])}
+                        prefix={STEP_ICON[step.kind]}
+                        monoSubtitle={step.kind === 'rename'}
+                        subtitle={
+                          step.kind === 'rename'
+                            ? step.template
+                            : step.kind === 'upload'
+                              ? `${step.remotePath} · ${t(step.deleteLocalAfter ? 'auto.localDeleted' : 'auto.localKept')}`
+                              : step.kind === 'notify' && settings?.telegramChatId
+                                ? t('auto.notifyTo', { id: settings.telegramChatId })
+                                : undefined
+                        }
+                        value={step.enabled ? <Check size={16} className="text-good" /> : <X size={16} className="text-ink-2" />}
+                        navigation
+                        onActivate={() => setEditing(step)}
+                      />
+                      {/* On the screen, not only inside the editor: tucked away there, nobody found it. */}
+                      {step.kind === 'upload' && (
+                        <SwitchRow
+                          title={t('auto.deleteLocal')}
+                          checked={step.deleteLocalAfter}
+                          onChange={(v) => void saveStep({ ...step, deleteLocalAfter: v })}
+                        />
+                      )}
+                    </div>
+                  ))}
+              </PreferencesGroup>
+
+              {/* ---- what has happened ---- */}
+              <PreferencesGroup title={t('auto.history')}>
+                {runs.length === 0 ? (
+                  <ActionRow title={t('auto.noRuns')} />
+                ) : (
+                  runs.map((run) => (
+                    <div key={run.id} className="ui-row flex-col items-stretch gap-1">
+                      <div className="flex items-center gap-2">
+                        <span className="numeric text-body text-ink">
+                          S{String(run.season).padStart(2, '0')}E{String(run.episode).padStart(2, '0')}
                         </span>
-                        <button
-                          className="btn-quiet px-3 py-1 text-[12px]"
-                          onClick={() => void retry(run)}
-                        >
-                          <RotateCcw size={12} /> {t('auto.retryRun')}
-                        </button>
+                        <span className={`text-meta font-bold ${run.state === 'failed' ? 'text-bad' : run.state === 'done' ? 'text-good' : 'text-ink-2'}`}>
+                          {t(RUN_LABEL[run.state])}
+                        </span>
+                        <span className="numeric ml-auto text-meta text-ink-2">{ago(run.startedAt, t)}</span>
                       </div>
-                    )}
-                  </li>
-                ))}
-              </ul>
-            )}
+                      <div className="flex flex-wrap gap-x-3 gap-y-0.5">
+                        {[...run.steps].sort(byStepOrder).map((st, i) => (
+                          <span
+                            key={i}
+                            className={`text-meta ${st.state === 'failed' ? 'text-bad' : 'text-ink-2'}`}
+                            title={st.message}
+                          >
+                            {t(STEP_LABEL[st.kind])}
+                            {(st.state === 'failed' || (run.state === 'skipped' && st.state === 'skipped')) && st.message ? `: ${st.message}` : ''}
+                          </span>
+                        ))}
+                      </div>
+                      {run.state === 'running' && run.downloadId && <QueueLink id={run.downloadId} />}
+                      {(run.state === 'failed' || run.state === 'skipped') && (
+                        <div className="flex items-center gap-2">
+                          <span className="min-w-0 flex-1 truncate text-meta text-ink-2">
+                            {run.state === 'failed' && attemptsAt(selected, run) > 0
+                              ? t('auto.runWillRetry', { n: attemptsAt(selected, run), max: MAX_ATTEMPTS })
+                              : ''}
+                          </span>
+                          <button type="button" className="btn-quiet" onClick={() => void retry(run)}>
+                            <RotateCcw size={14} /> {t('auto.retryRun')}
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  ))
+                )}
+              </PreferencesGroup>
+            </m.div>
+          )}
+
+          {/* ---- Telegram: its own group (A1 §3), the same form as Settings › Watching › Telegram ---- */}
+          <div className="space-y-3">
+            <PreferencesGroup title={t('prefs.sub.telegram')} id="telegram" />
+            <AutomationSettings part="telegram" />
           </div>
-        )}
-      </motion.section>
+        </PreferencesPage>
+      )}
 
       {adding && (
         <AddWatchDialog

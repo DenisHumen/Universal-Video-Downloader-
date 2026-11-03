@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Loader2, Radar } from 'lucide-react'
+import { Loader2, Radar } from '../ui/icons'
 import type { MediaInfo, QualityPreset } from '@shared/types'
 import { watchingAlready, type Watch } from '@shared/automation'
 import { PROVIDER_NAMES, streamUrl } from '@shared/streaming'
@@ -34,7 +34,6 @@ export default function StreamingCard({
   titleId
 }: Props): JSX.Element {
   const t = useT()
-  const setView = useStore((s) => s.setView)
   const requestWatch = useStore((s) => s.requestWatch)
   const settings = useStore((s) => s.settings)
   const s = info.streaming!
@@ -167,7 +166,6 @@ export default function StreamingCard({
     }
     if (!ok) return
     onDone()
-    setView('downloads')
   }
 
   const queueMovie = async (): Promise<void> => {
@@ -188,7 +186,6 @@ export default function StreamingCard({
     }
     if (!ok) return
     onDone()
-    setView('downloads')
   }
 
   const episodesOfSeason = currentSeason?.episodes ?? []
@@ -208,7 +205,7 @@ export default function StreamingCard({
           <h2 className="h2" id={titleId}>
             {s.title}
           </h2>
-          <p className="mono mt-1 text-[12px] text-ink-2">
+          <p className="mono mt-1 text-meta text-ink-2">
             {s.isSeries
               ? seasonsForT.length > 1
                 ? t('streaming.seriesSeasons', { count: seasonsForT.length })
@@ -297,7 +294,7 @@ export default function StreamingCard({
                       key={ep}
                       onClick={() => toggleEpisode(ep)}
                       aria-pressed={on}
-                      className={`no-drag mono h-9 w-9 shrink-0 rounded-1 border text-[12px] tabular-nums transition-colors duration-fast ease-ease ${
+                      className={`no-drag mono h-9 w-9 shrink-0 rounded-1 border text-meta tabular-nums transition-colors duration-fast ease-ease ${
                         on
                           ? 'border-accent bg-accent text-accent-fg'
                           : 'border-edge text-ink-2 hover:border-ink-3 hover:text-ink'
@@ -332,7 +329,7 @@ export default function StreamingCard({
               own click with an error toast.
             */}
             <button
-              className="btn-solid w-full py-3.5 text-[14px]"
+              className="btn-solid w-full py-3.5 text-body"
               onClick={queueSeries}
               disabled={busy || totalSelected === 0}
             >
@@ -371,7 +368,7 @@ export default function StreamingCard({
               onChange={onSaveDirChange}
               defaultDir={settings?.downloadDir ?? ''}
             />
-            <button className="btn-solid w-full py-3.5 text-[14px]" onClick={queueMovie} disabled={busy}>
+            <button className="btn-solid w-full py-3.5 text-body" onClick={queueMovie} disabled={busy}>
               {busy ? <Loader2 size={16} className="animate-spin" /> : null}
               {t('common.download')}
             </button>

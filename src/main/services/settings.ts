@@ -3,6 +3,7 @@ import { homedir } from 'os'
 import { join } from 'path'
 import { LEGACY_THEMES, THEMES, type AppSettings, type ThemeId } from '@shared/types'
 import { isSafeTemplate } from '@shared/filename'
+import { migrateAccent } from '@shared/accent'
 import { normaliseRate } from '@shared/rate'
 import { normaliseSmbTarget } from '@shared/automation'
 import { proxyUser, splitProxyPassword } from '@shared/proxy'
@@ -75,6 +76,7 @@ function defaults(): AppSettings {
     resumeOnLaunch: true,
     keepFinished: 0,
     theme: 'night',
+    accent: 'orange',
     language: 'auto',
     notifications: true,
     clipboardWatch: false,
@@ -84,7 +86,8 @@ function defaults(): AppSettings {
     proxy: '',
     cookiesFromBrowser: '',
     cookiesFile: '',
-    errorReports: 'ask'
+    errorReports: 'ask',
+    setupDone: false
   }
 }
 
@@ -101,7 +104,21 @@ export function migrate(raw: Record<string, unknown>): Partial<AppSettings> {
   if (raw.theme !== undefined && !THEMES.includes(raw.theme as ThemeId)) {
     next.theme = LEGACY_THEMES[String(raw.theme)] ?? 'night'
   }
-  delete next.accent
+  /*
+    3.x dropped the accent picker and deleted the field; 4.0 brings it back.
+    A name it ships is kept (a 2.x 'violet' still means violet), anything else
+    goes, and the default applies.
+  */
+  /*
+    An install that already has settings is not a first run: the setup (6.3)
+    is for new installs. It stays reachable from the primary menu.
+  */
+  if (raw.setupDone === undefined && Object.keys(raw).length > 0) next.setupDone = true
+  if (next.accent !== undefined) {
+    const accent = migrateAccent(next.accent)
+    if (accent) next.accent = accent
+    else delete next.accent
+  }
   if (typeof next.concurrentDownloads === 'number') {
     next.concurrentDownloads = Math.min(8, Math.max(1, Math.round(next.concurrentDownloads)))
   }
@@ -189,15 +206,39 @@ export function liftProxyPassword<T extends Partial<Pick<AppSettings, 'proxy'>>>
   return proxy === settings.proxy ? settings : { ...settings, proxy }
 }
 
+/** The last proxy-password save or removal asked for; true once it is on disk. */
+let proxySecretWrite: Promise<boolean> = Promise.resolve(true)
+
+/*
+  Whether the password will survive a restart is known at once - it is whether
+  there is a key store - so the address can lose it now; the sealed copy
+  reaches disk a moment later, and `proxyPasswordSaved` says when.
+*/
 const proxyPasswordStore: ProxyPasswordStore = {
   keep: (password) => {
-    try {
-      return secretsPersist() && setSecret(SECRET.proxyPassword(), password)
-    } catch {
-      return false
-    }
+    if (!secretsPersist()) return false
+    proxySecretWrite = setSecret(SECRET.proxyPassword(), password).then((saved) => {
+      if (!saved) {
+        log.error(
+          'settings',
+          'The proxy password could not be saved; it is kept for this session only'
+        )
+      }
+      return saved
+    })
+    return true
   },
-  forget: () => deleteSecret(SECRET.proxyPassword())
+  forget: () => {
+    proxySecretWrite = deleteSecret(SECRET.proxyPassword()).then(() => true)
+  }
+}
+
+/**
+ * Settles when the proxy password the last save lifted out (or dropped) is
+ * on disk; true when it is. The settings IPC waits for this before it answers.
+ */
+export function proxyPasswordSaved(): Promise<boolean> {
+  return proxySecretWrite
 }
 
 

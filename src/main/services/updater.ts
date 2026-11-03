@@ -3,7 +3,7 @@ import { EventEmitter } from 'events'
 import { readFileSync } from 'fs'
 import { release as osRelease } from 'os'
 import { join } from 'path'
-import pkg from 'electron-updater'
+import type { AppUpdater } from 'electron-updater'
 import { isNewerVersion } from '@shared/version'
 import type { UpdateStatus } from '@shared/types'
 import { log } from './log'
@@ -20,7 +20,14 @@ import {
   type ReleaseAsset
 } from './updater-rules'
 
-const { autoUpdater } = pkg
+/*
+  electron-updater is loaded on first use, not at startup: it pulls in
+  semver, js-yaml, lazy-val and its own HTTP stack, about 66 ms of module
+  evaluation on a cold start for something the scheduler first needs minutes
+  later. `initUpdater` loads and wires it; every caller awaits that.
+*/
+let autoUpdater: AppUpdater
+let loading: Promise<AppUpdater> | null = null
 
 export const updateEvents = new EventEmitter()
 
@@ -96,12 +103,20 @@ export function isManualPlatform(): boolean {
   return false
 }
 
-let initialised = false
+export function initUpdater(): Promise<AppUpdater> {
+  if (!loading) {
+    loading = import('electron-updater').then((mod) => {
+      // A CommonJS module: the namespace may or may not carry it under `default`.
+      const m = mod as unknown as { autoUpdater?: AppUpdater; default?: { autoUpdater: AppUpdater } }
+      autoUpdater = (m.default?.autoUpdater ?? m.autoUpdater) as AppUpdater
+      wire()
+      return autoUpdater
+    })
+  }
+  return loading
+}
 
-export function initUpdater(): void {
-  if (initialised) return
-  initialised = true
-
+function wire(): void {
   autoUpdater.autoDownload = false
   autoUpdater.autoInstallOnAppQuit = true
   autoUpdater.allowDowngrade = false
@@ -348,8 +363,8 @@ export async function checkForUpdates(): Promise<UpdateStatus> {
     await checkViaGitHub()
     return currentStatus
   }
-  initUpdater()
   try {
+    await initUpdater()
     await autoUpdater.checkForUpdates()
   } catch (err) {
     emit({ state: 'error', message: err instanceof Error ? err.message : String(err) })
@@ -373,7 +388,7 @@ export async function backgroundCheck(): Promise<void> {
     if (isManualPlatform()) {
       await checkViaGitHub(true)
     } else {
-      initUpdater()
+      await initUpdater()
       await autoUpdater.checkForUpdates()
     }
   } catch (err) {
@@ -414,9 +429,9 @@ export async function downloadUpdate(): Promise<void> {
     await shell.openExternal(currentStatus.downloadUrl || RELEASES_PAGE)
     return
   }
-  initUpdater()
   downloadRequested = true
   try {
+    await initUpdater()
     await autoUpdater.downloadUpdate()
   } catch (err) {
     emit({ state: 'error', message: err instanceof Error ? err.message : String(err) })
@@ -431,7 +446,7 @@ export function quitAndInstall(): void {
     return
   }
   // isSilent=false to show progress, isForceRunAfter=true to relaunch after install.
-  setImmediate(() => autoUpdater.quitAndInstall(false, true))
+  void initUpdater().then((au) => setImmediate(() => au.quitAndInstall(false, true)))
 }
 
 export function openReleasesPage(): Promise<void> {

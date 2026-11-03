@@ -10,23 +10,23 @@ const ru: TranslateFn = (key, vars) => translate('ru', key, vars)
 
 describe('releaseText', () => {
   it('counts whole days while it is days away', () => {
-    expect(releaseText(NOW + 36 * DAY, en, NOW)).toBe('out in 36 d')
-    expect(releaseText(NOW + 35.2 * DAY, en, NOW)).toBe('out in 36 d')
+    expect(releaseText(NOW + 36 * DAY, en, NOW)).toBe('Out in 36 d')
+    expect(releaseText(NOW + 35.2 * DAY, en, NOW)).toBe('Out in 36 d')
   })
 
   it('switches to hours once the last day has begun', () => {
-    expect(releaseText(NOW + DAY / 4, en, NOW)).toBe('out in 6 h')
+    expect(releaseText(NOW + DAY / 4, en, NOW)).toBe('Out in 6 h')
   })
 
   it('says "any day now" for a date that passed, never a negative number', () => {
-    expect(releaseText(NOW - 3 * DAY, en, NOW)).toBe('expected any day now')
+    expect(releaseText(NOW - 3 * DAY, en, NOW)).toBe('Expected any day now')
   })
 
   it('admits it when the site gives no date', () => {
-    expect(releaseText(undefined, en, NOW)).toBe('not out yet')
+    expect(releaseText(undefined, en, NOW)).toBe('Not out yet')
   })
 
   it('speaks the language of the interface, units included', () => {
-    expect(releaseText(NOW + 36 * DAY, ru, NOW)).toBe('выйдет через 36 д')
+    expect(releaseText(NOW + 36 * DAY, ru, NOW)).toBe('Выйдет через 36 д')
   })
 })

@@ -194,7 +194,7 @@ async function look(watch: Watch, manual: boolean, read: () => void): Promise<Fo
     */
     const current = getWatch(watch.id)
     if (failures === REPORT_AFTER_FAILURES && current?.enabled) {
-      const channel = alertChannel(current)
+      const channel = await alertChannel(current)
       if (channel) {
         await sendNotification(
           channel.token,

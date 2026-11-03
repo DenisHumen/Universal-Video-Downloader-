@@ -7,3 +7,5 @@ build/linux/* text eol=lf
 packaging/aur/PKGBUILD text eol=lf
 # The terminal command, run by /bin/sh on Linux and macOS.
 build/uvd text eol=lf
+# Double-clicked on a Mac and run by bash: a CR would break every line.
+*.command text eol=lf

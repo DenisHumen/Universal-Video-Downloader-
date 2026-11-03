@@ -1,5 +1,5 @@
 import { useEffect, useId, useState } from 'react'
-import { Loader2, X } from 'lucide-react'
+import { Loader2, X } from '../ui/icons'
 import {
   AUDIO_CONTAINERS,
   VIDEO_CONTAINERS,
@@ -10,11 +10,11 @@ import {
 } from '@shared/types'
 import { useT } from '../i18n'
 import { toast } from '../lib/toast'
+import { viewQueueAction } from '../lib/queue'
 import { describeError } from '../lib/errors'
-import { useStore } from '../store'
 import TrimEditor from './TrimEditor'
 import Choice from './Choice'
-import Modal from './Modal'
+import Dialog from '../ui/Dialog'
 
 export type JobMode = 'trim' | 'convert'
 
@@ -30,7 +30,6 @@ const RESOLUTIONS = ['keep', '1080', '720', '480', '360'] as const
 export default function MediaJobModal({ item, mode, onClose }: Props): JSX.Element {
   const t = useT()
   const titleId = useId()
-  const setView = useStore((s) => s.setView)
   const [duration, setDuration] = useState<number | undefined>(item.duration)
   const [hasAudio, setHasAudio] = useState(true)
   const [hasVideo, setHasVideo] = useState(item.mode !== 'audio')
@@ -104,9 +103,8 @@ export default function MediaJobModal({ item, mode, onClose }: Props): JSX.Eleme
       return
     }
     setBusy(false)
-    toast(t('home.addedToQueue'), 'success')
+    toast(t('home.addedToQueue'), 'success', viewQueueAction())
     onClose()
-    setView('downloads')
   }
 
   const containers = audioOnly ? AUDIO_CONTAINERS : VIDEO_CONTAINERS
@@ -116,26 +114,19 @@ export default function MediaJobModal({ item, mode, onClose }: Props): JSX.Eleme
       Esc closes it, through the shared Modal: a dialog that can only be
       dismissed by aiming at a small target is a dialog people learn to dread.
     */
-    <Modal onClose={onClose} labelledBy={titleId} className="panel w-full max-w-lg overflow-hidden">
-      <div className="flex items-center gap-3 border-b border-edge px-4 py-3">
-        <div className="min-w-0 flex-1">
-          <h2 className="h2" id={titleId}>
-            {mode === 'trim' ? t('trim.title') : t('convert.title')}
-          </h2>
-          <p className="mono truncate text-[12px] text-ink-2" title={item.title}>
-            {item.title}
-          </p>
-        </div>
-        <button className="btn-icon" onClick={onClose} aria-label={t('common.close')}>
-          <X size={15} />
-        </button>
-      </div>
-
-      <div className="space-y-5 p-4">
+    <Dialog
+      variant="sheet"
+      size="md"
+      title={mode === 'trim' ? t('trim.title') : t('convert.title')}
+      subtitle={<span title={item.title}>{item.title}</span>}
+      closeLabel={t('common.close')}
+      onClose={onClose}
+    >
+      <div className="space-y-5">
         {mode === 'trim' ? (
           <>
             {probing ? (
-              <div className="flex items-center gap-2 text-[13px] text-ink-2">
+              <div className="flex items-center gap-2 text-control text-ink-2">
                 <Loader2 size={14} className="animate-spin" /> …
               </div>
             ) : (
@@ -196,7 +187,7 @@ export default function MediaJobModal({ item, mode, onClose }: Props): JSX.Eleme
                 }))}
               />
               {container === 'gif' && (
-                <p className="mt-2 text-[12px] text-warn">{t('convert.gifHint')}</p>
+                <p className="mt-2 text-meta text-warn">{t('convert.gifHint')}</p>
               )}
             </div>
             {!audioOnly && container !== 'gif' && (
@@ -217,7 +208,7 @@ export default function MediaJobModal({ item, mode, onClose }: Props): JSX.Eleme
         )}
 
         <button
-          className="btn-solid w-full py-3.5 text-[14px]"
+          className="btn-solid h-11 w-full rounded-pill text-body"
           onClick={submit}
           disabled={busy || invalid || nothingToDo}
         >
@@ -225,6 +216,6 @@ export default function MediaJobModal({ item, mode, onClose }: Props): JSX.Eleme
           {mode === 'trim' ? t('trim.apply') : t('convert.apply')}
         </button>
       </div>
-    </Modal>
+    </Dialog>
   )
 }

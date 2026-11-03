@@ -1,6 +1,6 @@
 import type { DownloadRequest } from '@shared/types'
 import { useStore } from '../store'
-import { toast } from './toast'
+import { toast, type ToastAction } from './toast'
 import { describeError } from './errors'
 import { t, tp } from '../i18n'
 
@@ -18,7 +18,7 @@ export interface QueueResult {
  *
  * Six screens used to call `window.api.startDownload` directly, each wrapping
  * it in its own try/catch and its own success toast — six chances for the
- * wording, the error handling and the follow-up navigation to drift apart.
+ * wording, the error handling and the follow-up to drift apart.
  *
  * It also owns the "already queued" story. The main process refuses to create a
  * second entry for a URL that is still in flight and hands back the existing
@@ -48,17 +48,25 @@ async function queue(requests: DownloadRequest[]): Promise<QueueResult> {
   return result
 }
 
+/**
+ * Starting a download never moves the user off the screen they are on (plan
+ * 6.1): the queue is one press away on the toast instead.
+ */
+export function viewQueueAction(): ToastAction {
+  return { label: t('toast.viewQueue'), run: () => useStore.getState().setView('downloads') }
+}
+
 /** Queue one download and report the outcome. Returns true if anything moved. */
 export async function queueDownload(req: DownloadRequest): Promise<boolean> {
   const { added, duplicates, failed } = await queue([req])
   if (failed) return false
   if (duplicates) {
-    toast(t('queue.duplicate'), 'info')
+    toast(t('queue.duplicate'), 'info', viewQueueAction())
     // Still a success from the user's point of view: the thing they asked for
     // is in the queue. Only the reason differs.
     return true
   }
-  if (added) toast(t('home.addedToQueue'), 'success')
+  if (added) toast(t('home.addedToQueue'), 'success', viewQueueAction())
   return added > 0
 }
 
@@ -70,9 +78,13 @@ export async function queueDownloads(requests: DownloadRequest[]): Promise<boole
   const { added, duplicates, failed } = await queue(requests)
   if (!added && !duplicates) return false
   if (duplicates) {
-    toast(t('queue.addedWithDuplicates', { count: added, duplicates }), added ? 'success' : 'info')
+    toast(
+      t('queue.addedWithDuplicates', { count: added, duplicates }),
+      added ? 'success' : 'info',
+      viewQueueAction()
+    )
   } else {
-    toast(tp('playlist.added', added), 'success')
+    toast(tp('playlist.added', added), 'success', viewQueueAction())
   }
   return added > 0 || (duplicates > 0 && failed === 0)
 }

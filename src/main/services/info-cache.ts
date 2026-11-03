@@ -1,5 +1,6 @@
 import { createHash, randomBytes } from 'crypto'
-import { existsSync, mkdirSync, readdirSync, rmSync, statSync, writeFileSync } from 'fs'
+import { existsSync, mkdirSync, rmSync, statSync, writeFileSync } from 'fs'
+import { readdir, rm } from 'fs/promises'
 import { join } from 'path'
 import type { AppSettings } from '@shared/types'
 import { normalizeUrl } from '@shared/urls'
@@ -93,6 +94,12 @@ interface Entry {
 
 export class InfoCache {
   private readonly entries = new Map<string, Entry>()
+  /**
+   * Every file this session wrote. `clearDir` runs in the background at
+   * launch, so a probe can `put` (and a run `take`) before it reaches a name;
+   * those files are this session's and must survive it.
+   */
+  private readonly born = new Set<string>()
 
   constructor(
     private readonly dir: () => string,
@@ -109,6 +116,7 @@ export class InfoCache {
       mkdirSync(dir, { recursive: true })
       const file = join(dir, `${randomBytes(8).toString('hex')}${SUFFIX}`)
       writeFileSync(file, json, 'utf-8')
+      this.born.add(file)
       this.entries.set(key, { file, at: this.now() })
     } catch {
       /* a cache that cannot write is just a miss */
@@ -143,17 +151,22 @@ export class InfoCache {
   }
 
   /** At launch: whatever a previous session left behind is stale by definition. */
-  clearDir(): void {
-    this.entries.clear()
+  async clearDir(): Promise<void> {
+    let dir: string
     let names: string[]
     try {
-      names = readdirSync(this.dir())
+      dir = this.dir()
+      names = await readdir(dir)
     } catch {
       return
     }
-    for (const name of names) {
-      if (name.endsWith(SUFFIX)) rmSync(join(this.dir(), name), { force: true })
-    }
+    await Promise.all(
+      names
+        .filter((name) => name.endsWith(SUFFIX))
+        .map((name) => join(dir, name))
+        .filter((file) => !this.born.has(file))
+        .map((file) => rm(file, { force: true }).catch(() => undefined))
+    )
   }
 
   get size(): number {

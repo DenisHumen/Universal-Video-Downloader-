@@ -39,7 +39,7 @@ function rememberPreview(p: DetectPreview): void {
   while (previews.size > 8) previews.delete(previews.keys().next().value as string)
 }
 
-export type ViewId = 'home' | 'search' | 'downloads' | 'automation' | 'settings'
+export type ViewId = 'home' | 'search' | 'downloads' | 'library' | 'automation' | 'settings'
 
 export interface WatchIntent {
   url: string
@@ -49,7 +49,7 @@ export interface WatchIntent {
   watchId?: string
 }
 
-const VIEWS: ViewId[] = ['home', 'search', 'downloads', 'automation', 'settings']
+const VIEWS: ViewId[] = ['home', 'search', 'downloads', 'library', 'automation', 'settings']
 
 export function isViewId(value: string): value is ViewId {
   return (VIEWS as string[]).includes(value)
@@ -93,6 +93,27 @@ interface AppState {
   /** The site's own title and poster for the link being detected, when it has one. */
   detectPreview: DetectPreview | null
   shortcutsOpen: boolean
+  /** The Ctrl/⌘+K command palette (plan 4.5). */
+  paletteOpen: boolean
+  /** The first-run setup (6.3), shown once and again from the primary menu. */
+  setupOpen: boolean
+  /** The queue row a notification asked to show; Activity scrolls to it and pulses it once. */
+  focusedRow: string | null
+  focusRow: (id: string | null) => void
+  setSetupOpen: (open: boolean) => void
+  /**
+   * The Library's badge rule (5.3): files finished in this session since the
+   * Library was last opened. Opening it clears the count.
+   */
+  libraryUnseen: number
+  /** The sidebar as an overlay (below 860 px, or while Settings asks for room) is showing. */
+  sidebarOverlayOpen: boolean
+  /** Settings at 860-1099 px folds the app sidebar away so there is never a double rail (A1.1). */
+  sidebarFolded: boolean
+  /** Where Settings is: `<panel>[/<subpage>][#<row>]` (views/settings/router.ts). */
+  settingsRoute: string
+  /** Settings was opened at a route (a deep link), not from the sidebar: narrow mode skips the list. */
+  settingsDeepLinked: boolean
 
   init: () => Promise<void>
   setView: (view: ViewId) => void
@@ -104,6 +125,12 @@ interface AppState {
   dismissUpdate: () => void
   dismissClipboardLink: () => void
   setShortcutsOpen: (open: boolean) => void
+  setPaletteOpen: (open: boolean) => void
+  setSidebarOverlayOpen: (open: boolean) => void
+  setSidebarFolded: (folded: boolean) => void
+  /** Open Settings, at `route` or where it was last (Ctrl+, , About, Fix buttons, deep links). */
+  openSettings: (route?: string) => void
+  setSettingsRoute: (route: string) => void
   /** Home started detecting this link: its stage starts over, from resolving. */
   beginDetect: (url: string, requestId: string) => void
   /** Home stopped waiting - a result, an error, a cancel, or it went away. */
@@ -141,7 +168,7 @@ async function runInit(set: SetState, get: GetState): Promise<void> {
     window.api.getSettings(),
     window.api.listDownloads()
   ])
-  applyAppearance(settings, appInfo.locale)
+  applyAppearance(settings, appInfo.locale, appInfo.systemAccent)
   set({
     appInfo,
     settings,
@@ -153,6 +180,10 @@ async function runInit(set: SetState, get: GetState): Promise<void> {
 
   // One store update per batch, however many rows a bulk action touched.
   window.api.onDownloadsChanged((change) => {
+    // The Library's badge: a row that just finished with a file, while the Library is not showing.
+    const before = new Map(get().downloads.map((d) => [d.id, d.state]))
+    const fresh = change.updated.filter((d) => d.state === 'completed' && d.filepath && before.get(d.id) !== 'completed' && before.has(d.id)).length
+    if (fresh && get().view !== 'library') set({ libraryUnseen: get().libraryUnseen + fresh })
     const list = get().downloads
     const next = applyDownloadsChanged(list, change)
     if (next !== list) set({ downloads: next })
@@ -245,6 +276,13 @@ async function runInit(set: SetState, get: GetState): Promise<void> {
   window.api.onNavigate((view) => {
     if (isViewId(view)) set({ view })
   })
+  // A notification was clicked: Activity, with that row in view (6.4).
+  window.api.onFocusRow((id) => get().focusRow(id))
+  // The OS switched light/dark: a "system" theme and a clamped system accent repaint (E3a).
+  window.api.onNativeTheme(() => {
+    const settings = get().settings
+    if (settings) applyAppearance(settings, get().appInfo?.locale ?? 'en', get().appInfo?.systemAccent)
+  })
 
   /*
     Collect anything main tried to hand us before this point. IPC does not
@@ -284,25 +322,35 @@ export const useStore = create<AppState>((set, get) => ({
   detect: null,
   detectPreview: null,
   shortcutsOpen: false,
+  paletteOpen: false,
+  setupOpen: false,
+  focusedRow: null,
+  focusRow: (id) => set(id ? { focusedRow: id, view: 'downloads', sidebarOverlayOpen: false } : { focusedRow: null }),
+  libraryUnseen: 0,
+  sidebarOverlayOpen: false,
+  sidebarFolded: false,
+  settingsRoute: 'appearance',
+  settingsDeepLinked: false,
 
   init: () => {
     if (!initPromise) initPromise = runInit(set, get)
     return initPromise
   },
 
-  setView: (view) => set({ view }),
+  // Choosing a section closes the overlay sidebar, as GNOME's split view does.
+  setView: (view) => set(view === 'library' ? { view, sidebarOverlayOpen: false, libraryUnseen: 0 } : { view, sidebarOverlayOpen: false }),
 
   saveSettings: async (partial) => {
     const next = await window.api.setSettings(partial)
     forgetDetectsIfAccessChanged(get().settings, next)
-    applyAppearance(next, get().appInfo?.locale ?? 'en')
+    applyAppearance(next, get().appInfo?.locale ?? 'en', get().appInfo?.systemAccent)
     set({ settings: next })
   },
 
   resetSettings: async () => {
     const next = await window.api.resetSettings()
     forgetDetectsIfAccessChanged(get().settings, next)
-    applyAppearance(next, get().appInfo?.locale ?? 'en')
+    applyAppearance(next, get().appInfo?.locale ?? 'en', get().appInfo?.systemAccent)
     set({ settings: next })
   },
 
@@ -315,7 +363,7 @@ export const useStore = create<AppState>((set, get) => ({
     const outcome = await window.api.importBackup()
     if (outcome.ok) {
       forgetDetectsIfAccessChanged(get().settings, outcome.settings)
-      applyAppearance(outcome.settings, get().appInfo?.locale ?? 'en')
+      applyAppearance(outcome.settings, get().appInfo?.locale ?? 'en', get().appInfo?.systemAccent)
       set({ settings: outcome.settings })
     }
     return outcome
@@ -329,6 +377,18 @@ export const useStore = create<AppState>((set, get) => ({
   dismissUpdate: () => set({ updateDismissed: true }),
   dismissClipboardLink: () => set({ clipboardLink: null }),
   setShortcutsOpen: (open) => set({ shortcutsOpen: open }),
+  setPaletteOpen: (open) => set({ paletteOpen: open }),
+  setSetupOpen: (open) => set({ setupOpen: open }),
+  setSidebarOverlayOpen: (open) => set({ sidebarOverlayOpen: open }),
+  setSidebarFolded: (folded) => set({ sidebarFolded: folded }),
+  openSettings: (route) =>
+    set((s) => ({
+      view: 'settings',
+      settingsRoute: route ?? s.settingsRoute,
+      settingsDeepLinked: Boolean(route),
+      sidebarOverlayOpen: false
+    })),
+  setSettingsRoute: (route) => set({ settingsRoute: route }),
   beginDetect: (url, requestId) =>
     set({ detect: { stage: 'resolving', url, requestId }, detectPreview: previews.get(requestId) ?? null }),
   endDetect: () => {

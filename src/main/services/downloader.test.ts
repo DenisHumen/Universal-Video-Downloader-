@@ -9,6 +9,7 @@ function settings(overrides: Partial<AppSettings> = {}): AppSettings {
   return {
     downloadDir: '/tmp',
     errorReports: 'ask',
+    setupDone: true,
     playlistNumbering: true,
     playlistFolder: true,
     concurrentDownloads: 3,
@@ -31,6 +32,7 @@ function settings(overrides: Partial<AppSettings> = {}): AppSettings {
     resumeOnLaunch: true,
     keepFinished: 0,
     theme: 'night',
+    accent: 'blue',
     language: 'auto',
     notifications: true,
     clipboardWatch: false,

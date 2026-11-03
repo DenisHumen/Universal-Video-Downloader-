@@ -1,13 +1,16 @@
+import { buttonLayout, systemAccent } from './services/desktop'
+import { forgetEntry, missingFiles, onLibraryChanged, queryLibrary, trashEntry } from './services/library'
+import type { LibraryQuery } from '@shared/library'
 import {
   app,
   BrowserWindow,
-  clipboard,
   dialog,
   ipcMain,
   Notification,
   shell,
   type IpcMainInvokeEvent
 } from 'electron'
+import { dirname } from 'path'
 import { IPC } from '@shared/ipc'
 import type {
   AppSettings,
@@ -20,6 +23,7 @@ import type {
   MediaJobRequest,
   SearchScope
 } from '@shared/types'
+import { readClipboardText } from './services/clipboard'
 import { detect } from './services/detector'
 import { fetchOembed } from './services/oembed'
 import { searchVideos } from './services/search'
@@ -28,6 +32,7 @@ import { fetchThumbnail } from './services/thumbnails'
 import { registerBrowserIpc } from './services/browser'
 import { acquireAwake, releaseAwake } from './services/awake'
 import { mt } from './services/locale'
+import { ACTION_LABEL, planNotification } from './services/notify-plan'
 import {
   applyHistoryLimit,
   cancelDownload,
@@ -49,7 +54,7 @@ import {
   startMediaJob
 } from './services/downloader'
 import { forwardQueueEvents } from './services/queue-events'
-import { getSettings, resetSettings, setSettings } from './services/settings'
+import { getSettings, proxyPasswordSaved, resetSettings, setSettings } from './services/settings'
 import { exportBackup, importBackup } from './services/backup'
 import type { ExportOutcome, ImportOutcome } from '@shared/backup'
 import { forgetFailures, previewReport, sendReport } from './services/report'
@@ -165,6 +170,21 @@ export function registerIpc({ getWindow, openSearchWindow, onSettingsChanged }: 
   ipcMain.handle(IPC.downloadClearFinished, () => clearFinished())
   ipcMain.handle(IPC.downloadClearFailed, () => clearFailed())
   ipcMain.handle(IPC.downloadList, () => listDownloads())
+
+  // ---- Library (plan 5.3) ----
+  ipcMain.handle(IPC.libraryList, (_e, q: LibraryQuery) => queryLibrary(q ?? {}))
+  ipcMain.handle(IPC.libraryMissing, (event, paths: unknown) => {
+    requireRenderer(event, IPC.libraryMissing)
+    return missingFiles(Array.isArray(paths) ? paths.filter((p): p is string => typeof p === 'string') : [])
+  })
+  ipcMain.handle(IPC.libraryTrash, (event, id: string) => {
+    requireRenderer(event, IPC.libraryTrash)
+    return trashEntry(String(id))
+  })
+  ipcMain.handle(IPC.libraryForget, (event, id: string) => {
+    requireRenderer(event, IPC.libraryForget)
+    return forgetEntry(String(id))
+  })
   ipcMain.handle(IPC.mediaJobStart, (_e, req: MediaJobRequest) => startMediaJob(req))
   ipcMain.handle(IPC.mediaProbe, (_e, path: string) => probeMedia(path))
   ipcMain.handle(IPC.mediaThumbnail, (_e, url: string, pageUrl?: string) =>
@@ -181,8 +201,10 @@ export function registerIpc({ getWindow, openSearchWindow, onSettingsChanged }: 
     settings screen or from an imported backup - so an import reaches the tray,
     the watcher and the queue exactly as the switches on that screen do.
   */
-  const changeSettings = (partial: Partial<AppSettings>): AppSettings => {
+  const changeSettings = async (partial: Partial<AppSettings>): Promise<AppSettings> => {
     const next = setSettings(partial)
+    // A proxy password lifted out of the address is on disk before this answers.
+    await proxyPasswordSaved()
     onSettingsChanged(next)
     // Reports off: drop the failures already kept for one, not just the offer.
     if (next.errorReports === 'off') forgetFailures()
@@ -199,9 +221,10 @@ export function registerIpc({ getWindow, openSearchWindow, onSettingsChanged }: 
     requireRenderer(event, IPC.settingsSet)
     return changeSettings(partial)
   })
-  ipcMain.handle(IPC.settingsReset, (event) => {
+  ipcMain.handle(IPC.settingsReset, async (event) => {
     requireRenderer(event, IPC.settingsReset)
     const next = resetSettings()
+    await proxyPasswordSaved()
     onSettingsChanged(next)
     return next
   })
@@ -221,9 +244,15 @@ export function registerIpc({ getWindow, openSearchWindow, onSettingsChanged }: 
   })
 
   // ---- Shell / dialogs ----
+  /*
+    Since Electron 43 a dialog without `defaultPath` opens in Downloads rather
+    than wherever the OS last left it, so each picker starts from what it is
+    about to replace.
+  */
   ipcMain.handle(IPC.chooseDirectory, async (event) => {
     const win = BrowserWindow.fromWebContents(event.sender) ?? getWindow() ?? undefined
     const result = await dialog.showOpenDialog(win!, {
+      defaultPath: getSettings().downloadDir || undefined,
       properties: ['openDirectory', 'createDirectory']
     })
     if (result.canceled || !result.filePaths.length) return null
@@ -231,7 +260,9 @@ export function registerIpc({ getWindow, openSearchWindow, onSettingsChanged }: 
   })
   ipcMain.handle(IPC.chooseCookiesFile, async (event) => {
     const win = BrowserWindow.fromWebContents(event.sender) ?? getWindow() ?? undefined
+    const current = getSettings().cookiesFile
     const result = await dialog.showOpenDialog(win!, {
+      defaultPath: current ? dirname(current) : undefined,
       properties: ['openFile'],
       filters: [
         { name: 'Cookies', extensions: ['txt'] },
@@ -252,13 +283,7 @@ export function registerIpc({ getWindow, openSearchWindow, onSettingsChanged }: 
     if (!/^https?:\/\//i.test(url) && !isReportMailto(url)) return Promise.resolve()
     return shell.openExternal(url)
   })
-  ipcMain.handle(IPC.clipboardRead, () => {
-    try {
-      return clipboard.readText().trim()
-    } catch {
-      return ''
-    }
-  })
+  ipcMain.handle(IPC.clipboardRead, () => readClipboardText())
 
   // ---- yt-dlp engine ----
   ipcMain.handle(IPC.ytdlpEnsure, async () => {
@@ -310,7 +335,7 @@ export function registerIpc({ getWindow, openSearchWindow, onSettingsChanged }: 
   })
 
   // ---- App / window ----
-  ipcMain.handle(IPC.appInfo, () => ({
+  ipcMain.handle(IPC.appInfo, async () => ({
     version: app.getVersion(),
     name: app.getName(),
     platform: process.platform,
@@ -318,7 +343,10 @@ export function registerIpc({ getWindow, openSearchWindow, onSettingsChanged }: 
     locale: app.getLocale(),
     manualUpdates: isManualPlatform(),
     ytdlp: getYtdlpStatus(),
-    update: getUpdateStatus()
+    update: getUpdateStatus(),
+    // One-shot, time-limited desktop reads (services/desktop.ts, A1.2 E2/E6).
+    systemAccent: await systemAccent(),
+    buttonLayout: await buttonLayout()
   }))
   // Window controls act on the window the call came from (main or search).
   ipcMain.handle(IPC.windowMinimize, (e) => BrowserWindow.fromWebContents(e.sender)?.minimize())
@@ -347,6 +375,7 @@ export function registerIpc({ getWindow, openSearchWindow, onSettingsChanged }: 
     forget: forgetNotified,
     syncOs: () => syncOsState(getWindow)
   })
+  onLibraryChanged(() => send(IPC.evtLibraryChanged, null))
   ytdlpEvents.on('status', (s) => send(IPC.evtYtdlpStatus, s))
   updateEvents.on('status', (s) => send(IPC.evtUpdateStatus, s))
 }
@@ -360,6 +389,13 @@ export function registerIpc({ getWindow, openSearchWindow, onSettingsChanged }: 
  */
 const notified = new Set<string>()
 
+/**
+ * Notifications still on screen. Nothing else refers to one once `show()` has
+ * returned, so the garbage collector could take it - and its click handler
+ * with it - while it was still waiting to be clicked.
+ */
+const shown = new Set<Notification>()
+
 export function forgetNotified(id: string): void {
   notified.delete(id)
 }
@@ -369,20 +405,51 @@ function maybeNotify(item: DownloadItem): void {
   if (terminal && !notified.has(item.id)) {
     notified.add(item.id)
     if (getSettings().notifications && Notification.isSupported()) {
-      const done = item.state === 'completed'
+      const plan = planNotification(process.platform, item)
       const n = new Notification({
-        title: done ? mt('notify.done') : mt('notify.failed'),
+        title: mt(plan.title),
         body: item.title,
-        silent: false
+        silent: false,
+        actions: plan.actions.map((a) => ({ type: 'button' as const, text: mt(ACTION_LABEL[a]) }))
       })
+      shown.add(n)
+      // Everywhere: a click focuses the app on that row (6.4).
       n.on('click', () => {
-        if (done && item.filepath) shell.showItemInFolder(item.filepath)
-        else getWindowForNotification()?.show()
+        shown.delete(n)
+        focusRow(item.id)
+      })
+      // macOS only: the buttons planNotification gave it.
+      n.on('action', (_e, index) => {
+        shown.delete(n)
+        const action = plan.actions[index]
+        if (action === 'play' && item.filepath) void shell.openPath(item.filepath)
+        else if (action === 'showInFolder' && item.filepath) shell.showItemInFolder(item.filepath)
+        else focusRow(item.id)
+      })
+      n.on('close', () => shown.delete(n))
+      /*
+        Since Electron 42 macOS posts through UNNotification, which refuses an
+        app without a real signature (the ad-hoc sealed builds) and says so
+        here instead of showing anything.
+      */
+      n.on('failed', (_e, error) => {
+        shown.delete(n)
+        log.warn('app', 'A notification could not be shown', { why: error })
       })
       n.show()
     }
   }
   if (item.state === 'downloading' || item.state === 'queued') notified.delete(item.id)
+}
+
+/** Raise the window and show the row a notification was about (Activity, with the row in view). */
+function focusRow(id: string): void {
+  const win = getWindowForNotification()
+  if (!win) return
+  if (win.isMinimized()) win.restore()
+  win.show()
+  win.focus()
+  win.webContents.send(IPC.evtFocusRow, id)
 }
 
 /** Set once IPC is registered, so a notification click can raise the window. */
@@ -415,3 +482,4 @@ function syncOsState(getWindow: () => BrowserWindow | null): void {
   const avg = active.reduce((sum, d) => sum + (d.percent || 0), 0) / active.length / 100
   win.setProgressBar(Math.max(0.02, Math.min(1, avg)))
 }
+

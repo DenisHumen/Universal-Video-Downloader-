@@ -15,7 +15,7 @@ const h = vi.hoisted(() => ({ dir: '', busy: '' }))
 
 vi.mock('electron', () => ({
   app: { getPath: () => h.dir },
-  safeStorage: { isEncryptionAvailable: () => false }
+  safeStorage: { isAsyncEncryptionAvailable: async () => false }
 }))
 
 vi.mock('fs', async (importOriginal) => {

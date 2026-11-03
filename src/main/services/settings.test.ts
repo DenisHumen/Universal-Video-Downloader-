@@ -21,12 +21,20 @@ describe('migrate', () => {
     expect(migrate({ theme: 'night' }).theme).toBe('night')
   })
 
+  it('keeps System, which follows the OS', () => {
+    expect(migrate({ theme: 'system' }).theme).toBe('system')
+  })
+
   it('falls back to night for a theme nobody has ever heard of', () => {
     expect(migrate({ theme: 'chartreuse' }).theme).toBe('night')
   })
 
-  it('drops the accent that the redesign removed', () => {
-    expect('accent' in migrate({ accent: 'violet' })).toBe(false)
+  it('keeps an accent 4.0 ships, renames the GNOME ones, and drops one it does not', () => {
+    expect(migrate({ accent: 'teal' }).accent).toBe('teal')
+    expect(migrate({ accent: 'violet' }).accent).toBe('purple')
+    expect(migrate({ accent: 'graphite' }).accent).toBe('slate')
+    expect(migrate({ accent: 'system' }).accent).toBe('system')
+    expect('accent' in migrate({ accent: 'chartreuse' })).toBe(false)
   })
 
   it('clamps the numbers a hand-edited file could put out of range', () => {

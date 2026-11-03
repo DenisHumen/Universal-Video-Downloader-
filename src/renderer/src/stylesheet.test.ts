@@ -50,6 +50,51 @@ describe('button classes in the source', () => {
   })
 })
 
+describe('type sizes in the source', () => {
+  /*
+    4.0 type scale (plan 2.5): hero, title, section, body, control, meta,
+    caption. An arbitrary size is how the 3.x interface drifted to seven
+    near-identical ones; a new size goes into tailwind.config.js or nowhere.
+  */
+  it('uses the type scale, never text-[Npx]', () => {
+    const arbitrary = sources.flatMap(({ file, text }) =>
+      [...text.matchAll(/\btext-\[\d+(?:\.\d+)?px\]/g)].map((m) => `${file}: ${m[0]}`)
+    )
+    expect(arbitrary).toEqual([])
+  })
+})
+
+describe('motion tokens', () => {
+  const css = readFileSync(join(ROOT, 'index.css'), 'utf-8')
+
+  // Plan 2.6: press 90, fast 140, base 200, slow 260, plus the spring curve.
+  it('defines the 4.0 durations and curves', () => {
+    for (const [name, value] of [
+      ['--t-press', '90ms'],
+      ['--t-fast', '140ms'],
+      ['--t-base', '200ms'],
+      ['--t-slow', '260ms']
+    ]) {
+      expect(css).toMatch(new RegExp(`${name}:\\s*${value};`))
+    }
+    // libadwaita's critically damped spring as CSS linear(): no overshoot (A1).
+    expect(css).toMatch(/--ease-spring:\s*linear\(0,[^)]*, 1\);/)
+  })
+
+  it('writes no millisecond literal outside the tokens and the reduced-motion override', () => {
+    const literals = css
+      .split('\n')
+      .filter((line) => /\d+ms/.test(line) && !/^\s*--t-/.test(line) && !/0\.01ms !important/.test(line))
+    expect(literals).toEqual([])
+  })
+
+  it('collapses every animation and transition under reduced motion', () => {
+    const block = css.slice(css.indexOf('@media (prefers-reduced-motion: reduce)'))
+    expect(block).toMatch(/animation-duration:\s*0\.01ms !important/)
+    expect(block).toMatch(/transition-duration:\s*0\.01ms !important/)
+  })
+})
+
 /*
   The stylesheet as Tailwind actually builds it: what @apply copies and what
   order the layers land in decide how things look, and neither shows up in the
@@ -95,9 +140,15 @@ describe('the built stylesheet', () => {
   })
 
   // Day's quiet buttons were a 1.06:1 fill on a white panel: there, but unseen.
-  it('edges the neutral buttons with the theme hairline', async () => {
-    expect(await winning('.btn-quiet', 'box-shadow')).toContain('var(--control-edge)')
-    expect(await winning('.btn-icon', 'border-color')).toBe('var(--control-edge)')
+  /*
+    A1 retired the hairline (--control-edge): GNOME's controls are the text
+    colour at .10, which reads on every plane in both themes (D0, and the
+    contrast gate's control-fill checks).
+  */
+  it('fills the neutral controls with the text colour at .10, edge-free', async () => {
+    expect(await winning('.btn-quiet', 'background-color')).toContain('var(--fill)')
+    expect(await winning('.btn-icon', 'background-color')).toContain('var(--fill)')
+    expect(await winning('.btn-quiet', 'box-shadow')).toBeUndefined()
   })
 
   /*
@@ -106,7 +157,7 @@ describe('the built stylesheet', () => {
     very edge they exist to go without.
   */
   it('keeps the bare icon buttons bare', async () => {
-    expect(await winning('.btn-icon-bare', 'border-color')).toBe('transparent')
+    expect(await winning('.btn-icon-bare', 'background-color')).toBe('transparent')
     const themed = (await rules()).filter((rule) =>
       rule.selectors.some((s) => s.includes('[data-theme') && s.includes('.btn'))
     )

@@ -17,14 +17,20 @@ import type { Transition, Variants } from 'framer-motion'
 /** Decelerate-emphasised — the app's single easing curve. */
 export const EASE = [0.2, 0, 0, 1] as const
 
+/*
+  The same durations as the CSS motion tokens (index.css, --t-fast/base/slow).
+  framer-motion is on its way out of new work (plan 3.3: new motion is CSS);
+  what still uses it keeps in step with the tokens.
+*/
+
 /** Micro-interactions: hover, colour, small reveals. */
-export const quick: Transition = { duration: 0.16, ease: EASE }
+export const quick: Transition = { duration: 0.14, ease: EASE }
 
 /** Entering content: view switches, results appearing. */
-export const enter: Transition = { duration: 0.24, ease: EASE }
+export const enter: Transition = { duration: 0.2, ease: EASE }
 
 /** Height reveals — disclosure rows, expanding drawers. */
-export const reveal: Transition = { duration: 0.32, ease: EASE }
+export const reveal: Transition = { duration: 0.26, ease: EASE }
 
 /**
  * Dialogs. A spring, but a damped one: it should feel like the panel has mass,

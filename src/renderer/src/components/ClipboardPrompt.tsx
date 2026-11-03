@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react'
-import { AnimatePresence, motion } from 'framer-motion'
+import { AnimatePresence, m } from 'framer-motion'
 import { collapse } from '../lib/motion'
-import { X } from 'lucide-react'
+import { X } from '../ui/icons'
 import { useStore } from '../store'
 import { useT } from '../i18n'
 
@@ -48,12 +48,12 @@ export default function ClipboardPrompt(): JSX.Element {
   return (
     <AnimatePresence initial={false}>
       {link && (
-        <motion.div {...collapse} className="shrink-0 overflow-hidden">
+        <m.div {...collapse} className="shrink-0 overflow-hidden">
           <div className="flex items-center gap-3 border-b border-edge bg-raise px-4 py-2.5">
             <span className="label shrink-0 text-accent-ink">{t('stamp.clipboard')}</span>
             <div className="min-w-0 flex-1">
-              <p className="text-[14px] font-medium text-ink">{t('home.clipboardFound')}</p>
-              <p className="mono truncate text-[12px] text-ink-2" title={link}>
+              <p className="text-body font-medium text-ink">{t('home.clipboardFound')}</p>
+              <p className="mono truncate text-meta text-ink-2" title={link}>
                 {link}
               </p>
             </div>
@@ -67,7 +67,7 @@ export default function ClipboardPrompt(): JSX.Element {
               <X size={15} />
             </button>
           </div>
-        </motion.div>
+        </m.div>
       )}
     </AnimatePresence>
   )

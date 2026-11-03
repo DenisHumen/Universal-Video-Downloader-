@@ -16,7 +16,7 @@ import { checkNow, retryRun } from './services/automation/watcher'
 import { stopEpisode } from './services/automation/pipeline'
 import { testTarget } from './services/automation/smb'
 import { sendTest } from './services/automation/telegram'
-import { getSecret, hasSecret, SECRET, secretsPersist, setSecret } from './services/secrets'
+import { getSecretWhenReady, hasSecret, SECRET, secretsPersist, setSecret } from './services/secrets'
 import { logFilePath } from './services/log'
 import { getSettings } from './services/settings'
 import { coalesce } from './services/coalesce'
@@ -174,7 +174,7 @@ export function registerAutomationIpc(): void {
   ipcMain.handle(
     IPC.autoTestSmb,
     async (_e, target: SmbTarget, password: string): Promise<string> => {
-      const secret = password || getSecret(SECRET.smbPassword(target.id)) || ''
+      const secret = password || (await getSecretWhenReady(SECRET.smbPassword(target.id))) || ''
       return testTarget(target, secret)
     }
   )
@@ -182,7 +182,7 @@ export function registerAutomationIpc(): void {
   ipcMain.handle(
     IPC.autoTestTelegram,
     async (_e, token: string, chatId: string): Promise<string> => {
-      const secret = token || getSecret(SECRET.telegramToken()) || ''
+      const secret = token || (await getSecretWhenReady(SECRET.telegramToken())) || ''
       return sendTest(secret, chatId || getSettings().telegramChatId)
     }
   )
@@ -190,7 +190,7 @@ export function registerAutomationIpc(): void {
   /** One way only. There is deliberately no channel that returns a secret. */
   ipcMain.handle(
     IPC.autoSetSecret,
-    (_e, kind: 'smb' | 'telegram' | 'proxy', id: string, value: string) => {
+    async (_e, kind: 'smb' | 'telegram' | 'proxy', id: string, value: string) => {
       /*
         A new proxy password needs nothing more: Chromium caches only
         credentials that worked, and asks again - reading the new one - once
@@ -203,7 +203,8 @@ export function registerAutomationIpc(): void {
           : kind === 'proxy'
             ? SECRET.proxyPassword()
             : SECRET.telegramToken()
-      setSecret(key, value)
+      // Answers once it is on disk, so a quit right after cannot lose it; false when it is not.
+      return setSecret(key, value)
     }
   )
 

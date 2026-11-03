@@ -1,3 +1,5 @@
+import { EMPTY_LIBRARY, entryFromItem, listLibrary, removeEntry, upsertEntry, type LibraryFile } from '@shared/library'
+import type { ButtonLayout } from '@shared/desktop'
 import type { UvdApi, AppInfo } from '../../../preload/index'
 import type {
   AppSettings,
@@ -43,6 +45,7 @@ const settings: AppSettings = {
   resumeOnLaunch: true,
   keepFinished: 0,
   theme: 'night',
+  accent: 'orange',
   language: 'auto',
   notifications: true,
   clipboardWatch: false,
@@ -58,13 +61,18 @@ const settings: AppSettings = {
   proxy: '',
   cookiesFromBrowser: '',
   cookiesFile: '',
-  errorReports: 'ask'
+  errorReports: 'ask',
+  // The preview and tests start past the first-run setup; ?firstRun=1 shows it.
+  setupDone: !/[?&]firstRun=1/.test(typeof location === 'undefined' ? '' : location.search)
 }
 
 const appInfo: AppInfo = {
   version: 'dev',
   name: 'universal-video-downloader',
-  platform: 'win32' as NodeJS.Platform,
+  // The preview (and the visual harness) render as the user's desktop: Ubuntu GNOME.
+  platform: 'linux' as NodeJS.Platform,
+  systemAccent: 'e95420',
+  buttonLayout: { start: [], end: ['minimize', 'maximize', 'close'] } as ButtonLayout,
   arch: 'x64',
   locale: 'en-US',
   manualUpdates: false,
@@ -193,6 +201,9 @@ function fakeAnimeInfo(url: string): MediaInfo {
 
 let itemSeq = 0
 const items: DownloadItem[] = []
+let mockLibrary: LibraryFile = EMPTY_LIBRARY
+const libraryListeners = new Set<() => void>()
+const mockRemoved = new Set<string>()
 
 type YtdlpListener = (status: YtDlpStatus) => void
 type UpdateListener = (status: UpdateStatus) => void
@@ -635,11 +646,37 @@ export function installMockApi(): void {
     autoRetryRun: async () => ({ started: true }),
     autoTestSmb: async () => 'Connected.',
     autoTestTelegram: async () => 'Connected.',
-    autoSetSecret: async () => undefined,
+    autoSetSecret: async () => true,
     autoSecretState: async () => ({ telegram: false, smb: {}, proxy: false, persists: true }),
     getLogPath: async () => 'C:/mock/uvd.log',
     onAutomationChanged: () => () => undefined,
-    onNavigate: () => () => undefined
+    onNavigate: () => () => undefined,
+    onFocusRow: () => () => undefined,
+    onNativeTheme: () => () => undefined,
+    // The Library, as main builds it: every completed row with a file, kept apart from the queue.
+    listLibrary: async (q) => {
+      for (const item of items) {
+        const entry = entryFromItem(item)
+        if (entry && !mockRemoved.has(entry.id)) mockLibrary = upsertEntry(mockLibrary, entry)
+      }
+      return listLibrary(mockLibrary, q)
+    },
+    libraryMissing: async () => [],
+    trashLibraryEntry: async (id) => {
+      mockRemoved.add(id)
+      mockLibrary = removeEntry(mockLibrary, id)
+      libraryListeners.forEach((cb) => cb())
+      return true
+    },
+    forgetLibraryEntry: async (id) => {
+      mockRemoved.add(id)
+      mockLibrary = removeEntry(mockLibrary, id)
+      libraryListeners.forEach((cb) => cb())
+    },
+    onLibraryChanged: (cb) => {
+      libraryListeners.add(cb)
+      return () => libraryListeners.delete(cb)
+    }
   }
   window.api = api
 }

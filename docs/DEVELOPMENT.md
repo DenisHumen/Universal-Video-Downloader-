@@ -6,7 +6,7 @@ Everything a contributor needs that a user does not: the stack, the commands, ho
 
 | Layer | Choice |
 | --- | --- |
-| Shell | Electron 33 |
+| Shell | Electron 45 (Node 24); macOS 13+, Windows 10+, 64-bit only |
 | Build | electron-vite + electron-builder |
 | UI | React 18 + TypeScript + Tailwind CSS |
 | Animation | Framer Motion |
@@ -18,7 +18,9 @@ Everything a contributor needs that a user does not: the stack, the commands, ho
 
 ## Commands
 
-Requires Node.js (CI uses Node 20) and npm.
+Requires Node.js 22.12 or later; `.nvmrc` pins 24, which CI uses and which the Electron 45 binary wants for `npm run dev`. `npm run dev` and `npm start` first fetch the Electron binary if it is not there yet: since Electron 42, `npm install` no longer does. `npm test` never needs it.
+
+The `allowScripts` field in package.json names the four packages whose install scripts are expected to run (electron, esbuild, ffmpeg-static, sharp). npm 11 does not read it yet: it is an allowlist kept ready for an install-script policy (npm's planned one, or `@lavamoat/allow-scripts`), and documentation of which install scripts this project relies on. Nothing in the build depends on it.
 
 ```bash
 npm install              # install dependencies
@@ -64,6 +66,8 @@ Pushing a `v*` tag runs the [release workflow](../.github/workflows/release.yml)
 npm version minor        # bump version + create tag
 git push --follow-tags   # CI builds & publishes the release
 ```
+
+A release that needs a newer macOS than the one before it says so in its notes, as `Requires macOS 13 or later.`: a Mac older than that is then told it is up to date instead of being handed an app that will not open (`offeredToThisMac` in `src/main/services/updater-rules.ts`). The first Electron 45 release needs that line, and only copies that already know to read it can act on it, so a release with the check has to ship before the first one on Electron 45.
 
 ## The look
 

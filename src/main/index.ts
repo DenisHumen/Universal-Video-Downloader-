@@ -12,11 +12,14 @@ import { existsSync, mkdirSync, rmSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { IPC } from '@shared/ipc'
 import { registerIpc } from './ipc'
+import { holdQuitForSecrets, initSecretsWithin } from './services/secrets'
+import { createStartupGate, SECRETS_STARTUP_CAP_MS } from './startup-gate'
 import { flushSettings, getSettings } from './services/settings'
+import { flushLibrary, loadLibrary, recordFinished } from './services/library'
 import { applyProxy } from './services/proxy'
 import { answerProxyLoginsForPages } from './services/proxy-auth'
 import { ensureYtdlp, scheduleEngineRefresh } from './services/ytdlp'
-import { initUpdater, scheduleUpdateChecks } from './services/updater'
+import { scheduleUpdateChecks } from './services/updater'
 import { flushLog, initLog, log, setLogLevel } from './services/log'
 import { flushWatches } from './services/automation/store'
 import { startWatcher, stopWatcher } from './services/automation/watcher'
@@ -38,7 +41,13 @@ import {
 } from './services/downloader'
 import { startClipboardWatch, stopClipboardWatch } from './services/clipboard'
 import { rendererIndex, wireNavigation } from './services/navigation'
-import { chromeOptions, forwardMaximized } from './services/window-chrome'
+import {
+  chromeOptions,
+  followNativeTheme,
+  forwardMaximized,
+  settleNativeTheme,
+  themeOptions
+} from './services/window-chrome'
 import { currentLanguage, mt, type MainLanguage } from './services/locale'
 import type { AppSettings, PendingDelivery } from '@shared/types'
 import { cliArgvFrom } from './cli/format'
@@ -114,17 +123,19 @@ function wireWindow(win: BrowserWindow, showWhenReady = true): void {
 }
 
 function windowOptions(width: number, height: number): Electron.BrowserWindowConstructorOptions {
+  const theme = themeOptions(getSettings().theme)
   return {
     width,
     height,
     minWidth: 760,
     minHeight: 560,
     show: false,
-    backgroundColor: '#08080a',
-    ...chromeOptions(),
+    backgroundColor: theme.backgroundColor,
+    ...chromeOptions(getSettings().theme),
     icon: isMac ? undefined : loadIcon('app.png'),
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
+      additionalArguments: theme.additionalArguments,
       contextIsolation: true,
       nodeIntegration: false,
       /*
@@ -316,9 +327,10 @@ function applyAutostart(enabled: boolean): void {
       time. `args` puts the flag on the Windows command line instead; macOS
       ignores it and reports a login launch through `wasOpenedAtLogin`. The
       Run value written without the flag is replaced by this one at the next
-      launch, since the first apply of every session writes it.
+      launch, since the first apply of every session writes it. Electron 44
+      removed `openAsHidden` altogether.
     */
-    app.setLoginItemSettings({ openAtLogin: enabled, openAsHidden: true, args: LOGIN_ARGS })
+    app.setLoginItemSettings({ openAtLogin: enabled, args: LOGIN_ARGS })
   } catch (err) {
     log.warn('app', 'Could not change the start-with-system setting', {
       why: err instanceof Error ? err.message : String(err)
@@ -518,6 +530,8 @@ function destroyTray(): void {
 function applySettings(settings: AppSettings): void {
   // The app's own requests follow the proxy too, not only the engine's.
   void applyProxy(settings)
+  // A theme change repaints the native background and, on Windows, the caption overlay.
+  followNativeTheme(() => BrowserWindow.getAllWindows(), () => settings.theme)
   /*
     The application menu and the tray menu are built once from a dictionary, so
     switching the interface language left both of them in the old one until the
@@ -581,21 +595,37 @@ if (cliArgs) {
 } else if (!gotLock) {
   app.quit()
 } else {
+  const gate = createStartupGate()
   app.on('second-instance', (_event, argv) => {
-    showMainWindow()
+    // Before the first window exists this only records the request (startup-gate.ts).
+    gate.requestShow(showMainWindow)
     const link = linkFromArgv(argv)
     if (link) deliver(IPC.evtClipboardLink, 'link', link)
   })
 
-  app.whenReady().then(() => {
+  app.whenReady().then(async () => {
+    /*
+      Before anything reads a secret or the settings: the proxy password, the
+      SMB passwords and the bot token come out of secrets.dat here, and
+      settings only lift a proxy password out of the address once it is known
+      whether there is a key store to put it in. What this logs is queued
+      until the log opens, just below.
+    */
+    /*
+      At most a few seconds: a locked Linux keyring can hold this until a
+      password is typed. The store keeps opening behind the window, and what
+      needs a secret awaits `secretsReady` (proxy logins, Telegram, SMB).
+    */
+    const secrets = await initSecretsWithin(SECRETS_STARTUP_CAP_MS)
     /*
       First, so everything after it can be explained afterwards.
       `getPath('logs')` creates its directory as a side effect, which is why
       this cannot happen at module load.
     */
     initLog(getSettings().logVerbose ? 'debug' : 'info')
+    if (secrets === 'timeout') log.warn('secrets', 'The key store is slow to answer; starting without waiting for it')
     // Probe JSON a previous session kept for its downloads; the addresses in it have expired.
-    infoCache.clearDir()
+    void infoCache.clearDir()
 
     // Before any request is made: the proxy the user set applies to our own too.
     void applyProxy(getSettings())
@@ -605,8 +635,13 @@ if (cliArgs) {
       app.setAppUserModelId('com.denishumen.universalvideodownloader')
     }
 
-    // Windows lets the taskbar flip between light and dark while we run.
-    nativeTheme.on('updated', () => tray?.setImage(trayImage()))
+    // The OS scheme can change while we run (and, on Linux, arrives just after whenReady: E3a).
+    nativeTheme.on('updated', () => {
+      tray?.setImage(trayImage())
+      followNativeTheme(() => BrowserWindow.getAllWindows(), () => getSettings().theme)
+    })
+    // On Linux the scheme is not known yet at whenReady; wait for it (<= 200 ms) before the first window.
+    await settleNativeTheme(nativeTheme, process.platform)
 
     registerIpc({
       getWindow: () => mainWindow,
@@ -614,10 +649,15 @@ if (cliArgs) {
       onSettingsChanged: applySettings
     })
     loadHistory()
-    initUpdater()
+    // The Library is its own store (5.3); a finished download is recorded in it here,
+    // so the downloader never imports it and clearing Activity cannot reach it.
+    loadLibrary()
+    downloadEvents.on('updated', (item) => recordFinished(item))
+    // electron-updater loads with the first check (see updater.ts), not here.
     buildMenu()
     const startHidden = shouldStartHidden(process.argv, getSettings(), openedAtLogin())
     createWindow(startHidden)
+    gate.started()
     applySettings(getSettings())
     // The tray is how a hidden window is found again. Without one, show it.
     if (startHidden && !tray) showMainWindow()
@@ -686,8 +726,10 @@ if (cliArgs) {
     })
   })
 
-  app.on('before-quit', () => {
+  app.on('before-quit', (event) => {
     quitting = true
+    // A password still being sealed lands first; the quit is then asked for again.
+    if (holdQuitForSecrets(event, () => app.quit())) return
     stopClipboardWatch()
     // Settings are written on a short delay so typing into a text field doesn't
     // rewrite the file per keystroke; a change made just before quitting is
@@ -695,6 +737,7 @@ if (cliArgs) {
     flushSettings()
     flushWatches()
     shutdownDownloads()
+    flushLibrary()
     /*
       Last. Closing the log is final - anything logged afterwards is only
       queued, never written - and the shutdown above writes history.json,

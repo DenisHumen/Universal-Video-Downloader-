@@ -4,6 +4,9 @@ import type { ExportOutcome, ImportOutcome } from '@shared/backup'
 import type { SeriesOffer } from '../main/automation-ipc'
 import { contextBridge, ipcRenderer } from 'electron'
 import { IPC } from '@shared/ipc'
+import { themeFromArgv } from '@shared/theme-boot'
+import type { ButtonLayout } from '@shared/desktop'
+import type { LibraryPage, LibraryQuery } from '@shared/library'
 import type {
   AppSettings,
   BrowserMedia,
@@ -38,6 +41,10 @@ export interface AppInfo {
   manualUpdates: boolean
   ytdlp: YtDlpStatus
   update: UpdateStatus
+  /** The OS accent colour as `rrggbb`, where the desktop reports one (hides "System" when absent). */
+  systemAccent?: string
+  /** GNOME's caption-button order (Linux; the default elsewhere). */
+  buttonLayout: ButtonLayout
 }
 
 function on<T>(channel: string, cb: (payload: T) => void): () => void {
@@ -69,6 +76,12 @@ const api = {
   clearFinished: (): Promise<void> => ipcRenderer.invoke(IPC.downloadClearFinished),
   clearFailed: (): Promise<void> => ipcRenderer.invoke(IPC.downloadClearFailed),
   listDownloads: (): Promise<DownloadItem[]> => ipcRenderer.invoke(IPC.downloadList),
+  // Library (plan 5.3)
+  listLibrary: (q: LibraryQuery): Promise<LibraryPage> => ipcRenderer.invoke(IPC.libraryList, q),
+  libraryMissing: (paths: string[]): Promise<string[]> => ipcRenderer.invoke(IPC.libraryMissing, paths),
+  trashLibraryEntry: (id: string): Promise<boolean> => ipcRenderer.invoke(IPC.libraryTrash, id),
+  forgetLibraryEntry: (id: string): Promise<void> => ipcRenderer.invoke(IPC.libraryForget, id),
+  onLibraryChanged: (cb: () => void) => on<null>(IPC.evtLibraryChanged, () => cb()),
   // Local media jobs (trim / convert)
   startMediaJob: (req: MediaJobRequest): Promise<DownloadItem> =>
     ipcRenderer.invoke(IPC.mediaJobStart, req),
@@ -143,7 +156,7 @@ const api = {
   autoTestTelegram: (token: string, chatId: string): Promise<string> =>
     ipcRenderer.invoke(IPC.autoTestTelegram, token, chatId),
   /** One way. There is no channel that reads a secret back. */
-  autoSetSecret: (kind: 'smb' | 'telegram' | 'proxy', id: string, value: string): Promise<void> =>
+  autoSetSecret: (kind: 'smb' | 'telegram' | 'proxy', id: string, value: string): Promise<boolean> =>
     ipcRenderer.invoke(IPC.autoSetSecret, kind, id, value),
   autoSecretState: (): Promise<{
     telegram: boolean
@@ -177,6 +190,8 @@ const api = {
   isWindowMaximized: (): Promise<boolean> => ipcRenderer.invoke(IPC.windowIsMaximized),
   /** Every maximise and restore, including the ones the caption button did not cause. */
   onMaximizedChange: (cb: (maximized: boolean) => void) => on<boolean>(IPC.evtWindowState, cb),
+  /** The OS switched light/dark (main's nativeTheme). */
+  onNativeTheme: (cb: () => void) => on<void>(IPC.evtNativeTheme, cb),
 
   // Events
   onDownloadProgress: (cb: (p: DownloadProgress) => void) =>
@@ -189,9 +204,23 @@ const api = {
   onDetectStatus: (cb: (s: DetectStatus) => void) => on<DetectStatus>(IPC.evtDetectStatus, cb),
   onDetectPreview: (cb: (p: DetectPreview) => void) => on<DetectPreview>(IPC.evtDetectPreview, cb),
   onClipboardLink: (cb: (url: string) => void) => on<string>(IPC.evtClipboardLink, cb),
-  onNavigate: (cb: (view: string) => void) => on<string>(IPC.evtNavigate, cb)
+  onNavigate: (cb: (view: string) => void) => on<string>(IPC.evtNavigate, cb),
+  onFocusRow: (cb: (id: string) => void) => on<string>(IPC.evtFocusRow, cb)
 }
 
 export type UvdApi = typeof api
 
 contextBridge.exposeInMainWorld('api', api)
+
+/*
+  The theme, before first paint. Main resolved it and passed it as a switch
+  (see theme-boot.ts); the stylesheet's default is Night, so without this a
+  Day window flashed dark until the async settings call came back.
+*/
+const bootTheme = themeFromArgv(process.argv)
+if (bootTheme) {
+  const stamp = (): void => document.documentElement?.setAttribute('data-theme', bootTheme)
+  stamp()
+  // The preload can run before <html> exists; stamp again as soon as it does.
+  document.addEventListener('readystatechange', stamp, { once: true })
+}

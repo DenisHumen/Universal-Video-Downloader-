@@ -74,6 +74,8 @@ xattr -dr com.apple.quarantine "/Applications/Universal Video Downloader.app"
 
 The same command is printed in the install window. Unsigned apps can't replace themselves, so on a Mac the app hands you the new version's disk image for your processor instead of updating in place.
 
+The disk image includes **Fix App Is Damaged.command** (double-click it after copying the app; it runs the command for you) and **How to open on macOS.pdf** with the same steps. If macOS blocks the script too, use System Settings → Privacy & Security → Open Anyway, or paste the command into Terminal.
+
 ## Download from the terminal
 
 ```bash

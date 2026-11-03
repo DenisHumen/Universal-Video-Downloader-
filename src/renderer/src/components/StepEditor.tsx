@@ -1,12 +1,12 @@
 import { useEffect, useId, useMemo, useState } from 'react'
-import { Loader2, Plus, Trash2, X } from 'lucide-react'
+import { Loader2, Plus, Trash2, X } from '../ui/icons'
 import { useT } from '../i18n'
 import { useStore } from '../store'
 import { toast } from '../lib/toast'
 import { describeError } from '../lib/errors'
 import { STEP_LABEL } from '../lib/automationLabels'
 import { emptyTarget, pathOf, ShareForm, TelegramForm, useSecretState } from './AutomationForms'
-import Modal from './Modal'
+import Dialog from '../ui/Dialog'
 import {
   DEFAULT_REMOTE_PATH,
   DEFAULT_RENAME_TEMPLATE,
@@ -161,21 +161,30 @@ export default function StepEditor({
         : true
 
   return (
-    <Modal
+    <Dialog
+      variant="sheet"
+      size="md"
+      title={t(STEP_LABEL[step.kind])}
+      closeLabel={t('common.close')}
       onClose={onClose}
-      labelledBy={titleId}
-      className="panel flex max-h-full w-full max-w-lg flex-col overflow-hidden"
+      actions={
+        <>
+          {!isNew && (
+            <button className="btn-danger mr-auto" onClick={() => onRemove(step.id)}>
+              <Trash2 size={14} /> {t('common.remove')}
+            </button>
+          )}
+          <button className="btn-quiet" onClick={onClose}>
+            {t('common.cancel')}
+          </button>
+          <button className="btn-solid" onClick={() => void save()} disabled={!canSave || saving}>
+            {saving ? <Loader2 size={14} className="animate-spin" /> : null}
+            {t('common.save')}
+          </button>
+        </>
+      }
     >
-      <div className="flex shrink-0 items-center gap-3 border-b border-edge px-4 py-3">
-        <h2 className="h2 flex-1" id={titleId}>
-          {t(STEP_LABEL[step.kind])}
-        </h2>
-        <button className="btn-icon" onClick={onClose} aria-label={t('common.close')}>
-          <X size={15} />
-        </button>
-      </div>
-
-      <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-4">
+      <div className="space-y-4">
         {step.kind === 'rename' && (
           <>
             <div>
@@ -184,7 +193,7 @@ export default function StepEditor({
                 value={step.template}
                 onChange={(e) => set({ template: e.target.value })}
                 aria-label={t('auto.template')}
-                className="field mono w-full text-[13px]"
+                className="field mono w-full text-control"
                 spellCheck={false}
               />
               <p className="hint mt-1">{t('auto.templateHint')}</p>
@@ -194,12 +203,12 @@ export default function StepEditor({
                 series with only one.
               */}
               {renameGap(step.template) === 'episode' && (
-                <p className="mt-1 max-w-[62ch] text-[12px] leading-[1.5] text-warn">
+                <p className="mt-1 max-w-[62ch] text-meta leading-[1.5] text-warn">
                   {t('auto.templateNoEpisode')}
                 </p>
               )}
               {renameGap(step.template) === 'season' && (
-                <p className="mt-1 max-w-[62ch] text-[12px] leading-[1.5] text-warn">
+                <p className="mt-1 max-w-[62ch] text-meta leading-[1.5] text-warn">
                   {t('auto.templateNoSeason')}
                 </p>
               )}
@@ -218,7 +227,7 @@ export default function StepEditor({
                     }}
                     placeholder={t('auto.replaceFrom')}
                     aria-label={t('auto.replaceFrom')}
-                    className="field flex-1 text-[13px]"
+                    className="field flex-1 text-control"
                   />
                   <input
                     value={r.to}
@@ -229,7 +238,7 @@ export default function StepEditor({
                     }}
                     placeholder={t('auto.replaceTo')}
                     aria-label={t('auto.replaceTo')}
-                    className="field flex-1 text-[13px]"
+                    className="field flex-1 text-control"
                   />
                   <button
                     className="btn-icon"
@@ -260,7 +269,7 @@ export default function StepEditor({
               <div>
                 <p className="label mb-1.5">{t('auto.share')}</p>
                 <select
-                  className="field w-full text-[13px]"
+                  className="field w-full text-control"
                   aria-label={t('auto.share')}
                   value={targetId}
                   onChange={(e) => setTargetId(e.target.value)}
@@ -291,13 +300,13 @@ export default function StepEditor({
                 value={step.remotePath}
                 onChange={(e) => set({ remotePath: e.target.value })}
                 aria-label={t('auto.remotePath')}
-                className="field mono w-full text-[13px]"
+                className="field mono w-full text-control"
                 spellCheck={false}
               />
               <p className="hint mt-1">{t('auto.remotePathHint')}</p>
             </div>
 
-            <label className="flex items-center gap-2.5 text-[13px] text-ink">
+            <label className="flex items-center gap-2.5 text-control text-ink">
               <input
                 type="checkbox"
                 checked={step.deleteLocalAfter}
@@ -326,11 +335,11 @@ export default function StepEditor({
         {preview && (
           <div className="border-t border-edge pt-3">
             <p className="label mb-1">{t('auto.preview')}</p>
-            <p className="mono break-all text-[12px] text-ink-2">{preview}</p>
+            <p className="mono break-all text-meta text-ink-2">{preview}</p>
           </div>
         )}
 
-        <label className="flex items-center gap-2.5 border-t border-edge pt-3 text-[13px] text-ink">
+        <label className="flex items-center gap-2.5 border-t border-edge pt-3 text-control text-ink">
           <input
             type="checkbox"
             checked={step.enabled}
@@ -340,20 +349,6 @@ export default function StepEditor({
         </label>
       </div>
 
-      <div className="flex shrink-0 justify-end gap-2 border-t border-edge px-4 py-3">
-        {!isNew && (
-          <button className="btn-danger mr-auto" onClick={() => onRemove(step.id)}>
-            <Trash2 size={14} /> {t('common.remove')}
-          </button>
-        )}
-        <button className="btn-quiet" onClick={onClose}>
-          {t('common.cancel')}
-        </button>
-        <button className="btn-solid" onClick={() => void save()} disabled={!canSave || saving}>
-          {saving ? <Loader2 size={14} className="animate-spin" /> : null}
-          {t('common.save')}
-        </button>
-      </div>
-    </Modal>
+    </Dialog>
   )
 }

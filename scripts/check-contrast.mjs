@@ -11,6 +11,12 @@
  * This reads the real values out of index.css — so it cannot drift from the
  * stylesheet — and fails if any pairing lands under 4.5:1.
  *
+ * 4.0 + Adwaita/Yaru (A1, A1.1, A1.2): every plane the GNOME layout adds
+ * (--card, --sidebar, --sidebar-2, --surface-3), GNOME's nine accents in both
+ * themes, text on the .10/.15/.30 control fills, the destructive fill, and a
+ * hue gap so a failure can never read as the (orange) accent. The blur
+ * material is gone (A1), and so are its checks.
+ *
  * Run: node scripts/check-contrast.mjs
  */
 import { readFileSync } from 'fs'
@@ -25,13 +31,25 @@ const AA_NORMAL = 4.5
 /** Everything that is ever painted as text. */
 const TEXT_VARS = ['--text', '--text-2', '--text-3', '--accent-ink', '--good', '--warn', '--bad']
 /** Every plane text can sit on. */
-const PLANE_VARS = ['--bg', '--surface', '--surface-2']
+const PLANE_VARS = ['--bg', '--surface', '--surface-2', '--surface-3', '--card', '--sidebar', '--sidebar-2']
+/*
+ * Where a tinted state (status/12, accent/12) is drawn: content, cards and
+ * popovers. Not the sidebars (their selected row is a neutral fill) and not
+ * --surface-2, which is itself the opaque stand-in for a control fill.
+ */
+const TINT_PLANES = ['--bg', '--surface', '--card', '--surface-3']
+/* Where a control (.10 / .15 / .25 fill) sits. */
+const FILL_PLANES = ['--bg', '--surface', '--card', '--surface-3', '--sidebar', '--sidebar-2']
+/* Hairlines are drawn on the planes, not on a control's own fill. */
+const HAIRLINE_PLANES = PLANE_VARS.filter((p) => p !== '--surface-2')
 /** Status colours that are painted as text on top of a tint of themselves. */
 const TINT_VARS = ['--good', '--warn', '--bad']
 /** The tint strength those buttons use (`bg-bad/12`). */
 const TINT_ALPHA = 0.12
 /** Solid fills that carry a label, and the token that label is set in. */
 const FILL_PAIRS = [
+  ['--destructive', '--destructive-fg'],
+  ['--osd', '--osd-fg'],
   ['--accent', '--accent-fg'],
   ['--bad', '--bad-fg']
 ]
@@ -62,9 +80,23 @@ function fail(message) {
   process.exitCode = 1
 }
 
+/**
+ * Accents (plan 2.2): each is a fill / ink / label triple per theme, set under
+ * `[data-accent]` (Night, unqualified) and `[data-theme='day'][data-accent]`.
+ * Orange is the theme blocks' own default. Every accent in every theme passes
+ * the same checks as Blue: label on fill, ink on every plane, and ink on the
+ * accent tints the UI paints selected states with.
+ */
+// Orange (Yaru) is the default and lives in the theme blocks; the rest are [data-accent] blocks.
+const ACCENTS = ['orange', 'blue', 'teal', 'green', 'yellow', 'red', 'pink', 'purple', 'slate']
+const DEFAULT_ACCENT = 'orange'
+const ACCENT_VARS = ['--accent', '--accent-ink', '--accent-fg']
+// Selected and hover states are accent/12 only; a stronger tint is never under text.
+const ACCENT_TINTS = [0.12]
+
 /** Pull every `--name: r g b` out of a theme block. */
 function readTheme(selector) {
-  const block = css.match(new RegExp(`${selector}\\s*\\{([^}]*)\\}`, 's'))
+  const block = css.match(new RegExp(`(?:^|\\n|,\\s*)${selector}\\s*\\{([^}]*)\\}`, 's'))
   if (!block) return null
   const vars = {}
   for (const m of block[1].matchAll(/(--[\w-]+):\s*(\d+\s+\d+\s+\d+)\s*;/g)) {
@@ -91,6 +123,8 @@ let hairlines = 0
 let faintest = { ratio: Infinity, what: '' }
 let planes = 0
 let flattest = { ratio: Infinity, what: '' }
+let accentChecks = 0
+let worstAccent = { ratio: Infinity, what: '' }
 
 for (const { name, selector } of THEMES) {
   const vars = readTheme(selector)
@@ -151,7 +185,7 @@ for (const { name, selector } of THEMES) {
   for (const statusVar of TINT_VARS) {
     const status = vars[statusVar]
     if (!status) continue
-    for (const planeVar of PLANE_VARS) {
+    for (const planeVar of TINT_PLANES) {
       const plane = vars[planeVar]
       if (!plane) continue
       const fill = composite(status, plane, TINT_ALPHA)
@@ -177,13 +211,49 @@ for (const { name, selector } of THEMES) {
     if (ratio < PLANE_MIN) fail(`${what} → ${ratio.toFixed(2)}:1 (needs ${PLANE_MIN}:1)`)
   }
 
+  for (const accent of ACCENTS) {
+    const merged = { ...vars }
+    if (accent !== DEFAULT_ACCENT) {
+      const night = readTheme(`\\[data-accent='${accent}'\\]`)
+      const day = name === 'day' ? readTheme(`\\[data-theme='day'\\]\\[data-accent='${accent}'\\]`) : {}
+      if (!night || !day) {
+        fail(`accent "${accent}" has no ${night ? 'day' : 'night'} block in index.css`)
+        continue
+      }
+      for (const v of ACCENT_VARS) {
+        if (!(name === 'day' ? day[v] : night[v])) fail(`${name} · accent "${accent}" is missing ${v}`)
+      }
+      Object.assign(merged, night, day)
+    }
+    const [fill, ink, fg] = ACCENT_VARS.map((v) => merged[v])
+    if (!fill || !ink || !fg) continue
+    const pairs = [[`--accent-fg on --accent`, contrast(fill, fg)]]
+    for (const planeVar of TINT_PLANES) {
+      const plane = merged[planeVar]
+      if (!plane) continue
+      pairs.push([`--accent-ink on ${planeVar}`, contrast(ink, plane)])
+      for (const alpha of ACCENT_TINTS) {
+        pairs.push([
+          `--accent-ink on --accent/${alpha * 100} over ${planeVar}`,
+          contrast(ink, composite(fill, plane, alpha))
+        ])
+      }
+    }
+    for (const [label, ratio] of pairs) {
+      accentChecks++
+      const what = `${name} · ${accent} · ${label}`
+      if (ratio < worstAccent.ratio) worstAccent = { ratio, what }
+      if (ratio < AA_NORMAL) fail(`${what} → ${ratio.toFixed(2)}:1 (needs ${AA_NORMAL}:1)`)
+    }
+  }
+
   if (name === 'day') {
     const line = vars['--line']
     if (!line) {
       fail('theme "day" is missing --line')
       continue
     }
-    for (const planeVar of PLANE_VARS) {
+    for (const planeVar of HAIRLINE_PLANES) {
       const plane = vars[planeVar]
       if (!plane) continue
       const ratio = contrast(line, plane)
@@ -196,12 +266,81 @@ for (const { name, selector } of THEMES) {
   }
 }
 
+/*
+ * Controls (D0): buttons, entries, toggles and selected rows are the text
+ * colour at .10 (rest), .15 (hover) and .30 (checked / pressed) over whatever
+ * plane they sit on. Their label is --text, and must read at 4.5:1 on all of
+ * them.
+ */
+// Rest, hover, and checked/pressed. D0 measured .30 for checked; at .30 a checked
+// toggle on a dark card is 4.3:1, so ours is .25 (AA, near enough to look the same).
+const FILL_ALPHAS = [0.1, 0.15, 0.25]
+let fills = 0
+let thinnestFill = { ratio: Infinity, what: '' }
+/*
+ * A failure must never read as "accent" (A1.3, designer note): with Yaru's
+ * orange as the accent, the failure red and the destructive fill keep an
+ * OKLCh hue gap from it.
+ */
+const HUE_GAP = 12
+const hue = ([r, g, b]) => {
+  const lin = (c) => {
+    const v = c / 255
+    return v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4
+  }
+  const [R, G, B] = [r, g, b].map(lin)
+  const l = Math.cbrt(0.4122214708 * R + 0.5363325363 * G + 0.0514459929 * B)
+  const m = Math.cbrt(0.2119034982 * R + 0.6806995451 * G + 0.1073969566 * B)
+  const s2 = Math.cbrt(0.0883024619 * R + 0.2817188376 * G + 0.6299787005 * B)
+  const A = 1.9779984951 * l - 2.428592205 * m + 0.4505937099 * s2
+  const Bb = 0.0259040371 * l + 0.7827717662 * m - 0.808675766 * s2
+  return ((Math.atan2(Bb, A) * 180) / Math.PI + 360) % 360
+}
+const hueDistance = (a, b) => {
+  const d = Math.abs(hue(a) - hue(b)) % 360
+  return d > 180 ? 360 - d : d
+}
+let gaps = 0
+for (const { name, selector } of THEMES) {
+  const vars = readTheme(selector)
+  if (!vars) continue
+  for (const planeVar of FILL_PLANES) {
+    const plane = vars[planeVar]
+    if (!plane || !vars['--fill'] || !vars['--text']) continue
+    for (const alpha of FILL_ALPHAS) {
+      const ratio = contrast(vars['--text'], composite(vars['--fill'], plane, alpha))
+      fills++
+      const what = `${name} · --text on --fill/${alpha} over ${planeVar}`
+      if (ratio < thinnestFill.ratio) thinnestFill = { ratio, what }
+      if (ratio < AA_NORMAL) fail(`${what} → ${ratio.toFixed(2)}:1 (needs ${AA_NORMAL}:1)`)
+    }
+  }
+  for (const [x, y] of [
+    ['--bad', '--accent-ink'],
+    ['--destructive', '--accent']
+  ]) {
+    if (!vars[x] || !vars[y]) continue
+    gaps++
+    const d = hueDistance(vars[x], vars[y])
+    if (d < HUE_GAP) fail(`${name} · ${x} is only ${d.toFixed(0)}° from ${y}: a failure would read as the accent`)
+  }
+}
+
 if (process.exitCode) {
-  console.error(`\n${checks + hairlines + planes} pairings checked — see failures above.`)
+  console.error(`\n${checks + hairlines + planes + accentChecks} pairings checked — see failures above.`)
 } else {
   console.log(
     `✓ ${checks} theme/text/plane pairings all clear ${AA_NORMAL}:1 ` +
       `(tightest: ${worst.what} at ${worst.ratio.toFixed(2)}:1)`
+  )
+  console.log(
+    `✓ ${accentChecks} accent × theme pairings all clear ${AA_NORMAL}:1 ` +
+      `(tightest: ${worstAccent.what} at ${worstAccent.ratio.toFixed(2)}:1)`
+  )
+  console.log(
+    `✓ ${fills} control-fill pairings clear ${AA_NORMAL}:1 ` +
+      `(thinnest: ${thinnestFill.what} at ${thinnestFill.ratio.toFixed(2)}:1); ` +
+      `${gaps} failure/accent hue gaps ≥ ${HUE_GAP}°`
   )
   console.log(
     `✓ ${hairlines} day hairlines all clear ${HAIRLINE_MIN}:1 ` +

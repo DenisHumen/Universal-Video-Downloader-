@@ -13,7 +13,7 @@ import { acquireAwake, releaseAwake } from '../awake'
 import { shouldResume } from '../resume'
 import { getSettings } from '../settings'
 import { leftoversOf, mayRemoveFolder, splitLocalPath } from '@shared/cleanup'
-import { getSecret, SECRET } from '../secrets'
+import { getSecretWhenReady, SECRET } from '../secrets'
 import { log } from '../log'
 import { awaitDownload, DownloadStopped, type QueueView } from './await-download'
 import { carryOver } from './carry-over'
@@ -120,8 +120,9 @@ function markStep(run: Run, kind: PipelineStep['kind'], patch: Partial<RunStep>)
  * A watch without a notify step has said it does not want messages, and a
  * failure is not a reason to start sending them.
  */
-export function alertChannel(watch: Watch): { token: string; chatId: string } | undefined {
-  const token = getSecret(SECRET.telegramToken())
+export async function alertChannel(watch: Watch): Promise<{ token: string; chatId: string } | undefined> {
+  // During startup the secret store may still be opening (a locked keyring): wait for it.
+  const token = await getSecretWhenReady(SECRET.telegramToken())
   const chatId = getSettings().telegramChatId
   if (!token || !chatId) return undefined
   if (!watch.steps.some((s) => s.kind === 'notify' && s.enabled)) return undefined
@@ -325,7 +326,7 @@ export async function runEpisode(
       const source = localFile()
       const target = settings.smbTargets.find((t) => t.id === uploadStep.targetId)
       if (!target) throw new Error('The share this watch uploads to is no longer configured.')
-      const password = getSecret(SECRET.smbPassword(target.id))
+      const password = await getSecretWhenReady(SECRET.smbPassword(target.id))
       if (!password) {
         throw new Error(`No password is stored for "${target.name}". Enter it again in Settings.`)
       }
@@ -371,7 +372,7 @@ export async function runEpisode(
     const notifyStep = watch.steps.find((s) => s.kind === 'notify' && s.enabled)
     if (notifyStep) {
       markStep(run, 'notify', { state: 'running', startedAt: Date.now() })
-      const token = getSecret(SECRET.telegramToken())
+      const token = await getSecretWhenReady(SECRET.telegramToken())
       if (!token || !settings.telegramChatId) {
         markStep(run, 'notify', {
           state: 'skipped',
@@ -473,7 +474,7 @@ export async function runEpisode(
       when it gives up: a go the next check will repeat is not news yet, and
       the screen already shows it.
     */
-    const channel = options.final ? alertChannel(watch) : undefined
+    const channel = options.final ? await alertChannel(watch) : undefined
     if (channel) {
       await sendNotification(
         channel.token,

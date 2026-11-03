@@ -12,8 +12,26 @@ module.exports = {
         canvas: 'rgb(var(--bg) / <alpha-value>)',
         raise: 'rgb(var(--surface) / <alpha-value>)',
         sink: 'rgb(var(--surface-2) / <alpha-value>)',
+        // Floating planes: menus, popovers, dialogs. White in Day, a step
+        // above a field in Night.
+        float: 'rgb(var(--surface-3) / <alpha-value>)',
+        // GNOME planes (A1): cards and boxed lists, the app sidebar, Settings' panel list.
+        card: 'rgb(var(--card) / <alpha-value>)',
+        sidebar: {
+          DEFAULT: 'rgb(var(--sidebar) / <alpha-value>)',
+          2: 'rgb(var(--sidebar-2) / <alpha-value>)'
+        },
+        // The text colour as a fill: bg-fill/10 rest, /15 hover, /30 active (D0).
+        fill: 'rgb(var(--fill) / <alpha-value>)',
+        destructive: 'rgb(var(--destructive) / <alpha-value>)',
+        'destructive-fg': 'rgb(var(--destructive-fg) / <alpha-value>)',
+        osd: {
+          DEFAULT: 'rgb(var(--osd) / <alpha-value>)',
+          fg: 'rgb(var(--osd-fg) / <alpha-value>)'
+        },
         edge: {
           DEFAULT: 'rgb(var(--line) / <alpha-value>)',
+          soft: 'rgb(var(--line-soft) / <alpha-value>)',
           strong: 'rgb(var(--line-strong) / <alpha-value>)'
         },
         // Three text tiers, all verified ≥4.5:1 on every plane by
@@ -29,7 +47,9 @@ module.exports = {
           fg: 'rgb(var(--accent-fg) / <alpha-value>)',
           // Accent-coloured *text* on a plane — a lighter/darker cut of the
           // same hue, because the fill colour alone never clears 4.5:1.
-          ink: 'rgb(var(--accent-ink) / <alpha-value>)'
+          ink: 'rgb(var(--accent-ink) / <alpha-value>)',
+          // Non-text accent shapes (switch, progress): GNOME's raw accent colour.
+          bright: 'rgb(var(--accent-bright) / <alpha-value>)'
         },
         good: 'rgb(var(--good) / <alpha-value>)',
         warn: 'rgb(var(--warn) / <alpha-value>)',
@@ -42,8 +62,7 @@ module.exports = {
       },
       fontFamily: {
         sans: [
-          'Inter Variable',
-          'Inter',
+          'Ubuntu Sans',
           '-apple-system',
           'BlinkMacSystemFont',
           'Segoe UI',
@@ -53,8 +72,7 @@ module.exports = {
           'sans-serif'
         ],
         mono: [
-          'JetBrains Mono Variable',
-          'JetBrains Mono',
+          'Ubuntu Sans Mono',
           'ui-monospace',
           'SFMono-Regular',
           'Menlo',
@@ -62,10 +80,36 @@ module.exports = {
           'monospace'
         ]
       },
+      /*
+       * The type scale (4.0, plan 2.5). Seven steps and nothing between them;
+       * `text-[Npx]` is refused by stylesheet.test.ts. The four UI sizes
+       * carry no line-height of their own and keep the body's 1.5, so a
+       * label moved onto a token does not shift its row.
+       */
+      fontSize: {
+        // libadwaita's type classes at v4's density (A1.1): 14 px body, 13 px controls.
+        'title-1': ['26.67px', { lineHeight: '1.2', fontWeight: '800' }],
+        'title-2': ['20px', { lineHeight: '1.25', fontWeight: '800' }],
+        'title-3': ['20px', { lineHeight: '1.25', fontWeight: '700' }],
+        'title-4': ['17.33px', { lineHeight: '1.3', fontWeight: '700' }],
+        heading: ['14px', { fontWeight: '700' }],
+        'caption-heading': ['12px', { fontWeight: '700' }],
+        // v4 names kept as aliases while views move over (5.x): hero → title-1,
+        // title → title-2, section → title-4.
+        hero: ['26.67px', { lineHeight: '1.2', fontWeight: '800' }],
+        title: ['20px', { lineHeight: '1.25', fontWeight: '800' }],
+        section: ['17.33px', { lineHeight: '1.3', fontWeight: '700' }],
+        body: '14px',
+        control: '13px',
+        meta: '12px',
+        caption: '12px'
+      },
       borderRadius: {
         1: 'var(--r-1)',
         2: 'var(--r-2)',
-        3: 'var(--r-3)'
+        3: 'var(--r-3)',
+        4: 'var(--r-4)',
+        pill: 'var(--r-pill)'
       },
       // Status fills sit at 12% — enough to read as a tinted plane, light
       // enough that the status text on top keeps its verified contrast.
@@ -75,12 +119,15 @@ module.exports = {
       transitionTimingFunction: {
         // Decelerate-emphasised: off the mark instantly, lands soft. The app's
         // one curve — nothing eases on anything else.
-        ease: 'cubic-bezier(0.2, 0, 0, 1)'
+        ease: 'var(--ease)',
+        spring: 'var(--ease-spring)'
       },
+      // The motion tokens in index.css; Tailwind only points at them.
       transitionDuration: {
-        fast: '160ms',
-        base: '240ms',
-        slow: '320ms'
+        press: 'var(--t-press)',
+        fast: 'var(--t-fast)',
+        base: 'var(--t-base)',
+        slow: 'var(--t-slow)'
       },
       keyframes: {
         'idle-pulse': {
@@ -98,8 +145,8 @@ module.exports = {
         }
       },
       animation: {
-        'idle-pulse': 'idle-pulse 1.6s cubic-bezier(0.2, 0, 0, 1) infinite',
-        rise: 'rise 240ms cubic-bezier(0.2, 0, 0, 1)',
+        'idle-pulse': 'idle-pulse 1.6s var(--ease) infinite',
+        rise: 'rise var(--t-base) var(--ease)',
         'view-in': 'view-in var(--t-view) var(--ease)'
       }
     }

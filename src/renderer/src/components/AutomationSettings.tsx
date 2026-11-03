@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Loader2, Plus, Trash2 } from 'lucide-react'
+import { Loader2, Plus, Trash2 } from '../ui/icons'
 import { useT } from '../i18n'
 import { useStore } from '../store'
 import { toast } from '../lib/toast'
@@ -17,7 +17,12 @@ import type { SmbTarget } from '@shared/automation'
  * chain never has to leave it. Neither route is the "real" one, and because it
  * is one component over one source of truth there is nothing to keep in step.
  */
-export default function AutomationSettings(): JSX.Element {
+export default function AutomationSettings({
+  part = 'all'
+}: {
+  /** Settings shows each on its own subpage (Watching › Network Shares / Telegram, D8). */
+  part?: 'all' | 'shares' | 'telegram'
+}): JSX.Element {
   const t = useT()
   const settings = useStore((s) => s.settings)
   const saveSettings = useStore((s) => s.saveSettings)
@@ -106,11 +111,11 @@ export default function AutomationSettings(): JSX.Element {
 
   return (
     <>
-      {!secrets.persists && <p className="hint mb-3 text-bad">{t('settings.secretsVolatile')}</p>}
+      {!secrets.persists && <p className="mb-3 text-meta text-bad">{t('settings.secretsVolatile')}</p>}
 
-      <div className="border-b border-edge py-4">
-        <p className="text-[14px] text-ink">{t('settings.shares')}</p>
-        <p className="hint mt-1">{t('settings.sharesHint')}</p>
+      {part !== 'telegram' && (
+      <div className="panel p-4">
+        <p className="text-meta text-ink-2">{t('settings.sharesHint')}</p>
 
         <div className="mt-3 space-y-1.5">
           {targets.length === 0 && <p className="hint">{t('settings.noShares')}</p>}
@@ -118,11 +123,11 @@ export default function AutomationSettings(): JSX.Element {
             <div key={target.id}>
               <div className="flex items-center gap-2">
                 <button
-                  className="panel flex-1 px-3 py-2 text-left transition-colors hover:bg-raise"
+                  className="flex-1 rounded-1 bg-fill/10 px-3 py-2 text-left transition-colors hover:bg-fill/15"
                   onClick={() => (editing === target.id ? setEditing(null) : startEdit(target))}
                 >
-                  <span className="block text-[13px] text-ink">{target.name}</span>
-                  <span className="mono block text-[11px] text-ink-2">
+                  <span className="block text-control text-ink">{target.name}</span>
+                  <span className="mono block text-caption text-ink-2">
                     {pathOf(target)}
                     {/* Said in words and in the warning colour; it used to read "· password?". */}
                     {!secrets.smb[target.id] && (
@@ -191,10 +196,11 @@ export default function AutomationSettings(): JSX.Element {
           )}
         </div>
       </div>
+      )}
 
-      <div className="border-b border-edge py-4">
-        <p className="text-[14px] text-ink">{t('settings.telegram')}</p>
-        <p className="hint mb-3 mt-1">{t('settings.telegramHint')}</p>
+      {part !== 'shares' && (
+      <div className="panel p-4">
+        <p className="mb-3 text-meta text-ink-2">{t('settings.telegramHint')}</p>
         <TelegramForm
           token={token}
           onToken={setToken}
@@ -216,6 +222,7 @@ export default function AutomationSettings(): JSX.Element {
           </button>
         </div>
       </div>
+      )}
 
       {confirmShare && (
         <ConfirmDialog

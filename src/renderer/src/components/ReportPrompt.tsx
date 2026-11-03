@@ -1,6 +1,6 @@
 import { useState, useSyncExternalStore } from 'react'
-import { AnimatePresence, motion } from 'framer-motion'
-import { Check, ChevronDown, Copy, Loader2, Mail, RefreshCw, Send } from 'lucide-react'
+import { AnimatePresence, m } from 'framer-motion'
+import { Check, ChevronDown, Copy, Loader2, Mail, RefreshCw, Send } from '../ui/icons'
 import type { AppErrorCode } from '@shared/types'
 import {
   buildMailto,
@@ -144,7 +144,7 @@ export default function ReportPrompt(props: ReportFailure): JSX.Element | null {
     <div className="well mt-3 p-3.5">
       <div className="flex items-baseline gap-3">
         <span className="label shrink-0 text-accent-ink">{t('report.stamp')}</span>
-        <p className="min-w-0 flex-1 text-[13px] leading-relaxed text-ink">
+        <p className="min-w-0 flex-1 text-control leading-relaxed text-ink">
           {unsupported ? t('report.unsupported') : t('report.generic')}
         </p>
       </div>
@@ -157,7 +157,7 @@ export default function ReportPrompt(props: ReportFailure): JSX.Element | null {
       <div className="mt-3 flex flex-wrap items-center gap-2">
         {phase === 'idle' && (
           <>
-            <button className="btn-base bg-accent/12 text-accent-ink hover:bg-accent/20" onClick={send}>
+            <button className="btn-base bg-accent/12 text-accent-ink hover:underline" onClick={send}>
               <Send size={14} /> {t('report.send')}
             </button>
             <button className="btn-quiet" onClick={() => remember(key)}>
@@ -171,13 +171,13 @@ export default function ReportPrompt(props: ReportFailure): JSX.Element | null {
           </button>
         )}
         {phase === 'sent' && (
-          <p className="flex items-center gap-1.5 text-[13px] text-good">
+          <p className="flex items-center gap-1.5 text-control text-good">
             <Check size={14} /> {outcome}
           </p>
         )}
         {phase === 'failed' && (
           <div className="w-full">
-            <p className="text-[13px] leading-relaxed text-bad">{outcome}</p>
+            <p className="text-control leading-relaxed text-bad">{outcome}</p>
             {/*
               Answering already retired every other prompt for this site and
               error, so this card is the one way left to send it through the
@@ -188,7 +188,7 @@ export default function ReportPrompt(props: ReportFailure): JSX.Element | null {
             {(failure !== 'expired' || preview) && (
               <div className="mt-3 flex flex-wrap items-center gap-2">
                 {failure !== 'expired' && (
-                  <button className="btn-base bg-accent/12 text-accent-ink hover:bg-accent/20" onClick={send}>
+                  <button className="btn-base bg-accent/12 text-accent-ink hover:underline" onClick={send}>
                     <RefreshCw size={14} /> {t('common.retry')}
                   </button>
                 )}
@@ -216,27 +216,27 @@ export default function ReportPrompt(props: ReportFailure): JSX.Element | null {
               void loadPreview()
             }}
             aria-expanded={detailsOpen}
-            className="mono mt-3 flex items-center gap-1 text-[11px] uppercase tracking-[0.08em] text-ink-2 transition-colors duration-fast ease-ease hover:text-ink"
+            className="mt-3 flex items-center gap-1 text-meta font-bold text-ink-2 transition-colors duration-fast ease-ease hover:text-ink"
           >
             {t('report.details')}
-            <motion.span animate={{ rotate: detailsOpen ? 180 : 0 }} transition={{ duration: 0.16 }}>
+            <m.span animate={{ rotate: detailsOpen ? 180 : 0 }} transition={{ duration: 0.16 }}>
               <ChevronDown size={12} />
-            </motion.span>
+            </m.span>
           </button>
           <AnimatePresence initial={false}>
             {detailsOpen && (
-              <motion.div {...collapse} className="overflow-hidden">
+              <m.div {...collapse} className="overflow-hidden">
                 <p className="hint mt-2">{t('report.privacy')}</p>
                 {preview === undefined ? (
                   <Loader2 size={14} className="mt-2 animate-spin text-ink-3" />
                 ) : preview ? (
-                  <pre className="selectable mono mt-2 max-h-56 overflow-auto whitespace-pre-wrap break-all rounded-1 bg-raise px-3 py-2.5 text-[11px] leading-relaxed text-ink-2">
+                  <pre className="selectable mono mt-2 max-h-56 overflow-auto whitespace-pre-wrap break-all rounded-1 bg-raise px-3 py-2.5 text-caption leading-relaxed text-ink-2">
                     {`${preview.subject}\n\n${preview.text}`}
                   </pre>
                 ) : (
                   <p className="hint mt-2">{t('report.gone')}</p>
                 )}
-              </motion.div>
+              </m.div>
             )}
           </AnimatePresence>
         </>

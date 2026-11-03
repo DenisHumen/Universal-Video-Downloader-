@@ -1,7 +1,9 @@
 import { useEffect, useId, useRef, useState } from 'react'
-import { AnimatePresence, motion } from 'framer-motion'
-import { enter, staggerChild, staggerParent } from '../lib/motion'
-import { Check, Download, Loader2, RotateCw, Search, SearchX, X } from 'lucide-react'
+import { AnimatePresence, m } from 'framer-motion'
+import { staggerChild, staggerParent } from '../lib/motion'
+import { AlertTriangle, ArrowRight, Check, ChevronDown, Download, Loader2, RotateCw, Search, SearchX, X } from '../ui/icons'
+import { EmptyState, Icon, Spinner, ToggleGroup } from '../ui'
+import HeaderSlot from '../shell/HeaderSlot'
 import type {
   AppErrorCode,
   AppSettings,
@@ -13,16 +15,15 @@ import type {
 } from '@shared/types'
 import { ADULT_SEARCH_SERVICES, allowedSearchServices } from '@shared/types'
 import StreamingCard from '../components/StreamingCard'
-import Modal from '../components/Modal'
+import Dialog from '../ui/Dialog'
 import Thumbnail from '../components/Thumbnail'
-import Choice from '../components/Choice'
-import EmptyState from '../components/EmptyState'
 import { formatCount, formatDuration } from '../lib/format'
 import { initialMode, initialQuality, maxHeightOf } from '../lib/quality'
 import { toast } from '../lib/toast'
 import { queueDownload } from '../lib/queue'
 import { describeError, errorText } from '../lib/errors'
 import { useT, type TranslateFn } from '../i18n'
+import { serviceLabel } from '../lib/services'
 import { useStore } from '../store'
 
 type Status = 'idle' | 'searching' | 'error'
@@ -58,20 +59,6 @@ const SERVICES: SearchScope[] = [
   'pornhub'
 ]
 
-/**
- * What a service pill says.
- *
- * Brand names stay as they are in every language; the two pills that are
- * words, not brands, are translated. "anime" used to be written into the list
- * above as a literal, so the Russian window showed one English pill among
- * translated ones, and the idle screen named it in English too.
- */
-function serviceLabel(s: SearchScope, t: TranslateFn): string {
-  if (s === 'all') return t('search.allServices')
-  if (s === 'yummyani') return t('search.anime')
-  return s
-}
-
 // Services whose results carry real thumbnails + a probe-able quality.
 const PROBE_SERVICES: SearchService[] = ['youtube', 'pornhub', 'dailymotion']
 
@@ -82,7 +69,6 @@ function queryFromHash(): string {
 
 export default function SearchView({ settings, embedded = false }: Props): JSX.Element {
   const t = useT()
-  const setView = useStore((s) => s.setView)
   const pendingQuery = useStore((s) => s.pendingQuery)
   const takePendingQuery = useStore((s) => s.takePendingQuery)
   const [query, setQuery] = useState(embedded ? '' : queryFromHash)
@@ -285,199 +271,212 @@ export default function SearchView({ settings, embedded = false }: Props): JSX.E
   }
 
   const activeLabel = serviceLabel(service, t)
+  /*
+    Inside the main window a result opens in the Download view's own card,
+    as a pasted link would (plan 5.5); the standalone search window has no
+    Download view, so there it queues or opens the picker as before.
+  */
+  const requestDetect = useStore((s) => s.requestDetect)
+  const open = embedded ? (r: SearchResult) => requestDetect(r.pickerUrl || r.url) : undefined
+
+  const entry = (
+    <div className="field flex h-[34px] w-full items-center gap-1 rounded-1 px-1">
+      <Search size={16} className="ml-1.5 shrink-0 text-ink-2" />
+      <input
+        id="uvd-search"
+        ref={inputRef}
+        value={query}
+        onChange={(e) => setQuery(e.target.value)}
+        onKeyDown={(e) => e.key === 'Enter' && search()}
+        placeholder={t('search.placeholder')}
+        aria-label={t('search.label')}
+        className="no-drag min-w-0 flex-1 bg-transparent px-1 text-body text-ink outline-none placeholder:text-ink-2"
+        spellCheck={false}
+        autoComplete="off"
+      />
+      {status === 'searching' ? (
+        <span className="mr-1.5 flex"><Spinner size={16} label={t('search.searching')} /></span>
+      ) : (
+        <button
+          type="button"
+          className="ui-icon-btn ui-icon-btn-sm"
+          data-uvd="search"
+          onClick={() => search()}
+          disabled={!query.trim()}
+          aria-label={t('common.search')}
+        >
+          <ArrowRight size={16} />
+        </button>
+      )}
+    </div>
+  )
 
   return (
     <div className="flex h-full flex-col">
-      <div className="mx-auto w-full max-w-[1080px] shrink-0 px-6 pt-10">
-        <h1 className="h1">{t('search.title')}</h1>
-        <p className="lead mt-2">{t('search.hint')}</p>
-        {/*
-          The label names the field; the placeholder inside it says what to
-          type. Both used to be the same sentence, and an aria-label on the
-          input repeated it a third time over the label it already had.
-        */}
-        <label className="label mb-2 mt-7 block" htmlFor="uvd-search">
-          {t('search.label')}
-        </label>
-        <div className="field flex items-center gap-1.5 rounded-3 p-2">
-          <Search size={18} className="ml-2 shrink-0 text-ink-3" />
-          <input
-            id="uvd-search"
-            ref={inputRef}
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && search()}
-            placeholder={t('search.placeholder')}
-            className="no-drag min-w-0 flex-1 bg-transparent px-1.5 py-2 text-[16px] text-ink outline-none placeholder:text-ink-3"
-            spellCheck={false}
-            autoComplete="off"
-          />
-          <button
-            className="btn-solid px-5"
-            data-uvd="search"
-            onClick={() => search()}
-            disabled={!query.trim() || status === 'searching'}
-          >
-            {status === 'searching' ? <Loader2 size={15} className="animate-spin" /> : null}
-            {t('common.search')}
-          </button>
-        </div>
+      {/* The entry sits in the header bar (A1 §3); the standalone window has none, so it stays on the page. */}
+      {embedded ? <HeaderSlot where="center">{entry}</HeaderSlot> : <div className="mx-auto w-full max-w-[1000px] shrink-0 px-6 pt-4">{entry}</div>}
 
-        <div className="mt-3.5 flex flex-wrap items-center gap-3">
-          <Choice
+      <div className="mx-auto min-h-0 w-full max-w-[1000px] flex-1 overflow-y-auto px-6 pb-8 pt-4">
+        <div className="mb-5 flex items-center gap-3">
+          <ServiceFilter
             label={t('search.services')}
             value={service}
-            onChange={(v) => changeService(v as SearchScope)}
+            onChange={(v) => changeService(v)}
             options={services.map((s) => ({ value: s, label: serviceLabel(s, t) }))}
           />
           {results && (
-            <span className="mono ml-auto shrink-0 text-[12px] text-ink-2">
-              {t('search.results', { count: results.length })}
-            </span>
+            <span className="numeric ml-auto shrink-0 text-meta text-ink-2">{t('search.results', { count: results.length })}</span>
           )}
         </div>
-      </div>
-
-      <div className="mx-auto min-h-0 w-full max-w-[1080px] flex-1 overflow-y-auto px-6 pb-8 pt-6">
         {/*
-          Enter-only, like the home screen: these states are mutually exclusive,
-          and an exiting child that never reports its animation finished (a
-          throttled background window) stays in flow underneath the new one.
+          Enter-only: these states are mutually exclusive, and an exiting child
+          that never reports its animation finished (a throttled background
+          window) stays in flow underneath the new one.
         */}
         <>
           {status === 'searching' && (
-            <motion.div
-              key="skeleton"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              className="grid grid-cols-2 gap-x-5 gap-y-7 md:grid-cols-3 xl:grid-cols-4"
-            >
+            <div key="skeleton" className={GRID} aria-hidden="true">
               {Array.from({ length: 8 }).map((_, i) => (
-                <div key={i}>
-                  <div className="skeleton aspect-video w-full rounded-2" />
-                  <div className="skeleton mt-2.5 h-3.5 w-5/6 rounded-1" />
-                  <div className="skeleton mt-1.5 h-3 w-1/2 rounded-1" />
+                <div key={i} className="panel overflow-hidden">
+                  <div className="skeleton aspect-video w-full" />
+                  <div className="space-y-1.5 p-3">
+                    <div className="skeleton h-3.5 w-5/6 rounded-1" />
+                    <div className="skeleton h-3 w-1/2 rounded-1" />
+                  </div>
                 </div>
               ))}
-            </motion.div>
+            </div>
           )}
 
           {status === 'error' && (
-            <motion.div
-              key="error"
-              initial={{ opacity: 0, y: 6 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={enter}
-              className="panel p-4"
-            >
-              <p className="h2 flex items-center gap-2">
-                <span className="h-1.5 w-1.5 rounded-full bg-bad" /> {t('search.failed')}
-              </p>
-              <p className="selectable mt-2 break-words text-[13px] leading-relaxed text-ink-2">
-                {errorText(t, { error, errorCode })}
-              </p>
-              {/*
-                Most failures here are a network blip or a rate limit, which
-                the same search gets past a moment later. The button above
-                does the same, but the eye is down here, on the message.
-              */}
-              <button className="btn-quiet mt-3" onClick={() => search()} disabled={!query.trim()}>
-                <RotateCw size={14} /> {t('common.retry')}
-              </button>
-            </motion.div>
+            <EmptyState
+              icon={<Icon icon={AlertTriangle} size="xl" />}
+              title={t('search.failed')}
+              hint={errorText(t, { error, errorCode })}
+              action={
+                <button type="button" className="btn-solid rounded-pill px-6" onClick={() => search()} disabled={!query.trim()}>
+                  <RotateCw size={14} /> {t('common.retry')}
+                </button>
+              }
+            />
           )}
 
           {status === 'idle' && results && results.length === 0 && (
-            <motion.div key="empty" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-              <EmptyState
-                icon={<SearchX size={24} />}
-                title={t('search.nothing')}
-                hint={t('search.nothingHint')}
-                action={
-                  // One service had nothing; the others may well have it.
-                  service !== 'all' ? (
-                    <button className="btn-quiet" onClick={() => changeService('all')}>
-                      {t('search.tryAll')}
-                    </button>
-                  ) : undefined
-                }
-              />
-            </motion.div>
+            <EmptyState
+              icon={<Icon icon={SearchX} size="xl" />}
+              title={t('search.nothing')}
+              hint={t('search.nothingHint')}
+              action={
+                // One service had nothing; the others may well have it.
+                service !== 'all' ? (
+                  <button type="button" className="btn-solid rounded-pill px-6" onClick={() => changeService('all')}>
+                    {t('search.tryAll')}
+                  </button>
+                ) : undefined
+              }
+            />
           )}
 
           {status === 'idle' && results && results.length > 0 && (
-            <motion.div
-              key="results"
-              variants={staggerParent}
-              initial="hidden"
-              animate="show"
-              className="grid grid-cols-2 gap-x-5 gap-y-7 md:grid-cols-3 xl:grid-cols-4"
-            >
+            <m.div key="results" variants={staggerParent} initial="hidden" animate="show" className={GRID}>
               {results.map((r, i) => (
-                <ResultTile
+                <ResultCard
                   key={`${r.service}-${r.id}-${i}`}
                   result={r}
                   probe={probes[r.url]}
                   added={added.has(r.url)}
                   busy={pickerBusy === r.url}
                   t={t}
+                  onOpen={open ? () => open(r) : undefined}
                   onDownload={() => download(r)}
                   onOpenPicker={() => openPicker(r)}
                 />
               ))}
-            </motion.div>
+            </m.div>
           )}
 
           {status === 'idle' && !results && (
-            <motion.div
-              key="hint"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-            >
-              {/*
-                Nothing is running yet. This said "searching all services" -
-                a search that never ends - with the lead's sentence under it
-                for the second time on the screen.
-              */}
-              <EmptyState
-                icon={<Search size={24} />}
-                title={t('search.idle', { service: activeLabel })}
-                hint={t('search.idleHint')}
-              />
-            </motion.div>
+            <EmptyState icon={<Icon icon={Search} size="xl" />} title={t('search.idle', { service: activeLabel })} hint={t('search.idleHint')} />
           )}
         </>
       </div>
 
-      {/* Anime episode/translator/quality picker */}
+      {/* Anime episode/translator/quality picker (the standalone window) */}
       <AnimatePresence>
         {picker && (
-          <Modal
+          <Dialog
             key="picker"
+            variant="sheet"
+            size="md"
+            title={picker.title}
+            closeLabel={t('common.close')}
             onClose={() => setPicker(null)}
-            labelledBy={pickerTitleId}
-            className="relative max-h-[86vh] w-full max-w-lg overflow-y-auto"
           >
-            <button
-              className="btn-icon absolute right-2 top-2 z-10 bg-raise"
-              onClick={() => setPicker(null)}
-              aria-label={t('common.close')}
-            >
-              <X size={15} />
-            </button>
             <StreamingCard
               info={picker}
               onDone={() => {
                 setPicker(null)
-                if (embedded) setView('downloads')
               }}
               saveDir={pickerDir}
               onSaveDirChange={setPickerDir}
               titleId={pickerTitleId}
             />
-          </Modal>
+          </Dialog>
         )}
       </AnimatePresence>
+    </div>
+  )
+}
+
+/** 2 / 3 / 4 columns of poster cards; the gaps do the separating. */
+const GRID = 'grid grid-cols-2 gap-4 md:grid-cols-3 xl:grid-cols-4'
+
+/**
+ * The service filter: a GNOME toggle group, or a drop-down when the group
+ * would not fit (eight services, Russian labels, a 720 px window). The group
+ * is always laid out, invisibly, so a wider window brings it back.
+ */
+function ServiceFilter({
+  label,
+  value,
+  onChange,
+  options
+}: {
+  label: string
+  value: SearchScope
+  onChange: (v: SearchScope) => void
+  options: { value: SearchScope; label: string }[]
+}): JSX.Element {
+  const wrap = useRef<HTMLDivElement>(null)
+  const probe = useRef<HTMLDivElement>(null)
+  const [fits, setFits] = useState(true)
+  useEffect(() => {
+    const host = wrap.current
+    const group = probe.current
+    if (!host || !group) return
+    const check = (): void => setFits(group.scrollWidth <= host.clientWidth)
+    check()
+    const ro = new ResizeObserver(check)
+    ro.observe(host)
+    return () => ro.disconnect()
+  }, [options.length])
+  return (
+    <div ref={wrap} className="relative min-w-0 flex-1">
+      <div ref={probe} className={fits ? 'w-max' : 'pointer-events-none invisible absolute left-0 top-0 w-max'} aria-hidden={!fits || undefined}>
+        <ToggleGroup label={label} value={value} onChange={onChange} options={options} />
+      </div>
+      {!fits && (
+        <span className="relative inline-flex items-center">
+          <select aria-label={label} className="ui-combo btn-quiet pr-8" value={value} onChange={(e) => onChange(e.target.value as SearchScope)}>
+            {options.map((o) => (
+              <option key={o.value} value={o.value}>
+                {o.label}
+              </option>
+            ))}
+          </select>
+          <ChevronDown size={16} className="pointer-events-none absolute right-2 text-ink" />
+        </span>
+      )}
     </div>
   )
 }
@@ -496,18 +495,18 @@ function marker(probe: QualityProbe | undefined, service: SearchService, t: Tran
 }
 
 /**
- * A result tile with no frame.
- *
- * The old card had a border, a lit top edge, a hover lift and a hover shadow —
- * four devices to say "this is one item", in a grid where the gaps already say
- * it. Here the thumbnail is the object and everything else is set beneath it.
+ * A poster card (A1 §3): the poster with OSD badges — what it is in one
+ * corner, how long in the other — then the title, who made it, and the one
+ * action. In the main window the poster opens the result in the Download
+ * view's card; in the standalone window it opens the page in the browser.
  */
-function ResultTile({
+function ResultCard({
   result,
   probe,
   added,
   busy,
   t,
+  onOpen,
   onDownload,
   onOpenPicker
 }: {
@@ -516,6 +515,7 @@ function ResultTile({
   added: boolean
   busy: boolean
   t: TranslateFn
+  onOpen?: () => void
   onDownload: () => Promise<void>
   onOpenPicker: () => Promise<void>
 }): JSX.Element {
@@ -526,7 +526,8 @@ function ResultTile({
 
   const handle = async (): Promise<void> => {
     if (isAnime) {
-      await onOpenPicker()
+      if (onOpen) onOpen()
+      else await onOpenPicker()
       return
     }
     setDownloading(true)
@@ -534,68 +535,46 @@ function ResultTile({
     setDownloading(false)
   }
 
-  const meta = [result.uploader, result.viewCount != null ? formatCount(result.viewCount) : null]
+  const meta = [serviceLabel(result.service, t), result.uploader, result.viewCount != null ? formatCount(result.viewCount) : null]
     .filter(Boolean)
-    .join('  ·  ')
+    .join(' · ')
+  const openLabel = onOpen ? t('search.openResult') : t('common.openInBrowser')
 
   return (
-    <motion.div variants={staggerChild} className="group flex flex-col">
-      {/*
-        The thumbnail is the way to the site. A second, icon-only "open in
-        browser" sat beside the download button and did exactly this; it went,
-        so the one action the row is for has the row to itself. The thumbnail
-        never downloads: a stray click on a picture must not queue anything.
-        It is named for what it does, since its contents are a picture and a
-        couple of badges.
-      */}
+    <m.div variants={staggerChild} className="panel flex flex-col overflow-hidden">
       <button
-        className="relative block aspect-video w-full cursor-pointer overflow-hidden rounded-2 bg-sink text-left"
-        title={t('common.openInBrowser')}
-        aria-label={`${t('common.openInBrowser')}: ${result.title}`}
-        onClick={() => window.api.openExternal(result.url)}
+        type="button"
+        className="relative block aspect-video w-full cursor-pointer overflow-hidden bg-sink text-left"
+        aria-label={`${openLabel}: ${result.title}`}
+        onClick={() => (onOpen ? onOpen() : window.api.openExternal(result.url))}
       >
-        <Thumbnail
-          src={thumb}
-          pageUrl={result.url}
-          className="h-full w-full object-cover"
-          fallback={<div className="h-full w-full bg-sink" />}
-        />
+        <Thumbnail src={thumb} pageUrl={result.url} className="h-full w-full object-cover" fallback={<div className="h-full w-full bg-sink" />} />
         {badge && (
-          <span className="mono absolute left-2 top-2 rounded-1 bg-canvas/90 px-2 py-1 text-[11px] leading-none text-ink">
-            {badge}
-          </span>
+          <span className="absolute left-2 top-2 rounded-1 bg-osd px-1.5 py-0.5 text-caption font-bold leading-tight text-osd-fg">{badge}</span>
         )}
         {result.duration != null && result.duration > 0 && (
-          <span className="mono absolute bottom-2 right-2 rounded-1 bg-canvas/90 px-2 py-1 text-[11px] leading-none text-ink">
+          <span className="numeric absolute bottom-2 right-2 rounded-1 bg-osd px-1.5 py-0.5 text-caption leading-tight text-osd-fg">
             {formatDuration(result.duration)}
           </span>
         )}
       </button>
-
-      <p
-        className="mt-2.5 line-clamp-2 text-[14px] font-medium leading-snug text-ink"
-        title={result.title}
-      >
-        {result.title}
-      </p>
-      <p className="mono mt-1 truncate text-[12px] text-ink-2">{meta || result.service}</p>
-
-      <div className="mt-auto flex items-center gap-1 pt-2.5">
-        <button
-          className={`flex-1 py-2 ${added ? 'btn-base bg-good/12 text-good' : 'btn-quiet'}`}
-          onClick={handle}
-          disabled={downloading || busy || added}
-        >
-          {downloading || busy ? (
-            <Loader2 size={13} className="animate-spin" />
-          ) : added ? (
-            <Check size={13} />
-          ) : (
-            <Download size={13} />
-          )}
-          {added ? t('search.queued') : isAnime ? t('search.episodes') : t('common.download')}
-        </button>
+      <div className="flex flex-1 flex-col p-3">
+        <p className="line-clamp-2 text-body font-bold leading-snug text-ink" title={result.title}>
+          {result.title}
+        </p>
+        <p className="numeric mt-1 truncate text-meta text-ink-2">{meta}</p>
+        <div className="mt-auto pt-3">
+          <button
+            type="button"
+            className={`w-full ${added ? 'btn-base bg-good/12 text-good' : 'btn-quiet'}`}
+            onClick={handle}
+            disabled={downloading || busy || added}
+          >
+            {downloading || busy ? <Loader2 size={14} className="animate-spin" /> : added ? <Check size={14} /> : <Download size={14} />}
+            {added ? t('search.queued') : isAnime ? t('search.episodes') : t('common.download')}
+          </button>
+        </div>
       </div>
-    </motion.div>
+    </m.div>
   )
 }

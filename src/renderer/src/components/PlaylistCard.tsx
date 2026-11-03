@@ -1,5 +1,5 @@
 import { useLayoutEffect, useMemo, useRef, useState } from 'react'
-import { Check, Loader2 } from 'lucide-react'
+import { Check, Loader2 } from '../ui/icons'
 import type { DownloadMode, MediaInfo, PlaylistEntry, QualityPreset } from '@shared/types'
 import Choice from './Choice'
 import SaveLocation from './SaveLocation'
@@ -28,7 +28,6 @@ const OVERSCAN = 6
 export default function PlaylistCard({ info, onDone, saveDir, onSaveDirChange }: Props): JSX.Element {
   const t = useT()
   const tp = useTp()
-  const setView = useStore((s) => s.setView)
   const settings = useStore((s) => s.settings)
   const saveSettings = useStore((s) => s.saveSettings)
   /*
@@ -125,7 +124,6 @@ export default function PlaylistCard({ info, onDone, saveDir, onSaveDirChange }:
     }
     if (!ok) return
     onDone()
-    setView('downloads')
   }
 
   const chosen = entries.filter((e) => selected.has(e.url))
@@ -134,7 +132,7 @@ export default function PlaylistCard({ info, onDone, saveDir, onSaveDirChange }:
     <div className="panel overflow-hidden">
       <div className="border-b border-edge p-4">
         <h2 className="h2 truncate">{info.title}</h2>
-        <p className="mono mt-1 text-[12px] text-ink-2">
+        <p className="mono mt-1 text-meta text-ink-2">
           {tp('playlist.videos', entries.length)} · {info.extractor}
         </p>
       </div>
@@ -196,7 +194,7 @@ export default function PlaylistCard({ info, onDone, saveDir, onSaveDirChange }:
               a slice rather than ticking boxes one at a time. */}
           {entries.length > 8 && (
             <div className="mb-2 flex flex-wrap items-center gap-2">
-              <span className="mono shrink-0 text-[12px] text-ink-2">{t('playlist.range')}</span>
+              <span className="mono shrink-0 text-meta text-ink-2">{t('playlist.range')}</span>
               <input
                 type="number"
                 min={1}
@@ -205,7 +203,7 @@ export default function PlaylistCard({ info, onDone, saveDir, onSaveDirChange }:
                 onChange={(e) => setRangeFrom(e.target.value)}
                 // "items from" / "items to": the dash between the boxes is all a sighted user needs, and a screen reader had nothing.
                 aria-label={`${t('playlist.range')} ${t('trim.start')}`}
-                className="field mono w-[72px] px-2 text-center text-[13px]"
+                className="field mono w-[72px] px-2 text-center text-control"
               />
               <span className="text-ink-3" aria-hidden="true">
                 –
@@ -217,7 +215,7 @@ export default function PlaylistCard({ info, onDone, saveDir, onSaveDirChange }:
                 value={rangeTo}
                 onChange={(e) => setRangeTo(e.target.value)}
                 aria-label={`${t('playlist.range')} ${t('trim.end')}`}
-                className="field mono w-[72px] px-2 text-center text-[13px]"
+                className="field mono w-[72px] px-2 text-center text-control"
               />
               <button className="btn-quiet px-3 py-1.5" onClick={selectRange}>
                 {t('playlist.selectRange')}
@@ -258,10 +256,10 @@ export default function PlaylistCard({ info, onDone, saveDir, onSaveDirChange }:
                         >
                           {on && <Check size={11} strokeWidth={3} />}
                         </span>
-                        <span className="mono w-8 shrink-0 text-[11px] tabular-nums text-ink-3">
+                        <span className="mono w-8 shrink-0 text-caption tabular-nums text-ink-3">
                           {String(i + 1).padStart(2, '0')}
                         </span>
-                        <span className="truncate text-[13px] text-ink" title={e.title}>
+                        <span className="truncate text-control text-ink" title={e.title}>
                           {e.title}
                         </span>
                       </button>
@@ -342,7 +340,7 @@ function LayoutOption({
         {on && <Check size={11} strokeWidth={3} />}
       </span>
       <span className="min-w-0">
-        <span className="block text-[13px] text-ink">{label}</span>
+        <span className="block text-control text-ink">{label}</span>
         <span className="hint mt-0.5 block break-words">{hint}</span>
       </span>
     </button>
