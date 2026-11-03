@@ -223,6 +223,8 @@ export async function setSecret(key: string, value: string): Promise<boolean> {
     await deleteSecret(key)
     return true
   }
+  // A value saved while the store is still opening would be overwritten by the old one on disk.
+  if (!ready) await secretsReady
   plain.set(key, value)
   if (!persistent) {
     if (!warned) {
@@ -247,7 +249,8 @@ export function getSecret(key: string): string | undefined {
   return plain.get(key)
 }
 
-export function deleteSecret(key: string): Promise<void> {
+export async function deleteSecret(key: string): Promise<void> {
+  if (!ready) await secretsReady
   plain.delete(key)
   if (!persistent) return Promise.resolve()
   return enqueue(() => {
