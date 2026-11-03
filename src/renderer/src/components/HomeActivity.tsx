@@ -105,7 +105,7 @@ function LiveRow({ item }: { item: DownloadItem }): JSX.Element {
       {item.state !== 'queued' && (
         <div className="absolute inset-x-0 bottom-0 h-[2px] bg-edge" aria-hidden="true">
           <div
-            className="h-full bg-accent transition-[width] duration-base ease-ease"
+            className="h-full bg-accent-bright transition-[width] duration-base ease-ease"
             style={{ width: `${item.indeterminate ? 0 : percent}%` }}
           />
         </div>

@@ -49,6 +49,7 @@ const TINT_ALPHA = 0.12
 /** Solid fills that carry a label, and the token that label is set in. */
 const FILL_PAIRS = [
   ['--destructive', '--destructive-fg'],
+  ['--osd', '--osd-fg'],
   ['--accent', '--accent-fg'],
   ['--bad', '--bad-fg']
 ]

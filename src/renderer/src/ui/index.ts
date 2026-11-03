@@ -14,6 +14,22 @@ export { default as Dialog } from './Dialog'
 export { default as ToastViewport, toast, type ToastAction, type ToastKind } from './Toast'
 export { default as Tooltip, TOOLTIP_DELAY } from './Tooltip'
 export { SettingsGroup, SettingsRow, useSettingsRowLabel } from './Settings'
+export {
+  PreferencesPage,
+  PreferencesGroup,
+  ActionRow,
+  SwitchRow,
+  ComboRow,
+  EntryRow,
+  PasswordEntryRow,
+  ExpanderRow,
+  useRowTitleId,
+  type ComboOption
+} from './Rows'
+export { default as HeaderBar } from './HeaderBar'
+export { default as NavigationStack, type StackPage } from './NavigationStack'
+export { StyleTiles, AccentSwatches, Badge, type TileStyle, type SwatchOption } from './Pickers'
+export { Banner, Spinner } from './Status'
 export { default as EmptyState } from './EmptyState'
 export { default as Icon, ICON_SIZE } from './Icon'
 export { type IconComponent, type IconProps } from './icons'

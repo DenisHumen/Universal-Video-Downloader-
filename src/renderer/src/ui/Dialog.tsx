@@ -4,26 +4,28 @@ import { cx } from './cx'
 
 interface Props {
   title: ReactNode
-  /** One or two sentences under the title; it becomes the dialog's description. */
+  /** One or two sentences under the heading; it becomes the dialog's description. */
   description?: ReactNode
   children?: ReactNode
-  /** The footer's buttons, right-aligned; the primary one last. */
+  /** The responses, in one row, the suggested or destructive one last. */
   actions?: ReactNode
   onClose: () => void
   role?: 'dialog' | 'alertdialog'
   initialFocus?: RefObject<HTMLElement>
   /** Panel width. */
   size?: 'sm' | 'md' | 'lg'
-  /** An icon beside the title (an alert triangle for a confirmation). */
+  /** An icon above the heading. */
   icon?: ReactNode
 }
 
-const WIDTH = { sm: 'max-w-sm', md: 'max-w-lg', lg: 'max-w-2xl' }
+const WIDTH = { sm: 'max-w-[372px]', md: 'max-w-lg', lg: 'max-w-2xl' }
 
 /**
- * A dialog (plan 3.1): the shared Modal (role and name on the panel, focus in
- * and back, Tab kept inside, Esc for the top dialog only, a scrim behind) with
- * the 4.0 layout on `.surface-dialog`: title, description, body, actions.
+ * AdwAlertDialog (A1 D3): a centred heading (title-2) and body, then the
+ * responses side by side, each as wide as the others. On the shared Modal:
+ * role and name on the panel, focus in and back, Tab kept inside, Esc for
+ * the top dialog, a scrim behind. No bottom sheet: the window never gets
+ * narrower than 720 px.
  */
 export default function Dialog({
   title,
@@ -47,25 +49,23 @@ export default function Dialog({
       initialFocus={initialFocus}
       className={cx('surface-dialog flex max-h-full w-full flex-col overflow-hidden', WIDTH[size])}
     >
-      <div className="flex gap-3 px-5 pb-3 pt-5">
+      <div className="px-6 pb-4 pt-6 text-center">
         {icon && (
-          <span className="mt-0.5 shrink-0" aria-hidden="true">
+          <div className="mb-3 flex justify-center" aria-hidden="true">
             {icon}
-          </span>
+          </div>
         )}
-        <div className="min-w-0">
-          <h2 id={titleId} className="text-section font-semibold text-ink">
-            {title}
-          </h2>
-          {description && (
-            <p id={bodyId} className="mt-1 text-control text-ink-2">
-              {description}
-            </p>
-          )}
-        </div>
+        <h2 id={titleId} className="text-title-2 text-ink">
+          {title}
+        </h2>
+        {description && (
+          <p id={bodyId} className="mt-2 text-body text-ink">
+            {description}
+          </p>
+        )}
       </div>
-      {children && <div className="min-h-0 overflow-y-auto px-5 pb-4">{children}</div>}
-      {actions && <div className="flex justify-end gap-2 border-t border-edge-soft px-5 py-3">{actions}</div>}
+      {children && <div className="min-h-0 overflow-y-auto px-6 pb-4">{children}</div>}
+      {actions && <div className="flex gap-3 px-6 pb-6 pt-2 [&>*]:flex-1">{actions}</div>}
     </Modal>
   )
 }

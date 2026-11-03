@@ -67,7 +67,7 @@ export default function UpdateBanner(): JSX.Element {
                         downloads in the background, which is precisely where
                         the frame clock stops ticking. */}
                     <div
-                      className="h-full bg-accent transition-[width] duration-base ease-ease"
+                      className="h-full bg-accent-bright transition-[width] duration-base ease-ease"
                       style={{ width: `${update.percent ?? 0}%` }}
                     />
                   </div>

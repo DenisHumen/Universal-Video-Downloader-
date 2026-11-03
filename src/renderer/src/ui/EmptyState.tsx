@@ -1,31 +1,30 @@
 import type { ReactNode } from 'react'
 
 interface Props {
-  /** A 24px icon (an `<Icon size="lg">`). */
+  /** A symbolic icon at 128 px (`<Icon size="xl">`), drawn dim. */
   icon: ReactNode
   title: string
   hint?: string
-  /** The way out: a primary action. An empty state without one is a dead end. */
+  /** The way out: a suggested pill. A status page without one is a dead end. */
   action?: ReactNode
+  /** Extra content under the hint (Download's entry). */
+  children?: ReactNode
 }
 
 /**
- * "Nothing here", with the next step (plan 3.1, VD spec): a 48px icon tile on
- * `--surface-2` at r-3, the icon in accent ink, a 16/600 title, a 13px hint and
- * a primary action, centred at about 40% of the height.
+ * AdwStatusPage (A1 D3): a 128 px dimmed symbolic icon, a title-1 heading,
+ * body text and a suggested pill, centred in the pane.
  */
-export default function EmptyState({ icon, title, hint, action }: Props): JSX.Element {
+export default function EmptyState({ icon, title, hint, action, children }: Props): JSX.Element {
   return (
-    <div className="flex h-full flex-col items-center px-6 pb-16 pt-[22vh] text-center">
-      <div
-        className="flex h-12 w-12 items-center justify-center rounded-3 bg-sink text-accent-ink"
-        aria-hidden="true"
-      >
+    <div className="flex h-full flex-col items-center justify-center px-6 py-12 text-center">
+      <div className="text-ink opacity-50" aria-hidden="true">
         {icon}
       </div>
-      <p className="mt-4 text-section font-semibold text-ink">{title}</p>
-      {hint && <p className="mt-1.5 max-w-[46ch] text-control text-ink-2">{hint}</p>}
-      {action && <div className="mt-5">{action}</div>}
+      <h2 className="mt-6 text-title-1 text-ink">{title}</h2>
+      {hint && <p className="mt-3 max-w-[48ch] text-body text-ink">{hint}</p>}
+      {children && <div className="mt-6 w-full max-w-[600px]">{children}</div>}
+      {action && <div className="mt-6">{action}</div>}
     </div>
   )
 }

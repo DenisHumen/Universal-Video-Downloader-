@@ -140,9 +140,15 @@ describe('the built stylesheet', () => {
   })
 
   // Day's quiet buttons were a 1.06:1 fill on a white panel: there, but unseen.
-  it('edges the neutral buttons with the theme hairline', async () => {
-    expect(await winning('.btn-quiet', 'box-shadow')).toContain('var(--control-edge)')
-    expect(await winning('.btn-icon', 'border-color')).toBe('var(--control-edge)')
+  /*
+    A1 retired the hairline (--control-edge): GNOME's controls are the text
+    colour at .10, which reads on every plane in both themes (D0, and the
+    contrast gate's control-fill checks).
+  */
+  it('fills the neutral controls with the text colour at .10, edge-free', async () => {
+    expect(await winning('.btn-quiet', 'background-color')).toContain('var(--fill)')
+    expect(await winning('.btn-icon', 'background-color')).toContain('var(--fill)')
+    expect(await winning('.btn-quiet', 'box-shadow')).toBeUndefined()
   })
 
   /*
@@ -151,7 +157,7 @@ describe('the built stylesheet', () => {
     very edge they exist to go without.
   */
   it('keeps the bare icon buttons bare', async () => {
-    expect(await winning('.btn-icon-bare', 'border-color')).toBe('transparent')
+    expect(await winning('.btn-icon-bare', 'background-color')).toBe('transparent')
     const themed = (await rules()).filter((rule) =>
       rule.selectors.some((s) => s.includes('[data-theme') && s.includes('.btn'))
     )

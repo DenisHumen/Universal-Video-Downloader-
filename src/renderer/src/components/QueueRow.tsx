@@ -393,12 +393,12 @@ function QueueRow({ item, index, animateIn = true, heading }: Props): JSX.Elemen
           aria-label={phaseLabel ?? t(meta.label)}
         >
           <div
-            className={`h-full transition-[width] duration-base ease-ease ${item.state === 'paused' ? 'bg-edge-strong' : 'bg-accent'}`}
+            className={`h-full transition-[width] duration-base ease-ease ${item.state === 'paused' ? 'bg-edge-strong' : 'bg-accent-bright'}`}
             style={{ width: `${percent}%` }}
           />
           {indeterminate && percent < 100 && (
             <div className="absolute inset-y-0 right-0 overflow-hidden" style={{ left: `${percent}%` }}>
-              <div className="progress-indeterminate h-full bg-accent/45" />
+              <div className="progress-indeterminate h-full bg-accent-bright/45" />
             </div>
           )}
         </div>

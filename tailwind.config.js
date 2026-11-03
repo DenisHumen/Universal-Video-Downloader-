@@ -24,6 +24,11 @@ module.exports = {
         // The text colour as a fill: bg-fill/10 rest, /15 hover, /30 active (D0).
         fill: 'rgb(var(--fill) / <alpha-value>)',
         destructive: 'rgb(var(--destructive) / <alpha-value>)',
+        'destructive-fg': 'rgb(var(--destructive-fg) / <alpha-value>)',
+        osd: {
+          DEFAULT: 'rgb(var(--osd) / <alpha-value>)',
+          fg: 'rgb(var(--osd-fg) / <alpha-value>)'
+        },
         edge: {
           DEFAULT: 'rgb(var(--line) / <alpha-value>)',
           soft: 'rgb(var(--line-soft) / <alpha-value>)',
@@ -42,7 +47,9 @@ module.exports = {
           fg: 'rgb(var(--accent-fg) / <alpha-value>)',
           // Accent-coloured *text* on a plane — a lighter/darker cut of the
           // same hue, because the fill colour alone never clears 4.5:1.
-          ink: 'rgb(var(--accent-ink) / <alpha-value>)'
+          ink: 'rgb(var(--accent-ink) / <alpha-value>)',
+          // Non-text accent shapes (switch, progress): GNOME's raw accent colour.
+          bright: 'rgb(var(--accent-bright) / <alpha-value>)'
         },
         good: 'rgb(var(--good) / <alpha-value>)',
         warn: 'rgb(var(--warn) / <alpha-value>)',

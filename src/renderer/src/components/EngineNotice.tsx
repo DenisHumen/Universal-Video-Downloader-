@@ -71,7 +71,7 @@ export default function EngineNotice(): JSX.Element | null {
                     before the window has even been touched, which is when the
                     frame clock is least reliable. */}
                 <div
-                  className="h-full bg-accent transition-[width] duration-base ease-ease"
+                  className="h-full bg-accent-bright transition-[width] duration-base ease-ease"
                   style={{ width: `${percent}%` }}
                 />
               </div>
