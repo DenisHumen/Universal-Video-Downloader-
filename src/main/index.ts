@@ -12,6 +12,7 @@ import { existsSync, mkdirSync, rmSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { IPC } from '@shared/ipc'
 import { registerIpc } from './ipc'
+import { holdQuitForSecrets, initSecrets } from './services/secrets'
 import { flushSettings, getSettings } from './services/settings'
 import { applyProxy } from './services/proxy'
 import { answerProxyLoginsForPages } from './services/proxy-auth'
@@ -588,7 +589,15 @@ if (cliArgs) {
     if (link) deliver(IPC.evtClipboardLink, 'link', link)
   })
 
-  app.whenReady().then(() => {
+  app.whenReady().then(async () => {
+    /*
+      Before anything reads a secret or the settings: the proxy password, the
+      SMB passwords and the bot token come out of secrets.dat here, and
+      settings only lift a proxy password out of the address once it is known
+      whether there is a key store to put it in. What this logs is queued
+      until the log opens, just below.
+    */
+    await initSecrets()
     /*
       First, so everything after it can be explained afterwards.
       `getPath('logs')` creates its directory as a side effect, which is why
@@ -687,8 +696,10 @@ if (cliArgs) {
     })
   })
 
-  app.on('before-quit', () => {
+  app.on('before-quit', (event) => {
     quitting = true
+    // A password still being sealed lands first; the quit is then asked for again.
+    if (holdQuitForSecrets(event, () => app.quit())) return
     stopClipboardWatch()
     // Settings are written on a short delay so typing into a text field doesn't
     // rewrite the file per keystroke; a change made just before quitting is

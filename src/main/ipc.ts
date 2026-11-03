@@ -50,7 +50,7 @@ import {
   startMediaJob
 } from './services/downloader'
 import { forwardQueueEvents } from './services/queue-events'
-import { getSettings, resetSettings, setSettings } from './services/settings'
+import { getSettings, proxyPasswordSaved, resetSettings, setSettings } from './services/settings'
 import { exportBackup, importBackup } from './services/backup'
 import type { ExportOutcome, ImportOutcome } from '@shared/backup'
 import { forgetFailures, previewReport, sendReport } from './services/report'
@@ -182,8 +182,10 @@ export function registerIpc({ getWindow, openSearchWindow, onSettingsChanged }: 
     settings screen or from an imported backup - so an import reaches the tray,
     the watcher and the queue exactly as the switches on that screen do.
   */
-  const changeSettings = (partial: Partial<AppSettings>): AppSettings => {
+  const changeSettings = async (partial: Partial<AppSettings>): Promise<AppSettings> => {
     const next = setSettings(partial)
+    // A proxy password lifted out of the address is on disk before this answers.
+    await proxyPasswordSaved()
     onSettingsChanged(next)
     // Reports off: drop the failures already kept for one, not just the offer.
     if (next.errorReports === 'off') forgetFailures()
@@ -200,9 +202,10 @@ export function registerIpc({ getWindow, openSearchWindow, onSettingsChanged }: 
     requireRenderer(event, IPC.settingsSet)
     return changeSettings(partial)
   })
-  ipcMain.handle(IPC.settingsReset, (event) => {
+  ipcMain.handle(IPC.settingsReset, async (event) => {
     requireRenderer(event, IPC.settingsReset)
     const next = resetSettings()
+    await proxyPasswordSaved()
     onSettingsChanged(next)
     return next
   })

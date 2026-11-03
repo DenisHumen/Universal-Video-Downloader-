@@ -6,6 +6,7 @@ import { join, resolve } from 'path'
 import type { AppSettings, DownloadItem } from '@shared/types'
 import { normalizeUrl } from '@shared/urls'
 import { getSettings } from '../services/settings'
+import { flushSecrets, initSecrets } from '../services/secrets'
 import { applyProxy } from '../services/proxy'
 import { ensureYtdlp, ytdlpBinaryPath, ytdlpSpawnOptions } from '../services/ytdlp'
 import { ffmpegLocation } from '../services/ffmpeg'
@@ -71,9 +72,12 @@ function say(text: string): void {
 }
 
 function finish(code: number): void {
-  flushLog()
-  // Let the last lines reach the terminal before the process goes.
-  process.stdout.write('', () => app.exit(code))
+  // A secret still being sealed (a proxy password lifted out of settings) lands first.
+  void flushSecrets().finally(() => {
+    flushLog()
+    // Let the last lines reach the terminal before the process goes.
+    process.stdout.write('', () => app.exit(code))
+  })
 }
 
 /** Before `ready`: everything that has to be decided before Chromium starts. */
@@ -127,6 +131,7 @@ async function run(options: CliOptions): Promise<number> {
     return 64
   }
 
+  await initSecrets()
   const settings = getSettings()
   initLog(settings.logVerbose ? 'debug' : 'info')
   log.info('cli', 'Started', { links: options.links.length })

@@ -24,39 +24,41 @@ import {
  * The renderer is never told a value. It is told whether one is set, which is
  * all a settings screen needs to draw the difference between "not configured"
  * and "configured", and all a password field should ever know.
+ *
+ * Electron 45 deprecated the synchronous safeStorage calls (46 removes them),
+ * so the file is decrypted once, by `initSecrets` at startup, into memory;
+ * reads answer from there and stay synchronous. Writes update memory at once
+ * and seal and save on one serial chain, so two saves never interleave and the
+ * last one asked for is the one on disk. Blobs sealed by the synchronous calls
+ * open with the asynchronous ones, so nothing is migrated.
  */
 
 const FILE = (): string => join(app.getPath('userData'), 'secrets.dat')
 
-/** Encrypted blobs, base64, keyed by what they are for. */
+/** Encrypted blobs, base64, keyed by what they are for: what secrets.dat holds. */
 let cache: Record<string, string> | null = null
 
 /**
- * In-memory only, for when the OS has no key store to offer.
+ * Every secret this session knows, in clear, in memory only.
  *
- * Linux without a running keyring is the real case. The alternative would be
- * writing the password to disk in clear text, which is worse than losing it on
- * quit: a file that looks encrypted but is not is the kind of thing people find
- * out about afterwards. So the secret works for this session and the user is
- * told, once, why they will be asked again.
+ * With no OS key store (Linux without a running keyring) this is all there is.
+ * The alternative would be writing the password to disk in clear text, which
+ * is worse than losing it on quit: a file that looks encrypted but is not is
+ * the kind of thing people find out about afterwards. So the secret works for
+ * this session and the user is told, once, why they will be asked again.
  */
-const volatile = new Map<string, string>()
+const plain = new Map<string, string>()
 let warned = false
 
-function available(): boolean {
-  try {
-    return safeStorage.isEncryptionAvailable()
-  } catch {
-    return false
-  }
-}
+/** Whether secrets reach disk; settled by `initSecrets`. */
+let persistent = false
 
 /** secrets.dat is there but could not be read: when to look again. */
 const unread = new ReadFailure()
 
 function load(): Record<string, string> {
   if (cache) return cache
-  // Every settings screen asks about several secrets; one slow failed read is enough.
+  // Every save asks; one slow failed read is enough.
   if (unread.active && !unread.due()) return {}
   try {
     /*
@@ -101,17 +103,84 @@ function persist(): boolean {
   }
 }
 
+/** The tail of the write chain, and how many writes are on it. */
+let chain: Promise<unknown> = Promise.resolve()
+let queued = 0
+
+/** Run `job` after every write before it. Never rejects: a failure is logged and is `fallback`. */
+function enqueue<T>(job: () => Promise<T> | T, fallback: T): Promise<T> {
+  queued++
+  const run = chain
+    .then(job)
+    .catch((err) => {
+      log.error('secrets', 'Could not save the secret store', failure(err))
+      return fallback
+    })
+    .finally(() => {
+      queued--
+    })
+  chain = run
+  return run
+}
+
+async function seal(value: string): Promise<string> {
+  return (await safeStorage.encryptStringAsync(value)).toString('base64')
+}
+
 /**
- * True when the value is on disk and will still be there after a restart - which
- * is what a caller about to drop its own copy needs to know first.
+ * Open secrets.dat into memory. Awaited once, after the app is ready and
+ * before anything asks for a secret.
  */
-export function setSecret(key: string, value: string): boolean {
+export async function initSecrets(): Promise<void> {
+  try {
+    persistent = await safeStorage.isAsyncEncryptionAvailable()
+  } catch {
+    persistent = false
+  }
+  // Without the key nothing in the file can be opened; it is left as it is.
+  if (!persistent) return
+  const store = load()
+  const stale: string[] = []
+  for (const [key, blob] of Object.entries(store)) {
+    try {
+      const { result, shouldReEncrypt } = await safeStorage.decryptStringAsync(
+        Buffer.from(blob, 'base64')
+      )
+      plain.set(key, result)
+      if (shouldReEncrypt) stale.push(key)
+    } catch {
+      /*
+        Decryption fails when the file was written by another user or moved
+        from another machine — the OS key is not the one that sealed it.
+        Nothing can be done about the value; saying so is the useful part.
+      */
+      log.warn('secrets', 'A stored secret could not be decrypted on this machine', { key })
+    }
+  }
+  // The OS rotated its key: seal those again under the current one.
+  for (const key of stale) {
+    void enqueue(async () => {
+      const value = plain.get(key)
+      if (value === undefined) return false
+      const current = load()
+      current[key] = await seal(value)
+      return persist()
+    }, false)
+  }
+}
+
+/**
+ * Keep a secret. Usable at once through `getSecret`; the promise is true when
+ * the value is on disk and will still be there after a restart - which is
+ * what a caller about to drop its own copy needs to know first.
+ */
+export async function setSecret(key: string, value: string): Promise<boolean> {
   if (!value) {
-    deleteSecret(key)
+    await deleteSecret(key)
     return true
   }
-  if (!available()) {
-    volatile.set(key, value)
+  plain.set(key, value)
+  if (!persistent) {
     if (!warned) {
       warned = true
       log.warn(
@@ -122,53 +191,64 @@ export function setSecret(key: string, value: string): boolean {
     }
     return false
   }
-  const store = load()
-  store[key] = safeStorage.encryptString(value).toString('base64')
-  return persist()
+  return enqueue(async () => {
+    const sealed = await seal(value)
+    const store = load()
+    store[key] = sealed
+    return persist()
+  }, false)
 }
 
 export function getSecret(key: string): string | undefined {
-  const held = volatile.get(key)
-  if (held !== undefined) return held
-  const blob = load()[key]
-  if (!blob) return undefined
-  try {
-    return safeStorage.decryptString(Buffer.from(blob, 'base64'))
-  } catch (err) {
-    /*
-      Decryption fails when the file was written by another user or moved from
-      another machine — the OS key is not the one that sealed it. Nothing can be
-      done about the value; saying so is the useful part.
-    */
-    log.warn('secrets', 'A stored secret could not be decrypted on this machine', { key })
-    return undefined
-  }
+  return plain.get(key)
 }
 
-export function deleteSecret(key: string): void {
-  volatile.delete(key)
-  const store = load()
-  if (key in store) {
-    delete store[key]
-    persist()
-  }
+export function deleteSecret(key: string): Promise<void> {
+  plain.delete(key)
+  if (!persistent) return Promise.resolve()
+  return enqueue(() => {
+    const store = load()
+    if (key in store) {
+      delete store[key]
+      persist()
+    }
+  }, undefined)
 }
 
-/** What the renderer is allowed to know: whether it is set, never what it is. */
+/**
+ * What the renderer is allowed to know: whether it is set, never what it is.
+ *
+ * "Stored" means "and it reads back": a blob that did not open at startup is
+ * not in memory, so it does not draw a filled-in password field over an
+ * empty one.
+ */
 export function hasSecret(key: string): boolean {
-  /*
-    "Stored" has to mean "and it reads back". The key that sealed a value lives
-    in a file Chromium flushes on a clean quit, so an app killed between saving
-    a password and its first normal exit keeps a blob it can no longer open.
-    Answering true for that blob draws a filled-in password field over an empty
-    one, and nobody retypes what the screen says is already there.
-  */
-  return volatile.has(key) || getSecret(key) !== undefined
+  return plain.has(key)
 }
 
 /** True when secrets survive a restart on this machine. */
 export function secretsPersist(): boolean {
-  return available()
+  return persistent
+}
+
+/** Settles once every write asked for so far, and any queued behind them, is done. */
+export async function flushSecrets(): Promise<void> {
+  while (queued > 0) await chain
+}
+
+let quitHeld = false
+
+/**
+ * For `before-quit`: with writes still on the chain, put the quit off until
+ * they land and then ask for it again. True when it was put off. Only once:
+ * the second `before-quit` goes through whatever is left.
+ */
+export function holdQuitForSecrets(event: { preventDefault(): void }, quit: () => void): boolean {
+  if (quitHeld || queued === 0) return false
+  quitHeld = true
+  event.preventDefault()
+  void flushSecrets().finally(quit)
+  return true
 }
 
 /** Key names, in one place so a typo cannot quietly lose a password. */

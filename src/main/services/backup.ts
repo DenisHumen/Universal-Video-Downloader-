@@ -88,7 +88,7 @@ export async function exportBackup(win: BrowserWindow | undefined): Promise<Expo
  */
 export async function importBackup(
   win: BrowserWindow | undefined,
-  apply: (partial: Partial<AppSettings>) => AppSettings
+  apply: (partial: Partial<AppSettings>) => Promise<AppSettings>
 ): Promise<ImportOutcome> {
   const options: OpenDialogOptions = {
     properties: ['openFile'],
@@ -120,7 +120,7 @@ export async function importBackup(
     { settings: getSettings(), watches: listWatches() },
     { now: Date.now(), newId: () => randomUUID(), exists: existsSync }
   )
-  const settings = Object.keys(plan.settings).length ? apply(plan.settings) : getSettings()
+  const settings = Object.keys(plan.settings).length ? await apply(plan.settings) : getSettings()
   for (const watch of plan.watches) addWatch(watch)
 
   log.info('backup', 'Imported a backup', {

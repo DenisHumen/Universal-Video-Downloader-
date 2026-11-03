@@ -189,15 +189,39 @@ export function liftProxyPassword<T extends Partial<Pick<AppSettings, 'proxy'>>>
   return proxy === settings.proxy ? settings : { ...settings, proxy }
 }
 
+/** The last proxy-password save or removal asked for; true once it is on disk. */
+let proxySecretWrite: Promise<boolean> = Promise.resolve(true)
+
+/*
+  Whether the password will survive a restart is known at once - it is whether
+  there is a key store - so the address can lose it now; the sealed copy
+  reaches disk a moment later, and `proxyPasswordSaved` says when.
+*/
 const proxyPasswordStore: ProxyPasswordStore = {
   keep: (password) => {
-    try {
-      return secretsPersist() && setSecret(SECRET.proxyPassword(), password)
-    } catch {
-      return false
-    }
+    if (!secretsPersist()) return false
+    proxySecretWrite = setSecret(SECRET.proxyPassword(), password).then((saved) => {
+      if (!saved) {
+        log.error(
+          'settings',
+          'The proxy password could not be saved; it is kept for this session only'
+        )
+      }
+      return saved
+    })
+    return true
   },
-  forget: () => deleteSecret(SECRET.proxyPassword())
+  forget: () => {
+    proxySecretWrite = deleteSecret(SECRET.proxyPassword()).then(() => true)
+  }
+}
+
+/**
+ * Settles when the proxy password the last save lifted out (or dropped) is
+ * on disk; true when it is. The settings IPC waits for this before it answers.
+ */
+export function proxyPasswordSaved(): Promise<boolean> {
+  return proxySecretWrite
 }
 
 
