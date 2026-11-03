@@ -5,15 +5,15 @@ describe('applyAccent', () => {
   const root = document.documentElement
 
   it('sets the chosen accent as an attribute', () => {
-    applyAccent('violet')
-    expect(root.getAttribute('data-accent')).toBe('violet')
+    applyAccent('purple')
+    expect(root.getAttribute('data-accent')).toBe('purple')
     applyAccent(undefined)
-    expect(root.getAttribute('data-accent')).toBe('blue')
+    expect(root.getAttribute('data-accent')).toBe('orange')
   })
 
-  it('falls back to Blue when the OS reports no accent', () => {
+  it('falls back to the default (Yaru orange) when the OS reports no accent', () => {
     applyAccent('system', undefined)
-    expect(root.getAttribute('data-accent')).toBe('blue')
+    expect(root.getAttribute('data-accent')).toBe('orange')
     expect(root.style.getPropertyValue('--accent')).toBe('')
   })
 

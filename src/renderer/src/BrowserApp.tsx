@@ -19,7 +19,7 @@ import CaptionButtons from './components/CaptionButtons'
 import { enter } from './lib/motion'
 import { toast } from './lib/toast'
 import { formatBytes } from './lib/format'
-import { applyAppearance, applyMaterial } from './lib/theme'
+import { applyAppearance } from './lib/theme'
 import { t as tNow, useT } from './i18n'
 
 const PANEL_WIDTH = 300
@@ -53,7 +53,6 @@ export default function BrowserApp(): JSX.Element {
     void (async () => {
       const [settings, info] = await Promise.all([window.api.getSettings(), window.api.getAppInfo()])
       applyAppearance(settings, info.locale, info.systemAccent)
-      applyMaterial(info.platform)
       setIsMac(info.platform === 'darwin')
     })()
     const offState = window.api.onBrowserState(setState)

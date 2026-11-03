@@ -29,8 +29,10 @@ describe('migrate', () => {
     expect(migrate({ theme: 'chartreuse' }).theme).toBe('night')
   })
 
-  it('keeps an accent 4.0 ships and drops one it does not', () => {
-    expect(migrate({ accent: 'violet' }).accent).toBe('violet')
+  it('keeps an accent 4.0 ships, renames the GNOME ones, and drops one it does not', () => {
+    expect(migrate({ accent: 'teal' }).accent).toBe('teal')
+    expect(migrate({ accent: 'violet' }).accent).toBe('purple')
+    expect(migrate({ accent: 'graphite' }).accent).toBe('slate')
     expect(migrate({ accent: 'system' }).accent).toBe('system')
     expect('accent' in migrate({ accent: 'chartreuse' })).toBe(false)
   })

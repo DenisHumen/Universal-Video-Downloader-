@@ -26,14 +26,14 @@
  * ==================================================================== */
 
 :root {
-  /* ---- Shape. 6/8/12/16 (4.0), no in-between values. ----
-     The pill is kept for things that are *meant* to read as capsules: badges,
-     the switch and progress tracks. Buttons, choices and fields are r-2: a
-     pill button beside a square field read as two different systems. */
-  --r-1: 6px; /* tags, swatches, icon buttons, menu items */
-  --r-2: 8px; /* fields, buttons, choices, list rows */
-  --r-3: 12px; /* cards, menus, popovers, the content sheet */
-  --r-4: 16px; /* dialogs, the home input */
+  /* ---- Shape: 6 / 12 / 16, as the user's GNOME draws it (D0). ----
+     6 for buttons, entries, rows and menu items (r-2 is the same 6: A1 merged
+     it), 12 for cards, boxed lists, popovers and the sheet, 16 for dialogs.
+     The pill is for the main call to action, toasts, badges and the switch. */
+  --r-1: 6px;
+  --r-2: 6px;
+  --r-3: 12px;
+  --r-4: 16px;
   --r-pill: 999px;
 
   /* ---- Motion (4.0, plan 2.6). CSS only. ----
@@ -45,7 +45,10 @@
      this file), and nothing depends on animation-fill-mode: an element at
      rest is at its final state whether the animation ran or not. */
   --ease: cubic-bezier(0.2, 0, 0, 1);
-  --ease-spring: cubic-bezier(0.3, 1.25, 0.5, 1);
+  /* libadwaita's navigation spring (damping 1, mass 1, stiffness 1000):
+     critically damped, no overshoot, ~250 ms, sampled into CSS linear(). */
+  --ease-spring: linear(0, 0.142, 0.379, 0.588, 0.739, 0.841, 0.905, 0.944, 0.968, 0.982, 0.99, 0.994, 1);
+  --t-spring: 250ms;
   --t-press: 90ms;
   --t-fast: 140ms;
   --t-base: 200ms;
@@ -63,146 +66,181 @@
   --z-modal: 70;
 }
 
-/* ---- Night (default) ----
-   Bottoms out at #09090B rather than pure black: on OLED panels #000 smears
-   during motion, and a true-black canvas gives raised planes nothing to sit
-   against. */
+/* ---- Night: Yaru dark, as the user's GNOME renders it (docs/design/calibration.md) ----
+   Window 44, sidebar 48 (lighter, as libadwaita draws it), cards 61. The
+   v4 depth stays: the sheet keeps its edge and the v4 shadows. */
 :root,
 [data-theme='night'] {
   color-scheme: dark;
-  /* 4.0 planes (VD spec). Four steps now: canvas < sheet < field < floating
-     (menus, popovers, dialogs). --surface-3 is what lifts a menu off a sheet
-     in Night, where a shadow alone is all but invisible. */
-  --bg: 10 10 13;
-  --surface: 20 20 24;
-  --surface-2: 28 28 33;
-  --surface-3: 34 34 40;
-  /* Placeholder blocks. --surface-2 is 1.1:1 on a panel, and at the bottom of
-     its pulse the skeleton all but vanished - the card read as empty, not as
-     loading. Checked against --surface by check-contrast.mjs. */
-  --skeleton: 44 44 50;
-  --line: 44 44 52;
-  /* Dividers inside a sheet: rows of one list, sections of one card. */
-  --line-soft: 32 32 38;
-  --line-strong: 63 63 70;
-  --text: 244 244 245;
-  --text-2: 170 170 180;
-  --text-3: 140 140 152;
-  /* Blue, the default accent. The others are under [data-accent] below. */
-  --accent: 61 99 255;
+  --bg: 44 44 44;
+  /* The content sheet and every header bar (window_bg / headerbar_bg). */
+  --surface: 44 44 44;
+  /* An opaque stand-in for the .10 fill, for the few planes that cannot be an alpha. */
+  --surface-2: 64 64 64;
+  /* Popovers, menus, dialogs. */
+  --surface-3: 56 56 56;
+  --card: 61 61 61;
+  --sidebar: 48 48 48;
+  /* Settings' panel list (libadwaita's secondary sidebar): between window and sidebar. */
+  --sidebar-2: 46 46 46;
+  /* Buttons, entries, toggles and selected rows are this colour at .10 / .15 / .30. */
+  --fill: 247 247 247;
+  --skeleton: 66 66 66;
+  --line: 31 31 31;
+  --line-soft: 39 39 39;
+  --line-strong: 89 89 89;
+  --text: 247 247 247;
+  /* Yaru's 55% dim label is 4.0:1 on a card; corrected for AA. */
+  --text-2: 172 172 172;
+  --text-3: 172 172 172;
+  /* Yaru orange (the default accent); the others are under [data-accent]. */
+  --accent: 213 65 0;
   --accent-fg: 255 255 255;
-  --accent-ink: 140 170 255;
-  --good: 74 222 128;
-  --warn: 250 204 21;
-  --bad: 251 113 133;
-  --bad-fg: 10 10 13;
+  --accent-ink: 255 154 106;
+  --good: 120 233 171;
+  --warn: 255 194 82;
+  /* Kept crimson, well clear of the orange accent: a failure must never read as "accent". */
+  --bad: 255 170 190;
+  /* A label on a solid --bad fill (the live badge): dark, since this pink is light. */
+  --bad-fg: 30 30 30;
+  /* The destructive fill (white label). */
+  --destructive: 192 28 72;
+  --destructive-fg: 255 255 255;
   --control-edge: transparent;
   /* Elevation (4.0). Night leans on the plane step (--surface-3) and a top
      highlight; the drop shadow only has to separate, not to be seen. */
   --shadow-1: inset 0 1px 0 rgb(255 255 255 / 0.04), 0 1px 2px rgb(0 0 0 / 0.4);
   --shadow-2: 0 8px 24px -4px rgb(0 0 0 / 0.5), 0 2px 6px rgb(0 0 0 / 0.3);
   --shadow-3: 0 24px 64px -12px rgb(0 0 0 / 0.6), 0 8px 16px -8px rgb(0 0 0 / 0.4);
+  /* Cards and boxed lists (A1.1): Night keeps v4's depth on top of the card plane. */
+  --shadow-card: var(--shadow-1);
   /* What sits behind a dialog. */
-  --scrim: 10 10 13;
-  /* The content sheet's top and left edge (plan 4.2): Night's sheet is one
-     plane step above the canvas, too faint to read as an edge on its own. */
+  --scrim: 0 0 0;
+  /* The content sheet's top and left edge: the pane divider. */
   --sheet-edge: rgb(var(--line));
 }
 
-/* ---- Day ----
-   Not a tint-inverted Night: light interfaces need a canvas *darker* than the
-   raised planes, otherwise every block dissolves into the page.
-
-   --control-edge: the neutral buttons are a --surface-2 fill, which here sits
-   at 1.06:1 on a white panel and 1.07:1 on the canvas — the "change" button on
-   a result card was a pill you had to know was there. Darkening the fill
-   instead sinks every button on the canvas, so the plane stays and gains a
-   hairline. A token rather than a `[data-theme='day'] .btn-icon` rule because
-   `@apply btn-icon` copies such a rule into `.btn-icon-bare`, whose whole point
-   is having no surface; a token it can simply override. */
+/* ---- Day: Yaru light, as rendered ---- */
 [data-theme='day'] {
   color-scheme: light;
-  --bg: 238 238 242;
-  --surface: 255 255 255;
-  --surface-2: 246 246 249;
+  --bg: 250 250 250;
+  --surface: 250 250 250;
+  --surface-2: 231 231 231;
   --surface-3: 255 255 255;
-  --skeleton: 222 222 228;
-  --line: 222 222 228;
-  --line-soft: 236 236 240;
-  --line-strong: 198 198 206;
-  --text: 12 12 16;
-  --text-2: 78 78 88;
-  --text-3: 98 98 110;
-  --accent: 37 78 235;
+  --card: 255 255 255;
+  --sidebar: 235 235 235;
+  --sidebar-2: 243 243 243;
+  --fill: 61 61 61;
+  --skeleton: 216 216 216;
+  --line: 219 219 219;
+  --line-soft: 237 237 237;
+  --line-strong: 198 198 198;
+  /* Yaru's #3D3D3D. */
+  --text: 61 61 61;
+  /* Yaru's dim label is 2.8-3.0:1; corrected for AA. */
+  --text-2: 92 92 92;
+  --text-3: 92 92 92;
+  --accent: 213 65 0;
   --accent-fg: 255 255 255;
-  --accent-ink: 30 64 214;
+  --accent-ink: 183 31 0;
   --good: 20 107 53;
   --warn: 134 84 6;
-  --bad: 184 28 36;
+  --bad: 192 28 72;
   --bad-fg: 255 255 255;
-  --control-edge: rgb(var(--line));
+  --destructive: 192 28 72;
+  --destructive-fg: 255 255 255;
+  --control-edge: transparent;
   --shadow-1: 0 1px 2px rgb(0 0 0 / 0.06);
   --shadow-2: 0 8px 24px -4px rgb(0 0 0 / 0.16), 0 2px 6px rgb(0 0 0 / 0.08);
   --shadow-3: 0 24px 64px -12px rgb(0 0 0 / 0.28), 0 8px 16px -8px rgb(0 0 0 / 0.12);
-  --scrim: 24 24 32;
-  --sheet-edge: transparent;
+  /* libadwaita's light card: a hairline ring and two soft layers. */
+  --shadow-card: 0 0 0 1px rgb(0 0 6 / 0.03), 0 1px 3px 1px rgb(0 0 6 / 0.07), 0 2px 6px 2px rgb(0 0 6 / 0.03);
+  --scrim: 0 0 6;
+  --sheet-edge: rgb(var(--line));
 }
 
-/* ---- Accents (plan 2.2) ----
-   fill / ink / label-on-fill per accent and theme. Night first, unqualified,
-   so it is also what a document without data-theme gets; Day overrides with
-   the more specific selector. Blue is the theme blocks' own default.
-   Every value here is gated by scripts/check-contrast.mjs. */
-[data-accent='violet'] {
-  --accent: 124 77 255;
-  --accent-ink: 184 160 255;
+/* ---- Accents (A1 / Y1): GNOME's nine, Yaru orange in the orange slot ----
+   Generated by scripts/accents.mjs (OKLab: fills darkened until white reads
+   at 4.5:1, inks clamped per theme). Orange is the default and lives in the
+   theme blocks above. Gated by scripts/check-contrast.mjs. */
+[data-accent='blue'] {
+  --accent: 37 118 213;
+  --accent-ink: 129 208 255;
   --accent-fg: 255 255 255;
 }
 [data-accent='teal'] {
-  --accent: 13 148 136;
-  --accent-ink: 78 214 196;
-  --accent-fg: 10 10 13;
-}
-[data-accent='orange'] {
-  --accent: 234 88 12;
-  --accent-ink: 255 166 110;
-  --accent-fg: 10 10 13;
-}
-[data-accent='pink'] {
-  --accent: 219 39 119;
-  --accent-ink: 249 150 196;
+  --accent: 0 130 150;
+  --accent-ink: 123 223 244;
   --accent-fg: 255 255 255;
 }
-[data-accent='graphite'] {
-  --accent: 228 228 231;
-  --accent-ink: 228 228 231;
-  --accent-fg: 12 12 16;
+[data-accent='green'] {
+  --accent: 42 134 61;
+  --accent-ink: 141 230 152;
+  --accent-fg: 255 255 255;
 }
-[data-theme='day'][data-accent='violet'] {
-  --accent: 109 59 232;
-  --accent-ink: 94 48 204;
+[data-accent='yellow'] {
+  --accent: 166 104 0;
+  --accent-ink: 255 192 87;
+  --accent-fg: 255 255 255;
+}
+[data-accent='red'] {
+  --accent: 226 40 63;
+  --accent-ink: 255 136 140;
+  --accent-fg: 255 255 255;
+}
+[data-accent='pink'] {
+  --accent: 191 77 133;
+  --accent-ink: 255 160 216;
+  --accent-fg: 255 255 255;
+}
+[data-accent='purple'] {
+  --accent: 145 65 172;
+  --accent-ink: 251 167 255;
+  --accent-fg: 255 255 255;
+}
+[data-accent='slate'] {
+  --accent: 101 121 139;
+  --accent-ink: 187 209 229;
+  --accent-fg: 255 255 255;
+}
+[data-theme='day'][data-accent='blue'] {
+  --accent: 37 118 213;
+  --accent-ink: 4 97 190;
   --accent-fg: 255 255 255;
 }
 [data-theme='day'][data-accent='teal'] {
-  --accent: 15 118 110;
-  --accent-ink: 13 102 95;
+  --accent: 0 130 150;
+  --accent-ink: 0 113 132;
   --accent-fg: 255 255 255;
 }
-[data-theme='day'][data-accent='orange'] {
-  --accent: 194 65 12;
-  /* VD spec 170 56 10, darkened one notch: at that value the ink on the
-     hover tint (accent/20 over --bg) was 4.18:1. */
-  --accent-ink: 160 53 9;
+[data-theme='day'][data-accent='green'] {
+  --accent: 42 134 61;
+  --accent-ink: 21 119 46;
+  --accent-fg: 255 255 255;
+}
+[data-theme='day'][data-accent='yellow'] {
+  --accent: 166 104 0;
+  --accent-ink: 144 83 0;
+  --accent-fg: 255 255 255;
+}
+[data-theme='day'][data-accent='red'] {
+  --accent: 226 40 63;
+  --accent-ink: 192 0 35;
   --accent-fg: 255 255 255;
 }
 [data-theme='day'][data-accent='pink'] {
-  --accent: 190 24 93;
-  --accent-ink: 165 20 80;
+  --accent: 191 77 133;
+  --accent-ink: 162 50 108;
   --accent-fg: 255 255 255;
 }
-[data-theme='day'][data-accent='graphite'] {
-  --accent: 24 24 27;
-  --accent-ink: 24 24 27;
+[data-theme='day'][data-accent='purple'] {
+  --accent: 145 65 172;
+  --accent-ink: 137 57 164;
+  --accent-fg: 255 255 255;
+}
+[data-theme='day'][data-accent='slate'] {
+  --accent: 101 121 139;
+  --accent-ink: 82 102 120;
   --accent-fg: 255 255 255;
 }
 
@@ -346,8 +384,7 @@ textarea,
   /*
    * Floating planes (4.0, plan 2.4): menus, popovers and toasts on
    * .surface-float, dialogs on .surface-dialog. They are the only things
-   * that cast a shadow. Opaque by default; see `[data-material]` below for
-   * the translucent material and why Linux never gets it.
+   * that cast a shadow. Always opaque: A1 removed the blur material.
    */
   .surface-float {
     border-radius: var(--r-3);
@@ -363,7 +400,10 @@ textarea,
   }
   /* Behind a dialog. Opaque enough to read as "the page is paused". */
   .scrim {
-    background-color: rgb(var(--scrim) / 0.6);
+    background-color: rgb(var(--scrim) / 0.25);
+  }
+  [data-theme='night'] .scrim {
+    background-color: rgb(var(--scrim) / 0.5);
   }
 
   /* An inset plane: nests inside .panel for secondary content. */
@@ -542,34 +582,6 @@ textarea,
   .field:has(:focus-visible) {
     outline: 2px solid rgb(var(--accent));
     outline-offset: 2px;
-  }
-}
-
-/*
- * Overlay material (plan 2.4). Translucency is opt-in per window:
- * `data-material='translucent'` is set by the renderer on Windows and macOS,
- * never on Linux, where backdrop-filter runs on the CPU under software GL and
- * costs every frame behind a menu. The OS "reduce transparency" preference
- * turns it off everywhere. The opaque values above are the fallback, and
- * check-contrast.mjs gates text against the translucent surface flattened on
- * the plane behind it.
- */
-[data-material='translucent'] .surface-float {
-  background-color: rgb(var(--surface-3) / 0.86);
-  backdrop-filter: blur(20px) saturate(1.4);
-}
-[data-material='translucent'] .scrim {
-  background-color: rgb(var(--scrim) / 0.4);
-  backdrop-filter: blur(6px);
-}
-@media (prefers-reduced-transparency: reduce) {
-  [data-material='translucent'] .surface-float {
-    background-color: rgb(var(--surface-3));
-    backdrop-filter: none;
-  }
-  [data-material='translucent'] .scrim {
-    background-color: rgb(var(--scrim) / 0.6);
-    backdrop-filter: none;
   }
 }
 

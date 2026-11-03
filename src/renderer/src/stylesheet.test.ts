@@ -77,7 +77,8 @@ describe('motion tokens', () => {
     ]) {
       expect(css).toMatch(new RegExp(`${name}:\\s*${value};`))
     }
-    expect(css).toMatch(/--ease-spring:\s*cubic-bezier\(/)
+    // libadwaita's critically damped spring as CSS linear(): no overshoot (A1).
+    expect(css).toMatch(/--ease-spring:\s*linear\(0,[^)]*, 1\);/)
   })
 
   it('writes no millisecond literal outside the tokens and the reduced-motion override', () => {

@@ -1,5 +1,5 @@
 import type { AppSettings, ThemeId } from '@shared/types'
-import { deriveAccent, parseColor, type Rgb } from '@shared/accent'
+import { DEFAULT_ACCENT, deriveAccent, parseColor, type Rgb } from '@shared/accent'
 import { paintedTheme } from '@shared/theme-boot'
 import { resolveLanguage, useI18n } from '../i18n'
 
@@ -34,22 +34,23 @@ export function applyTheme(theme: ThemeId): void {
 }
 
 const ACCENT_VARS = ['--accent', '--accent-ink', '--accent-fg'] as const
-const PLANES = ['--bg', '--surface', '--surface-2', '--surface-3'] as const
+const PLANES = ['--bg', '--surface', '--surface-3', '--card', '--sidebar', '--sidebar-2'] as const
 
 /**
  * The accent is an attribute too (`[data-accent]` in index.css). `system` sets
  * the clamped OS colour inline on <html> and keeps `blue` underneath, which is
  * what shows wherever the OS reports none or its colour cannot be made to pass.
+ * Under 'system' that fallback is the default accent, Yaru orange.
  */
 export function applyAccent(accent: AppSettings['accent'] | undefined, systemAccent?: string): void {
   lastAccent = { accent, system: systemAccent }
   const root = document.documentElement
   for (const v of ACCENT_VARS) root.style.removeProperty(v)
   if (accent !== 'system') {
-    root.setAttribute('data-accent', accent ?? 'blue')
+    root.setAttribute('data-accent', accent ?? DEFAULT_ACCENT)
     return
   }
-  root.setAttribute('data-accent', 'blue')
+  root.setAttribute('data-accent', DEFAULT_ACCENT)
   const source = parseColor(systemAccent)
   if (!source) return
   const style = getComputedStyle(root)
@@ -61,15 +62,6 @@ export function applyAccent(accent: AppSettings['accent'] | undefined, systemAcc
   root.style.setProperty('--accent', tokens.fill.join(' '))
   root.style.setProperty('--accent-ink', tokens.ink.join(' '))
   root.style.setProperty('--accent-fg', tokens.fg.join(' '))
-}
-
-/**
- * Translucent overlay material where the compositor can afford it (plan 2.4):
- * Windows and macOS. Linux stays opaque; backdrop-filter there is software.
- */
-export function applyMaterial(platform: string | undefined): void {
-  const translucent = platform === 'win32' || platform === 'darwin'
-  document.documentElement.setAttribute('data-material', translucent ? 'translucent' : 'opaque')
 }
 
 /** Apply everything the shell derives from settings: palette, accent and language. */

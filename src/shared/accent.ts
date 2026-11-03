@@ -14,10 +14,21 @@
  * and falls back to Blue when it cannot.
  */
 
-export const ACCENTS = ['blue', 'violet', 'teal', 'orange', 'pink', 'graphite'] as const
+/** GNOME's nine accents (A1), with Ubuntu's Yaru orange in the orange slot and as the default (Y1). */
+export const ACCENTS = ['orange', 'blue', 'teal', 'green', 'yellow', 'red', 'pink', 'purple', 'slate'] as const
+export const DEFAULT_ACCENT = 'orange' as const
+
+/** 4.0-alpha accents that GNOME's set renamed. */
+export const RENAMED_ACCENTS: Record<string, AccentId> = { violet: 'purple', graphite: 'slate' }
 export type AccentId = (typeof ACCENTS)[number]
 export type AccentChoice = AccentId | 'system'
 export const ACCENT_CHOICES: readonly AccentChoice[] = [...ACCENTS, 'system']
+
+/** A stored accent as this build reads it: a renamed one is mapped, an unknown one is null. */
+export function migrateAccent(value: unknown): AccentChoice | null {
+  if (isAccentChoice(value)) return value
+  return typeof value === 'string' ? (RENAMED_ACCENTS[value] ?? null) : null
+}
 
 export function isAccentChoice(value: unknown): value is AccentChoice {
   return typeof value === 'string' && (ACCENT_CHOICES as readonly string[]).includes(value)

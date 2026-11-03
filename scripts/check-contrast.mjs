@@ -11,10 +11,11 @@
  * This reads the real values out of index.css — so it cannot drift from the
  * stylesheet — and fails if any pairing lands under 4.5:1.
  *
- * 4.0 adds --surface-3 to the planes, every accent in every theme (plan 2.2)
- * and the translucent overlay material (plan 2.4): each translucent surface
- * must have an opaque base rule and a reduced-transparency override, and text
- * on it must still clear 4.5:1 once flattened onto any plane behind it.
+ * 4.0 + Adwaita/Yaru (A1, A1.1, A1.2): every plane the GNOME layout adds
+ * (--card, --sidebar, --sidebar-2, --surface-3), GNOME's nine accents in both
+ * themes, text on the .10/.15/.30 control fills, the destructive fill, and a
+ * hue gap so a failure can never read as the (orange) accent. The blur
+ * material is gone (A1), and so are its checks.
  *
  * Run: node scripts/check-contrast.mjs
  */
@@ -30,13 +31,24 @@ const AA_NORMAL = 4.5
 /** Everything that is ever painted as text. */
 const TEXT_VARS = ['--text', '--text-2', '--text-3', '--accent-ink', '--good', '--warn', '--bad']
 /** Every plane text can sit on. */
-const PLANE_VARS = ['--bg', '--surface', '--surface-2', '--surface-3']
+const PLANE_VARS = ['--bg', '--surface', '--surface-2', '--surface-3', '--card', '--sidebar', '--sidebar-2']
+/*
+ * Where a tinted state (status/12, accent/12) is drawn: content, cards and
+ * popovers. Not the sidebars (their selected row is a neutral fill) and not
+ * --surface-2, which is itself the opaque stand-in for a control fill.
+ */
+const TINT_PLANES = ['--bg', '--surface', '--card', '--surface-3']
+/* Where a control (.10 / .15 / .25 fill) sits. */
+const FILL_PLANES = ['--bg', '--surface', '--card', '--surface-3', '--sidebar', '--sidebar-2']
+/* Hairlines are drawn on the planes, not on a control's own fill. */
+const HAIRLINE_PLANES = PLANE_VARS.filter((p) => p !== '--surface-2')
 /** Status colours that are painted as text on top of a tint of themselves. */
 const TINT_VARS = ['--good', '--warn', '--bad']
 /** The tint strength those buttons use (`bg-bad/12`). */
 const TINT_ALPHA = 0.12
 /** Solid fills that carry a label, and the token that label is set in. */
 const FILL_PAIRS = [
+  ['--destructive', '--destructive-fg'],
   ['--accent', '--accent-fg'],
   ['--bad', '--bad-fg']
 ]
@@ -70,13 +82,16 @@ function fail(message) {
 /**
  * Accents (plan 2.2): each is a fill / ink / label triple per theme, set under
  * `[data-accent]` (Night, unqualified) and `[data-theme='day'][data-accent]`.
- * Blue is the theme blocks' own default. Every accent in every theme passes
+ * Orange is the theme blocks' own default. Every accent in every theme passes
  * the same checks as Blue: label on fill, ink on every plane, and ink on the
  * accent tints the UI paints selected states with.
  */
-const ACCENTS = ['blue', 'violet', 'teal', 'orange', 'pink', 'graphite']
+// Orange (Yaru) is the default and lives in the theme blocks; the rest are [data-accent] blocks.
+const ACCENTS = ['orange', 'blue', 'teal', 'green', 'yellow', 'red', 'pink', 'purple', 'slate']
+const DEFAULT_ACCENT = 'orange'
 const ACCENT_VARS = ['--accent', '--accent-ink', '--accent-fg']
-const ACCENT_TINTS = [0.12, 0.2]
+// Selected and hover states are accent/12 only; a stronger tint is never under text.
+const ACCENT_TINTS = [0.12]
 
 /** Pull every `--name: r g b` out of a theme block. */
 function readTheme(selector) {
@@ -169,7 +184,7 @@ for (const { name, selector } of THEMES) {
   for (const statusVar of TINT_VARS) {
     const status = vars[statusVar]
     if (!status) continue
-    for (const planeVar of PLANE_VARS) {
+    for (const planeVar of TINT_PLANES) {
       const plane = vars[planeVar]
       if (!plane) continue
       const fill = composite(status, plane, TINT_ALPHA)
@@ -197,7 +212,7 @@ for (const { name, selector } of THEMES) {
 
   for (const accent of ACCENTS) {
     const merged = { ...vars }
-    if (accent !== 'blue') {
+    if (accent !== DEFAULT_ACCENT) {
       const night = readTheme(`\\[data-accent='${accent}'\\]`)
       const day = name === 'day' ? readTheme(`\\[data-theme='day'\\]\\[data-accent='${accent}'\\]`) : {}
       if (!night || !day) {
@@ -212,7 +227,7 @@ for (const { name, selector } of THEMES) {
     const [fill, ink, fg] = ACCENT_VARS.map((v) => merged[v])
     if (!fill || !ink || !fg) continue
     const pairs = [[`--accent-fg on --accent`, contrast(fill, fg)]]
-    for (const planeVar of PLANE_VARS) {
+    for (const planeVar of TINT_PLANES) {
       const plane = merged[planeVar]
       if (!plane) continue
       pairs.push([`--accent-ink on ${planeVar}`, contrast(ink, plane)])
@@ -237,7 +252,7 @@ for (const { name, selector } of THEMES) {
       fail('theme "day" is missing --line')
       continue
     }
-    for (const planeVar of PLANE_VARS) {
+    for (const planeVar of HAIRLINE_PLANES) {
       const plane = vars[planeVar]
       if (!plane) continue
       const ratio = contrast(line, plane)
@@ -251,57 +266,64 @@ for (const { name, selector } of THEMES) {
 }
 
 /*
- * Translucent surfaces. Each `[data-material='translucent'] .x` rule that
- * paints `rgb(var(--plane) / a)` is checked three ways: `.x` has an opaque
- * rule of its own (the fallback Linux and reduced transparency get), the
- * reduced-transparency media block resets it, and every text tier still
- * clears 4.5:1 on the surface flattened onto each plane it can float over.
- * Blur only softens what is behind; the flat composite is the honest floor.
+ * Controls (D0): buttons, entries, toggles and selected rows are the text
+ * colour at .10 (rest), .15 (hover) and .30 (checked / pressed) over whatever
+ * plane they sit on. Their label is --text, and must read at 4.5:1 on all of
+ * them.
  */
-let materials = 0
-let thinnest = { ratio: Infinity, what: '' }
-const reducedBlock = css.slice(css.indexOf('@media (prefers-reduced-transparency: reduce)'))
-for (const m of css.matchAll(
-  /\[data-material='translucent'\]\s+\.([\w-]+)\s*\{[^}]*background-color:\s*rgb\(var\((--[\w-]+)\)\s*\/\s*([\d.]+)\)/g
-)) {
-  // The reduced-transparency block repeats the selector; that copy is the override, not a material.
-  if (m.index >= css.indexOf('@media (prefers-reduced-transparency: reduce)')) continue
-  const [, cls, planeVar, alphaText] = m
-  const alpha = Number(alphaText)
-  const base = css.match(new RegExp(`\\n\\s*\\.${cls}\\s*\\{([^}]*)\\}`))?.[1]
-  /*
-    The fallback: a base rule with no blur. A surface that carries text must
-    be fully opaque there; the scrim is see-through by nature and only has to
-    drop the blur.
-  */
-  if (!base || /backdrop-filter/.test(base)) {
-    fail(`.${cls} is translucent but has no blur-free base rule (the fallback)`)
-  } else if (cls !== 'scrim' && !/background-color:\s*rgb\(var\(--[\w-]+\)\)/.test(base)) {
-    fail(`.${cls} is translucent but its base rule is not opaque`)
+// Rest, hover, and checked/pressed. D0 measured .30 for checked; at .30 a checked
+// toggle on a dark card is 4.3:1, so ours is .25 (AA, near enough to look the same).
+const FILL_ALPHAS = [0.1, 0.15, 0.25]
+let fills = 0
+let thinnestFill = { ratio: Infinity, what: '' }
+/*
+ * A failure must never read as "accent" (A1.3, designer note): with Yaru's
+ * orange as the accent, the failure red and the destructive fill keep an
+ * OKLCh hue gap from it.
+ */
+const HUE_GAP = 12
+const hue = ([r, g, b]) => {
+  const lin = (c) => {
+    const v = c / 255
+    return v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4
   }
-  if (reducedBlock.indexOf(`.${cls}`) < 0 || reducedBlock.indexOf('@media (prefers-reduced-transparency') !== 0) {
-    fail(`.${cls} is translucent but prefers-reduced-transparency does not make it opaque`)
-  }
-  // The scrim carries no text; only surfaces made of a plane token are read on.
-  if (cls === 'scrim') continue
-  for (const { name, selector } of THEMES) {
-    const vars = readTheme(selector)
-    if (!vars?.[planeVar]) continue
-    for (const behind of PLANE_VARS) {
-      if (!vars[behind]) continue
-      const surface = composite(vars[planeVar], vars[behind], alpha)
-      for (const textVar of TEXT_VARS) {
-        if (!vars[textVar]) continue
-        const ratio = contrast(vars[textVar], surface)
-        materials++
-        const what = `${name} · ${textVar} on .${cls} (${planeVar}/${alpha}) over ${behind}`
-        if (ratio < thinnest.ratio) thinnest = { ratio, what }
-        if (ratio < AA_NORMAL) fail(`${what} → ${ratio.toFixed(2)}:1 (needs ${AA_NORMAL}:1)`)
-      }
+  const [R, G, B] = [r, g, b].map(lin)
+  const l = Math.cbrt(0.4122214708 * R + 0.5363325363 * G + 0.0514459929 * B)
+  const m = Math.cbrt(0.2119034982 * R + 0.6806995451 * G + 0.1073969566 * B)
+  const s2 = Math.cbrt(0.0883024619 * R + 0.2817188376 * G + 0.6299787005 * B)
+  const A = 1.9779984951 * l - 2.428592205 * m + 0.4505937099 * s2
+  const Bb = 0.0259040371 * l + 0.7827717662 * m - 0.808675766 * s2
+  return ((Math.atan2(Bb, A) * 180) / Math.PI + 360) % 360
+}
+const hueDistance = (a, b) => {
+  const d = Math.abs(hue(a) - hue(b)) % 360
+  return d > 180 ? 360 - d : d
+}
+let gaps = 0
+for (const { name, selector } of THEMES) {
+  const vars = readTheme(selector)
+  if (!vars) continue
+  for (const planeVar of FILL_PLANES) {
+    const plane = vars[planeVar]
+    if (!plane || !vars['--fill'] || !vars['--text']) continue
+    for (const alpha of FILL_ALPHAS) {
+      const ratio = contrast(vars['--text'], composite(vars['--fill'], plane, alpha))
+      fills++
+      const what = `${name} · --text on --fill/${alpha} over ${planeVar}`
+      if (ratio < thinnestFill.ratio) thinnestFill = { ratio, what }
+      if (ratio < AA_NORMAL) fail(`${what} → ${ratio.toFixed(2)}:1 (needs ${AA_NORMAL}:1)`)
     }
   }
+  for (const [x, y] of [
+    ['--bad', '--accent-ink'],
+    ['--destructive', '--accent']
+  ]) {
+    if (!vars[x] || !vars[y]) continue
+    gaps++
+    const d = hueDistance(vars[x], vars[y])
+    if (d < HUE_GAP) fail(`${name} · ${x} is only ${d.toFixed(0)}° from ${y}: a failure would read as the accent`)
+  }
 }
-if (!materials) fail('no translucent surface found to check; did the [data-material] rules move?')
 
 if (process.exitCode) {
   console.error(`\n${checks + hairlines + planes + accentChecks} pairings checked — see failures above.`)
@@ -315,8 +337,9 @@ if (process.exitCode) {
       `(tightest: ${worstAccent.what} at ${worstAccent.ratio.toFixed(2)}:1)`
   )
   console.log(
-    `✓ ${materials} translucent-surface pairings clear ${AA_NORMAL}:1 on their opaque floor ` +
-      `(thinnest: ${thinnest.what} at ${thinnest.ratio.toFixed(2)}:1)`
+    `✓ ${fills} control-fill pairings clear ${AA_NORMAL}:1 ` +
+      `(thinnest: ${thinnestFill.what} at ${thinnestFill.ratio.toFixed(2)}:1); ` +
+      `${gaps} failure/accent hue gaps ≥ ${HUE_GAP}°`
   )
   console.log(
     `✓ ${hairlines} day hairlines all clear ${HAIRLINE_MIN}:1 ` +

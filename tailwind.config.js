@@ -15,6 +15,15 @@ module.exports = {
         // Floating planes: menus, popovers, dialogs. White in Day, a step
         // above a field in Night.
         float: 'rgb(var(--surface-3) / <alpha-value>)',
+        // GNOME planes (A1): cards and boxed lists, the app sidebar, Settings' panel list.
+        card: 'rgb(var(--card) / <alpha-value>)',
+        sidebar: {
+          DEFAULT: 'rgb(var(--sidebar) / <alpha-value>)',
+          2: 'rgb(var(--sidebar-2) / <alpha-value>)'
+        },
+        // The text colour as a fill: bg-fill/10 rest, /15 hover, /30 active (D0).
+        fill: 'rgb(var(--fill) / <alpha-value>)',
+        destructive: 'rgb(var(--destructive) / <alpha-value>)',
         edge: {
           DEFAULT: 'rgb(var(--line) / <alpha-value>)',
           soft: 'rgb(var(--line-soft) / <alpha-value>)',

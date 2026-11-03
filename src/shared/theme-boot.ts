@@ -22,8 +22,8 @@ export type PaintedTheme = 'night' | 'day'
  * `theme-boot.test.ts` keeps these equal to the stylesheet.
  */
 export const WINDOW_BACKGROUND: Record<PaintedTheme, string> = {
-  night: '#0a0a0d',
-  day: '#eeeef2'
+  night: '#2c2c2c',
+  day: '#fafafa'
 }
 
 export function themeArgument(theme: PaintedTheme): string {

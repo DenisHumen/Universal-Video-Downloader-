@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { contrast, deriveAccent, isAccentChoice, parseColor, type Rgb } from './accent'
+import { contrast, deriveAccent, isAccentChoice, migrateAccent, parseColor, type Rgb } from './accent'
 
 const NIGHT: Rgb[] = [
   [10, 10, 13],
@@ -16,7 +16,11 @@ const DAY: Rgb[] = [
 
 describe('accent choice', () => {
   it('knows the shipped accents and system', () => {
-    expect(isAccentChoice('violet')).toBe(true)
+    expect(isAccentChoice('purple')).toBe(true)
+    expect(isAccentChoice('violet')).toBe(false)
+    expect(migrateAccent('violet')).toBe('purple')
+    expect(migrateAccent('graphite')).toBe('slate')
+    expect(migrateAccent('neon')).toBeNull()
     expect(isAccentChoice('system')).toBe(true)
     expect(isAccentChoice('neon')).toBe(false)
   })
