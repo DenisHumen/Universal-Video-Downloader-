@@ -172,14 +172,18 @@ export function registerIpc({ getWindow, openSearchWindow, onSettingsChanged }: 
 
   // ---- Library (plan 5.3) ----
   ipcMain.handle(IPC.libraryList, (_e, q: LibraryQuery) => queryLibrary(q ?? {}))
-  ipcMain.handle(IPC.libraryMissing, (_e, paths: unknown) =>
-    missingFiles(Array.isArray(paths) ? paths.filter((p): p is string => typeof p === 'string') : [])
-  )
+  ipcMain.handle(IPC.libraryMissing, (event, paths: unknown) => {
+    requireRenderer(event, IPC.libraryMissing)
+    return missingFiles(Array.isArray(paths) ? paths.filter((p): p is string => typeof p === 'string') : [])
+  })
   ipcMain.handle(IPC.libraryTrash, (event, id: string) => {
     requireRenderer(event, IPC.libraryTrash)
     return trashEntry(String(id))
   })
-  ipcMain.handle(IPC.libraryForget, (_e, id: string) => forgetEntry(String(id)))
+  ipcMain.handle(IPC.libraryForget, (event, id: string) => {
+    requireRenderer(event, IPC.libraryForget)
+    return forgetEntry(String(id))
+  })
   ipcMain.handle(IPC.mediaJobStart, (_e, req: MediaJobRequest) => startMediaJob(req))
   ipcMain.handle(IPC.mediaProbe, (_e, path: string) => probeMedia(path))
   ipcMain.handle(IPC.mediaThumbnail, (_e, url: string, pageUrl?: string) =>
