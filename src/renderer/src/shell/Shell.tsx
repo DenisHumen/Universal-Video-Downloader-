@@ -6,7 +6,7 @@ import Sidebar from './Sidebar'
 import { NAV_ALL } from './nav'
 import { SidebarToggle, WindowControls } from './WindowControls'
 import { SIDEBAR_PINNED_FROM, useShellLayout } from './layout'
-import { HEADER_END_ID } from './HeaderSlot'
+import { HEADER_CENTER_ID, HEADER_END_ID } from './HeaderSlot'
 
 interface Props {
   /** From the preload (appInfo.platform), so tests can render the shell as any OS. */
@@ -39,6 +39,9 @@ const OWN_HEADER: ViewId[] = ['settings']
  * buttons in button-layout order, Windows reserves room for its caption
  * overlay, macOS keeps the traffic lights in the sidebar header.
  */
+/** Views whose header bar holds a control in place of the title (Search's entry). */
+const CENTERED: string[] = ['search']
+
 export default function Shell({ platform, notices, children }: Props): JSX.Element {
   const t = useT()
   const view = useStore((s) => s.view)
@@ -86,7 +89,8 @@ export default function Shell({ platform, notices, children }: Props): JSX.Eleme
           <HeaderBar
             data-uvd="sheet-drag"
             shade={scrolled}
-            title={section ? t(section.label) : undefined}
+            title={section ? (CENTERED.includes(view) ? <span className="sr-only">{t(section.label)}</span> : t(section.label)) : undefined}
+            center={CENTERED.includes(view) ? <div id={HEADER_CENTER_ID} className="ui-headerbar-center" /> : undefined}
             start={
               <>
                 <WindowControls side="start" where="content" />

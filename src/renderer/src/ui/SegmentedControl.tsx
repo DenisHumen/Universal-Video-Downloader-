@@ -25,17 +25,20 @@ interface Props<T extends string> {
  * Home/End jump. The selected segment is a raised plane, not a sliding
  * indicator: a re-rendered option list has nothing to slide from.
  */
-export default function SegmentedControl<T extends string>({
-  options,
-  value,
-  onChange,
-  label,
-  className
-}: Props<T>): JSX.Element {
-  if (options.length < 2 || options.length > 5) {
+export default function SegmentedControl<T extends string>(props: Props<T>): JSX.Element {
+  if (props.options.length < 2 || props.options.length > 5) {
     // A list or a select fits better; ui.test.tsx holds the contract.
-    console.warn(`SegmentedControl "${label}" has ${options.length} options; it is for 2 to 5.`)
+    console.warn(`SegmentedControl "${props.label}" has ${props.options.length} options; it is for 2 to 5.`)
   }
+  return <ToggleGroup {...props} />
+}
+
+/**
+ * AdwToggleGroup for any number of options (the Search service filter): the
+ * same look and keyboard as SegmentedControl, without its 2-5 contract. A
+ * caller that may run out of width measures it and falls back to a select.
+ */
+export function ToggleGroup<T extends string>({ options, value, onChange, label, className }: Props<T>): JSX.Element {
   const refs = useRef<(HTMLButtonElement | null)[]>([])
   const enabled = options.map((o, i) => (o.disabled ? -1 : i)).filter((i) => i >= 0)
   const current = options.findIndex((o) => o.value === value)

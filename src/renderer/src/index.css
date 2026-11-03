@@ -853,6 +853,11 @@ textarea,
   .ui-headerbar-end > * > * {
     @apply shrink-0 whitespace-nowrap;
   }
+  /* A control in the middle of the bar (Search's entry): clear of both ends. */
+  .ui-headerbar-center {
+    width: min(440px, calc(100% - 300px));
+    @apply no-drag absolute left-1/2 top-1/2 flex -translate-x-1/2 -translate-y-1/2 items-center;
+  }
   .ui-headerbar-title {
     max-width: calc(100% - 120px);
     @apply pointer-events-none absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 truncate text-heading text-ink;

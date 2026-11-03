@@ -6,6 +6,8 @@ interface Props {
   title?: ReactNode
   /** Leading controls (a back button, the sidebar toggle, a search button). */
   start?: ReactNode
+  /** A control in the middle of the bar, in place of a visible title (a search entry). */
+  center?: ReactNode
   /** Trailing controls (a menu, the caption buttons). */
   end?: ReactNode
   /** Draw the bottom shade: the content under the bar has scrolled. */
@@ -23,7 +25,7 @@ interface Props {
  * control inside is no-drag (the controls' own classes say so). The title
  * stays centred on the bar, not between the slots, as GTK centres it.
  */
-export default function HeaderBar({ title, start, end, shade, className, heading = true, ...rest }: Props): JSX.Element {
+export default function HeaderBar({ title, start, center, end, shade, className, heading = true, ...rest }: Props): JSX.Element {
   const Title = heading ? 'h1' : 'span'
   return (
     // Not a <header>: a window has several header bars, and none of them is the page's banner landmark.
@@ -35,6 +37,7 @@ export default function HeaderBar({ title, start, end, shade, className, heading
       {title != null && (
         <Title className="ui-headerbar-title">{title}</Title>
       )}
+      {center}
       <div className="ui-headerbar-end">{end}</div>
     </div>
   )
