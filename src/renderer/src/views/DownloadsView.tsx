@@ -227,6 +227,7 @@ export default function DownloadsView(): JSX.Element {
               className="btn-icon"
               title={t('queue.clearFailed')}
               aria-label={t('queue.clearFailed')}
+              data-uvd="clear-failed"
               onClick={() => setConfirmClearFailed(true)}
             >
               <CircleX size={16} />

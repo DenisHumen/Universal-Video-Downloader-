@@ -1,10 +1,13 @@
 import React from 'react'
 import ReactDOM from 'react-dom/client'
+import { MotionGlobalConfig } from 'framer-motion'
 import App from './App'
 import SearchApp from './SearchApp'
 import BrowserApp from './BrowserApp'
 import ErrorBoundary from './components/ErrorBoundary'
 import { useStore } from './store'
+import { useI18n } from './i18n'
+import { toast } from './lib/toast'
 import './index.css'
 
 /** One bundle serves three windows; the hash decides which shell to mount. */
@@ -43,6 +46,11 @@ async function bootstrap(): Promise<void> {
       the wrong screen.
     */
     ;(window as unknown as { __uvdStore?: unknown }).__uvdStore = useStore
+    // The visual harness (scripts/visual.mjs) sets the language and raises toasts the same way.
+    ;(window as unknown as { __uvdI18n?: unknown }).__uvdI18n = useI18n
+    ;(window as unknown as { __uvdToast?: unknown }).__uvdToast = toast
+    // `?still`: every framer-motion animation lands on its end state at once, so a screenshot is deterministic.
+    if (new URLSearchParams(window.location.search).has('still')) MotionGlobalConfig.skipAnimations = true
   }
 
   ReactDOM.createRoot(document.getElementById('root') as HTMLElement).render(

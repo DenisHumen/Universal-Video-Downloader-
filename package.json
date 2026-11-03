@@ -37,7 +37,9 @@
     "dist:mac": "npm run build && electron-builder --mac",
     "dist:win": "npm run build && electron-builder --win",
     "dist:linux": "npm run build && electron-builder --linux",
-    "release": "npm run build && electron-builder --publish always"
+    "release": "npm run build && electron-builder --publish always",
+    "visual": "node scripts/visual.mjs",
+    "visual:update": "node scripts/visual.mjs --update"
   },
   "dependencies": {
     "electron-updater": "^6.3.9",
@@ -57,6 +59,9 @@
     "electron-vite": "^2.3.0",
     "framer-motion": "^11.15.0",
     "lucide-react": "^0.468.0",
+    "pixelmatch": "^6.0.0",
+    "playwright-core": "1.62.0",
+    "pngjs": "^7.0.0",
     "postcss": "^8.4.49",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
