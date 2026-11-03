@@ -87,6 +87,8 @@ export const IPC = {
   evtBrowserQueued: 'event:browser-queued',
   evtClipboardLink: 'event:clipboard-link',
   evtNavigate: 'event:navigate',
+  /** A notification was clicked: show this queue row (6.4). */
+  evtFocusRow: 'event:focus-row',
   /** What main tried to hand the window before it was listening. */
   takePending: 'app:take-pending',
 

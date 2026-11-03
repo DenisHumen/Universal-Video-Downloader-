@@ -126,6 +126,30 @@ export default function DownloadsView(): JSX.Element {
     return filter === 'all' ? groupQueue(found) : found
   }, [downloads, filter, query])
 
+  /*
+    6.4: a notification was clicked. Show everything, bring its row into view
+    (instantly: smooth scrolling rides the frame clock) and pulse it once.
+  */
+  const focusedRow = useStore((s) => s.focusedRow)
+  const focusRow = useStore((s) => s.focusRow)
+  useEffect(() => {
+    if (!focusedRow) return
+    changeFilter('all')
+    changeQuery('')
+    const id = focusedRow
+    const timer = window.setTimeout(() => {
+      const row = scrollRef.current?.querySelector<HTMLElement>(`[data-row="${id.replace(/["\\]/g, '\\$&')}"]`)
+      if (row) {
+        row.scrollIntoView?.({ block: 'center' })
+        row.classList.add('ui-row-pulse')
+        window.setTimeout(() => row.classList.remove('ui-row-pulse'), 1300)
+      }
+      focusRow(null)
+    }, 60)
+    return () => window.clearTimeout(timer)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [focusedRow])
+
   const hasMore = visible.length > limit
   useEffect(() => {
     const root = scrollRef.current

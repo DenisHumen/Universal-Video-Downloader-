@@ -241,6 +241,7 @@ function QueueRow({ item, index, animateIn = true, heading }: Props): JSX.Elemen
 
   return (
     <m.li
+      data-row={item.id}
       /*
         Measured only when the row moves or changes state. With no dependency,
         framer measured the layout on every render, and a running download

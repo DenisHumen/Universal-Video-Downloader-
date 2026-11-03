@@ -651,6 +651,7 @@ export function installMockApi(): void {
     getLogPath: async () => 'C:/mock/uvd.log',
     onAutomationChanged: () => () => undefined,
     onNavigate: () => () => undefined,
+    onFocusRow: () => () => undefined,
     onNativeTheme: () => () => undefined,
     // The Library, as main builds it: every completed row with a file, kept apart from the queue.
     listLibrary: async (q) => {

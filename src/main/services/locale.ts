@@ -41,6 +41,9 @@ const EN = {
   'tray.quit': 'Quit',
   'notify.done': 'Download complete',
   'notify.failed': 'Download failed',
+  'notify.play': 'Play',
+  'notify.showInFolder': 'Show in Folder',
+  'notify.fix': 'Fix',
   'pick.hint': 'Click the video you want · Esc to cancel',
   // The macOS password prompt; the system adds its own line asking for the password.
   'cli.adminPrompt': 'Universal Video Downloader wants to add the uvd command to /usr/local/bin, so that it can be typed in a terminal.'
@@ -66,6 +69,9 @@ const RU: Record<MainKey, string> = {
   'tray.quit': 'Выход',
   'notify.done': 'Загрузка завершена',
   'notify.failed': 'Загрузка не удалась',
+  'notify.play': 'Воспроизвести',
+  'notify.showInFolder': 'Показать в папке',
+  'notify.fix': 'Исправить',
   'pick.hint': 'Нажмите на нужное видео · Esc — отмена',
   'cli.adminPrompt': 'Universal Video Downloader хочет добавить команду uvd в /usr/local/bin, чтобы её можно было набирать в терминале.'
 }

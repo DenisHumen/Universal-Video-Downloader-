@@ -97,6 +97,9 @@ interface AppState {
   paletteOpen: boolean
   /** The first-run setup (6.3), shown once and again from the primary menu. */
   setupOpen: boolean
+  /** The queue row a notification asked to show; Activity scrolls to it and pulses it once. */
+  focusedRow: string | null
+  focusRow: (id: string | null) => void
   setSetupOpen: (open: boolean) => void
   /**
    * The Library's badge rule (5.3): files finished in this session since the
@@ -273,6 +276,8 @@ async function runInit(set: SetState, get: GetState): Promise<void> {
   window.api.onNavigate((view) => {
     if (isViewId(view)) set({ view })
   })
+  // A notification was clicked: Activity, with that row in view (6.4).
+  window.api.onFocusRow((id) => get().focusRow(id))
   // The OS switched light/dark: a "system" theme and a clamped system accent repaint (E3a).
   window.api.onNativeTheme(() => {
     const settings = get().settings
@@ -319,6 +324,8 @@ export const useStore = create<AppState>((set, get) => ({
   shortcutsOpen: false,
   paletteOpen: false,
   setupOpen: false,
+  focusedRow: null,
+  focusRow: (id) => set(id ? { focusedRow: id, view: 'downloads', sidebarOverlayOpen: false } : { focusedRow: null }),
   libraryUnseen: 0,
   sidebarOverlayOpen: false,
   sidebarFolded: false,

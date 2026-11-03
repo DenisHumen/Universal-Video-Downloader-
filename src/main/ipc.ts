@@ -32,6 +32,7 @@ import { fetchThumbnail } from './services/thumbnails'
 import { registerBrowserIpc } from './services/browser'
 import { acquireAwake, releaseAwake } from './services/awake'
 import { mt } from './services/locale'
+import { ACTION_LABEL, planNotification } from './services/notify-plan'
 import {
   applyHistoryLimit,
   cancelDownload,
@@ -404,17 +405,26 @@ function maybeNotify(item: DownloadItem): void {
   if (terminal && !notified.has(item.id)) {
     notified.add(item.id)
     if (getSettings().notifications && Notification.isSupported()) {
-      const done = item.state === 'completed'
+      const plan = planNotification(process.platform, item)
       const n = new Notification({
-        title: done ? mt('notify.done') : mt('notify.failed'),
+        title: mt(plan.title),
         body: item.title,
-        silent: false
+        silent: false,
+        actions: plan.actions.map((a) => ({ type: 'button' as const, text: mt(ACTION_LABEL[a]) }))
       })
       shown.add(n)
+      // Everywhere: a click focuses the app on that row (6.4).
       n.on('click', () => {
         shown.delete(n)
-        if (done && item.filepath) shell.showItemInFolder(item.filepath)
-        else getWindowForNotification()?.show()
+        focusRow(item.id)
+      })
+      // macOS only: the buttons planNotification gave it.
+      n.on('action', (_e, index) => {
+        shown.delete(n)
+        const action = plan.actions[index]
+        if (action === 'play' && item.filepath) void shell.openPath(item.filepath)
+        else if (action === 'showInFolder' && item.filepath) shell.showItemInFolder(item.filepath)
+        else focusRow(item.id)
       })
       n.on('close', () => shown.delete(n))
       /*
@@ -430,6 +440,16 @@ function maybeNotify(item: DownloadItem): void {
     }
   }
   if (item.state === 'downloading' || item.state === 'queued') notified.delete(item.id)
+}
+
+/** Raise the window and show the row a notification was about (Activity, with the row in view). */
+function focusRow(id: string): void {
+  const win = getWindowForNotification()
+  if (!win) return
+  if (win.isMinimized()) win.restore()
+  win.show()
+  win.focus()
+  win.webContents.send(IPC.evtFocusRow, id)
 }
 
 /** Set once IPC is registered, so a notification click can raise the window. */
