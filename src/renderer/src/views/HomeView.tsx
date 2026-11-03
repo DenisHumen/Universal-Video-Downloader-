@@ -1,5 +1,5 @@
 import { useEffect, useId, useMemo, useRef, useState } from 'react'
-import { AnimatePresence, motion } from 'framer-motion'
+import { AnimatePresence, m } from 'framer-motion'
 import { collapse, enter } from '../lib/motion'
 import {
   ArrowRight,
@@ -493,7 +493,7 @@ export default function HomeView(): JSX.Element {
     <div className="h-full overflow-y-auto" ref={scrollRef}>
       <div className="mx-auto flex w-full max-w-[680px] flex-col px-6 pb-16 pt-6 min-[880px]:max-w-[840px]">
       {/* The focal control. Everything on this screen is downstream of it. */}
-      <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={enter}>
+      <m.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={enter}>
         {/*
           A real heading, then a sentence saying what the app does. The first
           cut of this screen opened with the prompt set as an 11px uppercase
@@ -587,11 +587,11 @@ export default function HomeView(): JSX.Element {
             <Globe size={15} /> {t('browser.open')}
           </button>
         </div>
-      </motion.div>
+      </m.div>
 
       <AnimatePresence initial={false}>
         {batchOpen && (
-          <motion.div {...collapse} id={batchPanelId} className="overflow-hidden">
+          <m.div {...collapse} id={batchPanelId} className="overflow-hidden">
             <div className="well mt-4 p-4">
               <p className="label mb-1.5">{t('home.batch')}</p>
               <p className="hint mb-3">{t('home.batchHint')}</p>
@@ -619,7 +619,7 @@ export default function HomeView(): JSX.Element {
                 {tp('home.batchAdd', batchLinks.length)}
               </button>
             </div>
-          </motion.div>
+          </m.div>
         )}
       </AnimatePresence>
 
@@ -653,7 +653,7 @@ export default function HomeView(): JSX.Element {
           )}
 
           {status === 'error' && (
-            <motion.div
+            <m.div
               key="error"
               initial={{ opacity: 0, y: 6 }}
               animate={{ opacity: 1, y: 0 }}
@@ -712,11 +712,11 @@ export default function HomeView(): JSX.Element {
                   />
                 )}
               </div>
-            </motion.div>
+            </m.div>
           )}
 
           {info && info.streaming && status === 'idle' && (
-            <motion.div
+            <m.div
               key="streaming"
               initial={{ opacity: 0, y: 6 }}
               animate={{ opacity: 1, y: 0 }}
@@ -728,11 +728,11 @@ export default function HomeView(): JSX.Element {
                 saveDir={saveDir}
                 onSaveDirChange={setSaveDir}
               />
-            </motion.div>
+            </m.div>
           )}
 
           {info && info.isPlaylist && !info.streaming && status === 'idle' && (
-            <motion.div
+            <m.div
               key="playlist"
               initial={{ opacity: 0, y: 6 }}
               animate={{ opacity: 1, y: 0 }}
@@ -744,11 +744,11 @@ export default function HomeView(): JSX.Element {
                 saveDir={saveDir}
                 onSaveDirChange={setSaveDir}
               />
-            </motion.div>
+            </m.div>
           )}
 
           {info && !info.isPlaylist && !info.streaming && status === 'idle' && settings && (
-            <motion.div
+            <m.div
               key="info"
               initial={{ opacity: 0, y: 6 }}
               animate={{ opacity: 1, y: 0 }}
@@ -864,13 +864,13 @@ export default function HomeView(): JSX.Element {
                           </span>
                         )}
                       </span>
-                      <motion.span animate={{ rotate: trimOpen ? 180 : 0 }} transition={enter}>
+                      <m.span animate={{ rotate: trimOpen ? 180 : 0 }} transition={enter}>
                         <ChevronDown size={15} />
-                      </motion.span>
+                      </m.span>
                     </button>
                     <AnimatePresence initial={false}>
                       {trimOpen && (
-                        <motion.div {...collapse} id={trimPanelId} className="overflow-hidden">
+                        <m.div {...collapse} id={trimPanelId} className="overflow-hidden">
                           <div className="space-y-4 pt-4">
                             <TrimEditor
                               duration={info.duration}
@@ -901,7 +901,7 @@ export default function HomeView(): JSX.Element {
                               </p>
                             </div>
                           </div>
-                        </motion.div>
+                        </m.div>
                       )}
                     </AnimatePresence>
                   </div>
@@ -937,11 +937,11 @@ export default function HomeView(): JSX.Element {
                 </button>
               </div>
               </div>
-            </motion.div>
+            </m.div>
           )}
 
           {status === 'idle' && !info && (
-            <motion.div
+            <m.div
               key="hint"
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
@@ -949,7 +949,7 @@ export default function HomeView(): JSX.Element {
             >
               {/* The introduction is for the first run; after that, what is happening. */}
               {hasHistory ? <HomeActivity /> : <CapabilitiesPanel />}
-            </motion.div>
+            </m.div>
           )}
         </>
         </div>
@@ -1020,7 +1020,7 @@ function DetectingCard({
   const skeletonThumb = <div className="skeleton h-full w-full" />
 
   return (
-    <motion.div
+    <m.div
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
@@ -1093,6 +1093,6 @@ function DetectingCard({
           <p className="hint mt-2 text-center">{t('home.downloadNowHint')}</p>
         </div>
       )}
-    </motion.div>
+    </m.div>
   )
 }

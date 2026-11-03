@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
-import { AnimatePresence, motion } from 'framer-motion'
+import { AnimatePresence, m } from 'framer-motion'
 import {
   ArrowLeft,
   ArrowRight,
@@ -229,7 +229,7 @@ export default function BrowserApp(): JSX.Element {
           <div className="min-h-0 flex-1 overflow-y-auto">
             <AnimatePresence initial={false}>
               {media.map((entry) => (
-                <motion.div
+                <m.div
                   key={entry.id}
                   layout
                   initial={{ opacity: 0 }}
@@ -256,7 +256,7 @@ export default function BrowserApp(): JSX.Element {
                     {queued.has(entry.id) ? <Check size={12} /> : <Download size={12} />}
                     {queued.has(entry.id) ? t('search.queued') : t('common.download')}
                   </button>
-                </motion.div>
+                </m.div>
               ))}
             </AnimatePresence>
 

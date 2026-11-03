@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { motion } from 'framer-motion'
+import { m } from 'framer-motion'
 import {
   Check,
   Clock,
@@ -353,7 +353,7 @@ export default function AutomationView(): JSX.Element {
       )}
 
       {/* ---- the selected series ---- */}
-      <motion.section
+      <m.section
         key={selectedId ?? 'none'}
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
@@ -635,7 +635,7 @@ export default function AutomationView(): JSX.Element {
             )}
           </div>
         )}
-      </motion.section>
+      </m.section>
 
       {adding && (
         <AddWatchDialog

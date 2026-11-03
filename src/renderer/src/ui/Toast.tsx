@@ -1,5 +1,5 @@
 import { useRef, type FocusEvent } from 'react'
-import { AnimatePresence, motion } from 'framer-motion'
+import { AnimatePresence, m } from 'framer-motion'
 import { enter } from '../lib/motion'
 import { AlertCircle, CheckCircle2, Info, X } from './icons'
 import { useToasts, type Toast } from '../lib/toast'
@@ -81,7 +81,7 @@ function ToastCard({ toast }: { toast: Toast }): JSX.Element {
   }
 
   return (
-    <motion.div
+    <m.div
       initial={{ opacity: 0, x: 12 }}
       animate={{ opacity: 1, x: 0 }}
       exit={{ opacity: 0, x: 12 }}
@@ -117,6 +117,6 @@ function ToastCard({ toast }: { toast: Toast }): JSX.Element {
       >
         <X size={13} aria-hidden />
       </button>
-    </motion.div>
+    </m.div>
   )
 }

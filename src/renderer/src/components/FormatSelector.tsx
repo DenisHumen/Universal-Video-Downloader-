@@ -1,5 +1,5 @@
 import { useId, useMemo, useState } from 'react'
-import { AnimatePresence, motion } from 'framer-motion'
+import { AnimatePresence, m } from 'framer-motion'
 import { collapse, enter } from '../lib/motion'
 import { ChevronDown } from '../ui/icons'
 import type { AppSettings, DownloadMode, MediaInfo, QualityPreset, VideoFormat } from '@shared/types'
@@ -179,13 +179,13 @@ export default function FormatSelector({
                 className="flex w-full items-center justify-between py-1 text-control font-medium text-ink-2 transition-colors duration-fast ease-ease hover:text-ink"
               >
                 {t('format.exactStream', { count: videoFormats.length })}
-                <motion.span animate={{ rotate: showAdvanced ? 180 : 0 }} transition={enter}>
+                <m.span animate={{ rotate: showAdvanced ? 180 : 0 }} transition={enter}>
                   <ChevronDown size={15} />
-                </motion.span>
+                </m.span>
               </button>
               <AnimatePresence initial={false}>
                 {showAdvanced && (
-                  <motion.div {...collapse} id={advancedId} className="overflow-hidden">
+                  <m.div {...collapse} id={advancedId} className="overflow-hidden">
                     {/* A table, because these rows are data: one column per
                         fact, aligned down the list so resolutions and sizes can
                         actually be compared. */}
@@ -222,7 +222,7 @@ export default function FormatSelector({
                         )
                       })}
                     </div>
-                  </motion.div>
+                  </m.div>
                 )}
               </AnimatePresence>
             </div>

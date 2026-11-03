@@ -76,6 +76,18 @@ describe('icons (plan 3.2)', () => {
   })
 })
 
+describe('framer-motion (plan 3.3)', () => {
+  const root = join(__dirname, '..')
+  const walk = (dir: string): string[] =>
+    readdirSync(dir, { withFileTypes: true }).flatMap((e) =>
+      e.isDirectory() ? walk(join(dir, e.name)) : /\.tsx$/.test(e.name) ? [join(dir, e.name)] : []
+    )
+  it('uses the lazy `m` components, never the full `motion` ones', () => {
+    const offenders = walk(root).filter((f) => /<motion\.|import \{[^}]*\bmotion\b[^}]*\} from 'framer-motion'/.test(readFileSync(f, 'utf-8')))
+    expect(offenders.map((f) => f.slice(root.length + 1))).toEqual([])
+  })
+})
+
 describe('Button', () => {
   it('maps variant and size onto the token classes', () => {
     render(

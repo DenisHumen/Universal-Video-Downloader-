@@ -1,5 +1,5 @@
 import { memo, useId, useState } from 'react'
-import { AnimatePresence, motion } from 'framer-motion'
+import { AnimatePresence, m } from 'framer-motion'
 import { collapse, listItem } from '../lib/motion'
 import {
   ArrowUp,
@@ -229,7 +229,7 @@ function QueueRow({ item, index, animateIn = true, heading }: Props): JSX.Elemen
   const showTrack = ['downloading', 'processing', 'detecting', 'paused'].includes(item.state)
 
   return (
-    <motion.li
+    <m.li
       /*
         Measured only when the row moves or changes state. With no dependency,
         framer measured the layout on every render, and a running download
@@ -444,19 +444,19 @@ function QueueRow({ item, index, animateIn = true, heading }: Props): JSX.Elemen
                 className="mono mt-2 flex items-center gap-1 text-caption uppercase tracking-[0.08em] text-ink-2 transition-colors duration-fast ease-ease hover:text-ink"
               >
                 {t('queue.log')}
-                <motion.span animate={{ rotate: logOpen ? 180 : 0 }} transition={{ duration: 0.16 }}>
+                <m.span animate={{ rotate: logOpen ? 180 : 0 }} transition={{ duration: 0.16 }}>
                   <ChevronDown size={12} />
-                </motion.span>
+                </m.span>
               </button>
               <AnimatePresence initial={false}>
                 {logOpen && (
-                  <motion.pre
+                  <m.pre
                     {...collapse}
                     id={logId}
                     className="selectable mono mt-2 max-h-48 overflow-auto whitespace-pre-wrap break-all rounded-1 bg-sink px-3 py-2.5 text-caption leading-relaxed text-ink-2"
                   >
                     {item.log}
-                  </motion.pre>
+                  </m.pre>
                 )}
               </AnimatePresence>
             </>
@@ -468,9 +468,9 @@ function QueueRow({ item, index, animateIn = true, heading }: Props): JSX.Elemen
               className="mono mt-2 flex items-center gap-1 text-caption uppercase tracking-[0.08em] text-accent-ink transition-colors duration-fast ease-ease hover:text-ink"
             >
               {t('report.open')}
-              <motion.span animate={{ rotate: reportOpen ? 180 : 0 }} transition={{ duration: 0.16 }}>
+              <m.span animate={{ rotate: reportOpen ? 180 : 0 }} transition={{ duration: 0.16 }}>
                 <ChevronDown size={12} />
-              </motion.span>
+              </m.span>
             </button>
           )}
           {/* Stays mounted once answered, so it can say how sending went. */}
@@ -479,7 +479,7 @@ function QueueRow({ item, index, animateIn = true, heading }: Props): JSX.Elemen
       )}
 
       {jobModal && <MediaJobModal item={item} mode={jobModal} onClose={() => setJobModal(null)} />}
-    </motion.li>
+    </m.li>
   )
 }
 

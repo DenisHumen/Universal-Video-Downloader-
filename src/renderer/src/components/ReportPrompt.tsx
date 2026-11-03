@@ -1,5 +1,5 @@
 import { useState, useSyncExternalStore } from 'react'
-import { AnimatePresence, motion } from 'framer-motion'
+import { AnimatePresence, m } from 'framer-motion'
 import { Check, ChevronDown, Copy, Loader2, Mail, RefreshCw, Send } from '../ui/icons'
 import type { AppErrorCode } from '@shared/types'
 import {
@@ -219,13 +219,13 @@ export default function ReportPrompt(props: ReportFailure): JSX.Element | null {
             className="mono mt-3 flex items-center gap-1 text-caption uppercase tracking-[0.08em] text-ink-2 transition-colors duration-fast ease-ease hover:text-ink"
           >
             {t('report.details')}
-            <motion.span animate={{ rotate: detailsOpen ? 180 : 0 }} transition={{ duration: 0.16 }}>
+            <m.span animate={{ rotate: detailsOpen ? 180 : 0 }} transition={{ duration: 0.16 }}>
               <ChevronDown size={12} />
-            </motion.span>
+            </m.span>
           </button>
           <AnimatePresence initial={false}>
             {detailsOpen && (
-              <motion.div {...collapse} className="overflow-hidden">
+              <m.div {...collapse} className="overflow-hidden">
                 <p className="hint mt-2">{t('report.privacy')}</p>
                 {preview === undefined ? (
                   <Loader2 size={14} className="mt-2 animate-spin text-ink-3" />
@@ -236,7 +236,7 @@ export default function ReportPrompt(props: ReportFailure): JSX.Element | null {
                 ) : (
                   <p className="hint mt-2">{t('report.gone')}</p>
                 )}
-              </motion.div>
+              </m.div>
             )}
           </AnimatePresence>
         </>

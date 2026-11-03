@@ -1,6 +1,6 @@
 import React from 'react'
 import ReactDOM from 'react-dom/client'
-import { MotionGlobalConfig } from 'framer-motion'
+import { LazyMotion, MotionGlobalConfig, domAnimation } from 'framer-motion'
 import App from './App'
 import SearchApp from './SearchApp'
 import BrowserApp from './BrowserApp'
@@ -55,7 +55,15 @@ async function bootstrap(): Promise<void> {
 
   ReactDOM.createRoot(document.getElementById('root') as HTMLElement).render(
     <React.StrictMode>
-      <ErrorBoundary>{shellFor(window.location.hash)}</ErrorBoundary>
+      {/*
+        framer-motion through LazyMotion + `m` (plan 3.3): only the DOM
+        animation features load, and `strict` makes a stray full `motion.`
+        component throw instead of quietly pulling the whole library back in.
+        New motion is CSS (index.css motion tokens); this serves what is left.
+      */}
+      <LazyMotion features={domAnimation} strict>
+        <ErrorBoundary>{shellFor(window.location.hash)}</ErrorBoundary>
+      </LazyMotion>
     </React.StrictMode>
   )
 }

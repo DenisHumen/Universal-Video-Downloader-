@@ -1,4 +1,4 @@
-import { AnimatePresence, motion } from 'framer-motion'
+import { AnimatePresence, m } from 'framer-motion'
 import { collapse } from '../lib/motion'
 import { Download, ExternalLink, RefreshCw, X } from '../ui/icons'
 import { useStore } from '../store'
@@ -41,7 +41,7 @@ export default function UpdateBanner(): JSX.Element {
   return (
     <AnimatePresence initial={false}>
       {visible && (
-        <motion.div {...collapse} className="shrink-0 overflow-hidden">
+        <m.div {...collapse} className="shrink-0 overflow-hidden">
           <div className="flex items-center gap-3 border-b border-edge bg-raise px-4 py-2.5">
             <span className="label shrink-0 text-accent-ink">{t('stamp.update')}</span>
             <div className="min-w-0 flex-1">
@@ -117,7 +117,7 @@ export default function UpdateBanner(): JSX.Element {
               </button>
             </div>
           </div>
-        </motion.div>
+        </m.div>
       )}
     </AnimatePresence>
   )

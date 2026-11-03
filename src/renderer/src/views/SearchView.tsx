@@ -1,5 +1,5 @@
 import { useEffect, useId, useRef, useState } from 'react'
-import { AnimatePresence, motion } from 'framer-motion'
+import { AnimatePresence, m } from 'framer-motion'
 import { enter, staggerChild, staggerParent } from '../lib/motion'
 import { Check, Download, Loader2, RotateCw, Search, SearchX, X } from '../ui/icons'
 import type {
@@ -345,7 +345,7 @@ export default function SearchView({ settings, embedded = false }: Props): JSX.E
         */}
         <>
           {status === 'searching' && (
-            <motion.div
+            <m.div
               key="skeleton"
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
@@ -358,11 +358,11 @@ export default function SearchView({ settings, embedded = false }: Props): JSX.E
                   <div className="skeleton mt-1.5 h-3 w-1/2 rounded-1" />
                 </div>
               ))}
-            </motion.div>
+            </m.div>
           )}
 
           {status === 'error' && (
-            <motion.div
+            <m.div
               key="error"
               initial={{ opacity: 0, y: 6 }}
               animate={{ opacity: 1, y: 0 }}
@@ -383,11 +383,11 @@ export default function SearchView({ settings, embedded = false }: Props): JSX.E
               <button className="btn-quiet mt-3" onClick={() => search()} disabled={!query.trim()}>
                 <RotateCw size={14} /> {t('common.retry')}
               </button>
-            </motion.div>
+            </m.div>
           )}
 
           {status === 'idle' && results && results.length === 0 && (
-            <motion.div key="empty" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+            <m.div key="empty" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
               <EmptyState
                 icon={<SearchX size={24} />}
                 title={t('search.nothing')}
@@ -401,11 +401,11 @@ export default function SearchView({ settings, embedded = false }: Props): JSX.E
                   ) : undefined
                 }
               />
-            </motion.div>
+            </m.div>
           )}
 
           {status === 'idle' && results && results.length > 0 && (
-            <motion.div
+            <m.div
               key="results"
               variants={staggerParent}
               initial="hidden"
@@ -424,11 +424,11 @@ export default function SearchView({ settings, embedded = false }: Props): JSX.E
                   onOpenPicker={() => openPicker(r)}
                 />
               ))}
-            </motion.div>
+            </m.div>
           )}
 
           {status === 'idle' && !results && (
-            <motion.div
+            <m.div
               key="hint"
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
@@ -443,7 +443,7 @@ export default function SearchView({ settings, embedded = false }: Props): JSX.E
                 title={t('search.idle', { service: activeLabel })}
                 hint={t('search.idleHint')}
               />
-            </motion.div>
+            </m.div>
           )}
         </>
       </div>
@@ -537,7 +537,7 @@ function ResultTile({
     .join('  ·  ')
 
   return (
-    <motion.div variants={staggerChild} className="group flex flex-col">
+    <m.div variants={staggerChild} className="group flex flex-col">
       {/*
         The thumbnail is the way to the site. A second, icon-only "open in
         browser" sat beside the download button and did exactly this; it went,
@@ -594,6 +594,6 @@ function ResultTile({
           {added ? t('search.queued') : isAnime ? t('search.episodes') : t('common.download')}
         </button>
       </div>
-    </motion.div>
+    </m.div>
   )
 }
