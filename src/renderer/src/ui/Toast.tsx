@@ -3,6 +3,9 @@ import { AnimatePresence, motion } from 'framer-motion'
 import { enter } from '../lib/motion'
 import { AlertCircle, CheckCircle2, Info, X } from 'lucide-react'
 import { useToasts, type Toast } from '../lib/toast'
+
+/** Raise a toast: `toast(message, kind?, action?)`. */
+export { toast, type ToastAction, type ToastKind } from '../lib/toast'
 import { useT } from '../i18n'
 
 const ICON = {
@@ -12,6 +15,9 @@ const ICON = {
 }
 
 /**
+ * The toast viewport (plan 3.1): mount once per window. Each toast is a
+ * `.surface-float` card with an optional action.
+ *
  * Toasts sit bottom-right rather than centred: the centre of this window is
  * where the user is working, and a confirmation shouldn't land on top of it.
  *

@@ -13,7 +13,7 @@ import {
   X
 } from 'lucide-react'
 import type { BrowserMedia, BrowserState } from '@shared/types'
-import Toasts from './components/Toasts'
+import { ToastViewport as Toasts } from './ui'
 import Logo from './components/Logo'
 import CaptionButtons from './components/CaptionButtons'
 import { enter } from './lib/motion'

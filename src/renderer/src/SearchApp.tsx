@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import type { AppSettings } from '@shared/types'
 import Logo from './components/Logo'
-import Toasts from './components/Toasts'
+import { ToastViewport as Toasts } from './ui'
 import CaptionButtons from './components/CaptionButtons'
 import SearchView from './views/SearchView'
 import { useStore } from './store'
