@@ -85,7 +85,9 @@ describe('the macOS instructions', () => {
   it.each(PLACES)('give %s the one xattr command, exactly', (_place, text) => {
     const commands = xattrCommands(text())
     expect(commands.length).toBeGreaterThan(0)
-    for (const command of commands) expect(command).toBe(COMMAND)
+    // The fix script also covers an app installed in ~/Applications, with the same command.
+    const home = COMMAND.replace('"/Applications/', '"$HOME/Applications/')
+    for (const command of commands) expect([COMMAND, `${COMMAND} 2>&1) && return 0`, `${home} 2>&1) && return 0`]).toContain(command)
   })
 
   // Right-click → Open → Open does nothing for "damaged", and macOS 15 took it away.
@@ -123,6 +125,17 @@ describe('the DMG extras (fix script and PDF guide)', () => {
     expect(script).not.toMatch(/xattr\s+-c/)
     expect(script).toMatch(/\[ ! -d "\$APP" \]/)
     expect(script).toMatch(/open -a "\$APP"/)
+  })
+
+  it('reads Cyrillic answers per character, finds ~/Applications, can be left, and takes "No such xattr" as done', () => {
+    const script = read(SCRIPT)
+    // A bracket class matches bytes in a C locale and splits д into two.
+    expect(script).not.toMatch(/\[[^\]]*[дДнН][^\]]*\]/)
+    expect(script).toContain('д*|Д*|y*|Y*')
+    expect(script).toContain('н*|Н*|n*|N*')
+    expect(script).toContain('$HOME/Applications/$NAME')
+    expect(script).toMatch(/exit 0 ;; esac/)
+    expect(script).toContain('No such xattr')
   })
 
   it('puts both into the install window, and the PDF exists', () => {
