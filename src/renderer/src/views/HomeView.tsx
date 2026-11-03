@@ -40,6 +40,8 @@ import { escapeClearsHome, isDownloadNowChord, linkIn } from '../lib/shortcuts'
 import { toClock } from '../lib/time'
 import { useT, useTp, type TranslationKey } from '../i18n'
 import FormatSelector, { type Selection } from '../components/FormatSelector'
+import HeaderSlot from '../shell/HeaderSlot'
+import Tooltip from '../ui/Tooltip'
 import PlaylistCard from '../components/PlaylistCard'
 import SaveLocation from '../components/SaveLocation'
 import StreamingCard from '../components/StreamingCard'
@@ -500,7 +502,7 @@ export default function HomeView(): JSX.Element {
           micro-label — visually quiet, and completely silent about what the
           window in front of you is for.
         */}
-        <h1 className="h1 text-title">{t('home.title')}</h1>
+        <h2 className="text-title-2 text-ink">{t('home.title')}</h2>
         <p className="lead mt-2">{t('home.subtitle')}</p>
 
         <label className="label mb-2 mt-7 block" htmlFor="uvd-url">
@@ -574,15 +576,23 @@ export default function HomeView(): JSX.Element {
 
         {/* Secondary entry points. Buttons, not bare text: they do things, and
             an underlined-looking phrase is a weaker promise than a control. */}
+        <HeaderSlot>
+          {/* A flat header button that switches the entry into batch mode (A1.1 §3). */}
+          {/* Short in the bar, and only the icon below 1024 px: a Russian label
+              the width of the bar's middle would run under the centred title. */}
+          <Tooltip label={t('home.batchOpen')}>
+            <button
+              className="btn-icon-bare w-auto gap-2 px-2.5 text-control font-bold"
+              onClick={() => setBatchOpen((v) => !v)}
+              aria-label={t('home.batchOpen')}
+              aria-expanded={batchOpen}
+              aria-controls={batchOpen ? batchPanelId : undefined}
+            >
+              <Layers size={16} /> <span className="hidden lg:inline">{t('home.batchHeader')}</span>
+            </button>
+          </Tooltip>
+        </HeaderSlot>
         <div className="mt-3 flex flex-wrap items-center gap-2">
-          <button
-            className="btn-quiet"
-            onClick={() => setBatchOpen((v) => !v)}
-            aria-expanded={batchOpen}
-            aria-controls={batchOpen ? batchPanelId : undefined}
-          >
-            <Layers size={15} /> {t('home.batchOpen')}
-          </button>
           <button className="btn-quiet" onClick={() => window.api.openBrowser()}>
             <Globe size={15} /> {t('browser.open')}
           </button>

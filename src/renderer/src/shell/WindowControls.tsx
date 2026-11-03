@@ -41,7 +41,7 @@ export function SidebarToggle(): JSX.Element | null {
   if (pinned) return null
   const badge = active > 0 ? (overall != null ? `${overall}%` : String(active)) : null
   return (
-    <span className="relative inline-flex">
+    <span className="inline-flex items-center gap-1">
       <IconButton
         label={t('shell.sidebar')}
         icon={<SidebarShow size={16} />}
@@ -50,11 +50,8 @@ export function SidebarToggle(): JSX.Element | null {
         onClick={() => setOpen(!open)}
         data-uvd="sidebar-toggle"
       />
-      {badge && (
-        <span className="pointer-events-none absolute -right-2 -top-1">
-          <Badge>{badge}</Badge>
-        </span>
-      )}
+      {/* Beside the toggle, not over it: the glyph must stay readable. */}
+      {badge && <Badge>{badge}</Badge>}
     </span>
   )
 }

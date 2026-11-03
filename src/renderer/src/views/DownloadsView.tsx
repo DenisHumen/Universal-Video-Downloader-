@@ -17,9 +17,10 @@ import { formatBytes, formatEta, formatSpeed } from '../lib/format'
 import { useT, useTp, type TranslationKey } from '../i18n'
 import QueueRow from '../components/QueueRow'
 import { groupQueue, queueGroupOf, type QueueGroup } from '../lib/downloads'
-import Choice from '../components/Choice'
 import EmptyState from '../components/EmptyState'
 import ConfirmDialog from '../components/ConfirmDialog'
+import HeaderSlot from '../shell/HeaderSlot'
+import { SegmentedControl } from '../ui'
 
 type Filter = 'all' | 'active' | 'done' | 'failed'
 
@@ -173,11 +174,25 @@ export default function DownloadsView(): JSX.Element {
   ].filter(Boolean)
 
   return (
-    <div className="mx-auto flex h-full w-full max-w-[860px] flex-col px-6 pb-8 pt-10">
-      <header className="flex items-end justify-between gap-4">
+    <div className="mx-auto flex h-full w-full max-w-[800px] flex-col px-6 pb-8 pt-4">
+      {/* GNOME keeps the view's main bulk action in its header bar (A1.1 §3). */}
+      <HeaderSlot>
+        {hasRunning && (
+          <button className="btn-quiet" onClick={() => window.api.pauseAll()}>
+            {t('queue.pauseAll')}
+          </button>
+        )}
+        {!hasRunning && hasPaused && (
+          <button className="btn-quiet" onClick={() => window.api.resumeAll()}>
+            {t('queue.resumeAll')}
+          </button>
+        )}
+      </HeaderSlot>
+      <header className="flex items-center justify-between gap-4">
         <div className="min-w-0">
-          <h1 className="h1">{t('queue.title')}</h1>
-          <p className="mono mt-1.5 truncate text-meta text-ink-2">{summary.join('  ·  ')}</p>
+          {/* The title is the header bar's now; this says how the queue stands. */}
+          <h2 className="sr-only">{t('queue.title')}</h2>
+          <p className="numeric truncate text-meta text-ink-2">{summary.join('  ·  ')}</p>
         </div>
         <div className="flex shrink-0 items-center gap-1">
           {settings?.downloadDir && (
@@ -189,18 +204,8 @@ export default function DownloadsView(): JSX.Element {
               <FolderOpen size={16} />
             </button>
           )}
-          {/* The two bulk actions people reach for most say what they do. */}
-          {hasRunning && (
-            <button
-              className="btn-quiet px-3 py-1.5"
-              title={t('queue.pauseAll')}
-              onClick={() => window.api.pauseAll()}
-            >
-              <Pause size={14} /> <span className="hidden sm:inline">{t('queue.pauseAll')}</span>
-            </button>
-          )}
-          {hasPaused && (
-            <button className="btn-icon" title={t('queue.resumeAll')} aria-label={t('queue.resumeAll')} onClick={() => window.api.resumeAll()}>
+          {hasRunning && hasPaused && (
+            <button className="btn-icon-bare" title={t('queue.resumeAll')} aria-label={t('queue.resumeAll')} onClick={() => window.api.resumeAll()}>
               <Play size={16} />
             </button>
           )}
@@ -238,7 +243,7 @@ export default function DownloadsView(): JSX.Element {
 
       {downloads.length > 0 && (
         <div className="mt-6 flex flex-wrap items-center gap-3">
-          <Choice
+          <SegmentedControl
             label={t('queue.title')}
             value={filter}
             onChange={(v) => changeFilter(v as Filter)}

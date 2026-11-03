@@ -287,8 +287,8 @@ export default function SearchView({ settings, embedded = false }: Props): JSX.E
 
   return (
     <div className="flex h-full flex-col">
-      <div className="mx-auto w-full max-w-[1080px] shrink-0 px-6 pt-10">
-        <h1 className="h1">{t('search.title')}</h1>
+      <div className="mx-auto w-full max-w-[1000px] shrink-0 px-6 pt-4">
+        <h2 className="text-title-2 text-ink">{t('search.title')}</h2>
         <p className="lead mt-2">{t('search.hint')}</p>
         {/*
           The label names the field; the placeholder inside it says what to

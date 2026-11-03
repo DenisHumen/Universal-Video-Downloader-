@@ -6,6 +6,7 @@ import Sidebar from './Sidebar'
 import { NAV_ALL } from './nav'
 import { SidebarToggle, WindowControls } from './WindowControls'
 import { SIDEBAR_PINNED_FROM, useShellLayout } from './layout'
+import { HEADER_END_ID } from './HeaderSlot'
 
 interface Props {
   /** From the preload (appInfo.platform), so tests can render the shell as any OS. */
@@ -92,7 +93,12 @@ export default function Shell({ platform, notices, children }: Props): JSX.Eleme
                 <SidebarToggle />
               </>
             }
-            end={<WindowControls side="end" where="content" />}
+            end={
+              <>
+                <span id={HEADER_END_ID} className="flex items-center gap-1.5" />
+                <WindowControls side="end" where="content" />
+              </>
+            }
           />
         )}
         {notices}

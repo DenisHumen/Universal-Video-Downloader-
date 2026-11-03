@@ -300,9 +300,9 @@ export default function AutomationView(): JSX.Element {
       {/* ---- the list ---- */}
       {!empty && (
         <aside className="flex w-[300px] shrink-0 flex-col border-r border-edge">
-          <div className="border-b border-edge px-3 pb-3 pt-8">
+          <div className="border-b border-edge px-3 pb-3 pt-4">
             <div className="flex items-center gap-2">
-              <h1 className="h1 min-w-0 flex-1 truncate">{t('auto.title')}</h1>
+              <h2 className="min-w-0 flex-1 truncate text-title-4 text-ink">{t('auto.title')}</h2>
               <button className="btn-solid px-2.5 py-1.5" onClick={() => setAdding(true)}>
                 <Plus size={14} /> {t('auto.add')}
               </button>
@@ -361,8 +361,8 @@ export default function AutomationView(): JSX.Element {
         className="min-h-0 flex-1 overflow-y-auto"
       >
         {empty ? (
-          <div className="mx-auto flex h-full w-full max-w-[860px] flex-col px-6 pb-8 pt-10">
-            <h1 className="h1">{t('auto.title')}</h1>
+          <div className="mx-auto flex h-full w-full max-w-[800px] flex-col px-6 pb-8 pt-4">
+            <h2 className="text-title-2 text-ink">{t('auto.title')}</h2>
             <p className="lead mt-2">{t('automation.lead')}</p>
             <div className="min-h-0 flex-1">
               <EmptyState
