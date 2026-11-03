@@ -258,6 +258,14 @@ export default function HomeView(): JSX.Element {
   const resetRef = useRef(reset)
   resetRef.current = reset
 
+  /** The "Audio Only" fix for a link with no video formats: queue it as audio, no format list needed. */
+  const downloadAudioOnly = async (): Promise<void> => {
+    const target = det.detectedUrl || url.trim()
+    if (!target) return
+    const ok = await queueDownload({ url: target, title: target, mode: 'audio', quality: 'audio', outputDir: saveDir || undefined })
+    if (ok) reset()
+  }
+
   const pick = (r: SearchResult): void => {
     const link = r.pickerUrl || r.url
     setUrl(r.url)
@@ -371,6 +379,7 @@ export default function HomeView(): JSX.Element {
             onSaveDir={setSaveDir}
             onDownload={() => void start()}
             onRetry={() => submit()}
+            onAudioOnly={() => void downloadAudioOnly()}
             onDone={det.dropInfo}
             starting={starting}
           />

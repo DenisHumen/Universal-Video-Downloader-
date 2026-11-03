@@ -25,6 +25,8 @@ import { toast } from '../lib/toast'
 import MediaJobModal, { type JobMode } from './MediaJobModal'
 import Thumbnail from './Thumbnail'
 import ReportPrompt, { useReportOffer } from './ReportPrompt'
+import FixBar from './FixBar'
+import { queueDownload } from '../lib/queue'
 import RowMenu, { type RowMenuItem } from './RowMenu'
 
 interface Props {
@@ -169,6 +171,27 @@ function QueueRow({ item, index, animateIn = true, heading }: Props): JSX.Elemen
     } catch {
       /* clipboard unavailable */
     }
+  }
+
+  /*
+    6.2: a fix that changes the request (audio only, another folder) queues
+    it afresh in place of this row; the row goes first, so the new one is not
+    taken for a duplicate of it.
+  */
+  const requeue = async (change: { mode?: 'audio'; outputDir?: string }): Promise<void> => {
+    await window.api.removeDownload(item.id)
+    await queueDownload({
+      url: item.url,
+      title: item.title,
+      thumbnail: item.thumbnail,
+      mode: change.mode ?? item.mode,
+      quality: change.mode === 'audio' ? 'audio' : item.quality,
+      formatId: change.mode === 'audio' ? undefined : item.formatId,
+      targetHeight: change.mode === 'audio' ? undefined : item.targetHeight,
+      duration: item.duration,
+      extractor: item.extractor,
+      outputDir: change.outputDir ?? item.outputDir
+    })
   }
 
   const running =
@@ -461,17 +484,22 @@ function QueueRow({ item, index, animateIn = true, heading }: Props): JSX.Elemen
               </AnimatePresence>
             </>
           )}
-          {canReport && (
-            <button
-              onClick={() => setReportOpenFor(reportOpen ? null : (failure.reportId ?? null))}
-              aria-expanded={reportOpen}
-              className="mono mt-2 flex items-center gap-1 text-caption uppercase tracking-[0.08em] text-accent-ink transition-colors duration-fast ease-ease hover:text-ink"
-            >
-              {t('report.open')}
-              <m.span animate={{ rotate: reportOpen ? 180 : 0 }} transition={{ duration: 0.16 }}>
-                <ChevronDown size={12} />
-              </m.span>
-            </button>
+          {item.state === 'error' && (
+            <FixBar
+              errorCode={item.errorCode}
+              cookieHint={item.cookieHint}
+              url={hasWebLink ? sourceLink : ''}
+              retryKey={item.id}
+              copyText={errorReport(t, item)}
+              onRetry={() => void window.api.retryDownload(item.id)}
+              onAudioOnly={() => void requeue({ mode: 'audio' })}
+              onChangeFolder={(dir) => void requeue({ outputDir: dir })}
+              report={
+                canReport
+                  ? { open: reportOpen, onToggle: () => setReportOpenFor(reportOpen ? null : (failure.reportId ?? null)) }
+                  : undefined
+              }
+            />
           )}
           {/* Stays mounted once answered, so it can say how sending went. */}
           {reportOpen && <ReportPrompt key={failure.reportId} {...failure} />}

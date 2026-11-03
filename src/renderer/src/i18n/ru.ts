@@ -208,7 +208,6 @@ export const ru: Dictionary = {
   'home.downloadNow': 'Скачать сейчас',
   'home.downloadNowHint': 'в качестве по умолчанию — список форматов можно не ждать.',
   'home.errorTitle': 'Не удалось найти видео',
-  'home.openAccessSettings': 'Открыть настройки → доступ',
   'home.batch': 'несколько ссылок',
   'home.batchHint': 'по одной ссылке в строке — каждая станет отдельной загрузкой',
   'home.batchAdd':
@@ -515,7 +514,16 @@ export const ru: Dictionary = {
   'report.gone': 'этот отчёт больше недоступен.',
   'report.mail': 'открыть в почте',
   'report.copy': 'скопировать отчёт',
-  'report.open': 'сообщить о проблеме',
+  'fix.cookies': 'Взять cookies из…',
+  'fix.cookiesSettings': 'Параметры › Доступ и cookies…',
+  'fix.browser': 'Открыть во встроенном браузере',
+  'fix.audioOnly': 'Только звук',
+  'fix.changeFolder': 'Сменить папку',
+  'fix.retryLater': 'Повторить через 5 мин',
+  'fix.retryingAt': 'Повтор в {time}',
+  'fix.report': 'Сообщить',
+  'fix.copyError': 'Скопировать ошибку',
+  'fix.reportConsent': 'Сначала будет показано, что уйдёт. Без вашего нажатия ничего не отправляется.',
 
   // ---- update banner ----
   'update.available': 'доступна версия {version}',

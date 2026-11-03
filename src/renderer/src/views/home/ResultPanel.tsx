@@ -2,7 +2,9 @@ import { m } from 'framer-motion'
 import { enter } from '../../lib/motion'
 import { Globe, RotateCw } from '../../ui/icons'
 import type { AppSettings, MediaInfo } from '@shared/types'
-import { errorText } from '../../lib/errors'
+import { errorReport, errorText } from '../../lib/errors'
+import { fixFor } from '../../lib/fixes'
+import FixBar from '../../components/FixBar'
 import { errorLead } from '../../lib/emphasis'
 import { useT } from '../../i18n'
 import { useStore } from '../../store'
@@ -25,6 +27,8 @@ interface Props {
   onSaveDir: (dir: string) => void
   onDownload: () => void
   onRetry: () => void
+  /** The "Audio Only" fix: queue the link as audio without the format list. */
+  onAudioOnly: () => void
   /** A series or playlist card queued what it was asked to. */
   onDone: () => void
   starting: boolean
@@ -48,12 +52,26 @@ export default function ResultPanel({
   onSaveDir,
   onDownload,
   onRetry,
+  onAudioOnly,
   onDone,
   starting
 }: Props): JSX.Element | null {
   const saveSettings = useStore((s) => s.saveSettings)
 
-  if (status === 'error') return <ErrorCard failure={failure} url={url} onRetry={onRetry} />
+  if (status === 'error') {
+    return (
+      <ErrorCard
+        failure={failure}
+        url={url}
+        onRetry={onRetry}
+        onAudioOnly={onAudioOnly}
+        onChangeFolder={(dir) => {
+          onSaveDir(dir)
+          onRetry()
+        }}
+      />
+    )
+  }
   if (!info || status !== 'idle') return null
   if (info.streaming) {
     return (
@@ -86,11 +104,23 @@ export default function ResultPanel({
 }
 
 /** A detect that failed: what to do about it first, the engine's own words second. */
-function ErrorCard({ failure, url, onRetry }: { failure: DetectFailure; url: string; onRetry: () => void }): JSX.Element {
+function ErrorCard({
+  failure,
+  url,
+  onRetry,
+  onAudioOnly,
+  onChangeFolder
+}: {
+  failure: DetectFailure
+  url: string
+  onRetry: () => void
+  onAudioOnly: () => void
+  onChangeFolder: (dir: string) => void
+}): JSX.Element {
   const t = useT()
-  const openSettings = useStore((s) => s.openSettings)
   const { error, errorCode, cookieHint, reported } = failure
   const retryLeads = errorLead(errorCode) === 'retry'
+  const fix = fixFor(errorCode, cookieHint)
   return (
     <m.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={enter} className="panel overflow-hidden">
       <div className="flex items-center gap-2.5 border-b border-edge-soft px-4 py-3">
@@ -104,22 +134,31 @@ function ErrorCard({ failure, url, onRetry }: { failure: DetectFailure; url: str
           <p className="mono selectable mt-2 break-words text-meta leading-relaxed text-ink-2">{error}</p>
         )}
         <div className="mt-4 flex flex-wrap items-center gap-2">
-          <button
-            type="button"
-            className={retryLeads ? 'btn-quiet' : 'btn-solid'}
-            onClick={() => window.api.openBrowser(url || undefined)}
-          >
-            <Globe size={14} /> {t('browser.open')}
-          </button>
-          {cookieHint && (
-            <button type="button" className="btn-quiet" onClick={() => openSettings('access')}>
-              {t('home.openAccessSettings')}
+          {/* The honest escape hatch, unless the fix below already is it. */}
+          {fix !== 'browser' && (
+            <button
+              type="button"
+              className={retryLeads || fix ? 'btn-quiet' : 'btn-solid'}
+              onClick={() => window.api.openBrowser(url || undefined)}
+            >
+              <Globe size={14} /> {t('browser.open')}
             </button>
           )}
           <button type="button" className={retryLeads ? 'btn-solid' : 'btn-quiet'} onClick={onRetry}>
             <RotateCw size={14} /> {t('common.retry')}
           </button>
         </div>
+        {/* 6.2: what this failure's code says to try, then Report and Copy Error. */}
+        <FixBar
+          errorCode={errorCode}
+          cookieHint={cookieHint}
+          url={url}
+          retryKey={`detect:${url}`}
+          copyText={errorReport(t, { error, errorCode, cookieHint })}
+          onRetry={onRetry}
+          onAudioOnly={onAudioOnly}
+          onChangeFolder={onChangeFolder}
+        />
         <p className="hint mt-3">{t('browser.openHint')}</p>
         {/* Keyed by the failure, so a retry that fails again asks afresh. */}
         {reported && (
