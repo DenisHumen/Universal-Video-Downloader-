@@ -96,12 +96,15 @@ module.exports = {
       transitionTimingFunction: {
         // Decelerate-emphasised: off the mark instantly, lands soft. The app's
         // one curve — nothing eases on anything else.
-        ease: 'cubic-bezier(0.2, 0, 0, 1)'
+        ease: 'var(--ease)',
+        spring: 'var(--ease-spring)'
       },
+      // The motion tokens in index.css; Tailwind only points at them.
       transitionDuration: {
-        fast: '160ms',
-        base: '240ms',
-        slow: '320ms'
+        press: 'var(--t-press)',
+        fast: 'var(--t-fast)',
+        base: 'var(--t-base)',
+        slow: 'var(--t-slow)'
       },
       keyframes: {
         'idle-pulse': {
@@ -119,8 +122,8 @@ module.exports = {
         }
       },
       animation: {
-        'idle-pulse': 'idle-pulse 1.6s cubic-bezier(0.2, 0, 0, 1) infinite',
-        rise: 'rise 240ms cubic-bezier(0.2, 0, 0, 1)',
+        'idle-pulse': 'idle-pulse 1.6s var(--ease) infinite',
+        rise: 'rise var(--t-base) var(--ease)',
         'view-in': 'view-in var(--t-view) var(--ease)'
       }
     }

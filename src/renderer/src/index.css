@@ -36,11 +36,20 @@
   --r-4: 16px; /* dialogs, the home input */
   --r-pill: 999px;
 
-  /* ---- Motion. Decelerate-emphasised: starts immediately, lands soft. ---- */
+  /* ---- Motion (4.0, plan 2.6). CSS only. ----
+     --ease is the app's curve (decelerate-emphasised: off the mark at once,
+     lands soft); --ease-spring is a damped overshoot for things that *arrive*
+     (a menu, a toast), never for colour. Durations: press for the down state
+     of a control, fast for hover and colour, base for entrances, slow for
+     height reveals. Every one collapses under prefers-reduced-motion (end of
+     this file), and nothing depends on animation-fill-mode: an element at
+     rest is at its final state whether the animation ran or not. */
   --ease: cubic-bezier(0.2, 0, 0, 1);
-  --t-fast: 160ms;
-  --t-base: 240ms;
-  --t-slow: 320ms;
+  --ease-spring: cubic-bezier(0.3, 1.25, 0.5, 1);
+  --t-press: 90ms;
+  --t-fast: 140ms;
+  --t-base: 200ms;
+  --t-slow: 260ms;
   /* A screen swap: long enough to read as a change, short enough that a
      paused compositor shows the view, not a blank, for no more than this. */
   --t-view: 120ms;
@@ -381,7 +390,7 @@ textarea,
       background-color var(--t-fast) var(--ease),
       color var(--t-fast) var(--ease),
       border-color var(--t-fast) var(--ease),
-      transform var(--t-fast) var(--ease);
+      transform var(--t-press) var(--ease);
     @apply no-drag inline-flex cursor-pointer select-none items-center justify-center gap-2 whitespace-nowrap px-4 py-2 text-control font-medium active:scale-[0.97] disabled:pointer-events-none disabled:opacity-40;
   }
   /* The single loud element on any screen. There is never more than one. */

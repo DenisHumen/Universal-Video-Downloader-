@@ -64,6 +64,36 @@ describe('type sizes in the source', () => {
   })
 })
 
+describe('motion tokens', () => {
+  const css = readFileSync(join(ROOT, 'index.css'), 'utf-8')
+
+  // Plan 2.6: press 90, fast 140, base 200, slow 260, plus the spring curve.
+  it('defines the 4.0 durations and curves', () => {
+    for (const [name, value] of [
+      ['--t-press', '90ms'],
+      ['--t-fast', '140ms'],
+      ['--t-base', '200ms'],
+      ['--t-slow', '260ms']
+    ]) {
+      expect(css).toMatch(new RegExp(`${name}:\\s*${value};`))
+    }
+    expect(css).toMatch(/--ease-spring:\s*cubic-bezier\(/)
+  })
+
+  it('writes no millisecond literal outside the tokens and the reduced-motion override', () => {
+    const literals = css
+      .split('\n')
+      .filter((line) => /\d+ms/.test(line) && !/^\s*--t-/.test(line) && !/0\.01ms !important/.test(line))
+    expect(literals).toEqual([])
+  })
+
+  it('collapses every animation and transition under reduced motion', () => {
+    const block = css.slice(css.indexOf('@media (prefers-reduced-motion: reduce)'))
+    expect(block).toMatch(/animation-duration:\s*0\.01ms !important/)
+    expect(block).toMatch(/transition-duration:\s*0\.01ms !important/)
+  })
+})
+
 /*
   The stylesheet as Tailwind actually builds it: what @apply copies and what
   order the layers land in decide how things look, and neither shows up in the
