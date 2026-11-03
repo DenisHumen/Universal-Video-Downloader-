@@ -94,12 +94,21 @@ describe('InfoCache', () => {
     expect(readFileSync(cache.take('k')!, 'utf-8')).toBe('{"v":2}')
   })
 
-  it('clears what a previous session left, and only its own files', () => {
+  it('clears what a previous session left, and only its own files', async () => {
     const { cache, dir } = setup()
     writeFileSync(join(dir, 'old.info.json'), '{}')
     writeFileSync(join(dir, 'keep.txt'), 'x')
-    cache.clearDir()
+    await cache.clearDir()
     expect(readdirSync(dir)).toEqual(['keep.txt'])
+  })
+
+  it('spares what this session wrote while it was still clearing', async () => {
+    const { cache, dir } = setup()
+    writeFileSync(join(dir, 'old.info.json'), '{}')
+    cache.put('k', '{}')
+    await cache.clearDir()
+    expect(readdirSync(dir)).toHaveLength(1)
+    expect(cache.take('k')).not.toBeNull()
   })
 
   it('treats a folder it cannot write to as a miss', () => {

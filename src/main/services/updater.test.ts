@@ -53,7 +53,7 @@ async function load(platform: NodeJS.Platform) {
   const au = (await import('electron-updater')).default.autoUpdater as unknown as FakeUpdater
   const seen: UpdateStatus[] = []
   updater.updateEvents.on('status', (s: UpdateStatus) => seen.push(s))
-  updater.initUpdater()
+  await updater.initUpdater()
   return { updater, au, seen }
 }
 

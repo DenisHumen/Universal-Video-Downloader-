@@ -16,7 +16,7 @@ import { flushSettings, getSettings } from './services/settings'
 import { applyProxy } from './services/proxy'
 import { answerProxyLoginsForPages } from './services/proxy-auth'
 import { ensureYtdlp, scheduleEngineRefresh } from './services/ytdlp'
-import { initUpdater, scheduleUpdateChecks } from './services/updater'
+import { scheduleUpdateChecks } from './services/updater'
 import { flushLog, initLog, log, setLogLevel } from './services/log'
 import { flushWatches } from './services/automation/store'
 import { startWatcher, stopWatcher } from './services/automation/watcher'
@@ -595,7 +595,7 @@ if (cliArgs) {
     */
     initLog(getSettings().logVerbose ? 'debug' : 'info')
     // Probe JSON a previous session kept for its downloads; the addresses in it have expired.
-    infoCache.clearDir()
+    void infoCache.clearDir()
 
     // Before any request is made: the proxy the user set applies to our own too.
     void applyProxy(getSettings())
@@ -614,7 +614,7 @@ if (cliArgs) {
       onSettingsChanged: applySettings
     })
     loadHistory()
-    initUpdater()
+    // electron-updater loads with the first check (see updater.ts), not here.
     buildMenu()
     const startHidden = shouldStartHidden(process.argv, getSettings(), openedAtLogin())
     createWindow(startHidden)
