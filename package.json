@@ -47,7 +47,8 @@
     "dist:linux": "npm run build && electron-builder --linux",
     "release": "npm run build && electron-builder --publish always",
     "visual": "node scripts/visual.mjs",
-    "visual:update": "node scripts/visual.mjs --update"
+    "visual:update": "node scripts/visual.mjs --update",
+    "check:scroll": "node scripts/scroll-check.mjs"
   },
   "dependencies": {
     "electron-updater": "^6.3.9",

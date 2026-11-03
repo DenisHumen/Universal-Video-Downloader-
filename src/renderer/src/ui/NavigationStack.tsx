@@ -24,6 +24,12 @@ interface Props {
  * transform whether the animation ran or not, and the stack host itself
  * never transforms (only the page inside it does).
  *
+ * The top page is the scroll container. A wrapper that scrolled around this
+ * clipping host never overflowed (the stack shrank to it), and Settings'
+ * long panels could not be wheeled at all; scripts/scroll-check.mjs holds
+ * that in real layout. A page pushed is a new element, so it starts at the
+ * top.
+ *
  * Esc and Alt+← go back while there is somewhere to go back to; Esc is left
  * alone when an open dialog or popover owns it (those stop it themselves).
  */
@@ -59,7 +65,7 @@ export default function NavigationStack({ pages, onBack, className }: Props): JS
     <div className={`relative flex min-h-0 flex-1 flex-col overflow-hidden ${className ?? ''}`}>
       <div
         key={top?.key}
-        className={`flex min-h-0 flex-1 flex-col ${depth > 1 || direction === 'pop' ? SLIDE[direction] : ''}`}
+        className={`min-h-0 flex-1 overflow-y-auto ${depth > 1 || direction === 'pop' ? SLIDE[direction] : ''}`}
         data-page={top?.key}
       >
         {top?.node}

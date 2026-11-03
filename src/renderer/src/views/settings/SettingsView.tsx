@@ -128,7 +128,8 @@ export default function SettingsView(): JSX.Element {
         }
         end={<WindowControls side="end" where="content" />}
       />
-      <div ref={page} className="flex min-h-0 flex-1 flex-col overflow-y-auto">
+      {/* Not a scroller: the top page in the stack is (NavigationStack). */}
+      <div ref={page} className="flex min-h-0 flex-1 flex-col">
         <NavigationStack pages={pages} onBack={back} />
       </div>
     </div>
