@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Loader2, Radar } from 'lucide-react'
+import { Loader2, Radar } from '../ui/icons'
 import type { MediaInfo, QualityPreset } from '@shared/types'
 import { watchingAlready, type Watch } from '@shared/automation'
 import { PROVIDER_NAMES, streamUrl } from '@shared/streaming'

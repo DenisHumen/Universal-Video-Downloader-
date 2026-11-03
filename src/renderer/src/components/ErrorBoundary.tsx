@@ -1,5 +1,5 @@
 import { Component, type ErrorInfo, type ReactNode } from 'react'
-import { RefreshCw } from 'lucide-react'
+import { RefreshCw } from '../ui/icons'
 import { translate, useI18n } from '../i18n'
 
 interface Props {

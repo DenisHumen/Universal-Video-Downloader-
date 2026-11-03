@@ -1,5 +1,5 @@
 import { useEffect, useId, useState } from 'react'
-import { CalendarClock, Film, Loader2, Radar, X } from 'lucide-react'
+import { CalendarClock, Film, Loader2, Radar, X } from '../ui/icons'
 import { resolveLanguage, useT, useTp } from '../i18n'
 import { toast } from '../lib/toast'
 import { describeError } from '../lib/errors'

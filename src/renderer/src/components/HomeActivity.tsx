@@ -1,4 +1,4 @@
-import { ArrowRight, FolderOpen, Play } from 'lucide-react'
+import { ArrowRight, FolderOpen, Play } from '../ui/icons'
 import type { DownloadItem } from '@shared/types'
 import { useStore } from '../store'
 import { useT } from '../i18n'

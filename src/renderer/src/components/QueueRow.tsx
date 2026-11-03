@@ -15,7 +15,7 @@ import {
   Scissors,
   Trash2,
   X
-} from 'lucide-react'
+} from '../ui/icons'
 import type { DownloadItem } from '@shared/types'
 import { formatBytes, formatEta, formatSpeed, splitPath } from '../lib/format'
 import { errorReport, errorText } from '../lib/errors'

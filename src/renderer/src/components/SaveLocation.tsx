@@ -1,4 +1,4 @@
-import { Folder } from 'lucide-react'
+import { Folder } from '../ui/icons'
 import { useT } from '../i18n'
 
 interface Props {

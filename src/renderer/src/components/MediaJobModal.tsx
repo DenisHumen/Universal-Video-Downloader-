@@ -1,5 +1,5 @@
 import { useEffect, useId, useState } from 'react'
-import { Loader2, X } from 'lucide-react'
+import { Loader2, X } from '../ui/icons'
 import {
   AUDIO_CONTAINERS,
   VIDEO_CONTAINERS,

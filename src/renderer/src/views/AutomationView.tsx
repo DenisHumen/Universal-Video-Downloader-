@@ -15,7 +15,7 @@ import {
   Send,
   Trash2,
   X
-} from 'lucide-react'
+} from '../ui/icons'
 import { enter } from '../lib/motion'
 import { useStore } from '../store'
 import { resolveLanguage, useT, type TranslateFn, type TranslationKey } from '../i18n'

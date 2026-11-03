@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Check, Loader2 } from 'lucide-react'
+import { Check, Loader2 } from '../ui/icons'
 import { useT } from '../i18n'
 import { toast } from '../lib/toast'
 import { describeError } from '../lib/errors'

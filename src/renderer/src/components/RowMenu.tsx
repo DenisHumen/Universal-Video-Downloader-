@@ -1,5 +1,5 @@
 import { useEffect, useId, useRef, useState, type KeyboardEvent, type ReactNode } from 'react'
-import { MoreHorizontal } from 'lucide-react'
+import { MoreHorizontal } from '../ui/icons'
 
 export interface RowMenuItem {
   label: string

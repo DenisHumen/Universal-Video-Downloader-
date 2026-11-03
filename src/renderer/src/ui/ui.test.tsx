@@ -10,6 +10,8 @@ import {
   Dialog,
   EmptyState,
   Field,
+  Icon,
+  ICON_STROKE,
   IconButton,
   Menu,
   SegmentedControl,
@@ -19,6 +21,7 @@ import {
   TOOLTIP_DELAY,
   useSettingsRowLabel
 } from '.'
+import { Download } from './icons'
 
 /*
   Plan 3.1: every primitive is token-only and tested — names, roles, the
@@ -35,6 +38,41 @@ describe('token-only', () => {
     expect(src).not.toMatch(/\btext-\[\d/)
     expect(src).not.toMatch(/\d+ms\b/)
     expect(src).not.toMatch(/\b(bg|text|border)-(white|black|gray|zinc|slate|neutral|red|blue|green)-/)
+  })
+})
+
+describe('icons (plan 3.2)', () => {
+  const root = join(__dirname, '..')
+  const walk = (dir: string): string[] =>
+    readdirSync(dir, { withFileTypes: true }).flatMap((e) =>
+      e.isDirectory() ? walk(join(dir, e.name)) : /\.tsx?$/.test(e.name) ? [join(dir, e.name)] : []
+    )
+  it('imports lucide-react only inside ui/', () => {
+    const offenders = walk(root)
+      .filter((f) => !f.startsWith(join(root, 'ui')))
+      .filter((f) => /from ['"]lucide-react['"]/.test(readFileSync(f, 'utf-8')))
+      .map((f) => f.slice(root.length + 1))
+    expect(offenders).toEqual([])
+  })
+
+  it('draws at sm 14 / md 16 / lg 24 with a 1.75 stroke', () => {
+    const { container } = render(
+      <>
+        <Icon icon={Download} size="sm" />
+        <Icon icon={Download} />
+        <Icon icon={Download} size="lg" label="Download" />
+      </>
+    )
+    const svgs = [...container.querySelectorAll('svg')]
+    expect(svgs.map((s) => s.getAttribute('width'))).toEqual(['14', '16', '24'])
+    expect(svgs.every((s) => s.getAttribute('stroke-width') === String(ICON_STROKE))).toBe(true)
+    expect(svgs[0].getAttribute('aria-hidden')).toBe('true')
+    expect(screen.getByRole('img', { name: 'Download' })).toBeTruthy()
+  })
+
+  it('gives the re-exported glyphs the same stroke by default', () => {
+    const { container } = render(<Download size={16} />)
+    expect(container.querySelector('svg')?.getAttribute('stroke-width')).toBe(String(ICON_STROKE))
   })
 })
 

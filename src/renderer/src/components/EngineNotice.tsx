@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Loader2, RefreshCw } from 'lucide-react'
+import { Loader2, RefreshCw } from '../ui/icons'
 import { useStore } from '../store'
 import { useT } from '../i18n'
 

@@ -1,6 +1,6 @@
 import { Fragment, useId } from 'react'
 import { AnimatePresence } from 'framer-motion'
-import { X } from 'lucide-react'
+import { X } from '../ui/icons'
 import { useStore } from '../store'
 import { useT } from '../i18n'
 import { SHORTCUT_ROWS } from '../lib/shortcuts'

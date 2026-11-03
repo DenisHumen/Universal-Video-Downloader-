@@ -6,7 +6,7 @@ import {
   Radar,
   Search,
   Settings as SettingsIcon
-} from 'lucide-react'
+} from '../ui/icons'
 import { useStore, type ViewId } from '../store'
 import { useI18n, useT, type TranslationKey } from '../i18n'
 import Logo from './Logo'

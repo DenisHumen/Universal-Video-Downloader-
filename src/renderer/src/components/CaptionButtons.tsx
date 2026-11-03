@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Copy, Minus, Square, X } from 'lucide-react'
+import { Copy, Minus, Square, X } from '../ui/icons'
 import { useT } from '../i18n'
 
 /*

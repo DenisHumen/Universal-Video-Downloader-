@@ -15,4 +15,6 @@ export { default as ToastViewport, toast, type ToastAction, type ToastKind } fro
 export { default as Tooltip, TOOLTIP_DELAY } from './Tooltip'
 export { SettingsGroup, SettingsRow, useSettingsRowLabel } from './Settings'
 export { default as EmptyState } from './EmptyState'
+export { default as Icon, ICON_SIZE } from './Icon'
+export { ICON_STROKE, type IconComponent, type IconProps } from './icons'
 export { cx } from './cx'

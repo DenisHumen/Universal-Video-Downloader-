@@ -1,5 +1,5 @@
 import type { ButtonHTMLAttributes, ReactNode } from 'react'
-import { Check, Minus } from 'lucide-react'
+import { Check, Minus } from './icons'
 import { cx } from './cx'
 
 export interface CheckboxProps

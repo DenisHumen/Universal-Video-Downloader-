@@ -1,5 +1,5 @@
 import { useLayoutEffect, useMemo, useRef, useState } from 'react'
-import { Check, Loader2 } from 'lucide-react'
+import { Check, Loader2 } from '../ui/icons'
 import type { DownloadMode, MediaInfo, PlaylistEntry, QualityPreset } from '@shared/types'
 import Choice from './Choice'
 import SaveLocation from './SaveLocation'

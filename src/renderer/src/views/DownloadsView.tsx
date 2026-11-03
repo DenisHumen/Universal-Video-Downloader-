@@ -10,7 +10,7 @@ import {
   Search,
   SearchX,
   Trash2
-} from 'lucide-react'
+} from '../ui/icons'
 import type { DownloadItem } from '@shared/types'
 import { useStore } from '../store'
 import { formatBytes, formatEta, formatSpeed } from '../lib/format'

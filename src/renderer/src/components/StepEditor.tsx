@@ -1,5 +1,5 @@
 import { useEffect, useId, useMemo, useState } from 'react'
-import { Loader2, Plus, Trash2, X } from 'lucide-react'
+import { Loader2, Plus, Trash2, X } from '../ui/icons'
 import { useT } from '../i18n'
 import { useStore } from '../store'
 import { toast } from '../lib/toast'

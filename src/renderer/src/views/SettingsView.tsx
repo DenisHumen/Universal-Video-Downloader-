@@ -17,7 +17,7 @@ import {
   Search,
   Terminal,
   Upload
-} from 'lucide-react'
+} from '../ui/icons'
 import {
   SUPPORTED_COOKIE_BROWSERS,
   THEMES,

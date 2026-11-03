@@ -1,6 +1,6 @@
 import { useState, useSyncExternalStore } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
-import { Check, ChevronDown, Copy, Loader2, Mail, RefreshCw, Send } from 'lucide-react'
+import { Check, ChevronDown, Copy, Loader2, Mail, RefreshCw, Send } from '../ui/icons'
 import type { AppErrorCode } from '@shared/types'
 import {
   buildMailto,

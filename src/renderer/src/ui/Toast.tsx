@@ -1,7 +1,7 @@
 import { useRef, type FocusEvent } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { enter } from '../lib/motion'
-import { AlertCircle, CheckCircle2, Info, X } from 'lucide-react'
+import { AlertCircle, CheckCircle2, Info, X } from './icons'
 import { useToasts, type Toast } from '../lib/toast'
 
 /** Raise a toast: `toast(message, kind?, action?)`. */

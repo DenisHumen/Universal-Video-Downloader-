@@ -1,7 +1,7 @@
 import { useEffect, useId, useRef, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { enter, staggerChild, staggerParent } from '../lib/motion'
-import { Check, Download, Loader2, RotateCw, Search, SearchX, X } from 'lucide-react'
+import { Check, Download, Loader2, RotateCw, Search, SearchX, X } from '../ui/icons'
 import type {
   AppErrorCode,
   AppSettings,

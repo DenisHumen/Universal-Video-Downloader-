@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Check, Copy, X } from 'lucide-react'
+import { Check, Copy, X } from '../ui/icons'
 import { useStore } from '../store'
 import { useT } from '../i18n'
 

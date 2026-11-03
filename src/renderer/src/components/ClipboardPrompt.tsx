@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { collapse } from '../lib/motion'
-import { X } from 'lucide-react'
+import { X } from '../ui/icons'
 import { useStore } from '../store'
 import { useT } from '../i18n'
 

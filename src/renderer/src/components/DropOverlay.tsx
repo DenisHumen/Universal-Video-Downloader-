@@ -1,4 +1,4 @@
-import { ArrowDownToLine } from 'lucide-react'
+import { ArrowDownToLine } from '../ui/icons'
 import { useT } from '../i18n'
 
 /**

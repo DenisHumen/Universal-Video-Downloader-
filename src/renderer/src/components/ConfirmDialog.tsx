@@ -1,5 +1,5 @@
 import { useId, useRef } from 'react'
-import { AlertTriangle } from 'lucide-react'
+import { AlertTriangle } from '../ui/icons'
 import { useT } from '../i18n'
 import Modal from './Modal'
 

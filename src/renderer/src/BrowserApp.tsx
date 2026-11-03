@@ -11,7 +11,7 @@ import {
   RotateCw,
   Trash2,
   X
-} from 'lucide-react'
+} from './ui/icons'
 import type { BrowserMedia, BrowserState } from '@shared/types'
 import { ToastViewport as Toasts } from './ui'
 import Logo from './components/Logo'

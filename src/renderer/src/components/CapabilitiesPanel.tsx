@@ -7,7 +7,7 @@ import {
   Radar,
   Scissors,
   Search
-} from 'lucide-react'
+} from '../ui/icons'
 import { useStore } from '../store'
 import { useT, type TranslationKey } from '../i18n'
 

@@ -12,7 +12,7 @@ import {
   Scissors,
   Search,
   X
-} from 'lucide-react'
+} from '../ui/icons'
 import {
   hasTrim,
   type AppErrorCode,

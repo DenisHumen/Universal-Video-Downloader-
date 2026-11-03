@@ -1,7 +1,7 @@
 import { useId, useMemo, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { collapse, enter } from '../lib/motion'
-import { ChevronDown } from 'lucide-react'
+import { ChevronDown } from '../ui/icons'
 import type { AppSettings, DownloadMode, MediaInfo, QualityPreset, VideoFormat } from '@shared/types'
 import { formatBytes } from '../lib/format'
 import {

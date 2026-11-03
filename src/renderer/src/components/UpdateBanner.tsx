@@ -1,6 +1,6 @@
 import { AnimatePresence, motion } from 'framer-motion'
 import { collapse } from '../lib/motion'
-import { Download, ExternalLink, RefreshCw, X } from 'lucide-react'
+import { Download, ExternalLink, RefreshCw, X } from '../ui/icons'
 import { useStore } from '../store'
 import { useT } from '../i18n'
 
