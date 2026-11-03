@@ -11,8 +11,7 @@ import {
   RotateCw,
   Scissors,
   Search,
-  X
-} from '../ui/icons'
+  X, Download } from '../ui/icons'
 import {
   hasTrim,
   type AppErrorCode,
@@ -41,6 +40,8 @@ import { toClock } from '../lib/time'
 import { useT, useTp, type TranslationKey } from '../i18n'
 import FormatSelector, { type Selection } from '../components/FormatSelector'
 import HeaderSlot from '../shell/HeaderSlot'
+import { Icon } from '../ui'
+import { sentenceCase } from '../lib/caps'
 import Tooltip from '../ui/Tooltip'
 import PlaylistCard from '../components/PlaylistCard'
 import SaveLocation from '../components/SaveLocation'
@@ -502,13 +503,25 @@ export default function HomeView(): JSX.Element {
           micro-label — visually quiet, and completely silent about what the
           window in front of you is for.
         */}
-        <h2 className="text-title-2 text-ink">{t('home.title')}</h2>
-        <p className="lead mt-2">{t('home.subtitle')}</p>
+        {/*
+          First run, or nothing downloaded yet: an AdwStatusPage (128 px symbolic,
+          title-1, one line saying what to do) with the entry under it. After
+          that the entry stands alone, compact, over what is happening.
+        */}
+        {!hasHistory && status === 'idle' && !info ? (
+          <div className="flex flex-col items-center pb-2 pt-6 text-center">
+            <Icon icon={Download} size="xl" className="text-ink opacity-50" />
+            <h2 className="mt-6 text-title-1 text-ink">{t('home.statusTitle')}</h2>
+            <p className="mt-3 max-w-[52ch] text-body text-ink">{sentenceCase(t('home.subtitle'))}</p>
+          </div>
+        ) : (
+          <h2 className="sr-only">{t('home.statusTitle')}</h2>
+        )}
 
-        <label className="label mb-2 mt-7 block" htmlFor="uvd-url">
+        <label className="sr-only" htmlFor="uvd-url">
           {t('home.linkLabel')}
         </label>
-        <div className="field flex items-center gap-1.5 rounded-3 p-2">
+        <div className="field mt-6 flex items-center gap-1.5 rounded-3 p-1.5 shadow-[var(--shadow-2)]">
           <input
             id="uvd-url"
             ref={inputRef}
@@ -545,7 +558,7 @@ export default function HomeView(): JSX.Element {
             }}
             placeholder={t('home.placeholder')}
             aria-label={t('home.placeholder')}
-            className="no-drag min-w-0 flex-1 bg-transparent px-2.5 py-2 text-section text-ink outline-none placeholder:text-ink-3"
+            className="no-drag min-w-0 flex-1 bg-transparent px-2.5 py-2 text-body text-ink outline-none placeholder:text-ink-3"
             spellCheck={false}
             autoComplete="off"
           />

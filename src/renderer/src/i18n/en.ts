@@ -194,7 +194,7 @@ export const en = {
   'engine.setupFailed': 'the download engine could not be installed',
 
   // ---- home ----
-  'home.title': 'Paste a Link, Get the Video',
+  'home.statusTitle': 'Paste a Link',
   'home.subtitle': 'automatic stream detection for thousands of sites — or type a title to search.',
   'home.placeholder': 'paste a video link — or search by title',
   'home.linkLabel': 'video link',
