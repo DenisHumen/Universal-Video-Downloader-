@@ -5,6 +5,7 @@ import type { SeriesOffer } from '../main/automation-ipc'
 import { contextBridge, ipcRenderer } from 'electron'
 import { IPC } from '@shared/ipc'
 import { themeFromArgv } from '@shared/theme-boot'
+import type { ButtonLayout } from '@shared/desktop'
 import type {
   AppSettings,
   BrowserMedia,
@@ -39,8 +40,10 @@ export interface AppInfo {
   manualUpdates: boolean
   ytdlp: YtDlpStatus
   update: UpdateStatus
-  /** The OS accent colour as `rrggbb` on Windows and macOS. */
+  /** The OS accent colour as `rrggbb`, where the desktop reports one (hides "System" when absent). */
   systemAccent?: string
+  /** GNOME's caption-button order (Linux; the default elsewhere). */
+  buttonLayout: ButtonLayout
 }
 
 function on<T>(channel: string, cb: (payload: T) => void): () => void {

@@ -26,6 +26,15 @@ export const WINDOW_BACKGROUND: Record<PaintedTheme, string> = {
   day: '#fafafa'
 }
 
+/** The text colour on the header bar per theme (`--text`), for Windows' caption overlay symbols. */
+export const WINDOW_FOREGROUND: Record<PaintedTheme, string> = {
+  night: '#f7f7f7',
+  day: '#3d3d3d'
+}
+
+/** The header bar's height (D0: 46 px); Windows' caption overlay matches it. */
+export const HEADER_HEIGHT = 46
+
 export function themeArgument(theme: PaintedTheme): string {
   return `${THEME_ARG}${theme}`
 }

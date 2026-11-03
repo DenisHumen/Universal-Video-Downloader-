@@ -209,7 +209,7 @@ export function openBrowserWindow(initialUrl?: string): void {
     show: false,
     backgroundColor: theme.backgroundColor,
     // The shell draws its own title bar, like the app's other windows.
-    ...chromeOptions(),
+    ...chromeOptions(getSettings().theme),
     icon: icon(),
     webPreferences: {
       preload: shellPreload(),

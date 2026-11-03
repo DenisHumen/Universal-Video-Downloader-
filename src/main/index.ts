@@ -129,7 +129,7 @@ function windowOptions(width: number, height: number): Electron.BrowserWindowCon
     minHeight: 560,
     show: false,
     backgroundColor: theme.backgroundColor,
-    ...chromeOptions(),
+    ...chromeOptions(getSettings().theme),
     icon: isMac ? undefined : loadIcon('app.png'),
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
@@ -528,6 +528,8 @@ function destroyTray(): void {
 function applySettings(settings: AppSettings): void {
   // The app's own requests follow the proxy too, not only the engine's.
   void applyProxy(settings)
+  // A theme change repaints the native background and, on Windows, the caption overlay.
+  followNativeTheme(() => BrowserWindow.getAllWindows(), () => settings.theme)
   /*
     The application menu and the tray menu are built once from a dictionary, so
     switching the interface language left both of them in the old one until the

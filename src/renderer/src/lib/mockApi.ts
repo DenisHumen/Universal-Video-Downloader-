@@ -1,3 +1,4 @@
+import type { ButtonLayout } from '@shared/desktop'
 import type { UvdApi, AppInfo } from '../../../preload/index'
 import type {
   AppSettings,
@@ -65,7 +66,10 @@ const settings: AppSettings = {
 const appInfo: AppInfo = {
   version: 'dev',
   name: 'universal-video-downloader',
-  platform: 'win32' as NodeJS.Platform,
+  // The preview (and the visual harness) render as the user's desktop: Ubuntu GNOME.
+  platform: 'linux' as NodeJS.Platform,
+  systemAccent: 'e95420',
+  buttonLayout: { start: [], end: ['minimize', 'maximize', 'close'] } as ButtonLayout,
   arch: 'x64',
   locale: 'en-US',
   manualUpdates: false,

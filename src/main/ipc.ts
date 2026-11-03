@@ -1,3 +1,4 @@
+import { buttonLayout, systemAccent } from './services/desktop'
 import {
   app,
   BrowserWindow,
@@ -5,7 +6,6 @@ import {
   ipcMain,
   Notification,
   shell,
-  systemPreferences,
   type IpcMainInvokeEvent
 } from 'electron'
 import { dirname } from 'path'
@@ -317,7 +317,7 @@ export function registerIpc({ getWindow, openSearchWindow, onSettingsChanged }: 
   })
 
   // ---- App / window ----
-  ipcMain.handle(IPC.appInfo, () => ({
+  ipcMain.handle(IPC.appInfo, async () => ({
     version: app.getVersion(),
     name: app.getName(),
     platform: process.platform,
@@ -326,7 +326,9 @@ export function registerIpc({ getWindow, openSearchWindow, onSettingsChanged }: 
     manualUpdates: isManualPlatform(),
     ytdlp: getYtdlpStatus(),
     update: getUpdateStatus(),
-    systemAccent: systemAccent()
+    // One-shot, time-limited desktop reads (services/desktop.ts, A1.2 E2/E6).
+    systemAccent: await systemAccent(),
+    buttonLayout: await buttonLayout()
   }))
   // Window controls act on the window the call came from (main or search).
   ipcMain.handle(IPC.windowMinimize, (e) => BrowserWindow.fromWebContents(e.sender)?.minimize())
@@ -443,15 +445,3 @@ function syncOsState(getWindow: () => BrowserWindow | null): void {
   win.setProgressBar(Math.max(0.02, Math.min(1, avg)))
 }
 
-/**
- * The OS accent as `rrggbb`, where the OS has one (Windows, macOS). Linux has
- * no such API; `accent: 'system'` then falls back to Blue in the renderer.
- */
-function systemAccent(): string | undefined {
-  if (process.platform !== 'win32' && process.platform !== 'darwin') return undefined
-  try {
-    return systemPreferences.getAccentColor().slice(0, 6) || undefined
-  } catch {
-    return undefined
-  }
-}
