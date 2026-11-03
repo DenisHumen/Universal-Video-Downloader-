@@ -55,8 +55,7 @@ module.exports = {
       },
       fontFamily: {
         sans: [
-          'Inter Variable',
-          'Inter',
+          'Ubuntu Sans',
           '-apple-system',
           'BlinkMacSystemFont',
           'Segoe UI',
@@ -66,8 +65,7 @@ module.exports = {
           'sans-serif'
         ],
         mono: [
-          'JetBrains Mono Variable',
-          'JetBrains Mono',
+          'Ubuntu Sans Mono',
           'ui-monospace',
           'SFMono-Regular',
           'Menlo',
@@ -82,13 +80,22 @@ module.exports = {
        * label moved onto a token does not shift its row.
        */
       fontSize: {
-        hero: ['28px', { lineHeight: '1.15', letterSpacing: '-0.02em', fontWeight: '600' }],
-        title: ['22px', { lineHeight: '1.2', letterSpacing: '-0.015em', fontWeight: '600' }],
-        section: ['16px', { lineHeight: '1.35' }],
+        // libadwaita's type classes at v4's density (A1.1): 14 px body, 13 px controls.
+        'title-1': ['26.67px', { lineHeight: '1.2', fontWeight: '800' }],
+        'title-2': ['20px', { lineHeight: '1.25', fontWeight: '800' }],
+        'title-3': ['20px', { lineHeight: '1.25', fontWeight: '700' }],
+        'title-4': ['17.33px', { lineHeight: '1.3', fontWeight: '700' }],
+        heading: ['14px', { fontWeight: '700' }],
+        'caption-heading': ['12px', { fontWeight: '700' }],
+        // v4 names kept as aliases while views move over (5.x): hero → title-1,
+        // title → title-2, section → title-4.
+        hero: ['26.67px', { lineHeight: '1.2', fontWeight: '800' }],
+        title: ['20px', { lineHeight: '1.25', fontWeight: '800' }],
+        section: ['17.33px', { lineHeight: '1.3', fontWeight: '700' }],
         body: '14px',
         control: '13px',
         meta: '12px',
-        caption: '11px'
+        caption: '12px'
       },
       borderRadius: {
         1: 'var(--r-1)',

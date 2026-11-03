@@ -9,7 +9,7 @@
  * 720 and 1220 px, plus a Russian pass at 720 px in both themes - the width
  * where long Russian labels overflow first.
  *
- * Determinism (plan [v3] SE-c): fonts are the bundled @fontsource ones the app
+ * Determinism (plan [v3] SE-c): fonts are the bundled Ubuntu Sans files the app
  * already ships, animations and transitions are off (reduced motion plus an
  * injected `transition:none; animation:none`), the clock is pinned, and the
  * comparison allows a small per-pixel tolerance for antialiasing.

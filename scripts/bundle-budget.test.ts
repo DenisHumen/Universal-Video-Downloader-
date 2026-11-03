@@ -18,6 +18,8 @@ import react from '@vitejs/plugin-react'
 */
 
 const BUDGET = {
+  /** Bundled fonts (L2): upright Ubuntu Sans + Ubuntu Sans Mono, unsubset. 1.31 MB today. */
+  fonts: 1_500_000,
   /** Entry JS, gzip. 3.26.1 minified: ~180 kB; +15 kB headroom. */
   entryJs: 195_000,
   /** All CSS, gzip. 3.26.1: ~11 kB. */
@@ -62,6 +64,14 @@ describe('renderer bundle budget', () => {
     const entry = html.match(/assets\/([^"]+\.js)/)?.[1]
     const size = assets.find((a) => a.name === entry)?.gzip ?? Infinity
     expect(size, `entry ${entry} is ${size} B gzip`).toBeLessThanOrEqual(BUDGET.entryJs)
+  })
+
+  it('keeps the bundled fonts within budget, and ships them as built', () => {
+    const dir = join(out, 'assets')
+    const fonts = readdirSync(dir).filter((f) => /\.(ttf|woff2?)$/.test(f))
+    expect(fonts.length).toBeGreaterThanOrEqual(2)
+    const total = fonts.reduce((n, f) => n + readFileSync(join(dir, f)).length, 0)
+    expect(total, `fonts are ${total} B`).toBeLessThanOrEqual(BUDGET.fonts)
   })
 
   it('keeps the stylesheet within budget', () => {
