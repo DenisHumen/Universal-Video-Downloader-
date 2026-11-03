@@ -39,7 +39,7 @@ function rememberPreview(p: DetectPreview): void {
   while (previews.size > 8) previews.delete(previews.keys().next().value as string)
 }
 
-export type ViewId = 'home' | 'search' | 'downloads' | 'automation' | 'settings'
+export type ViewId = 'home' | 'search' | 'downloads' | 'library' | 'automation' | 'settings'
 
 export interface WatchIntent {
   url: string
@@ -49,7 +49,7 @@ export interface WatchIntent {
   watchId?: string
 }
 
-const VIEWS: ViewId[] = ['home', 'search', 'downloads', 'automation', 'settings']
+const VIEWS: ViewId[] = ['home', 'search', 'downloads', 'library', 'automation', 'settings']
 
 export function isViewId(value: string): value is ViewId {
   return (VIEWS as string[]).includes(value)
@@ -95,6 +95,11 @@ interface AppState {
   shortcutsOpen: boolean
   /** The Ctrl/⌘+K command palette (plan 4.5). */
   paletteOpen: boolean
+  /**
+   * The Library's badge rule (5.3): files finished in this session since the
+   * Library was last opened. Opening it clears the count.
+   */
+  libraryUnseen: number
   /** The sidebar as an overlay (below 860 px, or while Settings asks for room) is showing. */
   sidebarOverlayOpen: boolean
   /** Settings at 860-1099 px folds the app sidebar away so there is never a double rail (A1.1). */
@@ -169,6 +174,10 @@ async function runInit(set: SetState, get: GetState): Promise<void> {
 
   // One store update per batch, however many rows a bulk action touched.
   window.api.onDownloadsChanged((change) => {
+    // The Library's badge: a row that just finished with a file, while the Library is not showing.
+    const before = new Map(get().downloads.map((d) => [d.id, d.state]))
+    const fresh = change.updated.filter((d) => d.state === 'completed' && d.filepath && before.get(d.id) !== 'completed' && before.has(d.id)).length
+    if (fresh && get().view !== 'library') set({ libraryUnseen: get().libraryUnseen + fresh })
     const list = get().downloads
     const next = applyDownloadsChanged(list, change)
     if (next !== list) set({ downloads: next })
@@ -306,6 +315,7 @@ export const useStore = create<AppState>((set, get) => ({
   detectPreview: null,
   shortcutsOpen: false,
   paletteOpen: false,
+  libraryUnseen: 0,
   sidebarOverlayOpen: false,
   sidebarFolded: false,
   settingsRoute: 'appearance',
@@ -317,7 +327,7 @@ export const useStore = create<AppState>((set, get) => ({
   },
 
   // Choosing a section closes the overlay sidebar, as GNOME's split view does.
-  setView: (view) => set({ view, sidebarOverlayOpen: false }),
+  setView: (view) => set(view === 'library' ? { view, sidebarOverlayOpen: false, libraryUnseen: 0 } : { view, sidebarOverlayOpen: false }),
 
   saveSettings: async (partial) => {
     const next = await window.api.setSettings(partial)

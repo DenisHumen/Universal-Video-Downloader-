@@ -27,14 +27,14 @@ type Filter = 'all' | 'active' | 'done' | 'failed'
 const FILTERS: { value: Filter; label: TranslationKey }[] = [
   { value: 'all', label: 'queue.filterAll' },
   { value: 'active', label: 'queue.filterActive' },
-  { value: 'done', label: 'queue.filterDone' },
+  { value: 'done', label: 'queue.finishedToday' },
   { value: 'failed', label: 'queue.filterFailed' }
 ]
 
 const GROUP_LABEL: Record<QueueGroup, TranslationKey> = {
   active: 'queue.filterActive',
   failed: 'queue.filterFailed',
-  done: 'queue.filterDone'
+  done: 'queue.finishedToday'
 }
 
 const ACTIVE_STATES: DownloadItem['state'][] = [
@@ -45,7 +45,15 @@ const ACTIVE_STATES: DownloadItem['state'][] = [
   'paused'
 ]
 
+/** Finished since midnight. Older finished rows live in the Library (5.2 + 5.3). */
+function finishedToday(item: DownloadItem): boolean {
+  const start = new Date()
+  start.setHours(0, 0, 0, 0)
+  return (item.finishedAt ?? item.createdAt) >= start.getTime()
+}
+
 function matches(item: DownloadItem, filter: Filter): boolean {
+  if (item.state === 'completed' && !finishedToday(item)) return false
   if (filter === 'all') return true
   if (filter === 'active') return ACTIVE_STATES.includes(item.state)
   if (filter === 'done') return item.state === 'completed'

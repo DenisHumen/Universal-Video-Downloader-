@@ -7,9 +7,9 @@ import { NAV_ALL, NAV_BOTTOM, NAV_MAIN } from './nav'
 describe('4.0 sections', () => {
   it('are Download, Search, Activity, Watching, with Settings at the bottom', () => {
     // Sentence case: the 4.0 copy voice reaches the shell first ([v3] VD note).
-    expect(NAV_MAIN.map((s) => en[s.label])).toEqual(['Download', 'Search', 'Activity', 'Watching'])
+    expect(NAV_MAIN.map((s) => en[s.label])).toEqual(['Download', 'Search', 'Activity', 'Library', 'Watching'])
     expect(NAV_BOTTOM.map((s) => en[s.label])).toEqual(['Settings'])
-    expect(NAV_ALL.map((s) => ru[s.label])).toEqual(['Скачать', 'Поиск', 'Активность', 'Слежение', 'Настройки'])
+    expect(NAV_ALL.map((s) => ru[s.label])).toEqual(['Скачать', 'Поиск', 'Активность', 'Библиотека', 'Слежение', 'Настройки'])
   })
 
   it('name every section in Russian too', () => {

@@ -86,6 +86,7 @@ function NavItem({ section }: { section: NavSection }): JSX.Element {
   )
   const overall = useStore((s) => (section.id === 'downloads' ? overallPercent(s.downloads) : null))
   const alerts = useStore((s) => (section.id === 'automation' ? s.watchAlerts : 0))
+  const unseen = useStore((s) => (section.id === 'library' ? s.libraryUnseen : 0))
   const label = t(section.label)
 
   const button = (
@@ -98,6 +99,7 @@ function NavItem({ section }: { section: NavSection }): JSX.Element {
       <section.icon size={16} />
       <span className="min-w-0 flex-1 truncate text-left">{label}</span>
       {active > 0 && <Badge>{overall != null ? `${overall}%` : active}</Badge>}
+      {unseen > 0 && <Badge label={t('library.unseen', { n: String(unseen) })}>{unseen}</Badge>}
       {alerts > 0 && (
         <span
           className="h-2 w-2 rounded-pill bg-bad"

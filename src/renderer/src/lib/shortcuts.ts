@@ -25,7 +25,8 @@ export const SHORTCUT_ROWS: ShortcutRow[] = [
   { keys: [['mod', '1'], ['mod', 'N']], label: 'shortcuts.newDownload', action: 'home' },
   { keys: [['mod', '2'], ['mod', 'F']], label: 'shortcuts.search', action: 'search' },
   { keys: [['mod', '3']], label: 'shortcuts.queue', action: 'downloads' },
-  { keys: [['mod', '4']], label: 'shortcuts.watch', action: 'automation' },
+  { keys: [['mod', '4']], label: 'shortcuts.library', action: 'library' },
+  { keys: [['mod', '5']], label: 'shortcuts.watch', action: 'automation' },
   // Ctrl+1..N follow the sidebar's sections top to bottom (shell/nav.ts); Settings, pinned
   // at the bottom, is Ctrl+, as GNOME's Preferences are, and opens at its last panel.
   { keys: [['mod', ',']], label: 'shortcuts.settings', action: 'settings' },

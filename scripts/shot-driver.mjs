@@ -98,6 +98,26 @@ window.__uvdShot = {
       totalBytes: 240_000_000,
       filepath: 'C:\\\\Users\\\\demo\\\\Downloads\\\\Elephants Dream [ed].mp4'
     })
+    // Finished on earlier days: in the Library, no longer in Activity (5.2).
+    ;[
+      ['shot-6', 'Cosmos Laundromat — first cycle', 1, 'mkv', 'vimeo', 610_000_000],
+      ['shot-7', 'Spring — Blender Open Movie', 1, 'mp4', 'youtube', 180_000_000],
+      ['shot-8', 'Agent 327: Operation Barbershop', 3, 'mp4', 'youtube', 320_000_000],
+      ['shot-9', 'Caminandes 3: Llamigos', 9, 'webm', 'youtube', 64_000_000]
+    ].forEach(([id, title, days, ext, site, size], n) =>
+      q({
+        id,
+        title,
+        thumbnail: window.__uvdShotPoster(6 + n, ext),
+        state: 'completed',
+        percent: 100,
+        extractor: site,
+        totalBytes: size,
+        createdAt: Date.now() - days * 86400e3 - 3600e3,
+        finishedAt: Date.now() - days * 86400e3,
+        filepath: '/home/demo/Videos/' + title + '.' + ext
+      })
+    )
     q({
       id: 'shot-5',
       title: 'members-only-stream',

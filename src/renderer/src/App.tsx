@@ -6,6 +6,7 @@ import UpdateBanner from './components/UpdateBanner'
 import EngineNotice from './components/EngineNotice'
 import HomeView from './views/HomeView'
 import DownloadsView from './views/DownloadsView'
+import LibraryView from './views/LibraryView'
 import SettingsView from './views/settings/SettingsView'
 import AutomationView from './views/AutomationView'
 import SearchView from './views/SearchView'
@@ -90,6 +91,7 @@ export default function App(): JSX.Element {
             {view === 'home' && <HomeView />}
             {view === 'search' && <SearchView settings={settings} embedded />}
             {view === 'downloads' && <DownloadsView />}
+            {view === 'library' && <LibraryView />}
             {view === 'automation' && <AutomationView />}
             {view === 'settings' && <SettingsView />}
           </div>

@@ -57,6 +57,7 @@ const CASES = [
     name: 'activity',
     setup: `for (let i = 0; i < 4; i++) __uvdShot.seedQueue(); await __uvdShot.view('downloads')`
   },
+  { name: 'library', setup: `for (let i = 0; i < 4; i++) __uvdShot.seedQueue(); await __uvdShot.view('library'); await new Promise((r) => setTimeout(r, 300))` },
   { name: 'watching', setup: `${WATCH} await __uvdShot.view('automation')` },
   { name: 'settings-list', setup: `await __uvdShot.view('settings')`, narrowOnly: true },
   ...SETTINGS_ROUTES.map((route) => ({

@@ -75,6 +75,7 @@ const SCENES = [
     name: 'search',
     setup: `await __uvdShot.view('search'); await __uvdShot.search('big buck bunny')`
   },
+  { name: 'library', setup: `__uvdShot.seedQueue(); await __uvdShot.view('library'); await new Promise((r) => setTimeout(r, 300))` },
   { name: 'watching', setup: `${WATCH}; await __uvdShot.view('automation')` },
   { name: 'settings', setup: `await __uvdShot.view('settings')` },
   // A panel with a subpage, deep-linked (GNOME Network › Proxy).

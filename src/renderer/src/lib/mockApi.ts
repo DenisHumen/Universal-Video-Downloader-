@@ -201,6 +201,7 @@ let itemSeq = 0
 const items: DownloadItem[] = []
 let mockLibrary: LibraryFile = EMPTY_LIBRARY
 const libraryListeners = new Set<() => void>()
+const mockRemoved = new Set<string>()
 
 type YtdlpListener = (status: YtDlpStatus) => void
 type UpdateListener = (status: UpdateStatus) => void
@@ -653,17 +654,19 @@ export function installMockApi(): void {
     listLibrary: async (q) => {
       for (const item of items) {
         const entry = entryFromItem(item)
-        if (entry) mockLibrary = upsertEntry(mockLibrary, entry)
+        if (entry && !mockRemoved.has(entry.id)) mockLibrary = upsertEntry(mockLibrary, entry)
       }
       return listLibrary(mockLibrary, q)
     },
     libraryMissing: async () => [],
     trashLibraryEntry: async (id) => {
+      mockRemoved.add(id)
       mockLibrary = removeEntry(mockLibrary, id)
       libraryListeners.forEach((cb) => cb())
       return true
     },
     forgetLibraryEntry: async (id) => {
+      mockRemoved.add(id)
       mockLibrary = removeEntry(mockLibrary, id)
       libraryListeners.forEach((cb) => cb())
     },

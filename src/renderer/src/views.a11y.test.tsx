@@ -11,7 +11,7 @@ import App from './App'
   (see test/axe.ts): contrast has its own gate.
 */
 
-const VIEWS: ViewId[] = ['home', 'search', 'downloads', 'automation', 'settings']
+const VIEWS: ViewId[] = ['home', 'search', 'downloads', 'library', 'automation', 'settings']
 
 beforeAll(() => {
   installMockApi()
