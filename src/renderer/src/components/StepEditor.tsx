@@ -6,7 +6,7 @@ import { toast } from '../lib/toast'
 import { describeError } from '../lib/errors'
 import { STEP_LABEL } from '../lib/automationLabels'
 import { emptyTarget, pathOf, ShareForm, TelegramForm, useSecretState } from './AutomationForms'
-import Modal from './Modal'
+import Dialog from '../ui/Dialog'
 import {
   DEFAULT_REMOTE_PATH,
   DEFAULT_RENAME_TEMPLATE,
@@ -161,21 +161,30 @@ export default function StepEditor({
         : true
 
   return (
-    <Modal
+    <Dialog
+      variant="sheet"
+      size="md"
+      title={t(STEP_LABEL[step.kind])}
+      closeLabel={t('common.close')}
       onClose={onClose}
-      labelledBy={titleId}
-      className="surface-dialog flex max-h-full w-full max-w-lg flex-col overflow-hidden"
+      actions={
+        <>
+          {!isNew && (
+            <button className="btn-danger mr-auto" onClick={() => onRemove(step.id)}>
+              <Trash2 size={14} /> {t('common.remove')}
+            </button>
+          )}
+          <button className="btn-quiet" onClick={onClose}>
+            {t('common.cancel')}
+          </button>
+          <button className="btn-solid" onClick={() => void save()} disabled={!canSave || saving}>
+            {saving ? <Loader2 size={14} className="animate-spin" /> : null}
+            {t('common.save')}
+          </button>
+        </>
+      }
     >
-      <div className="flex shrink-0 items-center gap-3 border-b border-edge px-4 py-3">
-        <h2 className="h2 flex-1" id={titleId}>
-          {t(STEP_LABEL[step.kind])}
-        </h2>
-        <button className="btn-icon" onClick={onClose} aria-label={t('common.close')}>
-          <X size={15} />
-        </button>
-      </div>
-
-      <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-4">
+      <div className="space-y-4">
         {step.kind === 'rename' && (
           <>
             <div>
@@ -340,20 +349,6 @@ export default function StepEditor({
         </label>
       </div>
 
-      <div className="flex shrink-0 justify-end gap-2 border-t border-edge px-4 py-3">
-        {!isNew && (
-          <button className="btn-danger mr-auto" onClick={() => onRemove(step.id)}>
-            <Trash2 size={14} /> {t('common.remove')}
-          </button>
-        )}
-        <button className="btn-quiet" onClick={onClose}>
-          {t('common.cancel')}
-        </button>
-        <button className="btn-solid" onClick={() => void save()} disabled={!canSave || saving}>
-          {saving ? <Loader2 size={14} className="animate-spin" /> : null}
-          {t('common.save')}
-        </button>
-      </div>
-    </Modal>
+    </Dialog>
   )
 }

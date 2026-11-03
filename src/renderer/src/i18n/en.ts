@@ -273,7 +273,6 @@ export const en = {
   'queue.moveUp': 'Download This One Next',
   'queue.next': 'next up',
   'queue.log': 'Engine Output',
-  'queue.copyError': 'Copy the Error',
   'queue.retryingIn': 'retrying automatically…',
   'queue.onShare': 'on the share: {path}',
   'queue.openFailed': 'could not open that file — it may have been moved or deleted',

@@ -14,7 +14,7 @@ import { viewQueueAction } from '../lib/queue'
 import { describeError } from '../lib/errors'
 import TrimEditor from './TrimEditor'
 import Choice from './Choice'
-import Modal from './Modal'
+import Dialog from '../ui/Dialog'
 
 export type JobMode = 'trim' | 'convert'
 
@@ -114,22 +114,15 @@ export default function MediaJobModal({ item, mode, onClose }: Props): JSX.Eleme
       Esc closes it, through the shared Modal: a dialog that can only be
       dismissed by aiming at a small target is a dialog people learn to dread.
     */
-    <Modal onClose={onClose} labelledBy={titleId} className="surface-dialog max-h-full w-full max-w-lg overflow-y-auto">
-      <div className="flex items-center gap-3 border-b border-edge px-4 py-3">
-        <div className="min-w-0 flex-1">
-          <h2 className="h2" id={titleId}>
-            {mode === 'trim' ? t('trim.title') : t('convert.title')}
-          </h2>
-          <p className="mono truncate text-meta text-ink-2" title={item.title}>
-            {item.title}
-          </p>
-        </div>
-        <button className="btn-icon" onClick={onClose} aria-label={t('common.close')}>
-          <X size={15} />
-        </button>
-      </div>
-
-      <div className="space-y-5 p-4">
+    <Dialog
+      variant="sheet"
+      size="md"
+      title={mode === 'trim' ? t('trim.title') : t('convert.title')}
+      subtitle={<span title={item.title}>{item.title}</span>}
+      closeLabel={t('common.close')}
+      onClose={onClose}
+    >
+      <div className="space-y-5">
         {mode === 'trim' ? (
           <>
             {probing ? (
@@ -215,7 +208,7 @@ export default function MediaJobModal({ item, mode, onClose }: Props): JSX.Eleme
         )}
 
         <button
-          className="btn-solid w-full py-3.5 text-body"
+          className="btn-solid h-11 w-full rounded-pill text-body"
           onClick={submit}
           disabled={busy || invalid || nothingToDo}
         >
@@ -223,6 +216,6 @@ export default function MediaJobModal({ item, mode, onClose }: Props): JSX.Eleme
           {mode === 'trim' ? t('trim.apply') : t('convert.apply')}
         </button>
       </div>
-    </Modal>
+    </Dialog>
   )
 }

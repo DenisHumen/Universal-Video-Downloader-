@@ -4,7 +4,7 @@ import { collapse, listItem } from '../lib/motion'
 import {
   ArrowUp,
   ChevronDown,
-  Copy,
+  MoreHorizontal,
   ExternalLink,
   Link2,
   FileVideo,
@@ -27,7 +27,7 @@ import Thumbnail from './Thumbnail'
 import ReportPrompt, { useReportOffer } from './ReportPrompt'
 import FixBar from './FixBar'
 import { queueDownload } from '../lib/queue'
-import RowMenu, { type RowMenuItem } from './RowMenu'
+import { IconButton, Menu, type MenuItem } from '../ui'
 
 interface Props {
   item: DownloadItem
@@ -164,15 +164,6 @@ function QueueRow({ item, index, animateIn = true, heading }: Props): JSX.Elemen
 
   const savedAt = splitPath(item.filepath ?? '')
 
-  const copyError = async (): Promise<void> => {
-    try {
-      await navigator.clipboard.writeText(errorReport(t, item))
-      toast(t('common.copied'), 'success')
-    } catch {
-      /* clipboard unavailable */
-    }
-  }
-
   /*
     6.2: a fix that changes the request (audio only, another folder) queues
     it afresh in place of this row; the row goes first, so the new one is not
@@ -206,7 +197,7 @@ function QueueRow({ item, index, animateIn = true, heading }: Props): JSX.Elemen
     the action the row was about was one square among many, and a narrow
     window left the title ten characters.
   */
-  const menu: RowMenuItem[] = [
+  const menu: MenuItem[] = [
     ...(hasWebLink
       ? [
           { label: t('queue.copyLink'), icon: <Link2 size={14} />, onSelect: () => void copyLink() },
@@ -232,9 +223,6 @@ function QueueRow({ item, index, animateIn = true, heading }: Props): JSX.Elemen
           { label: t('convert.open'), icon: <FileVideo size={14} />, onSelect: () => setJobModal('convert') }
         ]
       : []),
-    ...(item.state === 'error'
-      ? [{ label: t('queue.copyError'), icon: <Copy size={14} />, onSelect: () => void copyError() }]
-      : [])
   ]
 
   /* What the second line says, after the state: progress, speed, time left, quality. */
@@ -389,7 +377,13 @@ function QueueRow({ item, index, animateIn = true, heading }: Props): JSX.Elemen
               <Trash2 size={15} />
             </button>
           )}
-          <RowMenu label={t('queue.more')} items={menu} />
+          {menu.length > 0 && (
+            <Menu
+              label={t('queue.more')}
+              items={menu}
+              trigger={(p) => <IconButton {...p} label={t('queue.more')} icon={<MoreHorizontal size={16} />} />}
+            />
+          )}
         </div>
       </div>
 

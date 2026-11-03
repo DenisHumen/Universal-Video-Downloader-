@@ -15,7 +15,7 @@ import type {
 } from '@shared/types'
 import { ADULT_SEARCH_SERVICES, allowedSearchServices } from '@shared/types'
 import StreamingCard from '../components/StreamingCard'
-import Modal from '../components/Modal'
+import Dialog from '../ui/Dialog'
 import Thumbnail from '../components/Thumbnail'
 import { formatCount, formatDuration } from '../lib/format'
 import { initialMode, initialQuality, maxHeightOf } from '../lib/quality'
@@ -404,19 +404,14 @@ export default function SearchView({ settings, embedded = false }: Props): JSX.E
       {/* Anime episode/translator/quality picker (the standalone window) */}
       <AnimatePresence>
         {picker && (
-          <Modal
+          <Dialog
             key="picker"
+            variant="sheet"
+            size="md"
+            title={picker.title}
+            closeLabel={t('common.close')}
             onClose={() => setPicker(null)}
-            labelledBy={pickerTitleId}
-            className="surface-dialog relative max-h-[86vh] w-full max-w-lg overflow-y-auto"
           >
-            <button
-              className="ui-icon-btn ui-icon-btn-md absolute right-2 top-2 z-10"
-              onClick={() => setPicker(null)}
-              aria-label={t('common.close')}
-            >
-              <X size={16} />
-            </button>
             <StreamingCard
               info={picker}
               onDone={() => {
@@ -426,7 +421,7 @@ export default function SearchView({ settings, embedded = false }: Props): JSX.E
               onSaveDirChange={setPickerDir}
               titleId={pickerTitleId}
             />
-          </Modal>
+          </Dialog>
         )}
       </AnimatePresence>
     </div>

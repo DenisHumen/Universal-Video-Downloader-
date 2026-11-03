@@ -17,7 +17,7 @@ import { formatBytes, formatEta, formatSpeed } from '../lib/format'
 import { useT, useTp, type TranslationKey } from '../i18n'
 import QueueRow from '../components/QueueRow'
 import { groupQueue, queueGroupOf, type QueueGroup } from '../lib/downloads'
-import EmptyState from '../components/EmptyState'
+import { EmptyState, Icon } from '../ui'
 import ConfirmDialog from '../components/ConfirmDialog'
 import HeaderSlot from '../shell/HeaderSlot'
 import { SegmentedControl } from '../ui'
@@ -275,18 +275,18 @@ export default function DownloadsView(): JSX.Element {
       <div ref={scrollRef} className="mt-5 min-h-0 flex-1 overflow-y-auto">
         {downloads.length === 0 ? (
           <EmptyState
-            icon={<Inbox size={24} />}
+            icon={<Icon icon={Inbox} size="xl" />}
             title={t('queue.empty')}
             hint={t('queue.emptyHint')}
             action={
-              <button className="btn-solid" onClick={() => setView('home')}>
+              <button className="btn-solid rounded-pill px-6" onClick={() => setView('home')}>
                 <Plus size={15} /> {t('queue.add')}
               </button>
             }
           />
         ) : visible.length === 0 ? (
           <EmptyState
-            icon={<SearchX size={24} />}
+            icon={<Icon icon={SearchX} size="xl" />}
             title={t('queue.emptyFiltered')}
             hint={t('queue.emptyFilteredHint')}
             action={

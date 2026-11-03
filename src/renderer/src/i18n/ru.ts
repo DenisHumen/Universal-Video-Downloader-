@@ -267,7 +267,6 @@ export const ru: Dictionary = {
   'queue.moveUp': 'Скачать следующим',
   'queue.next': 'следующий',
   'queue.log': 'Вывод движка',
-  'queue.copyError': 'Скопировать ошибку',
   'queue.retryingIn': 'повторяю автоматически…',
   'queue.onShare': 'в сетевой папке: {path}',
   'queue.openFailed': 'не удалось открыть файл — возможно, его переместили или удалили',

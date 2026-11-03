@@ -1,10 +1,9 @@
 import { Fragment, useId } from 'react'
 import { AnimatePresence } from 'framer-motion'
-import { X } from '../ui/icons'
 import { useStore } from '../store'
 import { useT } from '../i18n'
 import { SHORTCUT_ROWS } from '../lib/shortcuts'
-import Modal from './Modal'
+import Dialog from '../ui/Dialog'
 
 export default function ShortcutsOverlay(): JSX.Element {
   const t = useT()
@@ -17,28 +16,18 @@ export default function ShortcutsOverlay(): JSX.Element {
   return (
     <AnimatePresence>
       {open && (
-        <Modal
+        <Dialog
           key="shortcuts"
+          variant="sheet"
+          title={t('shortcuts.title')}
+          closeLabel={t('common.close')}
           onClose={() => setOpen(false)}
-          labelledBy={titleId}
           layer="overlay"
-          className="surface-dialog max-h-full w-full max-w-sm overflow-y-auto"
         >
-          <div className="flex items-center justify-between border-b border-edge px-4 py-3">
-            <h2 className="label" id={titleId}>
-              {t('shortcuts.title')}
-            </h2>
-            <button className="btn-icon" onClick={() => setOpen(false)} aria-label={t('common.close')}>
-              <X size={15} />
-            </button>
-          </div>
-          <div className="px-4">
+          <div className="ui-boxed-list">
             {SHORTCUT_ROWS.map((row) => (
-              <div
-                key={row.label}
-                className="flex items-center justify-between gap-4 border-b border-edge py-2.5 last:border-b-0"
-              >
-                <span className="text-control text-ink-2">{t(row.label)}</span>
+              <div key={row.label} className="ui-row justify-between gap-4">
+                <span className="text-body text-ink">{t(row.label)}</span>
                 <span className="flex shrink-0 items-center gap-1">
                   {row.keys.map((chord, i) => (
                     <Fragment key={chord.join('+')}>
@@ -54,7 +43,7 @@ export default function ShortcutsOverlay(): JSX.Element {
               </div>
             ))}
           </div>
-        </Modal>
+        </Dialog>
       )}
     </AnimatePresence>
   )
