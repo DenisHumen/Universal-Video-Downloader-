@@ -6,7 +6,7 @@ Everything a contributor needs that a user does not: the stack, the commands, ho
 
 | Layer | Choice |
 | --- | --- |
-| Shell | Electron 33 |
+| Shell | Electron 45 (Node 24) |
 | Build | electron-vite + electron-builder |
 | UI | React 18 + TypeScript + Tailwind CSS |
 | Animation | Framer Motion |
@@ -18,7 +18,7 @@ Everything a contributor needs that a user does not: the stack, the commands, ho
 
 ## Commands
 
-Requires Node.js (CI uses Node 20) and npm.
+Requires Node.js 22.12 or later (CI uses Node 24) and npm. `npm run dev`, `npm start` and `npm test` first fetch the Electron binary if it is not there yet: since Electron 42, `npm install` no longer does.
 
 ```bash
 npm install              # install dependencies
