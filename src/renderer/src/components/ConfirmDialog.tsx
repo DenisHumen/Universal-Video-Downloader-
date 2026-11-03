@@ -48,7 +48,7 @@ export default function ConfirmDialog({
           <h2 className="h2" id={titleId}>
             {title}
           </h2>
-          <p className="mt-1 text-[13px] leading-relaxed text-ink-2" id={bodyId}>
+          <p className="mt-1 text-control leading-relaxed text-ink-2" id={bodyId}>
             {body}
           </p>
         </div>

@@ -500,7 +500,7 @@ export default function HomeView(): JSX.Element {
           micro-label — visually quiet, and completely silent about what the
           window in front of you is for.
         */}
-        <h1 className="h1 text-[20px]">{t('home.title')}</h1>
+        <h1 className="h1 text-title">{t('home.title')}</h1>
         <p className="lead mt-2">{t('home.subtitle')}</p>
 
         <label className="label mb-2 mt-7 block" htmlFor="uvd-url">
@@ -543,7 +543,7 @@ export default function HomeView(): JSX.Element {
             }}
             placeholder={t('home.placeholder')}
             aria-label={t('home.placeholder')}
-            className="no-drag min-w-0 flex-1 bg-transparent px-2.5 py-2 text-[16px] text-ink outline-none placeholder:text-ink-3"
+            className="no-drag min-w-0 flex-1 bg-transparent px-2.5 py-2 text-section text-ink outline-none placeholder:text-ink-3"
             spellCheck={false}
             autoComplete="off"
           />
@@ -601,7 +601,7 @@ export default function HomeView(): JSX.Element {
                 rows={5}
                 aria-label={t('home.batchHint')}
                 spellCheck={false}
-                className="field mono resize-none bg-canvas text-[13px]"
+                className="field mono resize-none bg-canvas text-control"
                 placeholder={'https://…\nhttps://…'}
               />
               <SaveLocation
@@ -665,7 +665,7 @@ export default function HomeView(): JSX.Element {
                 <p className="h2">{t('home.errorTitle')}</p>
               </div>
               <div className="p-4">
-                <p className="selectable break-words text-[13px] leading-relaxed text-ink">
+                <p className="selectable break-words text-control leading-relaxed text-ink">
                   {errorText(t, { error, errorCode, cookieHint })}
                 </p>
                 {/*
@@ -675,7 +675,7 @@ export default function HomeView(): JSX.Element {
                   is just noise.
                 */}
                 {error && errorCode && (
-                  <p className="mono selectable mt-2 break-words text-[12px] leading-relaxed text-ink-3">
+                  <p className="mono selectable mt-2 break-words text-meta leading-relaxed text-ink-3">
                     {error}
                   </p>
                 )}
@@ -785,7 +785,7 @@ export default function HomeView(): JSX.Element {
                     and its tight letter-spacing would win over the tracking.
                   */}
                   {info.isLive && (
-                    <span className="absolute left-1.5 top-1.5 rounded-1 bg-bad px-1.5 py-0.5 font-mono text-[11px] font-semibold uppercase leading-none tracking-[0.08em] text-bad-fg">
+                    <span className="absolute left-1.5 top-1.5 rounded-1 bg-bad px-1.5 py-0.5 font-mono text-caption font-semibold uppercase leading-none tracking-[0.08em] text-bad-fg">
                       {t('home.liveBadge')}
                     </span>
                   )}
@@ -794,7 +794,7 @@ export default function HomeView(): JSX.Element {
                   <h2 className="h2 line-clamp-2" title={info.title}>
                     {info.title}
                   </h2>
-                  <p className="mono mt-1.5 truncate text-[12px] text-ink-2">
+                  <p className="mono mt-1.5 truncate text-meta text-ink-2">
                     {[
                       info.uploader,
                       info.viewCount != null ? formatCount(info.viewCount) : null,
@@ -853,12 +853,12 @@ export default function HomeView(): JSX.Element {
                       onClick={() => setTrimOpen((v) => !v)}
                       aria-expanded={trimOpen}
                       aria-controls={trimOpen ? trimPanelId : undefined}
-                      className="flex w-full items-center justify-between rounded-1 py-1 text-[13px] font-medium text-ink-2 transition-colors duration-fast ease-ease hover:text-ink"
+                      className="flex w-full items-center justify-between rounded-1 py-1 text-control font-medium text-ink-2 transition-colors duration-fast ease-ease hover:text-ink"
                     >
                       <span className="flex items-center gap-2">
                         <Scissors size={13} /> {t('trim.enable')}
                         {trimOpen && hasTrim(section) && (
-                          <span className="mono text-[12px] text-accent-ink">
+                          <span className="mono text-meta text-accent-ink">
                             {toClock(section.start ?? 0)}
                             {section.end != null ? ` → ${toClock(section.end)}` : ' →'}
                           </span>
@@ -922,7 +922,7 @@ export default function HomeView(): JSX.Element {
               */}
               <div className="sticky bottom-0 mt-auto border-t border-edge bg-raise p-4">
                 <button
-                  className="btn-solid w-full py-3.5 text-[14px]"
+                  className="btn-solid w-full py-3.5 text-body"
                   onClick={start}
                   disabled={starting}
                 >
@@ -1035,7 +1035,7 @@ function DetectingCard({
           {slow && <p className="hint mt-1 truncate">{slowHint}</p>}
         </div>
         {elapsed >= 3 && (
-          <span className="mono shrink-0 text-[12px] tabular-nums text-ink-3" aria-hidden="true">
+          <span className="mono shrink-0 text-meta tabular-nums text-ink-3" aria-hidden="true">
             {t('detect.elapsed', { seconds: elapsed })}
           </span>
         )}
@@ -1068,7 +1068,7 @@ function DetectingCard({
               <div className="skeleton h-3 w-1/2 rounded-1" />
             </>
           )}
-          {preview?.author && <p className="mono truncate text-[12px] text-ink-2">{preview.author}</p>}
+          {preview?.author && <p className="mono truncate text-meta text-ink-2">{preview.author}</p>}
           {host && <span className="tag">{host}</span>}
         </div>
       </div>
@@ -1083,7 +1083,7 @@ function DetectingCard({
       {onDownloadNow && (
         <div className="border-t border-edge p-4">
           <button
-            className="btn-solid w-full py-3 text-[14px]"
+            className="btn-solid w-full py-3 text-body"
             onClick={onDownloadNow}
             disabled={starting}
           >

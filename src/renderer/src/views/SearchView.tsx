@@ -307,7 +307,7 @@ export default function SearchView({ settings, embedded = false }: Props): JSX.E
             onChange={(e) => setQuery(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && search()}
             placeholder={t('search.placeholder')}
-            className="no-drag min-w-0 flex-1 bg-transparent px-1.5 py-2 text-[16px] text-ink outline-none placeholder:text-ink-3"
+            className="no-drag min-w-0 flex-1 bg-transparent px-1.5 py-2 text-section text-ink outline-none placeholder:text-ink-3"
             spellCheck={false}
             autoComplete="off"
           />
@@ -330,7 +330,7 @@ export default function SearchView({ settings, embedded = false }: Props): JSX.E
             options={services.map((s) => ({ value: s, label: serviceLabel(s, t) }))}
           />
           {results && (
-            <span className="mono ml-auto shrink-0 text-[12px] text-ink-2">
+            <span className="mono ml-auto shrink-0 text-meta text-ink-2">
               {t('search.results', { count: results.length })}
             </span>
           )}
@@ -372,7 +372,7 @@ export default function SearchView({ settings, embedded = false }: Props): JSX.E
               <p className="h2 flex items-center gap-2">
                 <span className="h-1.5 w-1.5 rounded-full bg-bad" /> {t('search.failed')}
               </p>
-              <p className="selectable mt-2 break-words text-[13px] leading-relaxed text-ink-2">
+              <p className="selectable mt-2 break-words text-control leading-relaxed text-ink-2">
                 {errorText(t, { error, errorCode })}
               </p>
               {/*
@@ -559,24 +559,24 @@ function ResultTile({
           fallback={<div className="h-full w-full bg-sink" />}
         />
         {badge && (
-          <span className="mono absolute left-2 top-2 rounded-1 bg-canvas/90 px-2 py-1 text-[11px] leading-none text-ink">
+          <span className="mono absolute left-2 top-2 rounded-1 bg-canvas/90 px-2 py-1 text-caption leading-none text-ink">
             {badge}
           </span>
         )}
         {result.duration != null && result.duration > 0 && (
-          <span className="mono absolute bottom-2 right-2 rounded-1 bg-canvas/90 px-2 py-1 text-[11px] leading-none text-ink">
+          <span className="mono absolute bottom-2 right-2 rounded-1 bg-canvas/90 px-2 py-1 text-caption leading-none text-ink">
             {formatDuration(result.duration)}
           </span>
         )}
       </button>
 
       <p
-        className="mt-2.5 line-clamp-2 text-[14px] font-medium leading-snug text-ink"
+        className="mt-2.5 line-clamp-2 text-body font-medium leading-snug text-ink"
         title={result.title}
       >
         {result.title}
       </p>
-      <p className="mono mt-1 truncate text-[12px] text-ink-2">{meta || result.service}</p>
+      <p className="mono mt-1 truncate text-meta text-ink-2">{meta || result.service}</p>
 
       <div className="mt-auto flex items-center gap-1 pt-2.5">
         <button

@@ -50,11 +50,11 @@ export default function EngineNotice(): JSX.Element | null {
         </span>
 
         <div className="min-w-0 flex-1">
-          <p className="text-[14px] font-medium text-ink">
+          <p className="text-body font-medium text-ink">
             {failed ? t('engine.setupFailed') : t('engine.setupTitle')}
           </p>
           {failed ? (
-            <p className="mono truncate text-[12px] text-ink-2" title={ytdlp.message}>
+            <p className="mono truncate text-meta text-ink-2" title={ytdlp.message}>
               {ytdlp.message}
             </p>
           ) : (
@@ -75,7 +75,7 @@ export default function EngineNotice(): JSX.Element | null {
                   style={{ width: `${percent}%` }}
                 />
               </div>
-              <span className="mono shrink-0 text-[12px] tabular-nums text-ink-2">{percent}%</span>
+              <span className="mono shrink-0 text-meta tabular-nums text-ink-2">{percent}%</span>
             </div>
           )}
         </div>
@@ -86,7 +86,7 @@ export default function EngineNotice(): JSX.Element | null {
             {t('common.retry')}
           </button>
         ) : (
-          <span className="mono hidden shrink-0 text-[12px] text-ink-3 sm:inline">
+          <span className="mono hidden shrink-0 text-meta text-ink-3 sm:inline">
             {t('engine.setupOnce')}
           </span>
         )}

@@ -18,7 +18,7 @@ export default function DropOverlay(): JSX.Element {
       style={{ zIndex: 'var(--z-overlay)' }}
       aria-hidden="true"
     >
-      <p className="flex items-center gap-2 rounded-3 bg-raise px-4 py-2 text-[14px] font-medium text-ink">
+      <p className="flex items-center gap-2 rounded-3 bg-raise px-4 py-2 text-body font-medium text-ink">
         <ArrowDownToLine size={16} className="text-accent-ink" />
         {t('home.dropHint')}
       </p>

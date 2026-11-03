@@ -66,6 +66,21 @@ module.exports = {
           'monospace'
         ]
       },
+      /*
+       * The type scale (4.0, plan 2.5). Seven steps and nothing between them;
+       * `text-[Npx]` is refused by stylesheet.test.ts. The four UI sizes
+       * carry no line-height of their own and keep the body's 1.5, so a
+       * label moved onto a token does not shift its row.
+       */
+      fontSize: {
+        hero: ['28px', { lineHeight: '1.15', letterSpacing: '-0.02em', fontWeight: '600' }],
+        title: ['22px', { lineHeight: '1.2', letterSpacing: '-0.015em', fontWeight: '600' }],
+        section: ['16px', { lineHeight: '1.35' }],
+        body: '14px',
+        control: '13px',
+        meta: '12px',
+        caption: '11px'
+      },
       borderRadius: {
         1: 'var(--r-1)',
         2: 'var(--r-2)',

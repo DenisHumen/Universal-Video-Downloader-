@@ -32,7 +32,7 @@ export default function SaveLocation({ value, onChange, defaultDir, className = 
     <div className={`flex flex-wrap items-end justify-between gap-3 ${className}`}>
       <div className="min-w-0 flex-1">
         <p className="label mb-1.5">{t('settings.saveLocation')}</p>
-        <p className="mono truncate text-[12px] text-ink-2" title={value || defaultDir}>
+        <p className="mono truncate text-meta text-ink-2" title={value || defaultDir}>
           {value || defaultDir}
         </p>
       </div>

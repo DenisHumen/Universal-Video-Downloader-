@@ -109,7 +109,7 @@ export default function AutomationSettings(): JSX.Element {
       {!secrets.persists && <p className="hint mb-3 text-bad">{t('settings.secretsVolatile')}</p>}
 
       <div className="border-b border-edge py-4">
-        <p className="text-[14px] text-ink">{t('settings.shares')}</p>
+        <p className="text-body text-ink">{t('settings.shares')}</p>
         <p className="hint mt-1">{t('settings.sharesHint')}</p>
 
         <div className="mt-3 space-y-1.5">
@@ -121,8 +121,8 @@ export default function AutomationSettings(): JSX.Element {
                   className="panel flex-1 px-3 py-2 text-left transition-colors hover:bg-raise"
                   onClick={() => (editing === target.id ? setEditing(null) : startEdit(target))}
                 >
-                  <span className="block text-[13px] text-ink">{target.name}</span>
-                  <span className="mono block text-[11px] text-ink-2">
+                  <span className="block text-control text-ink">{target.name}</span>
+                  <span className="mono block text-caption text-ink-2">
                     {pathOf(target)}
                     {/* Said in words and in the warning colour; it used to read "· password?". */}
                     {!secrets.smb[target.id] && (
@@ -193,7 +193,7 @@ export default function AutomationSettings(): JSX.Element {
       </div>
 
       <div className="border-b border-edge py-4">
-        <p className="text-[14px] text-ink">{t('settings.telegram')}</p>
+        <p className="text-body text-ink">{t('settings.telegram')}</p>
         <p className="hint mb-3 mt-1">{t('settings.telegramHint')}</p>
         <TelegramForm
           token={token}

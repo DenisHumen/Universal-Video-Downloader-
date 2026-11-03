@@ -144,7 +144,7 @@ export default function ReportPrompt(props: ReportFailure): JSX.Element | null {
     <div className="well mt-3 p-3.5">
       <div className="flex items-baseline gap-3">
         <span className="label shrink-0 text-accent-ink">{t('report.stamp')}</span>
-        <p className="min-w-0 flex-1 text-[13px] leading-relaxed text-ink">
+        <p className="min-w-0 flex-1 text-control leading-relaxed text-ink">
           {unsupported ? t('report.unsupported') : t('report.generic')}
         </p>
       </div>
@@ -171,13 +171,13 @@ export default function ReportPrompt(props: ReportFailure): JSX.Element | null {
           </button>
         )}
         {phase === 'sent' && (
-          <p className="flex items-center gap-1.5 text-[13px] text-good">
+          <p className="flex items-center gap-1.5 text-control text-good">
             <Check size={14} /> {outcome}
           </p>
         )}
         {phase === 'failed' && (
           <div className="w-full">
-            <p className="text-[13px] leading-relaxed text-bad">{outcome}</p>
+            <p className="text-control leading-relaxed text-bad">{outcome}</p>
             {/*
               Answering already retired every other prompt for this site and
               error, so this card is the one way left to send it through the
@@ -216,7 +216,7 @@ export default function ReportPrompt(props: ReportFailure): JSX.Element | null {
               void loadPreview()
             }}
             aria-expanded={detailsOpen}
-            className="mono mt-3 flex items-center gap-1 text-[11px] uppercase tracking-[0.08em] text-ink-2 transition-colors duration-fast ease-ease hover:text-ink"
+            className="mono mt-3 flex items-center gap-1 text-caption uppercase tracking-[0.08em] text-ink-2 transition-colors duration-fast ease-ease hover:text-ink"
           >
             {t('report.details')}
             <motion.span animate={{ rotate: detailsOpen ? 180 : 0 }} transition={{ duration: 0.16 }}>
@@ -230,7 +230,7 @@ export default function ReportPrompt(props: ReportFailure): JSX.Element | null {
                 {preview === undefined ? (
                   <Loader2 size={14} className="mt-2 animate-spin text-ink-3" />
                 ) : preview ? (
-                  <pre className="selectable mono mt-2 max-h-56 overflow-auto whitespace-pre-wrap break-all rounded-1 bg-raise px-3 py-2.5 text-[11px] leading-relaxed text-ink-2">
+                  <pre className="selectable mono mt-2 max-h-56 overflow-auto whitespace-pre-wrap break-all rounded-1 bg-raise px-3 py-2.5 text-caption leading-relaxed text-ink-2">
                     {`${preview.subject}\n\n${preview.text}`}
                   </pre>
                 ) : (

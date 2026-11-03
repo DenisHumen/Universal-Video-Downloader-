@@ -142,7 +142,7 @@ export default function BrowserApp(): JSX.Element {
       >
         <div className="flex shrink-0 items-center gap-2.5 pr-1">
           <Logo className="h-[18px] w-[18px] text-ink" />
-          <span className="mono hidden text-[12px] font-semibold uppercase tracking-[0.16em] text-ink sm:inline">
+          <span className="mono hidden text-meta font-semibold uppercase tracking-[0.16em] text-ink sm:inline">
             {t('browser.title')}
           </span>
         </div>
@@ -185,7 +185,7 @@ export default function BrowserApp(): JSX.Element {
             onKeyDown={(e) => e.key === 'Enter' && go()}
             placeholder={t('browser.urlPlaceholder')}
             spellCheck={false}
-            className="no-drag mono min-w-0 flex-1 self-stretch bg-transparent text-[13px] text-ink outline-none placeholder:text-ink-3"
+            className="no-drag mono min-w-0 flex-1 self-stretch bg-transparent text-control text-ink outline-none placeholder:text-ink-3"
           />
         </label>
 
@@ -238,10 +238,10 @@ export default function BrowserApp(): JSX.Element {
                   transition={enter}
                   className="border-b border-edge px-4 py-3"
                 >
-                  <p className="truncate text-[13px] font-medium text-ink" title={entry.url}>
+                  <p className="truncate text-control font-medium text-ink" title={entry.url}>
                     {entry.label}
                   </p>
-                  <p className="mono mt-1 text-[11px] uppercase tracking-[0.08em] text-ink-2">
+                  <p className="mono mt-1 text-caption uppercase tracking-[0.08em] text-ink-2">
                     {[entry.kind, entry.bytes ? formatBytes(entry.bytes) : null]
                       .filter(Boolean)
                       .join('  ·  ')}
@@ -262,7 +262,7 @@ export default function BrowserApp(): JSX.Element {
 
             {media.length === 0 && (
               <div className="px-4 py-10 text-center">
-                <p className="text-[13px] font-medium text-ink">{t('browser.foundNone')}</p>
+                <p className="text-control font-medium text-ink">{t('browser.foundNone')}</p>
                 <p className="hint mt-2">
                   {t('browser.foundHint')}
                 </p>

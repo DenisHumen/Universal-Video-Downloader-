@@ -130,7 +130,7 @@ export default function RowMenu({ label, items }: { label: string; items: RowMen
               key={item.label}
               role="menuitem"
               tabIndex={-1}
-              className="flex w-full items-center gap-2.5 rounded-1 px-3 py-2 text-left text-[13px] text-ink-2 outline-none transition-colors duration-fast ease-ease hover:bg-sink hover:text-ink focus:bg-sink focus:text-ink"
+              className="flex w-full items-center gap-2.5 rounded-1 px-3 py-2 text-left text-control text-ink-2 outline-none transition-colors duration-fast ease-ease hover:bg-sink hover:text-ink focus:bg-sink focus:text-ink"
               onClick={() => {
                 close(true)
                 item.onSelect()

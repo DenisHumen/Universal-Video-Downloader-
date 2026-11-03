@@ -50,6 +50,20 @@ describe('button classes in the source', () => {
   })
 })
 
+describe('type sizes in the source', () => {
+  /*
+    4.0 type scale (plan 2.5): hero, title, section, body, control, meta,
+    caption. An arbitrary size is how the 3.x interface drifted to seven
+    near-identical ones; a new size goes into tailwind.config.js or nowhere.
+  */
+  it('uses the type scale, never text-[Npx]', () => {
+    const arbitrary = sources.flatMap(({ file, text }) =>
+      [...text.matchAll(/\btext-\[\d+(?:\.\d+)?px\]/g)].map((m) => `${file}: ${m[0]}`)
+    )
+    expect(arbitrary).toEqual([])
+  })
+})
+
 /*
   The stylesheet as Tailwind actually builds it: what @apply copies and what
   order the layers land in decide how things look, and neither shows up in the

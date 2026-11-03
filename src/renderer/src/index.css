@@ -215,7 +215,7 @@ body {
   /* 14px base. The first cut of this system ran on 13px with 10–11px meta,
      which read as "designed" in a screenshot and as squinting in daily use.
      Restraint is a job for colour and spacing, never for legibility. */
-  font-size: 14px;
+  font-size: theme('fontSize.body');
   line-height: 1.5;
   overflow: hidden;
   -webkit-font-smoothing: antialiased;
@@ -261,7 +261,7 @@ body {
 @layer components {
   /* The one heading per screen. */
   .h1 {
-    font-size: 24px;
+    font-size: theme('fontSize.title.0');
     line-height: 1.2;
     font-weight: 600;
     letter-spacing: -0.02em;
@@ -270,7 +270,7 @@ body {
 
   /* A section inside a screen. */
   .h2 {
-    font-size: 15px;
+    font-size: theme('fontSize.section.0');
     line-height: 1.35;
     font-weight: 600;
     color: rgb(var(--text));
@@ -279,7 +279,7 @@ body {
   /* The sentence under an h1 that says what the screen is for. Measure-capped:
      past ~65 characters the eye loses the line it was on. */
   .lead {
-    font-size: 14px;
+    font-size: theme('fontSize.body');
     line-height: 1.6;
     color: rgb(var(--text-2));
     max-width: 62ch;
@@ -287,7 +287,7 @@ body {
 
   /* Explanatory text under a control. */
   .hint {
-    font-size: 12px;
+    font-size: theme('fontSize.meta');
     line-height: 1.5;
     color: rgb(var(--text-2));
     max-width: 62ch;
@@ -297,7 +297,7 @@ body {
      10px in the third text tier this was decorative rather than readable. */
   .label {
     font-family: theme('fontFamily.mono');
-    font-size: 11px;
+    font-size: theme('fontSize.caption');
     line-height: 1.2;
     font-weight: 600;
     text-transform: uppercase;
@@ -382,7 +382,7 @@ textarea,
       color var(--t-fast) var(--ease),
       border-color var(--t-fast) var(--ease),
       transform var(--t-fast) var(--ease);
-    @apply no-drag inline-flex cursor-pointer select-none items-center justify-center gap-2 whitespace-nowrap px-4 py-2 text-[13px] font-medium active:scale-[0.97] disabled:pointer-events-none disabled:opacity-40;
+    @apply no-drag inline-flex cursor-pointer select-none items-center justify-center gap-2 whitespace-nowrap px-4 py-2 text-control font-medium active:scale-[0.97] disabled:pointer-events-none disabled:opacity-40;
   }
   /* The single loud element on any screen. There is never more than one. */
   .btn-solid {
@@ -432,7 +432,7 @@ textarea,
     transition:
       border-color var(--t-fast) var(--ease),
       box-shadow var(--t-fast) var(--ease);
-    @apply no-drag w-full border border-edge bg-sink px-3.5 py-2.5 text-[14px] text-ink outline-none placeholder:text-ink-3;
+    @apply no-drag w-full border border-edge bg-sink px-3.5 py-2.5 text-body text-ink outline-none placeholder:text-ink-3;
   }
   .field:focus,
   .field:focus-within {
@@ -441,7 +441,7 @@ textarea,
   }
   /* The home screen's focal input: the same field at display scale. */
   .field-lg {
-    @apply field px-5 py-4 text-[16px];
+    @apply field px-5 py-4 text-section;
     border-radius: var(--r-4);
   }
 
@@ -463,7 +463,7 @@ textarea,
       background-color var(--t-fast) var(--ease),
       color var(--t-fast) var(--ease),
       border-color var(--t-fast) var(--ease);
-    @apply no-drag inline-flex cursor-pointer select-none items-center justify-center gap-1.5 whitespace-nowrap border border-edge bg-sink px-3.5 py-2 text-[13px] font-medium text-ink-2 hover:border-edge-strong hover:bg-edge hover:text-ink;
+    @apply no-drag inline-flex cursor-pointer select-none items-center justify-center gap-1.5 whitespace-nowrap border border-edge bg-sink px-3.5 py-2 text-control font-medium text-ink-2 hover:border-edge-strong hover:bg-edge hover:text-ink;
   }
   .choice-on {
     @apply border-accent bg-accent text-accent-fg hover:border-accent hover:bg-accent hover:text-accent-fg;
@@ -481,7 +481,7 @@ textarea,
     transition:
       color var(--t-fast) var(--ease),
       border-color var(--t-fast) var(--ease);
-    @apply no-drag relative inline-flex cursor-pointer select-none items-center gap-2 border-b-2 border-transparent px-3.5 pb-2.5 pt-3 text-[13px] font-medium text-ink-2 hover:text-ink;
+    @apply no-drag relative inline-flex cursor-pointer select-none items-center gap-2 border-b-2 border-transparent px-3.5 pb-2.5 pt-3 text-control font-medium text-ink-2 hover:text-ink;
   }
   .tab-on {
     @apply border-accent font-semibold text-ink;
@@ -506,11 +506,11 @@ textarea,
   /* A read-only fact: extractor name, container, count. Never interactive. */
   .tag {
     border-radius: var(--r-1);
-    @apply inline-flex items-center gap-1 bg-sink px-2 py-1 font-mono text-[11px] leading-none text-ink-2;
+    @apply inline-flex items-center gap-1 bg-sink px-2 py-1 font-mono text-caption leading-none text-ink-2;
   }
   .kbd {
     border-radius: var(--r-1);
-    @apply inline-flex items-center border border-edge-strong bg-sink px-2 py-1 font-mono text-[11px] leading-none text-ink-2;
+    @apply inline-flex items-center border border-edge-strong bg-sink px-2 py-1 font-mono text-caption leading-none text-ink-2;
   }
 
   /*

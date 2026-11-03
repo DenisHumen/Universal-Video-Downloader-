@@ -145,11 +145,11 @@ function QueueLink({ id }: { id: string }): JSX.Element | null {
   return (
     <div className="mt-1.5 flex items-center gap-2">
       <span
-        className={`mono min-w-0 flex-1 truncate text-[11px] ${paused ? 'text-warn' : 'text-ink-2'}`}
+        className={`mono min-w-0 flex-1 truncate text-caption ${paused ? 'text-warn' : 'text-ink-2'}`}
       >
         {text}
       </span>
-      <button className="btn-quiet px-3 py-1 text-[12px]" onClick={() => setView('downloads')}>
+      <button className="btn-quiet px-3 py-1 text-meta" onClick={() => setView('downloads')}>
         {t('auto.showInQueue')}
       </button>
     </div>
@@ -327,10 +327,10 @@ export default function AutomationView(): JSX.Element {
                   fallback={<Film size={14} className="text-ink-3" />}
                 />
                 <span className="min-w-0 flex-1">
-                  <span className="block truncate text-[13px] text-ink" title={w.title}>
+                  <span className="block truncate text-control text-ink" title={w.title}>
                     {w.title}
                   </span>
-                  <span className="mono block truncate text-[11px] text-ink-2">
+                  <span className="mono block truncate text-caption text-ink-2">
                     {w.enabled
                       ? w.lastError
                         ? t('auto.failing')
@@ -398,7 +398,7 @@ export default function AutomationView(): JSX.Element {
                   {[selected.translatorName, selected.quality].filter(Boolean).join(' · ')}
                 </p>
                 {selected.pending && (
-                  <p className="mt-1 text-[13px] text-ink">
+                  <p className="mt-1 text-control text-ink">
                     {releaseText(selected.releaseAt, t)}
                     {selected.releaseAt
                       ? ` · ${t('auto.releaseOn', {
@@ -407,7 +407,7 @@ export default function AutomationView(): JSX.Element {
                       : ''}
                   </p>
                 )}
-                <p className="mono mt-1 text-[12px] text-ink-2">
+                <p className="mono mt-1 text-meta text-ink-2">
                   <Clock size={11} className="mr-1 inline" />
                   {selected.enabled
                     ? `${t('auto.nextCheck')} ${relative(selected.nextCheckAt, t)}`
@@ -473,7 +473,7 @@ export default function AutomationView(): JSX.Element {
                 {t('auto.checkNow')}
               </button>
               <select
-                className="field w-auto text-[13px]"
+                className="field w-auto text-control"
                 aria-label={t('auto.interval')}
                 value={String(selected.intervalMinutes)}
                 onChange={(e) => void patch({ intervalMinutes: Number(e.target.value) })}
@@ -494,7 +494,7 @@ export default function AutomationView(): JSX.Element {
             <div className="mt-3 space-y-2">
               <div className="panel flex items-center gap-3 px-3 py-2.5 opacity-80">
                 {STEP_ICON.download}
-                <span className="flex-1 text-[13px] text-ink">{t('auto.step.download')}</span>
+                <span className="flex-1 text-control text-ink">{t('auto.step.download')}</span>
                 <span className="hint">{t('auto.always')}</span>
               </div>
 
@@ -510,10 +510,10 @@ export default function AutomationView(): JSX.Element {
                     >
                       {STEP_ICON[step.kind]}
                       <span className="min-w-0 flex-1">
-                        <span className="block text-[13px] text-ink">
+                        <span className="block text-control text-ink">
                           {t(STEP_LABEL[step.kind])}
                         </span>
-                        <span className="mono block truncate text-[11px] text-ink-2">
+                        <span className="mono block truncate text-caption text-ink-2">
                           {step.kind === 'rename' && step.template}
                           {step.kind === 'upload' &&
                             `${step.remotePath} · ${t(step.deleteLocalAfter ? 'auto.localDeleted' : 'auto.localKept')}`}
@@ -534,7 +534,7 @@ export default function AutomationView(): JSX.Element {
                       well as on the share.
                     */}
                     {step.kind === 'upload' && (
-                      <label className="mt-1.5 flex cursor-pointer items-center gap-2.5 px-3 text-[13px] text-ink-2">
+                      <label className="mt-1.5 flex cursor-pointer items-center gap-2.5 px-3 text-control text-ink-2">
                         <input
                           type="checkbox"
                           checked={step.deleteLocalAfter}
@@ -566,7 +566,7 @@ export default function AutomationView(): JSX.Element {
                 {runs.map((run) => (
                   <li key={run.id} className="panel px-3 py-2">
                     <div className="flex items-center gap-2">
-                      <span className="mono text-[12px] text-ink">
+                      <span className="mono text-meta text-ink">
                         S{String(run.season).padStart(2, '0')}E
                         {String(run.episode).padStart(2, '0')}
                       </span>
@@ -581,7 +581,7 @@ export default function AutomationView(): JSX.Element {
                       >
                         {t(RUN_LABEL[run.state])}
                       </span>
-                      <span className="mono ml-auto text-[11px] text-ink-3">
+                      <span className="mono ml-auto text-caption text-ink-3">
                         {ago(run.startedAt, t)}
                       </span>
                     </div>
@@ -590,7 +590,7 @@ export default function AutomationView(): JSX.Element {
                       {[...run.steps].sort(byStepOrder).map((s, i) => (
                         <span
                           key={i}
-                          className={`mono text-[11px] ${
+                          className={`mono text-caption ${
                             s.state === 'failed'
                               ? 'text-bad'
                               : s.state === 'done'
@@ -612,7 +612,7 @@ export default function AutomationView(): JSX.Element {
                     )}
                     {(run.state === 'failed' || run.state === 'skipped') && (
                       <div className="mt-1.5 flex items-center gap-2">
-                        <span className="mono min-w-0 flex-1 truncate text-[11px] text-ink-2">
+                        <span className="mono min-w-0 flex-1 truncate text-caption text-ink-2">
                           {/* Counted on the watch only while the schedule still means to try again. */}
                           {run.state === 'failed' && attemptsAt(selected, run) > 0
                             ? t('auto.runWillRetry', {
@@ -622,7 +622,7 @@ export default function AutomationView(): JSX.Element {
                             : ''}
                         </span>
                         <button
-                          className="btn-quiet px-3 py-1 text-[12px]"
+                          className="btn-quiet px-3 py-1 text-meta"
                           onClick={() => void retry(run)}
                         >
                           <RotateCcw size={12} /> {t('auto.retryRun')}

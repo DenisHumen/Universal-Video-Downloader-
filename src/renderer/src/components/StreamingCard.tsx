@@ -205,7 +205,7 @@ export default function StreamingCard({
           <h2 className="h2" id={titleId}>
             {s.title}
           </h2>
-          <p className="mono mt-1 text-[12px] text-ink-2">
+          <p className="mono mt-1 text-meta text-ink-2">
             {s.isSeries
               ? seasonsForT.length > 1
                 ? t('streaming.seriesSeasons', { count: seasonsForT.length })
@@ -294,7 +294,7 @@ export default function StreamingCard({
                       key={ep}
                       onClick={() => toggleEpisode(ep)}
                       aria-pressed={on}
-                      className={`no-drag mono h-9 w-9 shrink-0 rounded-1 border text-[12px] tabular-nums transition-colors duration-fast ease-ease ${
+                      className={`no-drag mono h-9 w-9 shrink-0 rounded-1 border text-meta tabular-nums transition-colors duration-fast ease-ease ${
                         on
                           ? 'border-accent bg-accent text-accent-fg'
                           : 'border-edge text-ink-2 hover:border-ink-3 hover:text-ink'
@@ -329,7 +329,7 @@ export default function StreamingCard({
               own click with an error toast.
             */}
             <button
-              className="btn-solid w-full py-3.5 text-[14px]"
+              className="btn-solid w-full py-3.5 text-body"
               onClick={queueSeries}
               disabled={busy || totalSelected === 0}
             >
@@ -368,7 +368,7 @@ export default function StreamingCard({
               onChange={onSaveDirChange}
               defaultDir={settings?.downloadDir ?? ''}
             />
-            <button className="btn-solid w-full py-3.5 text-[14px]" onClick={queueMovie} disabled={busy}>
+            <button className="btn-solid w-full py-3.5 text-body" onClick={queueMovie} disabled={busy}>
               {busy ? <Loader2 size={16} className="animate-spin" /> : null}
               {t('common.download')}
             </button>

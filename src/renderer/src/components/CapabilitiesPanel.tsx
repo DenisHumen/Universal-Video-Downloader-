@@ -94,7 +94,7 @@ export default function CapabilitiesPanel(): JSX.Element {
                 <span className="min-w-0 flex-1">
                   <span className="flex items-center gap-1.5">
                     <span
-                      className={`text-[14px] font-medium text-ink ${
+                      className={`text-body font-medium text-ink ${
                         interactive ? 'group-hover:text-accent-ink' : ''
                       }`}
                     >

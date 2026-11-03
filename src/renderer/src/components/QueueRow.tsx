@@ -247,7 +247,7 @@ function QueueRow({ item, index, animateIn = true, heading }: Props): JSX.Elemen
       {/* In the row rather than between rows, so the list stays one <ul> of <li>s. */}
       {heading && <p className="label border-b border-edge pb-2 pt-5">{heading}</p>}
       <div className="flex items-center gap-3 py-2.5 pl-1 pr-1 transition-colors duration-fast ease-ease group-hover:bg-raise">
-        <span className="mono w-6 shrink-0 text-center text-[12px] tabular-nums text-ink-3">
+        <span className="mono w-6 shrink-0 text-center text-meta tabular-nums text-ink-3">
           {String(index + 1).padStart(2, '0')}
         </span>
 
@@ -261,10 +261,10 @@ function QueueRow({ item, index, animateIn = true, heading }: Props): JSX.Elemen
         </div>
 
         <div className="min-w-0 flex-1">
-          <p className="truncate text-[14px] font-medium text-ink" title={item.title}>
+          <p className="truncate text-body font-medium text-ink" title={item.title}>
             {item.title}
           </p>
-          <p className="mono mt-0.5 flex items-center gap-2 truncate text-[12px] text-ink-2">
+          <p className="mono mt-0.5 flex items-center gap-2 truncate text-meta text-ink-2">
             <span className={`inline-flex shrink-0 items-center gap-1.5 ${meta.text}`}>
               <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${meta.dot}`} />
               {t(meta.label)}
@@ -418,19 +418,19 @@ function QueueRow({ item, index, animateIn = true, heading }: Props): JSX.Elemen
           */}
           {item.state === 'error' ? (
             <p
-              className="selectable line-clamp-3 break-words text-[12px] text-bad"
+              className="selectable line-clamp-3 break-words text-meta text-bad"
               title={errorText(t, item)}
             >
               {errorText(t, item)}
             </p>
           ) : (
             item.filepath ? (
-              <p className="selectable mono flex min-w-0 text-[12px]" title={item.filepath}>
+              <p className="selectable mono flex min-w-0 text-meta" title={item.filepath}>
                 <span className="min-w-0 shrink truncate text-ink-3">{savedAt.dir}</span>
                 <span className="max-w-full shrink-0 truncate text-ink-2">{savedAt.base}</span>
               </p>
             ) : (
-              <p className="selectable mono truncate text-[12px] text-ink-3" title={landed}>
+              <p className="selectable mono truncate text-meta text-ink-3" title={landed}>
                 {landed}
               </p>
             )
@@ -441,7 +441,7 @@ function QueueRow({ item, index, animateIn = true, heading }: Props): JSX.Elemen
                 onClick={() => setLogOpen((v) => !v)}
                 aria-expanded={logOpen}
                 aria-controls={logOpen ? logId : undefined}
-                className="mono mt-2 flex items-center gap-1 text-[11px] uppercase tracking-[0.08em] text-ink-2 transition-colors duration-fast ease-ease hover:text-ink"
+                className="mono mt-2 flex items-center gap-1 text-caption uppercase tracking-[0.08em] text-ink-2 transition-colors duration-fast ease-ease hover:text-ink"
               >
                 {t('queue.log')}
                 <motion.span animate={{ rotate: logOpen ? 180 : 0 }} transition={{ duration: 0.16 }}>
@@ -453,7 +453,7 @@ function QueueRow({ item, index, animateIn = true, heading }: Props): JSX.Elemen
                   <motion.pre
                     {...collapse}
                     id={logId}
-                    className="selectable mono mt-2 max-h-48 overflow-auto whitespace-pre-wrap break-all rounded-1 bg-sink px-3 py-2.5 text-[11px] leading-relaxed text-ink-2"
+                    className="selectable mono mt-2 max-h-48 overflow-auto whitespace-pre-wrap break-all rounded-1 bg-sink px-3 py-2.5 text-caption leading-relaxed text-ink-2"
                   >
                     {item.log}
                   </motion.pre>
@@ -465,7 +465,7 @@ function QueueRow({ item, index, animateIn = true, heading }: Props): JSX.Elemen
             <button
               onClick={() => setReportOpenFor(reportOpen ? null : (failure.reportId ?? null))}
               aria-expanded={reportOpen}
-              className="mono mt-2 flex items-center gap-1 text-[11px] uppercase tracking-[0.08em] text-accent-ink transition-colors duration-fast ease-ease hover:text-ink"
+              className="mono mt-2 flex items-center gap-1 text-caption uppercase tracking-[0.08em] text-accent-ink transition-colors duration-fast ease-ease hover:text-ink"
             >
               {t('report.open')}
               <motion.span animate={{ rotate: reportOpen ? 180 : 0 }} transition={{ duration: 0.16 }}>

@@ -192,7 +192,7 @@ function Row({
       }`}
     >
       <div className="min-w-0 max-w-md">
-        <p className="text-[14px] text-ink" id={labelId}>
+        <p className="text-body text-ink" id={labelId}>
           {label}
         </p>
         {hint &&
@@ -221,7 +221,7 @@ function TextField({
   value,
   onChange,
   placeholder,
-  className = 'field mono text-[13px]'
+  className = 'field mono text-control'
 }: {
   value: string
   onChange: (v: string) => void
@@ -295,7 +295,7 @@ function TemplateField({
         aria-labelledby={labelledBy}
         aria-describedby={example ? exampleId : undefined}
         aria-invalid={!safe}
-        className="field mono text-[13px]"
+        className="field mono text-control"
         spellCheck={false}
       />
       {!safe && <p className="hint mt-1.5 text-bad">{t('settings.filenameTemplateUnsafe')}</p>}
@@ -303,14 +303,14 @@ function TemplateField({
         <dl id={exampleId} className="mt-2.5 space-y-1.5">
           <div>
             <dt className="hint">{t('settings.templateExample')}</dt>
-            <dd className="mono selectable text-[12px] text-ink-2 [overflow-wrap:anywhere]">
+            <dd className="mono selectable text-meta text-ink-2 [overflow-wrap:anywhere]">
               {example.video}
             </dd>
           </div>
           {example.playlist && (
             <div>
               <dt className="hint">{t('settings.templateExamplePlaylist')}</dt>
-              <dd className="mono selectable text-[12px] text-ink-2 [overflow-wrap:anywhere]">
+              <dd className="mono selectable text-meta text-ink-2 [overflow-wrap:anywhere]">
                 {example.playlist}
               </dd>
             </div>
@@ -366,7 +366,7 @@ function SpeedLimitField({
         aria-labelledby={labelledBy}
         aria-invalid={!valid}
         aria-describedby={valid ? undefined : hintId}
-        className="field mono w-36 text-[13px]"
+        className="field mono w-36 text-control"
         spellCheck={false}
       />
       {!valid && (
@@ -448,7 +448,7 @@ function ProxyField({
         aria-labelledby={labelledBy}
         aria-invalid={!valid}
         aria-describedby={valid ? undefined : hintId}
-        className="field mono text-[13px]"
+        className="field mono text-control"
         spellCheck={false}
       />
       {!valid && (
@@ -503,7 +503,7 @@ function ProxyPasswordField({
       placeholder={stored ? t('auto.secretKept') : ''}
       aria-labelledby={labelledBy}
       autoComplete="new-password"
-      className="field mono text-[13px] disabled:cursor-not-allowed disabled:opacity-40"
+      className="field mono text-control disabled:cursor-not-allowed disabled:opacity-40"
       spellCheck={false}
     />
   )
@@ -640,7 +640,7 @@ function BackupRows(): JSX.Element {
       </Row>
       {result && (
         <div role="status" className="border-b border-edge py-4">
-          <ul className="space-y-1 text-[13px] text-ink-2">
+          <ul className="space-y-1 text-control text-ink-2">
             <li>
               {result.settings
                 ? t('settings.backupResultSettings')
@@ -658,9 +658,9 @@ function BackupRows(): JSX.Element {
             <li>{t('settings.backupResultTargets', { n: result.targetsAdded })}</li>
             {result.folderKept && <li>{t('settings.backupResultFolder')}</li>}
           </ul>
-          <p className="mt-3 text-[13px] text-warn">{t('settings.backupSecrets')}</p>
+          <p className="mt-3 text-control text-warn">{t('settings.backupSecrets')}</p>
           {result.proxyPassword && (
-            <p className="mt-1 text-[13px] text-warn">{t('settings.backupResultProxy')}</p>
+            <p className="mt-1 text-control text-warn">{t('settings.backupResultProxy')}</p>
           )}
         </div>
       )}
@@ -906,7 +906,7 @@ export default function SettingsView(): JSX.Element {
             }}
             placeholder={t('settings.search')}
             aria-label={t('settings.search')}
-            className="no-drag min-w-0 flex-1 bg-transparent text-[13px] text-ink outline-none placeholder:text-ink-3"
+            className="no-drag min-w-0 flex-1 bg-transparent text-control text-ink outline-none placeholder:text-ink-3"
             spellCheck={false}
           />
         </label>
@@ -929,7 +929,7 @@ export default function SettingsView(): JSX.Element {
                     key={s.id}
                     onClick={() => jump(s.id)}
                     aria-current={active === s.id ? 'location' : undefined}
-                    className={`w-full rounded px-2.5 py-1.5 text-left text-[13px] transition-colors ${
+                    className={`w-full rounded px-2.5 py-1.5 text-left text-control transition-colors ${
                       active === s.id ? 'bg-raise text-ink' : 'text-ink-2 hover:bg-raise/60'
                     }`}
                   >
@@ -1068,7 +1068,7 @@ export default function SettingsView(): JSX.Element {
                 value={settings.subtitleLanguages}
                 onChange={(v) => set('subtitleLanguages', v)}
                 placeholder="en,ru"
-                className="field mono w-44 text-[13px]"
+                className="field mono w-44 text-control"
               />
             </Row>
             <Row label={t('settings.sponsorBlock')} hint={t('settings.sponsorBlockHint')}>
@@ -1251,7 +1251,7 @@ export default function SettingsView(): JSX.Element {
               >
                 <Github size={14} /> {t('settings.viewOnGithub')}
               </button>
-              <p className="mono mt-4 text-[12px] text-ink-3">
+              <p className="mono mt-4 text-meta text-ink-3">
                 v{appInfo?.version} · {appInfo?.platform} · {appInfo?.arch}
               </p>
             </div>

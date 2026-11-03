@@ -43,7 +43,7 @@ export default function HomeActivity(): JSX.Element {
             {recent.map((item) => (
               <li key={item.id} className="flex items-center gap-2 py-2">
                 <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-good" aria-hidden="true" />
-                <span className="min-w-0 flex-1 truncate text-[13px] text-ink" title={item.title}>
+                <span className="min-w-0 flex-1 truncate text-control text-ink" title={item.title}>
                   {item.title}
                 </span>
                 {item.filepath && (
@@ -97,10 +97,10 @@ function LiveRow({ item }: { item: DownloadItem }): JSX.Element {
     <li className="relative py-2">
       <div className="flex items-center gap-2">
         <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${meta.dot}`} aria-hidden="true" />
-        <span className="min-w-0 flex-1 truncate text-[13px] text-ink" title={item.title}>
+        <span className="min-w-0 flex-1 truncate text-control text-ink" title={item.title}>
           {item.title}
         </span>
-        <span className="mono shrink-0 text-[12px] text-ink-2">{facts.join(' · ')}</span>
+        <span className="mono shrink-0 text-meta text-ink-2">{facts.join(' · ')}</span>
       </div>
       {item.state !== 'queued' && (
         <div className="absolute inset-x-0 bottom-0 h-[2px] bg-edge" aria-hidden="true">

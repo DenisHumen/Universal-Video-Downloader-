@@ -120,7 +120,7 @@ export default function MediaJobModal({ item, mode, onClose }: Props): JSX.Eleme
           <h2 className="h2" id={titleId}>
             {mode === 'trim' ? t('trim.title') : t('convert.title')}
           </h2>
-          <p className="mono truncate text-[12px] text-ink-2" title={item.title}>
+          <p className="mono truncate text-meta text-ink-2" title={item.title}>
             {item.title}
           </p>
         </div>
@@ -133,7 +133,7 @@ export default function MediaJobModal({ item, mode, onClose }: Props): JSX.Eleme
         {mode === 'trim' ? (
           <>
             {probing ? (
-              <div className="flex items-center gap-2 text-[13px] text-ink-2">
+              <div className="flex items-center gap-2 text-control text-ink-2">
                 <Loader2 size={14} className="animate-spin" /> …
               </div>
             ) : (
@@ -194,7 +194,7 @@ export default function MediaJobModal({ item, mode, onClose }: Props): JSX.Eleme
                 }))}
               />
               {container === 'gif' && (
-                <p className="mt-2 text-[12px] text-warn">{t('convert.gifHint')}</p>
+                <p className="mt-2 text-meta text-warn">{t('convert.gifHint')}</p>
               )}
             </div>
             {!audioOnly && container !== 'gif' && (
@@ -215,7 +215,7 @@ export default function MediaJobModal({ item, mode, onClose }: Props): JSX.Eleme
         )}
 
         <button
-          className="btn-solid w-full py-3.5 text-[14px]"
+          className="btn-solid w-full py-3.5 text-body"
           onClick={submit}
           disabled={busy || invalid || nothingToDo}
         >

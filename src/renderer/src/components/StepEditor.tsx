@@ -184,7 +184,7 @@ export default function StepEditor({
                 value={step.template}
                 onChange={(e) => set({ template: e.target.value })}
                 aria-label={t('auto.template')}
-                className="field mono w-full text-[13px]"
+                className="field mono w-full text-control"
                 spellCheck={false}
               />
               <p className="hint mt-1">{t('auto.templateHint')}</p>
@@ -194,12 +194,12 @@ export default function StepEditor({
                 series with only one.
               */}
               {renameGap(step.template) === 'episode' && (
-                <p className="mt-1 max-w-[62ch] text-[12px] leading-[1.5] text-warn">
+                <p className="mt-1 max-w-[62ch] text-meta leading-[1.5] text-warn">
                   {t('auto.templateNoEpisode')}
                 </p>
               )}
               {renameGap(step.template) === 'season' && (
-                <p className="mt-1 max-w-[62ch] text-[12px] leading-[1.5] text-warn">
+                <p className="mt-1 max-w-[62ch] text-meta leading-[1.5] text-warn">
                   {t('auto.templateNoSeason')}
                 </p>
               )}
@@ -218,7 +218,7 @@ export default function StepEditor({
                     }}
                     placeholder={t('auto.replaceFrom')}
                     aria-label={t('auto.replaceFrom')}
-                    className="field flex-1 text-[13px]"
+                    className="field flex-1 text-control"
                   />
                   <input
                     value={r.to}
@@ -229,7 +229,7 @@ export default function StepEditor({
                     }}
                     placeholder={t('auto.replaceTo')}
                     aria-label={t('auto.replaceTo')}
-                    className="field flex-1 text-[13px]"
+                    className="field flex-1 text-control"
                   />
                   <button
                     className="btn-icon"
@@ -260,7 +260,7 @@ export default function StepEditor({
               <div>
                 <p className="label mb-1.5">{t('auto.share')}</p>
                 <select
-                  className="field w-full text-[13px]"
+                  className="field w-full text-control"
                   aria-label={t('auto.share')}
                   value={targetId}
                   onChange={(e) => setTargetId(e.target.value)}
@@ -291,13 +291,13 @@ export default function StepEditor({
                 value={step.remotePath}
                 onChange={(e) => set({ remotePath: e.target.value })}
                 aria-label={t('auto.remotePath')}
-                className="field mono w-full text-[13px]"
+                className="field mono w-full text-control"
                 spellCheck={false}
               />
               <p className="hint mt-1">{t('auto.remotePathHint')}</p>
             </div>
 
-            <label className="flex items-center gap-2.5 text-[13px] text-ink">
+            <label className="flex items-center gap-2.5 text-control text-ink">
               <input
                 type="checkbox"
                 checked={step.deleteLocalAfter}
@@ -326,11 +326,11 @@ export default function StepEditor({
         {preview && (
           <div className="border-t border-edge pt-3">
             <p className="label mb-1">{t('auto.preview')}</p>
-            <p className="mono break-all text-[12px] text-ink-2">{preview}</p>
+            <p className="mono break-all text-meta text-ink-2">{preview}</p>
           </div>
         )}
 
-        <label className="flex items-center gap-2.5 border-t border-edge pt-3 text-[13px] text-ink">
+        <label className="flex items-center gap-2.5 border-t border-edge pt-3 text-control text-ink">
           <input
             type="checkbox"
             checked={step.enabled}

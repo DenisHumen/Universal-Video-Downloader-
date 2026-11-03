@@ -96,7 +96,7 @@ export default function TopBar(): JSX.Element {
             behind the scroll arrow; the logo beside it already says whose
             window this is.
           */}
-          <span className="mono hidden text-[12px] font-semibold uppercase tracking-[0.16em] text-ink lg:inline">
+          <span className="mono hidden text-meta font-semibold uppercase tracking-[0.16em] text-ink lg:inline">
             uvd
           </span>
         </div>
@@ -137,7 +137,7 @@ export default function TopBar(): JSX.Element {
                 )}
                 {item.id === 'downloads' && active > 0 && (
                   <span
-                    className={`mono rounded-full px-1.5 py-0.5 text-[11px] font-semibold leading-none ${
+                    className={`mono rounded-full px-1.5 py-0.5 text-caption font-semibold leading-none ${
                       on ? 'bg-accent text-accent-fg' : 'bg-sink text-ink-2'
                     }`}
                   >

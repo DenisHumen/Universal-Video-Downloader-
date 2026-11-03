@@ -89,7 +89,7 @@ function Field({
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
         aria-label={label}
-        className="field mono w-full text-[13px]"
+        className="field mono w-full text-control"
         spellCheck={false}
       />
       {hint && <p className="hint mt-1">{hint}</p>}
@@ -192,7 +192,7 @@ export function ShareForm({
       />
 
       {(target.host || target.share) && (
-        <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-0.5 text-[11px]">
+        <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-0.5 text-caption">
           <dt className="text-ink-2">{t('auto.shareHost')}</dt>
           <dd className="mono truncate text-ink">{target.host || '—'}</dd>
           <dt className="text-ink-2">{t('auto.shareName2')}</dt>

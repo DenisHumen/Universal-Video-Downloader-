@@ -163,7 +163,7 @@ export default function FormatSelector({
             {/* The consequence of the choice above, spelled out: what arrives,
                 in what container, at roughly what size. */}
             {outcomeFacts.length > 0 && (
-              <p className="mono mt-2 text-[12px] text-ink-2">
+              <p className="mono mt-2 text-meta text-ink-2">
                 <span className="text-ink-3">{t('format.youGet')}</span>{' '}
                 {outcomeFacts.join('  ·  ')}
               </p>
@@ -176,7 +176,7 @@ export default function FormatSelector({
                 onClick={() => setShowAdvanced((v) => !v)}
                 aria-expanded={showAdvanced}
                 aria-controls={showAdvanced ? advancedId : undefined}
-                className="flex w-full items-center justify-between py-1 text-[13px] font-medium text-ink-2 transition-colors duration-fast ease-ease hover:text-ink"
+                className="flex w-full items-center justify-between py-1 text-control font-medium text-ink-2 transition-colors duration-fast ease-ease hover:text-ink"
               >
                 {t('format.exactStream', { count: videoFormats.length })}
                 <motion.span animate={{ rotate: showAdvanced ? 180 : 0 }} transition={enter}>
@@ -205,17 +205,17 @@ export default function FormatSelector({
                                 on ? 'bg-accent' : 'bg-edge-strong'
                               }`}
                             />
-                            <span className="mono w-16 shrink-0 text-[12px] text-ink">
+                            <span className="mono w-16 shrink-0 text-meta text-ink">
                               {f.resolution}
                             </span>
-                            <span className="mono w-12 shrink-0 text-[12px] uppercase text-ink-2">
+                            <span className="mono w-12 shrink-0 text-meta uppercase text-ink-2">
                               {f.ext}
                             </span>
-                            <span className="mono min-w-0 flex-1 truncate text-[12px] text-ink-2">
+                            <span className="mono min-w-0 flex-1 truncate text-meta text-ink-2">
                               {f.vcodec?.split('.')[0]}
                               {f.kind === 'video' ? ` ${t('format.plusAudio')}` : ''}
                             </span>
-                            <span className="mono shrink-0 text-[12px] text-ink-2">
+                            <span className="mono shrink-0 text-meta text-ink-2">
                               {formatBytes(f.filesize || f.filesizeApprox)}
                             </span>
                           </button>
@@ -241,7 +241,7 @@ export default function FormatSelector({
             }))}
           />
           {outcomeFacts.length > 0 && (
-            <p className="mono mt-2 text-[12px] text-ink-2">
+            <p className="mono mt-2 text-meta text-ink-2">
               <span className="text-ink-3">{t('format.youGet')}</span> {outcomeFacts.join('  ·  ')}
             </p>
           )}

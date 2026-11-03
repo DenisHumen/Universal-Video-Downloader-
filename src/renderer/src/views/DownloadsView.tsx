@@ -177,7 +177,7 @@ export default function DownloadsView(): JSX.Element {
       <header className="flex items-end justify-between gap-4">
         <div className="min-w-0">
           <h1 className="h1">{t('queue.title')}</h1>
-          <p className="mono mt-1.5 truncate text-[12px] text-ink-2">{summary.join('  ·  ')}</p>
+          <p className="mono mt-1.5 truncate text-meta text-ink-2">{summary.join('  ·  ')}</p>
         </div>
         <div className="flex shrink-0 items-center gap-1">
           {settings?.downloadDir && (
@@ -252,7 +252,7 @@ export default function DownloadsView(): JSX.Element {
               value={query}
               onChange={(e) => changeQuery(e.target.value)}
               placeholder={t('queue.searchPlaceholder')}
-              className="no-drag min-w-0 flex-1 self-stretch bg-transparent text-[13px] text-ink outline-none placeholder:text-ink-3"
+              className="no-drag min-w-0 flex-1 self-stretch bg-transparent text-control text-ink outline-none placeholder:text-ink-3"
               spellCheck={false}
             />
           </label>

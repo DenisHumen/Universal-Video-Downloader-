@@ -38,11 +38,11 @@ export default function ShortcutsOverlay(): JSX.Element {
                 key={row.label}
                 className="flex items-center justify-between gap-4 border-b border-edge py-2.5 last:border-b-0"
               >
-                <span className="text-[13px] text-ink-2">{t(row.label)}</span>
+                <span className="text-control text-ink-2">{t(row.label)}</span>
                 <span className="flex shrink-0 items-center gap-1">
                   {row.keys.map((chord, i) => (
                     <Fragment key={chord.join('+')}>
-                      {i > 0 && <span className="px-1 text-[12px] text-ink-3">{t('shortcuts.or')}</span>}
+                      {i > 0 && <span className="px-1 text-meta text-ink-3">{t('shortcuts.or')}</span>}
                       {chord.map((key) => (
                         <kbd key={key} className="kbd">
                           {key === 'mod' ? mod : key}

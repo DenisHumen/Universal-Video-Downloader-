@@ -172,7 +172,7 @@ export default function AddWatchDialog({
               onKeyDown={(e) => e.key === 'Enter' && void look()}
               placeholder="https://…"
               aria-label={t('auto.seriesUrl')}
-              className="field mono flex-1 text-[13px]"
+              className="field mono flex-1 text-control"
               spellCheck={false}
               autoFocus
             />
@@ -198,7 +198,7 @@ export default function AddWatchDialog({
                 fallback={<Film size={18} className="text-ink-3" />}
               />
               <div className="min-w-0">
-                <p className="text-[14px] text-ink">{offer.title}</p>
+                <p className="text-body text-ink">{offer.title}</p>
                 <p className="hint mt-1">
                   {offer.upcoming
                     ? releaseText(offer.upcoming.releaseAt, t)
@@ -217,7 +217,7 @@ export default function AddWatchDialog({
               <div className="well flex gap-3 p-3">
                 <Radar size={16} className="mt-0.5 shrink-0 text-ink-2" />
                 <div className="min-w-0 flex-1">
-                  <p className="text-[13px] text-ink">{t('auto.alreadyWatching')}</p>
+                  <p className="text-control text-ink">{t('auto.alreadyWatching')}</p>
                   <p className="hint mt-1">
                     {copy ? t('auto.alreadySameQuality') : t('auto.alreadyHint')}
                   </p>
@@ -236,7 +236,7 @@ export default function AddWatchDialog({
                 <CalendarClock size={16} className="mt-0.5 shrink-0 text-ink-2" />
                 <div className="min-w-0">
                   {offer.upcoming.releaseAt && (
-                    <p className="text-[13px] text-ink">
+                    <p className="text-control text-ink">
                       {t('auto.releaseOn', {
                         date: releaseDate(offer.upcoming.releaseAt, locale)
                       })}
@@ -250,7 +250,7 @@ export default function AddWatchDialog({
             <div hidden={Boolean(offer.upcoming)}>
               <p className="label mb-2">{t('auto.dub')}</p>
               <select
-                className="field w-full text-[13px]"
+                className="field w-full text-control"
                 aria-label={t('auto.dub')}
                 value={translatorId}
                 onChange={(e) => setTranslatorId(e.target.value)}
@@ -267,7 +267,7 @@ export default function AddWatchDialog({
 
             {!offer.upcoming && backlog.length > 0 && (
               <div>
-                <label className="flex items-center gap-2.5 text-[13px] text-ink">
+                <label className="flex items-center gap-2.5 text-control text-ink">
                   <input
                     type="checkbox"
                     checked={backfill}
@@ -286,7 +286,7 @@ export default function AddWatchDialog({
             <div>
               <p className="label mb-2">{t('common.quality')}</p>
               <select
-                className="field w-full text-[13px]"
+                className="field w-full text-control"
                 aria-label={t('common.quality')}
                 value={quality}
                 onChange={(e) => setQuality(e.target.value)}

@@ -46,16 +46,16 @@ export default function UpdateBanner(): JSX.Element {
             <span className="label shrink-0 text-accent-ink">{t('stamp.update')}</span>
             <div className="min-w-0 flex-1">
               {update.state === 'available' && (
-                <p className="truncate text-[14px] font-medium text-ink">
+                <p className="truncate text-body font-medium text-ink">
                   {t('update.available', { version: update.version ?? '' })}
-                  <span className="mono ml-2 text-[12px] text-ink-2">
+                  <span className="mono ml-2 text-meta text-ink-2">
                     {manual ? t('update.availableManualHint') : t('update.availableHint')}
                   </span>
                 </p>
               )}
               {update.state === 'downloading' && (
                 <div className="flex items-center gap-3">
-                  <p className="shrink-0 text-[14px] font-medium text-ink">{t('update.downloading')}</p>
+                  <p className="shrink-0 text-body font-medium text-ink">{t('update.downloading')}</p>
                   <div
                     className="h-1 min-w-0 flex-1 overflow-hidden rounded-full bg-sink"
                     role="progressbar"
@@ -71,22 +71,22 @@ export default function UpdateBanner(): JSX.Element {
                       style={{ width: `${update.percent ?? 0}%` }}
                     />
                   </div>
-                  <span className="mono shrink-0 text-[12px] text-ink-2">
+                  <span className="mono shrink-0 text-meta text-ink-2">
                     {Math.round(update.percent ?? 0)}%
                   </span>
                 </div>
               )}
               {update.state === 'downloaded' && (
-                <p className="truncate text-[14px] font-medium text-ink">
+                <p className="truncate text-body font-medium text-ink">
                   {t('update.ready', { version: update.version ?? '' })}
-                  <span className="mono ml-2 text-[12px] text-ink-2">{t('update.readyHint')}</span>
+                  <span className="mono ml-2 text-meta text-ink-2">{t('update.readyHint')}</span>
                 </p>
               )}
               {update.state === 'error' && (
-                <p className="truncate text-[14px] font-medium text-bad" title={update.message}>
+                <p className="truncate text-body font-medium text-bad" title={update.message}>
                   {t('update.failed')}
                   {update.message && (
-                    <span className="mono ml-2 text-[12px] text-ink-2">{update.message}</span>
+                    <span className="mono ml-2 text-meta text-ink-2">{update.message}</span>
                   )}
                 </p>
               )}
