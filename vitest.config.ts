@@ -27,6 +27,8 @@ export default defineConfig({
     environmentMatchGlobs: [['src/renderer/**/*.test.tsx', 'jsdom']],
     setupFiles: ['test/setup-dom.ts'],
     include: ['src/**/*.test.ts', 'src/**/*.test.tsx', 'scripts/**/*.test.ts'],
+    // Agent worktrees and other checkouts nested under .claude/ are never this checkout's tests.
+    exclude: ['**/node_modules/**', '**/dist/**', '.claude/**', '**/.claude/worktrees/**'],
     reporters: 'default',
     env: {
       ELECTRON_OVERRIDE_DIST_PATH:

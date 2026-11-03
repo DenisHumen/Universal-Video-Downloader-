@@ -20,6 +20,8 @@ Everything a contributor needs that a user does not: the stack, the commands, ho
 
 Requires Node.js 22.12 or later; `.nvmrc` pins 24, which CI uses and which the Electron 45 binary wants for `npm run dev`. `npm run dev` and `npm start` first fetch the Electron binary if it is not there yet: since Electron 42, `npm install` no longer does. `npm test` never needs it.
 
+The `allowScripts` field in package.json names the four packages whose install scripts are expected to run (electron, esbuild, ffmpeg-static, sharp). npm 11 does not read it yet: it is an allowlist kept ready for an install-script policy (npm's planned one, or `@lavamoat/allow-scripts`), and documentation of which install scripts this project relies on. Nothing in the build depends on it.
+
 ```bash
 npm install              # install dependencies
 npm run dev              # launch the app with hot reload
