@@ -65,6 +65,7 @@ vi.mock('../settings', () => ({
 }))
 vi.mock('../secrets', () => ({
   getSecret: () => 'example-secret',
+  getSecretWhenReady: async () => 'example-secret',
   SECRET: { smbPassword: (id: string) => `smb:${id}`, telegramToken: () => 'telegram' }
 }))
 vi.mock('./smb', () => ({ uploadFile: h.upload }))

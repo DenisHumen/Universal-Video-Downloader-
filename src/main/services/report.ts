@@ -24,7 +24,7 @@ import { hasCookies } from './options'
 import { getYtdlpStatus } from './ytdlp'
 import { ffmpegPath } from './ffmpeg'
 import { currentLanguage } from './locale'
-import { getSecret, SECRET } from './secrets'
+import { getSecretWhenReady, SECRET } from './secrets'
 import { log } from './log'
 
 /**
@@ -225,10 +225,13 @@ async function environment(): Promise<ReportEnv> {
   } catch {
     /* some sandboxes have no passwd entry */
   }
-  const secrets = [
-    getSecret(SECRET.telegramToken()),
-    ...settings.smbTargets.map((target) => getSecret(SECRET.smbPassword(target.id)))
-  ].filter((value): value is string => Boolean(value))
+  // Awaited: a report built while the store is still opening must still scrub them.
+  const secrets = (
+    await Promise.all([
+      getSecretWhenReady(SECRET.telegramToken()),
+      ...settings.smbTargets.map((target) => getSecretWhenReady(SECRET.smbPassword(target.id)))
+    ])
+  ).filter((value): value is string => Boolean(value))
 
   return {
     appVersion: app.getVersion(),

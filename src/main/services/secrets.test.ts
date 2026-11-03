@@ -16,13 +16,18 @@ const h = vi.hoisted(() => ({
   /** Milliseconds each encryption takes, in call order; missing ones take none. */
   delays: [] as number[],
   sealing: 0,
-  mostSealing: 0
+  mostSealing: 0,
+  /** When set, the key store answers only once this resolves (a locked keyring). */
+  gate: null as Promise<void> | null
 }))
 
 vi.mock('electron', () => ({
   app: { getPath: () => h.dir },
   safeStorage: {
-    isAsyncEncryptionAvailable: async () => h.keyStore,
+    isAsyncEncryptionAvailable: async () => {
+      if (h.gate) await h.gate
+      return h.keyStore
+    },
     encryptStringAsync: async (value: string) => {
       const delay = h.delays.shift() ?? 0
       h.sealing++
@@ -74,9 +79,30 @@ describe('the secret store', () => {
     h.delays = []
     h.sealing = 0
     h.mostSealing = 0
+    h.gate = null
   })
   afterEach(() => {
     rmSync(h.dir, { recursive: true, force: true })
+  })
+
+  it('stops waiting for a locked key store after the cap, and hands secrets out once it opens', async () => {
+    seed({ 'telegram.token': 'v1:123:abc' })
+    let unlock: () => void = () => undefined
+    h.gate = new Promise((resolve) => (unlock = resolve))
+    vi.resetModules()
+    const secrets = await import('./secrets')
+    expect(await secrets.initSecretsWithin(30)).toBe('timeout')
+    expect(secrets.secretsAreReady()).toBe(false)
+    const waiting = secrets.getSecretWhenReady('telegram.token')
+    unlock()
+    expect(await waiting).toBe('123:abc')
+    expect(secrets.secretsAreReady()).toBe(true)
+  })
+
+  it('reports ready when the store opens within the cap', async () => {
+    vi.resetModules()
+    const secrets = await import('./secrets')
+    expect(await secrets.initSecretsWithin(2000)).toBe('ready')
   })
 
   it('opens what the synchronous safeStorage sealed, without rewriting it', async () => {
@@ -176,10 +202,10 @@ describe('the secret store', () => {
 describe('startup order', () => {
   const source = (path: string): string => readFileSync(join(__dirname, path), 'utf-8')
 
-  it('opens the secret store before the app applies the proxy, the IPC or the watcher', () => {
+  it('opens the secret store (waiting at most the cap) before the app applies the proxy, the IPC or the watcher', () => {
     const main = source('../index.ts')
     const ready = main.slice(main.indexOf('app.whenReady().then(async () => {'))
-    const init = ready.indexOf('await initSecrets()')
+    const init = ready.indexOf('await initSecretsWithin(')
     expect(init).toBeGreaterThan(0)
     for (const later of ['getSettings()', 'applyProxy(', 'registerIpc(', 'startWatcher()']) {
       expect(ready.indexOf(later)).toBeGreaterThan(init)

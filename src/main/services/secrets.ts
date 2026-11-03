@@ -127,11 +127,55 @@ async function seal(value: string): Promise<string> {
   return (await safeStorage.encryptStringAsync(value)).toString('base64')
 }
 
+let markReady: () => void = () => undefined
 /**
- * Open secrets.dat into memory. Awaited once, after the app is ready and
- * before anything asks for a secret.
+ * Settles once secrets.dat has been opened (or found unusable). Startup waits
+ * on it for a few seconds at most (`initSecretsWithin`); anything that needs
+ * a secret after that awaits this instead of holding the window back.
+ */
+export const secretsReady: Promise<void> = new Promise((resolve) => {
+  markReady = resolve
+})
+let ready = false
+
+/** A secret, once the store is open. Use this from anything that may run during startup. */
+export async function getSecretWhenReady(key: string): Promise<string | undefined> {
+  await secretsReady
+  return plain.get(key)
+}
+
+/** Whether the store has been opened (sync callers that must not block can check). */
+export function secretsAreReady(): boolean {
+  return ready
+}
+
+/**
+ * Open the store, but give up waiting after `ms`: a locked Linux keyring can
+ * hold `isAsyncEncryptionAvailable` until someone types a password, and the
+ * window must not wait for that. The open carries on; `secretsReady` settles
+ * when it is done. Resolves 'ready' or 'timeout'.
+ */
+export function initSecretsWithin(ms: number): Promise<'ready' | 'timeout'> {
+  return Promise.race([
+    initSecrets().then(() => 'ready' as const),
+    new Promise<'timeout'>((resolve) => setTimeout(() => resolve('timeout'), ms).unref?.())
+  ])
+}
+
+/**
+ * Open secrets.dat into memory. Called once, after the app is ready; see
+ * `initSecretsWithin` and `secretsReady`.
  */
 export async function initSecrets(): Promise<void> {
+  try {
+    await openStore()
+  } finally {
+    ready = true
+    markReady()
+  }
+}
+
+async function openStore(): Promise<void> {
   try {
     persistent = await safeStorage.isAsyncEncryptionAvailable()
   } catch {

@@ -12,7 +12,8 @@ import { existsSync, mkdirSync, rmSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { IPC } from '@shared/ipc'
 import { registerIpc } from './ipc'
-import { holdQuitForSecrets, initSecrets } from './services/secrets'
+import { holdQuitForSecrets, initSecretsWithin } from './services/secrets'
+import { createStartupGate, SECRETS_STARTUP_CAP_MS } from './startup-gate'
 import { flushSettings, getSettings } from './services/settings'
 import { flushLibrary, loadLibrary, recordFinished } from './services/library'
 import { applyProxy } from './services/proxy'
@@ -594,8 +595,10 @@ if (cliArgs) {
 } else if (!gotLock) {
   app.quit()
 } else {
+  const gate = createStartupGate()
   app.on('second-instance', (_event, argv) => {
-    showMainWindow()
+    // Before the first window exists this only records the request (startup-gate.ts).
+    gate.requestShow(showMainWindow)
     const link = linkFromArgv(argv)
     if (link) deliver(IPC.evtClipboardLink, 'link', link)
   })
@@ -608,13 +611,19 @@ if (cliArgs) {
       whether there is a key store to put it in. What this logs is queued
       until the log opens, just below.
     */
-    await initSecrets()
+    /*
+      At most a few seconds: a locked Linux keyring can hold this until a
+      password is typed. The store keeps opening behind the window, and what
+      needs a secret awaits `secretsReady` (proxy logins, Telegram, SMB).
+    */
+    const secrets = await initSecretsWithin(SECRETS_STARTUP_CAP_MS)
     /*
       First, so everything after it can be explained afterwards.
       `getPath('logs')` creates its directory as a side effect, which is why
       this cannot happen at module load.
     */
     initLog(getSettings().logVerbose ? 'debug' : 'info')
+    if (secrets === 'timeout') log.warn('secrets', 'The key store is slow to answer; starting without waiting for it')
     // Probe JSON a previous session kept for its downloads; the addresses in it have expired.
     void infoCache.clearDir()
 
@@ -648,6 +657,7 @@ if (cliArgs) {
     buildMenu()
     const startHidden = shouldStartHidden(process.argv, getSettings(), openedAtLogin())
     createWindow(startHidden)
+    gate.started()
     applySettings(getSettings())
     // The tray is how a hidden window is found again. Without one, show it.
     if (startHidden && !tray) showMainWindow()
