@@ -1,7 +1,6 @@
 import {
   app,
   BrowserWindow,
-  clipboard,
   dialog,
   ipcMain,
   Notification,
@@ -9,6 +8,7 @@ import {
   systemPreferences,
   type IpcMainInvokeEvent
 } from 'electron'
+import { dirname } from 'path'
 import { IPC } from '@shared/ipc'
 import type {
   AppSettings,
@@ -21,6 +21,7 @@ import type {
   MediaJobRequest,
   SearchScope
 } from '@shared/types'
+import { readClipboardText } from './services/clipboard'
 import { detect } from './services/detector'
 import { fetchOembed } from './services/oembed'
 import { searchVideos } from './services/search'
@@ -50,7 +51,7 @@ import {
   startMediaJob
 } from './services/downloader'
 import { forwardQueueEvents } from './services/queue-events'
-import { getSettings, resetSettings, setSettings } from './services/settings'
+import { getSettings, proxyPasswordSaved, resetSettings, setSettings } from './services/settings'
 import { exportBackup, importBackup } from './services/backup'
 import type { ExportOutcome, ImportOutcome } from '@shared/backup'
 import { forgetFailures, previewReport, sendReport } from './services/report'
@@ -182,8 +183,10 @@ export function registerIpc({ getWindow, openSearchWindow, onSettingsChanged }: 
     settings screen or from an imported backup - so an import reaches the tray,
     the watcher and the queue exactly as the switches on that screen do.
   */
-  const changeSettings = (partial: Partial<AppSettings>): AppSettings => {
+  const changeSettings = async (partial: Partial<AppSettings>): Promise<AppSettings> => {
     const next = setSettings(partial)
+    // A proxy password lifted out of the address is on disk before this answers.
+    await proxyPasswordSaved()
     onSettingsChanged(next)
     // Reports off: drop the failures already kept for one, not just the offer.
     if (next.errorReports === 'off') forgetFailures()
@@ -200,9 +203,10 @@ export function registerIpc({ getWindow, openSearchWindow, onSettingsChanged }: 
     requireRenderer(event, IPC.settingsSet)
     return changeSettings(partial)
   })
-  ipcMain.handle(IPC.settingsReset, (event) => {
+  ipcMain.handle(IPC.settingsReset, async (event) => {
     requireRenderer(event, IPC.settingsReset)
     const next = resetSettings()
+    await proxyPasswordSaved()
     onSettingsChanged(next)
     return next
   })
@@ -222,9 +226,15 @@ export function registerIpc({ getWindow, openSearchWindow, onSettingsChanged }: 
   })
 
   // ---- Shell / dialogs ----
+  /*
+    Since Electron 43 a dialog without `defaultPath` opens in Downloads rather
+    than wherever the OS last left it, so each picker starts from what it is
+    about to replace.
+  */
   ipcMain.handle(IPC.chooseDirectory, async (event) => {
     const win = BrowserWindow.fromWebContents(event.sender) ?? getWindow() ?? undefined
     const result = await dialog.showOpenDialog(win!, {
+      defaultPath: getSettings().downloadDir || undefined,
       properties: ['openDirectory', 'createDirectory']
     })
     if (result.canceled || !result.filePaths.length) return null
@@ -232,7 +242,9 @@ export function registerIpc({ getWindow, openSearchWindow, onSettingsChanged }: 
   })
   ipcMain.handle(IPC.chooseCookiesFile, async (event) => {
     const win = BrowserWindow.fromWebContents(event.sender) ?? getWindow() ?? undefined
+    const current = getSettings().cookiesFile
     const result = await dialog.showOpenDialog(win!, {
+      defaultPath: current ? dirname(current) : undefined,
       properties: ['openFile'],
       filters: [
         { name: 'Cookies', extensions: ['txt'] },
@@ -253,13 +265,7 @@ export function registerIpc({ getWindow, openSearchWindow, onSettingsChanged }: 
     if (!/^https?:\/\//i.test(url) && !isReportMailto(url)) return Promise.resolve()
     return shell.openExternal(url)
   })
-  ipcMain.handle(IPC.clipboardRead, () => {
-    try {
-      return clipboard.readText().trim()
-    } catch {
-      return ''
-    }
-  })
+  ipcMain.handle(IPC.clipboardRead, () => readClipboardText())
 
   // ---- yt-dlp engine ----
   ipcMain.handle(IPC.ytdlpEnsure, async () => {
@@ -362,6 +368,13 @@ export function registerIpc({ getWindow, openSearchWindow, onSettingsChanged }: 
  */
 const notified = new Set<string>()
 
+/**
+ * Notifications still on screen. Nothing else refers to one once `show()` has
+ * returned, so the garbage collector could take it - and its click handler
+ * with it - while it was still waiting to be clicked.
+ */
+const shown = new Set<Notification>()
+
 export function forgetNotified(id: string): void {
   notified.delete(id)
 }
@@ -377,9 +390,21 @@ function maybeNotify(item: DownloadItem): void {
         body: item.title,
         silent: false
       })
+      shown.add(n)
       n.on('click', () => {
+        shown.delete(n)
         if (done && item.filepath) shell.showItemInFolder(item.filepath)
         else getWindowForNotification()?.show()
+      })
+      n.on('close', () => shown.delete(n))
+      /*
+        Since Electron 42 macOS posts through UNNotification, which refuses an
+        app without a real signature (the ad-hoc sealed builds) and says so
+        here instead of showing anything.
+      */
+      n.on('failed', (_e, error) => {
+        shown.delete(n)
+        log.warn('app', 'A notification could not be shown', { why: error })
       })
       n.show()
     }

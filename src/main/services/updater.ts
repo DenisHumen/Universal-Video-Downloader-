@@ -1,6 +1,7 @@
 import { app, net, powerMonitor, shell } from 'electron'
 import { EventEmitter } from 'events'
 import { readFileSync } from 'fs'
+import { release as osRelease } from 'os'
 import { join } from 'path'
 import type { AppUpdater } from 'electron-updater'
 import { isNewerVersion } from '@shared/version'
@@ -13,6 +14,7 @@ import {
   CHECK_TICK,
   checkDue,
   mayCheckInBackground,
+  offeredToThisMac,
   pickDownload,
   type InstallKind,
   type ReleaseAsset
@@ -318,6 +320,19 @@ async function checkViaGitHub(quietly = false): Promise<boolean> {
       return true
     }
     const version = tag.replace(/^v/i, '')
+    /*
+      A release built on a newer Electron can need a newer macOS than this
+      one runs (Electron 44 and later need macOS 13); its notes say so, and a
+      Mac it would not open on is told it is up to date instead.
+    */
+    if (process.platform === 'darwin' && !offeredToThisMac(osRelease(), release.body)) {
+      log.info('updater', 'The latest release needs a newer macOS than this Mac runs', {
+        version,
+        darwin: osRelease()
+      })
+      emit({ state: 'not-available', version: app.getVersion() })
+      return true
+    }
     if (isNewerVersion(version, app.getVersion())) {
       releasePage = release.html_url || RELEASES_PAGE
       const file = pickDownload(release.assets, installKind())

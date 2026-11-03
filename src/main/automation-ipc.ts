@@ -190,7 +190,7 @@ export function registerAutomationIpc(): void {
   /** One way only. There is deliberately no channel that returns a secret. */
   ipcMain.handle(
     IPC.autoSetSecret,
-    (_e, kind: 'smb' | 'telegram' | 'proxy', id: string, value: string) => {
+    async (_e, kind: 'smb' | 'telegram' | 'proxy', id: string, value: string) => {
       /*
         A new proxy password needs nothing more: Chromium caches only
         credentials that worked, and asks again - reading the new one - once
@@ -203,7 +203,8 @@ export function registerAutomationIpc(): void {
           : kind === 'proxy'
             ? SECRET.proxyPassword()
             : SECRET.telegramToken()
-      setSecret(key, value)
+      // Answers once it is on disk, so a quit right after cannot lose it.
+      await setSecret(key, value)
     }
   )
 

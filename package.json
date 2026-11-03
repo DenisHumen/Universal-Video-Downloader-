@@ -15,10 +15,18 @@
     "url": "https://github.com/DenisHumen/Universal-Video-Downloader-.git"
   },
   "engines": {
-    "node": ">=22"
+    "node": ">=22.12"
+  },
+  "allowScripts": {
+    "electron": true,
+    "esbuild": true,
+    "ffmpeg-static": true,
+    "sharp": true
   },
   "scripts": {
+    "predev": "install-electron",
     "dev": "electron-vite dev",
+    "prestart": "install-electron",
     "start": "electron-vite preview",
     "preview": "vite --config vite.preview.config.ts",
     "build": "electron-vite build",
@@ -57,7 +65,7 @@
     "@vitejs/plugin-react": "^4.3.4",
     "autoprefixer": "^10.4.20",
     "axe-core": "^4.14.0",
-    "electron": "^33.3.1",
+    "electron": "^45.2.1",
     "electron-builder": "^25.1.8",
     "electron-vite": "^2.3.0",
     "framer-motion": "^11.15.0",
