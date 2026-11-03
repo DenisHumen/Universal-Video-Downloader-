@@ -32,7 +32,7 @@ export const ru: Dictionary = {
 
   // ---- navigation ----
   'nav.home': 'скачать',
-  'nav.queue': 'очередь',
+  'nav.queue': 'активность',
   'nav.search': 'поиск',
   'nav.settings': 'настройки',
   'nav.label': 'разделы',
@@ -62,7 +62,7 @@ export const ru: Dictionary = {
   'home.dropHint': 'отпустите, чтобы скачать',
   'home.active': 'сейчас',
   'home.recent': 'недавние',
-  'home.openQueue': 'открыть очередь',
+  'home.openQueue': 'открыть активность',
   'home.downloadSummary': 'скачать · {details}',
   'home.downloadNow': 'скачать сейчас',
   'home.downloadNowHint': 'в качестве по умолчанию — список форматов можно не ждать.',
@@ -79,7 +79,7 @@ export const ru: Dictionary = {
   'home.clipboardFound': 'в буфере обмена ссылка',
   'home.clipboardUse': 'использовать',
   'home.addedToQueue': 'добавлено в очередь',
-  'toast.viewQueue': 'открыть очередь',
+  'toast.viewQueue': 'открыть активность',
   'home.startFailed': 'не удалось запустить загрузку',
   'home.liveHint':
     'это прямой эфир — запись идёт с этого момента, пока вы её не остановите. длина заранее неизвестна, поэтому ни обрезки, ни процента здесь нет.',
@@ -95,7 +95,7 @@ export const ru: Dictionary = {
   'detect.elapsed': '{seconds} с',
 
   // ---- queue ----
-  'queue.title': 'очередь',
+  'queue.title': 'активность',
   'queue.items': '{count} запись|{count} записи|{count} записей',
   'queue.empty': 'здесь пока пусто',
   'queue.emptyHint': 'вставьте ссылку, чтобы начать',
@@ -416,7 +416,7 @@ export const ru: Dictionary = {
   // ---- shortcuts ----
   'shortcuts.title': 'горячие клавиши',
   'shortcuts.newDownload': 'новая загрузка',
-  'shortcuts.queue': 'открыть очередь',
+  'shortcuts.queue': 'активность',
   'shortcuts.search': 'поиск по названию',
   'shortcuts.settings': 'настройки',
   'shortcuts.watch': 'слежение за сериалами',

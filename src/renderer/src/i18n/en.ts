@@ -39,7 +39,7 @@ export const en = {
 
   // ---- navigation ----
   'nav.home': 'download',
-  'nav.queue': 'queue',
+  'nav.queue': 'activity',
   'nav.search': 'search',
   'nav.settings': 'settings',
   'nav.label': 'sections',
@@ -69,7 +69,7 @@ export const en = {
   'home.dropHint': 'drop to download',
   'home.active': 'active',
   'home.recent': 'recent',
-  'home.openQueue': 'open the queue',
+  'home.openQueue': 'open activity',
   'home.downloadSummary': 'download · {details}',
   'home.downloadNow': 'download now',
   'home.downloadNowHint': 'in your default quality — no need to wait for the format list.',
@@ -85,7 +85,7 @@ export const en = {
   'home.clipboardFound': 'link on your clipboard',
   'home.clipboardUse': 'use it',
   'home.addedToQueue': 'added to the queue',
-  'toast.viewQueue': 'view in queue',
+  'toast.viewQueue': 'view in activity',
   'home.startFailed': 'could not start the download',
   'home.liveHint':
     'this is a live stream — it records from now until you stop it, so there is no length to trim and no percentage to report.',
@@ -101,7 +101,7 @@ export const en = {
   'detect.elapsed': '{seconds} s',
 
   // ---- queue ----
-  'queue.title': 'queue',
+  'queue.title': 'activity',
   'queue.items': '{count} item|{count} items',
   'queue.empty': 'nothing here yet',
   'queue.emptyHint': 'paste a link to get started',
@@ -424,7 +424,7 @@ export const en = {
   // ---- shortcuts ----
   'shortcuts.title': 'keyboard shortcuts',
   'shortcuts.newDownload': 'new download',
-  'shortcuts.queue': 'open the queue',
+  'shortcuts.queue': 'activity',
   'shortcuts.search': 'search by title',
   'shortcuts.settings': 'settings',
   'shortcuts.watch': 'watched series',
@@ -574,7 +574,7 @@ export const en = {
   'err.cookieHint': 'try switching on browser cookies in settings → access.',
   'common.save': 'save',
   'common.saved': 'saved',
-  'nav.automation': 'watch',
+  'nav.automation': 'watching',
   'automation.lead': 'new episodes of the series you follow are found and downloaded for you, on a schedule.',
   'auto.title': 'watching',
   'auto.add': 'add',

@@ -1,27 +1,13 @@
-import {
-  Download,
-  Globe,
-  Keyboard,
-  ListVideo,
-  Radar,
-  Search,
-  Settings as SettingsIcon
-} from '../ui/icons'
-import { useStore, type ViewId } from '../store'
-import { useI18n, useT, type TranslationKey } from '../i18n'
+import { Globe, Keyboard } from '../ui/icons'
+import { NAV_ALL } from '../shell/nav'
+import { useStore } from '../store'
+import { useI18n, useT } from '../i18n'
 import Logo from './Logo'
 import TabStrip from './TabStrip'
 import EngineBadge from './EngineBadge'
 import CaptionButtons from './CaptionButtons'
 import { useMediaQuery } from '../hooks/useMediaQuery'
 import { overallPercent } from '../lib/downloads'
-
-interface NavItem {
-  id: ViewId
-  label: TranslationKey
-  icon: JSX.Element
-  hint: string
-}
 
 /**
  * Navigation: icon plus label, marked by a rule on the bar's own bottom
@@ -32,13 +18,7 @@ interface NavItem {
  * someone find "queue" at a glance instead of parsing a row of same-sized
  * lowercase words.
  */
-const ITEMS: NavItem[] = [
-  { id: 'home', label: 'nav.home', icon: <Download size={15} />, hint: '1' },
-  { id: 'search', label: 'nav.search', icon: <Search size={15} />, hint: '2' },
-  { id: 'downloads', label: 'nav.queue', icon: <ListVideo size={15} />, hint: '3' },
-  { id: 'automation', label: 'nav.automation', icon: <Radar size={15} />, hint: '4' },
-  { id: 'settings', label: 'nav.settings', icon: <SettingsIcon size={15} />, hint: '5' }
-]
+const ITEMS = NAV_ALL
 
 const ACTIVE_STATES = ['downloading', 'processing', 'queued', 'paused', 'detecting']
 
@@ -125,7 +105,7 @@ export default function TopBar(): JSX.Element {
                 */
                 className={`tab -mb-px ${on ? 'tab-on' : ''}`}
               >
-                {item.icon}
+                <item.icon size={15} />
                 {!narrow && t(item.label)}
                 {item.id === 'automation' && alerts > 0 && (
                   <span
