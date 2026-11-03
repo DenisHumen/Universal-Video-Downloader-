@@ -70,6 +70,8 @@ const SCENES = [
     name: 'detected',
     setup: `await __uvdShot.view('home'); await __uvdShot.detect('https://www.youtube.com/watch?v=aqz-KE-bpKQ')`
   },
+  // Plain text in the Download entry: the top results inline (5.4).
+  { name: 'home-search', setup: `await __uvdShot.view('home'); await __uvdShot.detect('big buck bunny')` },
   { name: 'activity', setup: `__uvdShot.seedQueue(); await __uvdShot.view('downloads')` },
   {
     name: 'search',

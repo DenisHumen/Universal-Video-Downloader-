@@ -188,7 +188,14 @@ export const ru: Dictionary = {
 
   // ---- home ----
   'home.statusTitle': 'Вставьте ссылку',
-  'home.subtitle': 'автоопределение потока для тысяч сайтов — или введите название для поиска.',
+  'home.saveTo': 'Сохранить в',
+  'home.searchResults': 'Результаты для «{query}»',
+  'home.searching': 'Поиск…',
+  'home.seeAll': 'Все результаты в поиске',
+  'home.batchValid': '{count} ссылка|{count} ссылки|{count} ссылок',
+  'home.batchDuplicates': '{count} повтор пропущен|{count} повтора пропущено|{count} повторов пропущено',
+  'home.batchInvalid': '{count} строка — не ссылка|{count} строки — не ссылки|{count} строк — не ссылки',
+  'home.subtitle': 'Автоопределение потока для тысяч сайтов — или введите название для поиска.',
   'home.placeholder': 'вставьте ссылку или найдите по названию',
   'home.linkLabel': 'ссылка на видео',
   'home.saveDefault': 'папка по умолчанию',
@@ -197,7 +204,7 @@ export const ru: Dictionary = {
   'home.active': 'сейчас',
   'home.recent': 'недавние',
   'home.openQueue': 'Открыть активность',
-  'home.downloadSummary': 'скачать · {details}',
+  'home.downloadSummary': 'Скачать · {details}',
   'home.downloadNow': 'Скачать сейчас',
   'home.downloadNowHint': 'в качестве по умолчанию — список форматов можно не ждать.',
   'home.errorTitle': 'Не удалось найти видео',
@@ -312,8 +319,9 @@ export const ru: Dictionary = {
   'streaming.latestHint': 'самая новая серия последнего сезона',
 
   // ---- format selector ----
-  'format.exactStream': 'выбрать конкретный поток ({count})',
   'format.audioFormat': 'формат звука',
+  'format.exactStreamTitle': 'Точный поток',
+  'format.streams': '{count} поток|{count} потока|{count} потоков',
   'format.plusAudio': '+ звук',
   'format.upTo': 'до {height}p',
   'format.youGet': 'получите',
@@ -562,7 +570,6 @@ export const ru: Dictionary = {
 
   // ---- trim ----
   'trim.title': 'обрезка',
-  'trim.enable': 'вырезать фрагмент',
   'trim.start': 'с',
   'trim.end': 'по',
   'trim.end.full': 'конец',
@@ -570,6 +577,9 @@ export const ru: Dictionary = {
   'trim.reset': 'всё видео',
   'trim.precise': 'точная резка',
   'trim.fast': 'быстрая резка',
+  'trim.rowTitle': 'Вырезать фрагмент',
+  'trim.preciseShort': 'Точно',
+  'trim.fastShort': 'Быстро',
   'trim.preciseHint': 'перекодирует, чтобы фрагмент начался точно здесь — дольше, зато без лишних секунд в начале',
   'trim.fastHint':
     'копирует поток — почти мгновенно, но клип может начаться на несколько секунд раньше и выйти длиннее',

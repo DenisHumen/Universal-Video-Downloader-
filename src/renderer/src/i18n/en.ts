@@ -195,7 +195,14 @@ export const en = {
 
   // ---- home ----
   'home.statusTitle': 'Paste a Link',
-  'home.subtitle': 'automatic stream detection for thousands of sites — or type a title to search.',
+  'home.saveTo': 'Save To',
+  'home.searchResults': 'Results for “{query}”',
+  'home.searching': 'Searching…',
+  'home.seeAll': 'See All in Search',
+  'home.batchValid': '{count} link|{count} links',
+  'home.batchDuplicates': '{count} duplicate skipped|{count} duplicates skipped',
+  'home.batchInvalid': '{count} line is not a link|{count} lines are not links',
+  'home.subtitle': 'Automatic stream detection for thousands of sites — or type a title to search.',
   'home.placeholder': 'paste a video link — or search by title',
   'home.linkLabel': 'video link',
   'home.saveDefault': 'use default folder',
@@ -204,7 +211,7 @@ export const en = {
   'home.active': 'active',
   'home.recent': 'recent',
   'home.openQueue': 'Open Activity',
-  'home.downloadSummary': 'download · {details}',
+  'home.downloadSummary': 'Download · {details}',
   'home.downloadNow': 'Download Now',
   'home.downloadNowHint': 'in your default quality — no need to wait for the format list.',
   'home.errorTitle': 'Couldn’t Detect a Video',
@@ -321,8 +328,9 @@ export const en = {
   'streaming.latestHint': 'the newest episode of the last season',
 
   // ---- format selector ----
-  'format.exactStream': 'choose exact stream ({count})',
   'format.audioFormat': 'audio format',
+  'format.exactStreamTitle': 'Exact Stream',
+  'format.streams': '{count} stream|{count} streams',
   'format.plusAudio': '+ audio',
   'format.upTo': 'up to {height}p',
   'format.subtitles': '{count} subtitle track|{count} subtitle tracks',
@@ -570,7 +578,6 @@ export const en = {
 
   // ---- trim ----
   'trim.title': 'trim',
-  'trim.enable': 'cut a section',
   'trim.start': 'from',
   'trim.end': 'to',
   'trim.end.full': 'end',
@@ -578,6 +585,9 @@ export const en = {
   'trim.reset': 'whole video',
   'trim.precise': 'exact cut',
   'trim.fast': 'fast cut',
+  'trim.rowTitle': 'Cut a Section',
+  'trim.preciseShort': 'Exact',
+  'trim.fastShort': 'Fast',
   'trim.preciseHint': 're-encodes so the cut lands exactly here — slower, but nothing extra at the start',
   'trim.fastHint':
     'copies the stream — near-instant, but the clip can start seconds early and run longer than asked',

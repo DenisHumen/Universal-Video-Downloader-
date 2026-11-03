@@ -23,6 +23,7 @@ import { toast } from '../lib/toast'
 import { queueDownload } from '../lib/queue'
 import { describeError, errorText } from '../lib/errors'
 import { useT, type TranslateFn } from '../i18n'
+import { serviceLabel } from '../lib/services'
 import { useStore } from '../store'
 
 type Status = 'idle' | 'searching' | 'error'
@@ -57,20 +58,6 @@ const SERVICES: SearchScope[] = [
   'niconico',
   'pornhub'
 ]
-
-/**
- * What a service pill says.
- *
- * Brand names stay as they are in every language; the two pills that are
- * words, not brands, are translated. "anime" used to be written into the list
- * above as a literal, so the Russian window showed one English pill among
- * translated ones, and the idle screen named it in English too.
- */
-function serviceLabel(s: SearchScope, t: TranslateFn): string {
-  if (s === 'all') return t('search.allServices')
-  if (s === 'yummyani') return t('search.anime')
-  return s
-}
 
 // Services whose results carry real thumbnails + a probe-able quality.
 const PROBE_SERVICES: SearchService[] = ['youtube', 'pornhub', 'dailymotion']
