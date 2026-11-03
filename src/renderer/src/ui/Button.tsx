@@ -15,6 +15,18 @@ export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   iconEnd?: ReactNode
 }
 
+/*
+  Whole class names, never built from a template: Tailwind keeps only the
+  component classes it can find written out in the source.
+*/
+const SIZE: Record<ControlSize, string> = { sm: 'ui-h-sm', md: 'ui-h-md', lg: 'ui-h-lg' }
+const VARIANT: Record<ButtonVariant, string> = {
+  primary: 'ui-btn-primary',
+  quiet: 'ui-btn-quiet',
+  ghost: 'ui-btn-ghost',
+  danger: 'ui-btn-danger'
+}
+
 /** The app's button. Shape, size and colour all come from tokens (index.css, `.ui-btn`). */
 const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button(
   { variant = 'quiet', size = 'md', icon, iconEnd, className, children, type = 'button', ...rest },
@@ -24,7 +36,7 @@ const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button(
     <button
       ref={ref}
       type={type}
-      className={cx('ui-btn', `ui-h-${size}`, `ui-btn-${variant}`, className)}
+      className={cx('ui-btn', SIZE[size], VARIANT[variant], className)}
       {...rest}
     >
       {icon}

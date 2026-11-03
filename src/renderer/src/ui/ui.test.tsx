@@ -38,6 +38,8 @@ describe('token-only', () => {
     expect(src).not.toMatch(/\btext-\[\d/)
     expect(src).not.toMatch(/\d+ms\b/)
     expect(src).not.toMatch(/\b(bg|text|border)-(white|black|gray|zinc|slate|neutral|red|blue|green)-/)
+    // Tailwind drops a component class it cannot see written out whole.
+    expect(src).not.toMatch(/`ui-[\w-]*\$\{/)
   })
 })
 

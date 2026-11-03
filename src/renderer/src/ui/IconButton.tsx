@@ -13,6 +13,9 @@ export interface IconButtonProps extends Omit<ButtonHTMLAttributes<HTMLButtonEle
   tooltipSide?: 'bottom' | 'top' | 'right'
 }
 
+/* Whole class names, so Tailwind keeps them (see Button). */
+const SIZE = { sm: 'ui-icon-btn-sm', md: 'ui-icon-btn-md' }
+
 /** An icon-only control: always labelled, always a 36 px target, a tooltip after 500 ms. */
 const IconButton = forwardRef<HTMLButtonElement, IconButtonProps>(function IconButton(
   { label, icon, size = 'md', tooltip = true, tooltipSide, className, type = 'button', ...rest },
@@ -23,7 +26,7 @@ const IconButton = forwardRef<HTMLButtonElement, IconButtonProps>(function IconB
       ref={ref}
       type={type}
       aria-label={label}
-      className={cx('ui-icon-btn', `ui-icon-btn-${size}`, className)}
+      className={cx('ui-icon-btn', SIZE[size], className)}
       {...rest}
     >
       {icon}
