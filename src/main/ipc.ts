@@ -1,13 +1,13 @@
 import {
   app,
   BrowserWindow,
-  clipboard,
   dialog,
   ipcMain,
   Notification,
   shell,
   type IpcMainInvokeEvent
 } from 'electron'
+import { dirname } from 'path'
 import { IPC } from '@shared/ipc'
 import type {
   AppSettings,
@@ -20,6 +20,7 @@ import type {
   MediaJobRequest,
   SearchScope
 } from '@shared/types'
+import { readClipboardText } from './services/clipboard'
 import { detect } from './services/detector'
 import { fetchOembed } from './services/oembed'
 import { searchVideos } from './services/search'
@@ -221,9 +222,15 @@ export function registerIpc({ getWindow, openSearchWindow, onSettingsChanged }: 
   })
 
   // ---- Shell / dialogs ----
+  /*
+    Since Electron 43 a dialog without `defaultPath` opens in Downloads rather
+    than wherever the OS last left it, so each picker starts from what it is
+    about to replace.
+  */
   ipcMain.handle(IPC.chooseDirectory, async (event) => {
     const win = BrowserWindow.fromWebContents(event.sender) ?? getWindow() ?? undefined
     const result = await dialog.showOpenDialog(win!, {
+      defaultPath: getSettings().downloadDir || undefined,
       properties: ['openDirectory', 'createDirectory']
     })
     if (result.canceled || !result.filePaths.length) return null
@@ -231,7 +238,9 @@ export function registerIpc({ getWindow, openSearchWindow, onSettingsChanged }: 
   })
   ipcMain.handle(IPC.chooseCookiesFile, async (event) => {
     const win = BrowserWindow.fromWebContents(event.sender) ?? getWindow() ?? undefined
+    const current = getSettings().cookiesFile
     const result = await dialog.showOpenDialog(win!, {
+      defaultPath: current ? dirname(current) : undefined,
       properties: ['openFile'],
       filters: [
         { name: 'Cookies', extensions: ['txt'] },
@@ -252,13 +261,7 @@ export function registerIpc({ getWindow, openSearchWindow, onSettingsChanged }: 
     if (!/^https?:\/\//i.test(url) && !isReportMailto(url)) return Promise.resolve()
     return shell.openExternal(url)
   })
-  ipcMain.handle(IPC.clipboardRead, () => {
-    try {
-      return clipboard.readText().trim()
-    } catch {
-      return ''
-    }
-  })
+  ipcMain.handle(IPC.clipboardRead, () => readClipboardText())
 
   // ---- yt-dlp engine ----
   ipcMain.handle(IPC.ytdlpEnsure, async () => {
@@ -379,6 +382,14 @@ function maybeNotify(item: DownloadItem): void {
         if (done && item.filepath) shell.showItemInFolder(item.filepath)
         else getWindowForNotification()?.show()
       })
+      /*
+        Since Electron 42 macOS posts through UNNotification, which refuses an
+        app without a real signature (the ad-hoc sealed builds) and says so
+        here instead of showing anything.
+      */
+      n.on('failed', (_e, error) =>
+        log.warn('app', 'A notification could not be shown', { why: error })
+      )
       n.show()
     }
   }

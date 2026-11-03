@@ -316,9 +316,10 @@ function applyAutostart(enabled: boolean): void {
       time. `args` puts the flag on the Windows command line instead; macOS
       ignores it and reports a login launch through `wasOpenedAtLogin`. The
       Run value written without the flag is replaced by this one at the next
-      launch, since the first apply of every session writes it.
+      launch, since the first apply of every session writes it. Electron 44
+      removed `openAsHidden` altogether.
     */
-    app.setLoginItemSettings({ openAtLogin: enabled, openAsHidden: true, args: LOGIN_ARGS })
+    app.setLoginItemSettings({ openAtLogin: enabled, args: LOGIN_ARGS })
   } catch (err) {
     log.warn('app', 'Could not change the start-with-system setting', {
       why: err instanceof Error ? err.message : String(err)
