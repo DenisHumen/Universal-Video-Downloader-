@@ -847,7 +847,7 @@ textarea,
     @apply justify-end;
   }
   .ui-headerbar-title {
-    max-width: calc(100% - 200px);
+    max-width: calc(100% - 120px);
     @apply pointer-events-none absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 truncate text-heading text-ink;
   }
 

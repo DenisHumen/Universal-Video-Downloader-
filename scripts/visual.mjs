@@ -77,6 +77,11 @@ const SCENES = [
   },
   { name: 'watching', setup: `${WATCH}; await __uvdShot.view('automation')` },
   { name: 'settings', setup: `await __uvdShot.view('settings')` },
+  // A panel with a subpage, deep-linked (GNOME Network › Proxy).
+  {
+    name: 'settings-subpage',
+    setup: `__uvdStore.getState().openSettings('network/proxy#address'); await new Promise((r) => setTimeout(r, 300))`
+  },
   {
     name: 'menu',
     setup: `

@@ -99,6 +99,8 @@ interface AppState {
   sidebarFolded: boolean
   /** Where Settings is: `<panel>[/<subpage>][#<row>]` (views/settings/router.ts). */
   settingsRoute: string
+  /** Settings was opened at a route (a deep link), not from the sidebar: narrow mode skips the list. */
+  settingsDeepLinked: boolean
 
   init: () => Promise<void>
   setView: (view: ViewId) => void
@@ -303,6 +305,7 @@ export const useStore = create<AppState>((set, get) => ({
   sidebarOverlayOpen: false,
   sidebarFolded: false,
   settingsRoute: 'appearance',
+  settingsDeepLinked: false,
 
   init: () => {
     if (!initPromise) initPromise = runInit(set, get)
@@ -352,7 +355,12 @@ export const useStore = create<AppState>((set, get) => ({
   setSidebarOverlayOpen: (open) => set({ sidebarOverlayOpen: open }),
   setSidebarFolded: (folded) => set({ sidebarFolded: folded }),
   openSettings: (route) =>
-    set((s) => ({ view: 'settings', settingsRoute: route ?? s.settingsRoute, sidebarOverlayOpen: false })),
+    set((s) => ({
+      view: 'settings',
+      settingsRoute: route ?? s.settingsRoute,
+      settingsDeepLinked: Boolean(route),
+      sidebarOverlayOpen: false
+    })),
   setSettingsRoute: (route) => set({ settingsRoute: route }),
   beginDetect: (url, requestId) =>
     set({ detect: { stage: 'resolving', url, requestId }, detectPreview: previews.get(requestId) ?? null }),

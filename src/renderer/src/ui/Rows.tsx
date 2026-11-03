@@ -54,7 +54,7 @@ interface GroupProps {
 export function PreferencesGroup({ title, description, suffix, children, id, footer }: GroupProps): JSX.Element {
   const titleId = useId()
   return (
-    <section id={id} aria-labelledby={title ? titleId : undefined} className="space-y-3">
+    <section id={id} data-row={id} aria-labelledby={title ? titleId : undefined} className="space-y-3">
       {(title || suffix) && (
         <div className="flex items-end gap-3">
           <div className="min-w-0 flex-1">

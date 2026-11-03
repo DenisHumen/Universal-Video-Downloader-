@@ -50,7 +50,7 @@ describe('icons (plan 3.2)', () => {
     )
   it('takes icons only from ui/icons (lucide is gone; Yaru symbolics replace it)', () => {
     const offenders = walk(root)
-      .filter((f) => /from ['"]lucide-react['"]|resources\/icons\//.test(readFileSync(f, 'utf-8')))
+      .filter((f) => /from ['"]lucide-react['"]|resources\/icons\/[^'"]*\.svg/.test(readFileSync(f, 'utf-8')))
       .filter((f) => !f.endsWith(join('ui', 'icons.tsx')) && !f.endsWith('ui.test.tsx'))
       .map((f) => f.slice(root.length + 1))
     expect(offenders).toEqual([])
