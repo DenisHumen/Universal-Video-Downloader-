@@ -42,7 +42,7 @@ theme swap is one attribute on `<html>`. Two themes, no accent picker.
 | Token | Role | Night | Day |
 |---|---|---|---|
 | `--bg` | window canvas | `#09090B` | `#F0F0F3` |
-| `--surface` | raised plane (`.block`) | `#141417` | `#FFFFFF` |
+| `--surface` | raised plane (`.panel`) | `#141417` | `#FFFFFF` |
 | `--surface-2` | inset plane (`.field`, `.well`) | `#1C1C20` | `#F8F8FA` |
 | `--line` | hairline | `#27272C` | `#E0E0E5` |
 | `--line-strong` | emphasised border | `#3F3F46` | `#C6C6CE` |

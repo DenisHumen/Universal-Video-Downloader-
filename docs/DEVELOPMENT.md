@@ -18,7 +18,7 @@ Everything a contributor needs that a user does not: the stack, the commands, ho
 
 ## Commands
 
-Requires Node.js (CI uses Node 20) and npm.
+Requires Node.js 24 (pinned in `.nvmrc`; CI uses the same) and npm.
 
 ```bash
 npm install              # install dependencies

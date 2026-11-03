@@ -14,6 +14,9 @@
     "type": "git",
     "url": "https://github.com/DenisHumen/Universal-Video-Downloader-.git"
   },
+  "engines": {
+    "node": ">=22"
+  },
   "scripts": {
     "dev": "electron-vite dev",
     "start": "electron-vite preview",
