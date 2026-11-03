@@ -1,4 +1,6 @@
 import { buttonLayout, systemAccent } from './services/desktop'
+import { forgetEntry, missingFiles, onLibraryChanged, queryLibrary, trashEntry } from './services/library'
+import type { LibraryQuery } from '@shared/library'
 import {
   app,
   BrowserWindow,
@@ -167,6 +169,17 @@ export function registerIpc({ getWindow, openSearchWindow, onSettingsChanged }: 
   ipcMain.handle(IPC.downloadClearFinished, () => clearFinished())
   ipcMain.handle(IPC.downloadClearFailed, () => clearFailed())
   ipcMain.handle(IPC.downloadList, () => listDownloads())
+
+  // ---- Library (plan 5.3) ----
+  ipcMain.handle(IPC.libraryList, (_e, q: LibraryQuery) => queryLibrary(q ?? {}))
+  ipcMain.handle(IPC.libraryMissing, (_e, paths: unknown) =>
+    missingFiles(Array.isArray(paths) ? paths.filter((p): p is string => typeof p === 'string') : [])
+  )
+  ipcMain.handle(IPC.libraryTrash, (event, id: string) => {
+    requireRenderer(event, IPC.libraryTrash)
+    return trashEntry(String(id))
+  })
+  ipcMain.handle(IPC.libraryForget, (_e, id: string) => forgetEntry(String(id)))
   ipcMain.handle(IPC.mediaJobStart, (_e, req: MediaJobRequest) => startMediaJob(req))
   ipcMain.handle(IPC.mediaProbe, (_e, path: string) => probeMedia(path))
   ipcMain.handle(IPC.mediaThumbnail, (_e, url: string, pageUrl?: string) =>
@@ -357,6 +370,7 @@ export function registerIpc({ getWindow, openSearchWindow, onSettingsChanged }: 
     forget: forgetNotified,
     syncOs: () => syncOsState(getWindow)
   })
+  onLibraryChanged(() => send(IPC.evtLibraryChanged, null))
   ytdlpEvents.on('status', (s) => send(IPC.evtYtdlpStatus, s))
   updateEvents.on('status', (s) => send(IPC.evtUpdateStatus, s))
 }

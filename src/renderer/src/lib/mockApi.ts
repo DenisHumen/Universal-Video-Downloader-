@@ -1,3 +1,4 @@
+import { EMPTY_LIBRARY, entryFromItem, listLibrary, removeEntry, upsertEntry, type LibraryFile } from '@shared/library'
 import type { ButtonLayout } from '@shared/desktop'
 import type { UvdApi, AppInfo } from '../../../preload/index'
 import type {
@@ -198,6 +199,8 @@ function fakeAnimeInfo(url: string): MediaInfo {
 
 let itemSeq = 0
 const items: DownloadItem[] = []
+let mockLibrary: LibraryFile = EMPTY_LIBRARY
+const libraryListeners = new Set<() => void>()
 
 type YtdlpListener = (status: YtDlpStatus) => void
 type UpdateListener = (status: UpdateStatus) => void
@@ -645,7 +648,29 @@ export function installMockApi(): void {
     getLogPath: async () => 'C:/mock/uvd.log',
     onAutomationChanged: () => () => undefined,
     onNavigate: () => () => undefined,
-    onNativeTheme: () => () => undefined
+    onNativeTheme: () => () => undefined,
+    // The Library, as main builds it: every completed row with a file, kept apart from the queue.
+    listLibrary: async (q) => {
+      for (const item of items) {
+        const entry = entryFromItem(item)
+        if (entry) mockLibrary = upsertEntry(mockLibrary, entry)
+      }
+      return listLibrary(mockLibrary, q)
+    },
+    libraryMissing: async () => [],
+    trashLibraryEntry: async (id) => {
+      mockLibrary = removeEntry(mockLibrary, id)
+      libraryListeners.forEach((cb) => cb())
+      return true
+    },
+    forgetLibraryEntry: async (id) => {
+      mockLibrary = removeEntry(mockLibrary, id)
+      libraryListeners.forEach((cb) => cb())
+    },
+    onLibraryChanged: (cb) => {
+      libraryListeners.add(cb)
+      return () => libraryListeners.delete(cb)
+    }
   }
   window.api = api
 }

@@ -6,6 +6,7 @@ import { contextBridge, ipcRenderer } from 'electron'
 import { IPC } from '@shared/ipc'
 import { themeFromArgv } from '@shared/theme-boot'
 import type { ButtonLayout } from '@shared/desktop'
+import type { LibraryPage, LibraryQuery } from '@shared/library'
 import type {
   AppSettings,
   BrowserMedia,
@@ -75,6 +76,12 @@ const api = {
   clearFinished: (): Promise<void> => ipcRenderer.invoke(IPC.downloadClearFinished),
   clearFailed: (): Promise<void> => ipcRenderer.invoke(IPC.downloadClearFailed),
   listDownloads: (): Promise<DownloadItem[]> => ipcRenderer.invoke(IPC.downloadList),
+  // Library (plan 5.3)
+  listLibrary: (q: LibraryQuery): Promise<LibraryPage> => ipcRenderer.invoke(IPC.libraryList, q),
+  libraryMissing: (paths: string[]): Promise<string[]> => ipcRenderer.invoke(IPC.libraryMissing, paths),
+  trashLibraryEntry: (id: string): Promise<boolean> => ipcRenderer.invoke(IPC.libraryTrash, id),
+  forgetLibraryEntry: (id: string): Promise<void> => ipcRenderer.invoke(IPC.libraryForget, id),
+  onLibraryChanged: (cb: () => void) => on<null>(IPC.evtLibraryChanged, () => cb()),
   // Local media jobs (trim / convert)
   startMediaJob: (req: MediaJobRequest): Promise<DownloadItem> =>
     ipcRenderer.invoke(IPC.mediaJobStart, req),

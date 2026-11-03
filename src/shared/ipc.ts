@@ -15,6 +15,12 @@ export const IPC = {
   downloadClearFinished: 'download:clear-finished',
   downloadClearFailed: 'download:clear-failed',
   downloadList: 'download:list',
+  /** The Library (plan 5.3): a page of finished files, which are gone, trash one, forget one. */
+  libraryList: 'library:list',
+  libraryMissing: 'library:missing',
+  libraryTrash: 'library:trash',
+  libraryForget: 'library:forget',
+  evtLibraryChanged: 'library:changed',
   mediaJobStart: 'media:job-start',
   mediaProbe: 'media:probe',
   mediaThumbnail: 'media:thumbnail',

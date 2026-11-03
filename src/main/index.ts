@@ -14,6 +14,7 @@ import { IPC } from '@shared/ipc'
 import { registerIpc } from './ipc'
 import { holdQuitForSecrets, initSecrets } from './services/secrets'
 import { flushSettings, getSettings } from './services/settings'
+import { flushLibrary, loadLibrary, recordFinished } from './services/library'
 import { applyProxy } from './services/proxy'
 import { answerProxyLoginsForPages } from './services/proxy-auth'
 import { ensureYtdlp, scheduleEngineRefresh } from './services/ytdlp'
@@ -639,6 +640,10 @@ if (cliArgs) {
       onSettingsChanged: applySettings
     })
     loadHistory()
+    // The Library is its own store (5.3); a finished download is recorded in it here,
+    // so the downloader never imports it and clearing Activity cannot reach it.
+    loadLibrary()
+    downloadEvents.on('updated', (item) => recordFinished(item))
     // electron-updater loads with the first check (see updater.ts), not here.
     buildMenu()
     const startHidden = shouldStartHidden(process.argv, getSettings(), openedAtLogin())
@@ -722,6 +727,7 @@ if (cliArgs) {
     flushSettings()
     flushWatches()
     shutdownDownloads()
+    flushLibrary()
     /*
       Last. Closing the log is final - anything logged afterwards is only
       queued, never written - and the shutdown above writes history.json,
