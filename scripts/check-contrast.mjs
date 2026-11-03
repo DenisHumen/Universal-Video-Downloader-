@@ -11,6 +11,11 @@
  * This reads the real values out of index.css — so it cannot drift from the
  * stylesheet — and fails if any pairing lands under 4.5:1.
  *
+ * 4.0 adds --surface-3 to the planes, every accent in every theme (plan 2.2)
+ * and the translucent overlay material (plan 2.4): each translucent surface
+ * must have an opaque base rule and a reduced-transparency override, and text
+ * on it must still clear 4.5:1 once flattened onto any plane behind it.
+ *
  * Run: node scripts/check-contrast.mjs
  */
 import { readFileSync } from 'fs'
@@ -245,6 +250,59 @@ for (const { name, selector } of THEMES) {
   }
 }
 
+/*
+ * Translucent surfaces. Each `[data-material='translucent'] .x` rule that
+ * paints `rgb(var(--plane) / a)` is checked three ways: `.x` has an opaque
+ * rule of its own (the fallback Linux and reduced transparency get), the
+ * reduced-transparency media block resets it, and every text tier still
+ * clears 4.5:1 on the surface flattened onto each plane it can float over.
+ * Blur only softens what is behind; the flat composite is the honest floor.
+ */
+let materials = 0
+let thinnest = { ratio: Infinity, what: '' }
+const reducedBlock = css.slice(css.indexOf('@media (prefers-reduced-transparency: reduce)'))
+for (const m of css.matchAll(
+  /\[data-material='translucent'\]\s+\.([\w-]+)\s*\{[^}]*background-color:\s*rgb\(var\((--[\w-]+)\)\s*\/\s*([\d.]+)\)/g
+)) {
+  // The reduced-transparency block repeats the selector; that copy is the override, not a material.
+  if (m.index >= css.indexOf('@media (prefers-reduced-transparency: reduce)')) continue
+  const [, cls, planeVar, alphaText] = m
+  const alpha = Number(alphaText)
+  const base = css.match(new RegExp(`\\n\\s*\\.${cls}\\s*\\{([^}]*)\\}`))?.[1]
+  /*
+    The fallback: a base rule with no blur. A surface that carries text must
+    be fully opaque there; the scrim is see-through by nature and only has to
+    drop the blur.
+  */
+  if (!base || /backdrop-filter/.test(base)) {
+    fail(`.${cls} is translucent but has no blur-free base rule (the fallback)`)
+  } else if (cls !== 'scrim' && !/background-color:\s*rgb\(var\(--[\w-]+\)\)/.test(base)) {
+    fail(`.${cls} is translucent but its base rule is not opaque`)
+  }
+  if (reducedBlock.indexOf(`.${cls}`) < 0 || reducedBlock.indexOf('@media (prefers-reduced-transparency') !== 0) {
+    fail(`.${cls} is translucent but prefers-reduced-transparency does not make it opaque`)
+  }
+  // The scrim carries no text; only surfaces made of a plane token are read on.
+  if (cls === 'scrim') continue
+  for (const { name, selector } of THEMES) {
+    const vars = readTheme(selector)
+    if (!vars?.[planeVar]) continue
+    for (const behind of PLANE_VARS) {
+      if (!vars[behind]) continue
+      const surface = composite(vars[planeVar], vars[behind], alpha)
+      for (const textVar of TEXT_VARS) {
+        if (!vars[textVar]) continue
+        const ratio = contrast(vars[textVar], surface)
+        materials++
+        const what = `${name} · ${textVar} on .${cls} (${planeVar}/${alpha}) over ${behind}`
+        if (ratio < thinnest.ratio) thinnest = { ratio, what }
+        if (ratio < AA_NORMAL) fail(`${what} → ${ratio.toFixed(2)}:1 (needs ${AA_NORMAL}:1)`)
+      }
+    }
+  }
+}
+if (!materials) fail('no translucent surface found to check; did the [data-material] rules move?')
+
 if (process.exitCode) {
   console.error(`\n${checks + hairlines + planes + accentChecks} pairings checked — see failures above.`)
 } else {
@@ -255,6 +313,10 @@ if (process.exitCode) {
   console.log(
     `✓ ${accentChecks} accent × theme pairings all clear ${AA_NORMAL}:1 ` +
       `(tightest: ${worstAccent.what} at ${worstAccent.ratio.toFixed(2)}:1)`
+  )
+  console.log(
+    `✓ ${materials} translucent-surface pairings clear ${AA_NORMAL}:1 on their opaque floor ` +
+      `(thinnest: ${thinnest.what} at ${thinnest.ratio.toFixed(2)}:1)`
   )
   console.log(
     `✓ ${hairlines} day hairlines all clear ${HAIRLINE_MIN}:1 ` +
