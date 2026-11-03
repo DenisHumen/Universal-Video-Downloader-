@@ -3,7 +3,7 @@ import type { TranslationKey } from '../i18n'
 import { isProbablyUrl } from './format'
 
 /** What a ⌘/Ctrl chord does: open a screen, or toggle the shortcut list. */
-export type ShortcutAction = ViewId | 'help'
+export type ShortcutAction = ViewId | 'help' | 'palette'
 
 export interface ShortcutRow {
   /** One chord per entry; a second entry is an alias for the same thing. */
@@ -29,6 +29,7 @@ export const SHORTCUT_ROWS: ShortcutRow[] = [
   // Ctrl+1..N follow the sidebar's sections top to bottom (shell/nav.ts); Settings, pinned
   // at the bottom, is Ctrl+, as GNOME's Preferences are, and opens at its last panel.
   { keys: [['mod', ',']], label: 'shortcuts.settings', action: 'settings' },
+  { keys: [['mod', 'K']], label: 'shortcuts.palette', action: 'palette' },
   { keys: [['mod', 'V']], label: 'shortcuts.paste' },
   // Home's own: it needs the link on screen, so it is answered there, not globally.
   { keys: [['mod', 'Enter']], label: 'shortcuts.downloadNow' },

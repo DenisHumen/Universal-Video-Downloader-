@@ -105,6 +105,10 @@ const SCENES = [
     `
   },
   {
+    name: 'palette',
+    setup: `await __uvdShot.view('home'); __uvdStore.getState().setPaletteOpen(true); await new Promise((r) => setTimeout(r, 200))`
+  },
+  {
     name: 'toast',
     setup: `
       await __uvdShot.view('home');

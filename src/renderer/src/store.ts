@@ -93,6 +93,8 @@ interface AppState {
   /** The site's own title and poster for the link being detected, when it has one. */
   detectPreview: DetectPreview | null
   shortcutsOpen: boolean
+  /** The Ctrl/⌘+K command palette (plan 4.5). */
+  paletteOpen: boolean
   /** The sidebar as an overlay (below 860 px, or while Settings asks for room) is showing. */
   sidebarOverlayOpen: boolean
   /** Settings at 860-1099 px folds the app sidebar away so there is never a double rail (A1.1). */
@@ -112,6 +114,7 @@ interface AppState {
   dismissUpdate: () => void
   dismissClipboardLink: () => void
   setShortcutsOpen: (open: boolean) => void
+  setPaletteOpen: (open: boolean) => void
   setSidebarOverlayOpen: (open: boolean) => void
   setSidebarFolded: (folded: boolean) => void
   /** Open Settings, at `route` or where it was last (Ctrl+, , About, Fix buttons, deep links). */
@@ -302,6 +305,7 @@ export const useStore = create<AppState>((set, get) => ({
   detect: null,
   detectPreview: null,
   shortcutsOpen: false,
+  paletteOpen: false,
   sidebarOverlayOpen: false,
   sidebarFolded: false,
   settingsRoute: 'appearance',
@@ -352,6 +356,7 @@ export const useStore = create<AppState>((set, get) => ({
   dismissUpdate: () => set({ updateDismissed: true }),
   dismissClipboardLink: () => set({ clipboardLink: null }),
   setShortcutsOpen: (open) => set({ shortcutsOpen: open }),
+  setPaletteOpen: (open) => set({ paletteOpen: open }),
   setSidebarOverlayOpen: (open) => set({ sidebarOverlayOpen: open }),
   setSidebarFolded: (folded) => set({ sidebarFolded: folded }),
   openSettings: (route) =>

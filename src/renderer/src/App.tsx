@@ -1,6 +1,7 @@
 import { useEffect } from 'react'
 import { useStore } from './store'
 import Shell from './shell/Shell'
+import CommandPalette from './components/CommandPalette'
 import UpdateBanner from './components/UpdateBanner'
 import EngineNotice from './components/EngineNotice'
 import HomeView from './views/HomeView'
@@ -40,6 +41,7 @@ export default function App(): JSX.Element {
       {/* Outcomes as text, for anyone not watching the window. */}
       <LiveRegion />
       <ShortcutsOverlay />
+      <CommandPalette />
       {dragging && <DropOverlay />}
 
       <Shell
