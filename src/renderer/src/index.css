@@ -60,25 +60,31 @@
 :root,
 [data-theme='night'] {
   color-scheme: dark;
-  --bg: 9 9 11;
-  --surface: 20 20 23;
-  --surface-2: 28 28 32;
+  /* 4.0 planes (VD spec). Four steps now: canvas < sheet < field < floating
+     (menus, popovers, dialogs). --surface-3 is what lifts a menu off a sheet
+     in Night, where a shadow alone is all but invisible. */
+  --bg: 10 10 13;
+  --surface: 20 20 24;
+  --surface-2: 28 28 33;
+  --surface-3: 34 34 40;
   /* Placeholder blocks. --surface-2 is 1.1:1 on a panel, and at the bottom of
      its pulse the skeleton all but vanished - the card read as empty, not as
      loading. Checked against --surface by check-contrast.mjs. */
   --skeleton: 44 44 50;
-  --line: 39 39 44;
+  --line: 44 44 52;
+  /* Dividers inside a sheet: rows of one list, sections of one card. */
+  --line-soft: 32 32 38;
   --line-strong: 63 63 70;
   --text: 244 244 245;
-  --text-2: 168 168 178;
-  --text-3: 135 135 146;
+  --text-2: 170 170 180;
+  --text-3: 140 140 152;
   --accent: 47 91 255;
   --accent-fg: 255 255 255;
   --accent-ink: 138 168 255;
   --good: 74 222 128;
   --warn: 250 204 21;
   --bad: 251 113 133;
-  --bad-fg: 9 9 11;
+  --bad-fg: 10 10 13;
   --control-edge: transparent;
 }
 
@@ -95,15 +101,17 @@
    is having no surface; a token it can simply override. */
 [data-theme='day'] {
   color-scheme: light;
-  --bg: 240 240 243;
+  --bg: 238 238 242;
   --surface: 255 255 255;
-  --surface-2: 248 248 250;
+  --surface-2: 246 246 249;
+  --surface-3: 255 255 255;
   --skeleton: 222 222 228;
-  --line: 224 224 229;
+  --line: 222 222 228;
+  --line-soft: 236 236 240;
   --line-strong: 198 198 206;
-  --text: 9 9 11;
-  --text-2: 82 82 91;
-  --text-3: 100 100 110;
+  --text: 12 12 16;
+  --text-2: 78 78 88;
+  --text-3: 98 98 110;
   --accent: 37 78 235;
   --accent-fg: 255 255 255;
   --accent-ink: 30 64 214;

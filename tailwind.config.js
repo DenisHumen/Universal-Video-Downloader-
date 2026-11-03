@@ -12,8 +12,12 @@ module.exports = {
         canvas: 'rgb(var(--bg) / <alpha-value>)',
         raise: 'rgb(var(--surface) / <alpha-value>)',
         sink: 'rgb(var(--surface-2) / <alpha-value>)',
+        // Floating planes: menus, popovers, dialogs. White in Day, a step
+        // above a field in Night.
+        float: 'rgb(var(--surface-3) / <alpha-value>)',
         edge: {
           DEFAULT: 'rgb(var(--line) / <alpha-value>)',
+          soft: 'rgb(var(--line-soft) / <alpha-value>)',
           strong: 'rgb(var(--line-strong) / <alpha-value>)'
         },
         // Three text tiers, all verified ≥4.5:1 on every plane by

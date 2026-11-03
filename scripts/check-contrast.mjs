@@ -25,7 +25,7 @@ const AA_NORMAL = 4.5
 /** Everything that is ever painted as text. */
 const TEXT_VARS = ['--text', '--text-2', '--text-3', '--accent-ink', '--good', '--warn', '--bad']
 /** Every plane text can sit on. */
-const PLANE_VARS = ['--bg', '--surface', '--surface-2']
+const PLANE_VARS = ['--bg', '--surface', '--surface-2', '--surface-3']
 /** Status colours that are painted as text on top of a tint of themselves. */
 const TINT_VARS = ['--good', '--warn', '--bad']
 /** The tint strength those buttons use (`bg-bad/12`). */

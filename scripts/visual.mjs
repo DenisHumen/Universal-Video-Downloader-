@@ -40,7 +40,7 @@ const BASELINE = join(root, 'tests', 'visual', 'baseline')
 const ACTUAL = join(root, 'tests', 'visual', '.out')
 
 /** Per-pixel colour distance pixelmatch tolerates (0..1), and the share of pixels that may still differ. */
-const PIXEL_THRESHOLD = 0.12
+const PIXEL_THRESHOLD = 0.03
 const MAX_DIFF_RATIO = 0.002
 const HEIGHT = 820
 /** 2026-01-15 12:00 UTC: every "in 2 h", "today" and date stamp reads the same on every run. */
