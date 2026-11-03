@@ -53,6 +53,9 @@ describe('the library rules (shared)', () => {
     expect(again).toBe(lib)
     lib = upsertEntry(lib, entryFromItem(done('a2', '/d/a.mp4', 3))!)
     expect(lib.entries.map((e) => e.id)).toEqual(['a2', 'b'])
+    // The same job re-run into another file replaces its entry.
+    lib = upsertEntry(lib, entryFromItem(done('b', '/d/b.mkv', 4))!)
+    expect(lib.entries.map((e) => e.filepath)).toEqual(['/d/b.mkv', '/d/a.mp4'])
   })
 
   it('seeds from history idempotently, deduped by file path', () => {
@@ -114,11 +117,53 @@ describe('the library store (main)', () => {
     expect(lib.queryLibrary({}).total).toBe(0)
   })
 
-  it('reports files that are gone', async () => {
+  it('reports files that are gone, and only checks paths the library holds', async () => {
     const lib = await import('./library')
+    lib.loadLibrary()
     writeFileSync(join(h.dir, 'here.mp4'), 'x')
-    expect(await lib.missingFiles([join(h.dir, 'here.mp4'), join(h.dir, 'gone.mp4')])).toEqual([join(h.dir, 'gone.mp4')])
+    lib.recordFinished(done('h', join(h.dir, 'here.mp4'), 1))
+    lib.recordFinished(done('g', join(h.dir, 'gone.mp4'), 2))
+    expect(
+      await lib.missingFiles([join(h.dir, 'here.mp4'), join(h.dir, 'gone.mp4'), join(h.dir, 'stranger.mp4')])
+    ).toEqual([join(h.dir, 'gone.mp4')])
     expect(existsSync(join(h.dir, 'here.mp4'))).toBe(true)
+  })
+})
+
+describe('the library store: damaged and newer files', () => {
+  it('never touches a corrupt history.json, and does not persist a library it could not seed', async () => {
+    const corrupt = '[{"id": "a", "state": "compl'
+    writeFileSync(join(h.dir, 'history.json'), corrupt)
+    const lib = await import('./library')
+    lib.loadLibrary()
+    lib.recordFinished(done('n', '/d/n.mp4', 5))
+    lib.flushLibrary()
+    expect(readFileSync(join(h.dir, 'history.json'), 'utf-8')).toBe(corrupt)
+    expect(existsSync(join(h.dir, 'history.json.bak'))).toBe(false)
+    expect(existsSync(join(h.dir, 'library.json'))).toBe(false)
+    // The entry is still there for this session.
+    expect(lib.queryLibrary({}).total).toBe(1)
+  })
+
+  it('seeds from a readable history.json.bak without restoring it', async () => {
+    const corrupt = 'not json'
+    writeFileSync(join(h.dir, 'history.json'), corrupt)
+    writeFileSync(join(h.dir, 'history.json.bak'), JSON.stringify([done('b', '/d/b.mp4', 1)]))
+    const lib = await import('./library')
+    lib.loadLibrary()
+    expect(lib.queryLibrary({}).total).toBe(1)
+    expect(readFileSync(join(h.dir, 'history.json'), 'utf-8')).toBe(corrupt)
+  })
+
+  it('reads a library.json from a newer version but never writes it', async () => {
+    const newer = JSON.stringify({ version: 2, entries: [{ id: 'z', filepath: '/d/z.mp4', title: 'Z', url: 'u', finishedAt: 1, extra: 'kept' }] })
+    writeFileSync(join(h.dir, 'library.json'), newer)
+    const lib = await import('./library')
+    lib.loadLibrary()
+    expect(lib.queryLibrary({}).total).toBe(1)
+    lib.recordFinished(done('n', '/d/n.mp4', 5))
+    lib.flushLibrary()
+    expect(readFileSync(join(h.dir, 'library.json'), 'utf-8')).toBe(newer)
   })
 })
 

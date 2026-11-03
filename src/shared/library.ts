@@ -68,6 +68,11 @@ export function isLibraryFile(raw: unknown): raw is LibraryFile {
   )
 }
 
+/** A file written by a newer version of the app: read it, never write it back. */
+export function isNewerLibrary(raw: unknown): boolean {
+  return isLibraryFile(raw) && raw.version > LIBRARY_VERSION
+}
+
 function isEntry(raw: unknown): raw is LibraryEntry {
   const e = raw as LibraryEntry
   return (
@@ -95,11 +100,16 @@ export function normaliseLibrary(raw: LibraryFile): LibraryFile {
 
 const sortNewest = (entries: LibraryEntry[]): LibraryEntry[] => entries.sort((a, b) => b.finishedAt - a.finishedAt)
 
-/** Add or replace an entry (by file path). Returns the same object when nothing changed. */
+/** Add or replace an entry (by file path or id). Returns the same object when nothing changed. */
 export function upsertEntry(lib: LibraryFile, entry: LibraryEntry): LibraryFile {
   const at = lib.entries.findIndex((e) => e.filepath === entry.filepath)
   if (at >= 0 && JSON.stringify(lib.entries[at]) === JSON.stringify(entry)) return lib
-  const entries = at >= 0 ? lib.entries.map((e, i) => (i === at ? entry : e)) : [entry, ...lib.entries]
+  /*
+    By path, and by id: a row re-run into a new file (renamed, another
+    container) replaces its old entry rather than leaving two for one job.
+  */
+  const rest = lib.entries.filter((e, i) => i !== at && e.id !== entry.id)
+  const entries = [entry, ...rest]
   return { version: LIBRARY_VERSION, entries: sortNewest(entries) }
 }
 

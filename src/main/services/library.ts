@@ -1,10 +1,12 @@
 import { app, shell } from 'electron'
+import { readFileSync } from 'fs'
 import { access } from 'fs/promises'
 import { join } from 'path'
 import {
   EMPTY_LIBRARY,
   entryFromItem,
   isLibraryFile,
+  isNewerLibrary,
   listLibrary,
   normaliseLibrary,
   removeEntry,
@@ -40,9 +42,47 @@ const unread = new ReadFailure()
 let timer: NodeJS.Timeout | null = null
 const listeners = new Set<() => void>()
 
+type HistoryRead = { status: 'ok'; data: unknown[] } | { status: 'missing' } | { status: 'bad' }
+
+/**
+ * history.json, strictly read-only: no restore from `.bak`, no set-aside, and
+ * none of json-store's per-file state touched (that belongs to history.ts,
+ * the file's owner). A damaged file falls back to a read-only parse of the
+ * backup; failing that it is "bad", and the library does not seed from it.
+ */
+export function readHistoryReadOnly(file: string): HistoryRead {
+  let sawFile = false
+  for (const path of [file, `${file}.bak`]) {
+    let text: string
+    try {
+      text = readFileSync(path, 'utf-8')
+    } catch (err) {
+      if ((err as NodeJS.ErrnoException)?.code === 'ENOENT') continue
+      sawFile = true
+      continue
+    }
+    sawFile = true
+    try {
+      const data: unknown = JSON.parse(text)
+      if (Array.isArray(data)) return { status: 'ok', data }
+    } catch {
+      /* try the backup */
+    }
+  }
+  return sawFile ? { status: 'bad' } : { status: 'missing' }
+}
+
+/*
+  Seeding could not read history.json: the library lives in memory for this
+  session and library.json is not written, so the next launch seeds again
+  instead of finding an empty library and never looking at history.
+*/
+let seedPending = false
+
 /** Read library.json, or seed it from history.json when there is none. */
 export function loadLibrary(): void {
   try {
+    seedPending = false
     const read = readJsonStore(FILE(), 'library', isLibraryFile)
     if (read.status === 'unreadable') {
       unread.set()
@@ -51,11 +91,25 @@ export function loadLibrary(): void {
     unread.clear()
     if (read.status === 'ok') {
       lib = normaliseLibrary(read.data as LibraryFile)
+      /*
+        Written by a newer version: shown, but never written back. Saving it
+        would downgrade it to this version's shape and lose what it added.
+      */
+      if (isNewerLibrary(read.data)) {
+        unread.set()
+        log.warn('library', 'library.json is from a newer version; reading it, not saving over it')
+      }
       return
     }
     if (read.status === 'missing') {
-      const history = readJsonStore(HISTORY(), 'library', Array.isArray)
-      lib = history.status === 'ok' ? seedFromHistory(history.data as unknown[]) : EMPTY_LIBRARY
+      const history = readHistoryReadOnly(HISTORY())
+      if (history.status === 'bad') {
+        lib = EMPTY_LIBRARY
+        seedPending = true
+        log.warn('library', 'history.json could not be read; the library is not saved until it can be seeded')
+        return
+      }
+      lib = history.status === 'ok' ? seedFromHistory(history.data) : EMPTY_LIBRARY
       log.info('library', 'Seeded the library from history', { entries: lib.entries.length })
       flushLibrary()
       return
@@ -81,6 +135,7 @@ export function flushLibrary(): void {
     noteRefusedWrite(FILE(), 'library')
     return
   }
+  if (seedPending) return
   try {
     writeJsonAtomic(FILE(), lib)
   } catch (err) {
@@ -105,8 +160,10 @@ export function queryLibrary(q: LibraryQuery): LibraryPage {
 /** Which of these files are gone from disk. Asked in batches when the view opens; never stored. */
 export async function missingFiles(paths: string[]): Promise<string[]> {
   const gone: string[] = []
+  // Only paths the library holds: the renderer cannot probe arbitrary files through this.
+  const known = new Set(lib.entries.map((e) => e.filepath))
   await Promise.all(
-    paths.slice(0, 200).map(async (p) => {
+    paths.filter((p) => known.has(p)).slice(0, 200).map(async (p) => {
       try {
         await access(p)
       } catch {
@@ -149,4 +206,5 @@ export function onLibraryChanged(cb: () => void): () => void {
 export function __resetLibrary(): void {
   lib = EMPTY_LIBRARY
   unread.clear()
+  seedPending = false
 }
