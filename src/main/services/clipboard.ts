@@ -13,8 +13,16 @@ let lastSeen = ''
 let deliver: (url: string) => void = () => {}
 /** Bumped on every start and stop, so a read still under way when the watch stopped is dropped. */
 let generation = 0
-/** A read still in flight; the next tick waits for it rather than starting a second one. */
-let reading = false
+
+/** How long one read may take before it counts as empty. */
+export const READ_TIMEOUT_MS = 1500
+
+/**
+ * The read under way, whichever run started it. A run started while an older
+ * run's read is still out waits on that same read rather than issuing a second
+ * one, so reads never overlap.
+ */
+let inFlight: Promise<string> | null = null
 
 /**
  * Start watching, or keep watching if already started.
@@ -26,6 +34,9 @@ let reading = false
  *
  * Electron 44 made `clipboard.readText()` return a promise, so the seed and
  * each tick are asynchronous; nothing is offered until the seed has landed.
+ * A read that never answers counts as empty after READ_TIMEOUT_MS, so it
+ * cannot stop the watch for good; and whether a read is out is kept per run,
+ * so an old run's read can never clear (or hold) a new run's.
  */
 export function startClipboardWatch(onLink: (url: string) => void): void {
   deliver = onLink
@@ -33,7 +44,9 @@ export function startClipboardWatch(onLink: (url: string) => void): void {
   const run = ++generation
   let seeded = false
   // Seed with whatever is already on the clipboard so we don't fire on startup.
-  void readClipboardText().then((text) => {
+  let reading = true
+  void sharedRead().then((text) => {
+    reading = false
     if (run !== generation) return
     lastSeen = text
     seeded = true
@@ -41,7 +54,7 @@ export function startClipboardWatch(onLink: (url: string) => void): void {
   timer = setInterval(() => {
     if (!seeded || reading) return
     reading = true
-    void readClipboardText().then((text) => {
+    void sharedRead().then((text) => {
       reading = false
       if (run !== generation) return
       if (!text || text === lastSeen) return
@@ -59,11 +72,33 @@ export function stopClipboardWatch(): void {
   }
 }
 
-/** The clipboard's text, trimmed; empty when it cannot be read. Never rejects. */
+/** One read at a time, shared by whoever asks while it is out. */
+function sharedRead(): Promise<string> {
+  if (!inFlight) {
+    inFlight = readClipboardText().finally(() => {
+      inFlight = null
+    })
+  }
+  return inFlight
+}
+
+/**
+ * The clipboard's text, trimmed; empty when it cannot be read or does not
+ * answer within READ_TIMEOUT_MS. Never rejects.
+ */
 export async function readClipboardText(): Promise<string> {
+  let timeout: NodeJS.Timeout | undefined
+  const late = new Promise<string>((resolve) => {
+    timeout = setTimeout(() => resolve(''), READ_TIMEOUT_MS)
+  })
   try {
-    return (await clipboard.readText()).trim()
+    const read = Promise.resolve()
+      .then(() => clipboard.readText())
+      .then((text) => text.trim())
+    return await Promise.race([read, late])
   } catch {
     return ''
+  } finally {
+    clearTimeout(timeout)
   }
 }
