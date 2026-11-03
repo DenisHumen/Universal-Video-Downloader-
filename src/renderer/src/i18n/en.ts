@@ -38,11 +38,11 @@ export const en = {
   'common.paste': 'paste from clipboard',
 
   // ---- navigation ----
-  'nav.home': 'download',
-  'nav.queue': 'activity',
-  'nav.search': 'search',
-  'nav.settings': 'settings',
-  'nav.label': 'sections',
+  'nav.home': 'Download',
+  'nav.queue': 'Activity',
+  'nav.search': 'Search',
+  'nav.settings': 'Settings',
+  'nav.label': 'Sections',
   // ---- 4.0 sidebar footer ----
   'shell.language': 'Language',
   'shell.language.auto': 'Match the system',
@@ -52,22 +52,22 @@ export const en = {
   'shell.overall': 'Downloading, {percent}% overall',
 
   // ---- title bar ----
-  'window.minimize': 'minimize',
-  'window.maximize': 'maximize',
-  'window.restore': 'restore',
-  'window.close': 'close',
-  'engine.ready': 'engine ready',
-  'engine.downloading': 'engine {percent}%',
-  'engine.checking': 'engine…',
-  'engine.error': 'engine error',
-  'engine.idle': 'engine',
+  'window.minimize': 'Minimize',
+  'window.maximize': 'Maximize',
+  'window.restore': 'Restore',
+  'window.close': 'Close',
+  'engine.ready': 'Engine ready',
+  'engine.downloading': 'Engine {percent}%',
+  'engine.checking': 'Engine…',
+  'engine.error': 'Engine error',
+  'engine.idle': 'Engine',
   'engine.setupLabel': 'setup',
   'engine.setupTitle': 'getting the download engine ready',
   'engine.setupOnce': 'one time, about 30 MB',
   'engine.setupFailed': 'the download engine could not be installed',
 
   // ---- home ----
-  'home.title': 'paste a link, get the video',
+  'home.title': 'Paste a link, get the video',
   'home.subtitle': 'automatic stream detection for thousands of sites — or type a title to search.',
   'home.placeholder': 'paste a video link — or search by title',
   'home.linkLabel': 'video link',
@@ -92,7 +92,7 @@ export const en = {
   'home.clipboardFound': 'link on your clipboard',
   'home.clipboardUse': 'use it',
   'home.addedToQueue': 'added to the queue',
-  'toast.viewQueue': 'view in activity',
+  'toast.viewQueue': 'View in Activity',
   'home.startFailed': 'could not start the download',
   'home.liveHint':
     'this is a live stream — it records from now until you stop it, so there is no length to trim and no percentage to report.',
@@ -108,7 +108,7 @@ export const en = {
   'detect.elapsed': '{seconds} s',
 
   // ---- queue ----
-  'queue.title': 'activity',
+  'queue.title': 'Activity',
   'queue.items': '{count} item|{count} items',
   'queue.empty': 'nothing here yet',
   'queue.emptyHint': 'paste a link to get started',
@@ -202,7 +202,7 @@ export const en = {
   'format.youGet': 'you get',
 
   // ---- search ----
-  'search.title': 'search across every service',
+  'search.title': 'Search across every service',
   'search.hint': 'videos, music & anime — type a title and press enter',
   'search.placeholder': 'search videos, music & anime by title',
   'search.label': 'title',
@@ -222,7 +222,7 @@ export const en = {
   'search.audio': 'audio',
 
   // ---- settings ----
-  'settings.title': 'settings',
+  'settings.title': 'Settings',
   'settings.search': 'find a setting',
   'settings.searchEmpty': 'no setting matches that',
   'settings.tier.essentials': 'essentials',
@@ -430,7 +430,7 @@ export const en = {
     'it isn’t — the build has no paid Apple certificate, so Gatekeeper quarantines it. run this once in Terminal:',
 
   // ---- shortcuts ----
-  'shortcuts.title': 'keyboard shortcuts',
+  'shortcuts.title': 'Keyboard shortcuts',
   'shortcuts.newDownload': 'new download',
   'shortcuts.queue': 'activity',
   'shortcuts.search': 'search by title',
@@ -500,7 +500,7 @@ export const en = {
   'job.convert': 'converting',
 
   // ---- built-in browser ----
-  'browser.open': 'open the built-in browser',
+  'browser.open': 'Open the built-in browser',
   'browser.openHint': 'browse to the video and grab it by hand',
   'browser.title': 'browser',
   'browser.urlPlaceholder': 'address or search',
@@ -535,7 +535,7 @@ export const en = {
   // ---- errors ----
   'error.title': 'something went wrong',
   'error.reload': 'reload the app',
-  'error.starting': 'starting up…',
+  'error.starting': 'Starting up…',
 
   /*
     Failures, in the user's own language.
@@ -580,9 +580,9 @@ export const en = {
   'err.cookieHint': 'try switching on browser cookies in settings → access.',
   'common.save': 'save',
   'common.saved': 'saved',
-  'nav.automation': 'watching',
+  'nav.automation': 'Watching',
   'automation.lead': 'new episodes of the series you follow are found and downloaded for you, on a schedule.',
-  'auto.title': 'watching',
+  'auto.title': 'Watching',
   'auto.add': 'add',
   'auto.empty': 'nothing is being watched yet',
   'auto.emptyHint':

@@ -31,11 +31,11 @@ export const ru: Dictionary = {
   'common.paste': 'вставить из буфера',
 
   // ---- navigation ----
-  'nav.home': 'скачать',
-  'nav.queue': 'активность',
-  'nav.search': 'поиск',
-  'nav.settings': 'настройки',
-  'nav.label': 'разделы',
+  'nav.home': 'Скачать',
+  'nav.queue': 'Активность',
+  'nav.search': 'Поиск',
+  'nav.settings': 'Настройки',
+  'nav.label': 'Разделы',
   // ---- 4.0 sidebar footer ----
   'shell.language': 'Язык',
   'shell.language.auto': 'Как в системе',
@@ -45,22 +45,22 @@ export const ru: Dictionary = {
   'shell.overall': 'Загрузка, всего {percent}%',
 
   // ---- title bar ----
-  'window.minimize': 'свернуть',
-  'window.maximize': 'развернуть',
-  'window.restore': 'свернуть в окно',
-  'window.close': 'закрыть',
-  'engine.ready': 'движок готов',
-  'engine.downloading': 'движок {percent}%',
-  'engine.checking': 'движок…',
-  'engine.error': 'ошибка движка',
-  'engine.idle': 'движок',
+  'window.minimize': 'Свернуть',
+  'window.maximize': 'Развернуть',
+  'window.restore': 'Свернуть в окно',
+  'window.close': 'Закрыть',
+  'engine.ready': 'Движок готов',
+  'engine.downloading': 'Движок {percent}%',
+  'engine.checking': 'Движок…',
+  'engine.error': 'Ошибка движка',
+  'engine.idle': 'Движок',
   'engine.setupLabel': 'установка',
   'engine.setupTitle': 'готовлю движок загрузок',
   'engine.setupOnce': 'один раз, около 30 МБ',
   'engine.setupFailed': 'не удалось установить движок загрузок',
 
   // ---- home ----
-  'home.title': 'вставьте ссылку — получите видео',
+  'home.title': 'Вставьте ссылку — получите видео',
   'home.subtitle': 'автоопределение потока для тысяч сайтов — или введите название для поиска.',
   'home.placeholder': 'вставьте ссылку или найдите по названию',
   'home.linkLabel': 'ссылка на видео',
@@ -86,7 +86,7 @@ export const ru: Dictionary = {
   'home.clipboardFound': 'в буфере обмена ссылка',
   'home.clipboardUse': 'использовать',
   'home.addedToQueue': 'добавлено в очередь',
-  'toast.viewQueue': 'открыть активность',
+  'toast.viewQueue': 'Открыть «Активность»',
   'home.startFailed': 'не удалось запустить загрузку',
   'home.liveHint':
     'это прямой эфир — запись идёт с этого момента, пока вы её не остановите. длина заранее неизвестна, поэтому ни обрезки, ни процента здесь нет.',
@@ -102,7 +102,7 @@ export const ru: Dictionary = {
   'detect.elapsed': '{seconds} с',
 
   // ---- queue ----
-  'queue.title': 'активность',
+  'queue.title': 'Активность',
   'queue.items': '{count} запись|{count} записи|{count} записей',
   'queue.empty': 'здесь пока пусто',
   'queue.emptyHint': 'вставьте ссылку, чтобы начать',
@@ -194,7 +194,7 @@ export const ru: Dictionary = {
     '{count} дорожка субтитров|{count} дорожки субтитров|{count} дорожек субтитров',
 
   // ---- search ----
-  'search.title': 'поиск по всем сервисам',
+  'search.title': 'Поиск по всем сервисам',
   'search.hint': 'видео, музыка и аниме — введите название и нажмите enter',
   'search.placeholder': 'поиск видео, музыки и аниме по названию',
   'search.label': 'название',
@@ -214,7 +214,7 @@ export const ru: Dictionary = {
   'search.audio': 'звук',
 
   // ---- settings ----
-  'settings.title': 'настройки',
+  'settings.title': 'Настройки',
   'settings.search': 'найти настройку',
   'settings.searchEmpty': 'такой настройки нет',
   'settings.tier.essentials': 'основное',
@@ -422,7 +422,7 @@ export const ru: Dictionary = {
     'на самом деле нет — у сборки нет платного сертификата Apple, поэтому macOS помещает её в карантин. выполните один раз в терминале:',
 
   // ---- shortcuts ----
-  'shortcuts.title': 'горячие клавиши',
+  'shortcuts.title': 'Горячие клавиши',
   'shortcuts.newDownload': 'новая загрузка',
   'shortcuts.queue': 'активность',
   'shortcuts.search': 'поиск по названию',
@@ -492,7 +492,7 @@ export const ru: Dictionary = {
   'job.convert': 'конвертация',
 
   // ---- built-in browser ----
-  'browser.open': 'открыть встроенный браузер',
+  'browser.open': 'Открыть встроенный браузер',
   'browser.openHint': 'дойдите до видео и заберите его вручную',
   'browser.title': 'браузер',
   'browser.urlPlaceholder': 'адрес или поиск',
@@ -522,7 +522,7 @@ export const ru: Dictionary = {
   // ---- errors ----
   'error.title': 'что-то пошло не так',
   'error.reload': 'перезагрузить приложение',
-  'error.starting': 'запускаемся…',
+  'error.starting': 'Запускаемся…',
 
   /*
     Ошибки — на языке пользователя.
@@ -566,9 +566,9 @@ export const ru: Dictionary = {
   'err.cookieHint': 'попробуйте включить cookies браузера в настройках → доступ.',
   'common.save': 'сохранить',
   'common.saved': 'сохранено',
-  'nav.automation': 'слежение',
+  'nav.automation': 'Слежение',
   'automation.lead': 'новые серии того, за чем вы следите, находятся и скачиваются сами, по расписанию.',
-  'auto.title': 'слежение',
+  'auto.title': 'Слежение',
   'auto.add': 'добавить',
   'auto.empty': 'пока ни за чем не следим',
   'auto.emptyHint':

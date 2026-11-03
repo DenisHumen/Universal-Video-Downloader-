@@ -103,7 +103,7 @@ const SCENES = [
     name: 'toast',
     setup: `
       await __uvdShot.view('home');
-      __uvdToast('added to the queue', 'success', { label: 'view in queue', run() {} });
+      __uvdToast('added to the queue', 'success', { label: 'View in Activity', run() {} });
       __uvdToast('Could not reach the server. Check the connection and try again.', 'error');
       await new Promise((r) => setTimeout(r, 200));
     `
