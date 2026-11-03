@@ -10,52 +10,41 @@
   been launched, which is exactly the point at which the in-app notice cannot
   help because the app cannot start.
 
-  So the instructions live on the background of the drag-to-install window, and
-  the layout leaves the top two thirds clear for the two icons Finder draws.
+  So the instructions live on the background of the drag-to-install window.
+  Finder draws four icons on it (electron-builder.yml dmg.contents, 80 px):
+  the app and Applications in the top row, the fix script and the PDF guide
+  in the second; the artwork leaves their slots and labels clear.
 -->
 <svg width="660" height="520" viewBox="0 0 660 520" fill="none" xmlns="http://www.w3.org/2000/svg">
-  <defs>
-    <linearGradient id="canvas" x1="0" y1="0" x2="0" y2="520" gradientUnits="userSpaceOnUse">
-      <stop stop-color="#141417" />
-      <stop offset="1" stop-color="#09090b" />
-    </linearGradient>
-  </defs>
+  <rect width="660" height="520" fill="#2c2c2c" />
 
-  <rect width="660" height="520" fill="url(#canvas)" />
-
-  <!-- Identity, quiet and at the top so the icons below own the middle. -->
-  <text x="330" y="52" text-anchor="middle" fill="#f4f4f5"
-    font-family="Inter, -apple-system, BlinkMacSystemFont, Helvetica, Arial, sans-serif"
-    font-size="19" font-weight="600" letter-spacing="-0.3">Universal Video Downloader</text>
-
-  <!-- The one instruction the window exists for. -->
-  <text x="330" y="80" text-anchor="middle" fill="#a8a8b2"
-    font-family="Inter, -apple-system, BlinkMacSystemFont, Helvetica, Arial, sans-serif"
+  <!-- Identity, quiet and at the top. -->
+  <text x="330" y="40" text-anchor="middle" fill="#f7f7f7" font-family="Ubuntu Sans, -apple-system, BlinkMacSystemFont, Helvetica, Arial, sans-serif"
+    font-size="18" font-weight="700">Universal Video Downloader</text>
+  <text x="330" y="62" text-anchor="middle" fill="#acacac" font-family="Ubuntu Sans, -apple-system, BlinkMacSystemFont, Helvetica, Arial, sans-serif"
     font-size="13">Drag the app onto Applications</text>
 
-  <!-- The arrow between the two icon slots Finder places at y≈230. -->
-  <path d="M296 232 H364" stroke="#3f3f46" stroke-width="2" stroke-linecap="round" />
-  <path d="M356 224 L366 232 L356 240" stroke="#3f3f46" stroke-width="2" stroke-linecap="round"
+  <!-- Row 1 (icons at y 150): app → Applications. -->
+  <path d="M296 150 H364" stroke="#595959" stroke-width="2" stroke-linecap="round" />
+  <path d="M356 142 L366 150 L356 158" stroke="#595959" stroke-width="2" stroke-linecap="round"
     stroke-linejoin="round" fill="none" />
 
-  <!-- Below the fold of the icons: what to do when macOS calls it damaged. -->
-  <rect x="40" y="342" width="580" height="1" fill="#27272c" />
+  <!-- Between the rows: what the second row is for. -->
+  <text x="330" y="236" text-anchor="middle" fill="#ffc252" font-family="Ubuntu Sans, -apple-system, BlinkMacSystemFont, Helvetica, Arial, sans-serif"
+    font-size="12.5" font-weight="700">macOS says it is “damaged”? Run the script, or read the guide:</text>
 
-  <text x="40" y="378" fill="#facc15"
-    font-family="Inter, -apple-system, BlinkMacSystemFont, Helvetica, Arial, sans-serif"
-    font-size="12" font-weight="600">macOS says it is “damaged”?</text>
+  <!-- Row 2 (icons at y 300): the fix script and the PDF guide. -->
 
-  <text x="40" y="400" fill="#a8a8b2"
-    font-family="Inter, -apple-system, BlinkMacSystemFont, Helvetica, Arial, sans-serif"
-    font-size="12">It isn’t. The build has no paid Apple certificate, so Gatekeeper quarantines it.</text>
-  <text x="40" y="418" fill="#a8a8b2"
-    font-family="Inter, -apple-system, BlinkMacSystemFont, Helvetica, Arial, sans-serif"
-    font-size="12">Copy the app across first, then run this once in Terminal:</text>
-
-  <rect x="40" y="432" width="580" height="40" rx="8" fill="#1c1c20" stroke="#27272c" />
-  <text x="56" y="457" fill="#f4f4f5"
-    font-family="JetBrains Mono, SFMono-Regular, Menlo, Consolas, monospace"
+  <rect x="40" y="368" width="580" height="1" fill="#3d3d3d" />
+  <text x="40" y="390" fill="#acacac" font-family="Ubuntu Sans, -apple-system, BlinkMacSystemFont, Helvetica, Arial, sans-serif"
+    font-size="12">It isn’t damaged: the build has no paid Apple certificate. Or run this once in Terminal:</text>
+  <rect x="40" y="402" width="580" height="40" rx="8" fill="#383838" stroke="#4a4a4a" />
+  <text x="56" y="427" fill="#f7f7f7" font-family="Ubuntu Sans Mono, SFMono-Regular, Menlo, Consolas, monospace"
     font-size="11.5">xattr -dr com.apple.quarantine "/Applications/Universal Video Downloader.app"</text>
+  <text x="40" y="468" fill="#acacac" font-family="Ubuntu Sans, -apple-system, BlinkMacSystemFont, Helvetica, Arial, sans-serif"
+    font-size="12">Script blocked too? System Settings › Privacy &amp; Security › Open Anyway.</text>
+  <text x="40" y="486" fill="#acacac" font-family="Ubuntu Sans, -apple-system, BlinkMacSystemFont, Helvetica, Arial, sans-serif"
+    font-size="12">Needed once per install or update.</text>
 
   <!--
     There used to be a line here: right-click the app → Open → Open. That only

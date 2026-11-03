@@ -48,7 +48,8 @@
     "release": "npm run build && electron-builder --publish always",
     "visual": "node scripts/visual.mjs",
     "visual:update": "node scripts/visual.mjs --update",
-    "check:scroll": "node scripts/scroll-check.mjs"
+    "check:scroll": "node scripts/scroll-check.mjs",
+    "make:mac-guide": "electron scripts/generate-mac-guide.mjs"
   },
   "dependencies": {
     "electron-updater": "^6.3.9",

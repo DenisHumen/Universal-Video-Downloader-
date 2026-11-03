@@ -1,4 +1,4 @@
-import { readFileSync } from 'fs'
+import { readFileSync, statSync } from 'fs'
 import { describe, expect, it } from 'vitest'
 
 /*
@@ -54,7 +54,17 @@ function macNotice(): string {
   return [command, ...strings].join('\n')
 }
 
+const SCRIPT = 'build/mac/Fix App Is Damaged.command'
+const GUIDE = 'build/mac/How to open on macOS.pdf'
+
 const PLACES: [string, () => string][] = [
+  // The DMG's double-clickable fix and the generator of its PDF guide (the PDF is built from it).
+  ['the fix script', () => read(SCRIPT)],
+  ['the PDF guide', () => {
+    const src = read('scripts/generate-mac-guide.mjs')
+    // The generator builds the command from the product name; check what it renders.
+    return src.replace(/\$\{productName\}/g, productName)
+  }],
   ['the README', readmeMacSection],
   ['the release notes', releaseNotes],
   ['the DMG background', dmgText],
@@ -88,5 +98,32 @@ describe('the macOS instructions', () => {
     expect(releaseNotes()).toContain('### If macOS says the app is damaged')
     expect(dmgText()).toContain('damaged')
     expect(macNotice().split('\n')).toHaveLength(5)
+  })
+})
+
+describe('the DMG extras (fix script and PDF guide)', () => {
+  it('ships the script executable, with LF line endings, under an ASCII name', () => {
+    expect(statSync(SCRIPT).mode & 0o777).toBe(0o755)
+    expect(readFileSync(SCRIPT, 'utf-8')).not.toContain('\r')
+    expect(SCRIPT).toMatch(/^[\x20-\x7e]+$/)
+    expect(read('.gitattributes')).toMatch(/^\*\.command text eol=lf$/m)
+  })
+
+  it('never strips every attribute, and checks the app is in Applications first', () => {
+    const script = read(SCRIPT)
+    expect(script).not.toMatch(/xattr\s+-c/)
+    expect(script).toMatch(/\[ ! -d "\$APP" \]/)
+    expect(script).toMatch(/open -a "\$APP"/)
+  })
+
+  it('puts both into the install window, and the PDF exists', () => {
+    expect(builderYml).toContain(`path: ${SCRIPT}`)
+    expect(builderYml).toContain(`path: ${GUIDE}`)
+    expect(statSync(GUIDE).size).toBeGreaterThan(10_000)
+  })
+
+  it('tells the release notes about them', () => {
+    expect(releaseNotes()).toMatch(/Fix App Is Damaged\.command/)
+    expect(releaseNotes()).toMatch(/How to open on macOS\.pdf/)
   })
 })

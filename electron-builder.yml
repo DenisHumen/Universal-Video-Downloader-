@@ -108,18 +108,28 @@ dmg:
   window:
     width: 660
     height: 520
-  # Big enough to be the obvious thing to grab, small enough that the icons and
-  # their labels stay inside the band the artwork leaves clear for them.
-  iconSize: 100
-  iconTextSize: 13
+  # Four icons now (the app, Applications, the fix script and the guide), in two
+  # rows the artwork in assets/dmg-background.svg leaves clear, labels included.
+  iconSize: 80
+  iconTextSize: 12
   contents:
     - x: 190
-      y: 232
+      y: 150
       type: file
     - x: 470
-      y: 232
+      y: 150
       type: link
       path: /Applications
+    # Removes the quarantine flag once (the same xattr command as everywhere else).
+    - x: 190
+      y: 300
+      type: file
+      path: build/mac/Fix App Is Damaged.command
+    # How to open it, in English and Russian (npm run make:mac-guide).
+    - x: 470
+      y: 300
+      type: file
+      path: build/mac/How to open on macOS.pdf
 
 linux:
   artifactName: ${productName}-${version}-linux-${arch}.${ext}

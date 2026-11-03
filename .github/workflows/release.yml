@@ -312,6 +312,10 @@ jobs:
             # every file in the bundle; only the quarantine flag is in the way.
             echo "### If macOS says the app is damaged"
             echo
+            echo "The disk image now carries two helpers next to the app: double-click"
+            echo "**Fix App Is Damaged.command** to do it for you, or open"
+            echo "**How to open on macOS.pdf** (English and Russian) for the steps."
+            echo
             echo "It is not damaged. The app is not signed with a paid Apple developer"
             echo "certificate, so macOS quarantines it. Copy it into Applications, then"
             echo "run this once, in Terminal:"
