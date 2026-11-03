@@ -22,7 +22,7 @@ export default function ShortcutsOverlay(): JSX.Element {
           onClose={() => setOpen(false)}
           labelledBy={titleId}
           layer="overlay"
-          className="panel w-full max-w-sm overflow-hidden"
+          className="surface-dialog w-full max-w-sm overflow-hidden"
         >
           <div className="flex items-center justify-between border-b border-edge px-4 py-3">
             <h2 className="label" id={titleId}>

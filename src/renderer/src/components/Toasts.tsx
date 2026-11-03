@@ -84,7 +84,7 @@ function ToastCard({ toast }: { toast: Toast }): JSX.Element {
       onMouseLeave={() => hold('pointer', false)}
       onFocus={() => hold('focus', true)}
       onBlur={onBlur}
-      className="pointer-events-auto mt-2 flex max-w-[min(420px,calc(100vw-32px))] items-start gap-2.5 rounded-2 border border-edge bg-raise py-2.5 pl-3.5 pr-2"
+      className="pointer-events-auto mt-2 flex max-w-[min(420px,calc(100vw-32px))] items-start gap-2.5 surface-float py-2.5 pl-3.5 pr-2"
     >
       {ICON[toast.kind]}
       <span className="min-w-0 flex-1 text-[14px] text-ink [overflow-wrap:anywhere]">

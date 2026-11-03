@@ -164,7 +164,7 @@ export default function StepEditor({
     <Modal
       onClose={onClose}
       labelledBy={titleId}
-      className="panel flex max-h-full w-full max-w-lg flex-col overflow-hidden"
+      className="surface-dialog flex max-h-full w-full max-w-lg flex-col overflow-hidden"
     >
       <div className="flex shrink-0 items-center gap-3 border-b border-edge px-4 py-3">
         <h2 className="h2 flex-1" id={titleId}>

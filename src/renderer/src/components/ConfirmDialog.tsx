@@ -40,7 +40,7 @@ export default function ConfirmDialog({
       labelledBy={titleId}
       describedBy={bodyId}
       initialFocus={cancel}
-      className="panel w-full max-w-sm overflow-hidden"
+      className="surface-dialog w-full max-w-sm overflow-hidden"
     >
       <div className="flex gap-3 p-4">
         <AlertTriangle size={18} className="mt-[2px] shrink-0 text-bad" aria-hidden="true" />

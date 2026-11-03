@@ -5,7 +5,7 @@ import Toasts from './components/Toasts'
 import CaptionButtons from './components/CaptionButtons'
 import SearchView from './views/SearchView'
 import { useStore } from './store'
-import { applyAppearance } from './lib/theme'
+import { applyAppearance, applyMaterial } from './lib/theme'
 import { useT } from './i18n'
 
 /** Shell for the dedicated title-search window. */
@@ -18,6 +18,7 @@ export default function SearchApp(): JSX.Element {
     void (async () => {
       const [next, info] = await Promise.all([window.api.getSettings(), window.api.getAppInfo()])
       applyAppearance(next, info.locale, info.systemAccent)
+      applyMaterial(info.platform)
       setSettings(next)
       setIsMac(info.platform === 'darwin')
       // Share settings with the store so the embedded StreamingCard (anime

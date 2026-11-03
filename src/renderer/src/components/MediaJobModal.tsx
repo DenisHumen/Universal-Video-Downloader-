@@ -114,7 +114,7 @@ export default function MediaJobModal({ item, mode, onClose }: Props): JSX.Eleme
       Esc closes it, through the shared Modal: a dialog that can only be
       dismissed by aiming at a small target is a dialog people learn to dread.
     */
-    <Modal onClose={onClose} labelledBy={titleId} className="panel w-full max-w-lg overflow-hidden">
+    <Modal onClose={onClose} labelledBy={titleId} className="surface-dialog w-full max-w-lg overflow-hidden">
       <div className="flex items-center gap-3 border-b border-edge px-4 py-3">
         <div className="min-w-0 flex-1">
           <h2 className="h2" id={titleId}>

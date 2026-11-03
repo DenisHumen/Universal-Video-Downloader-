@@ -205,7 +205,7 @@ export default function Modal({
   return (
     <motion.div
       {...overlay}
-      className="fixed inset-0 flex items-center justify-center bg-canvas/80 p-6"
+      className="scrim fixed inset-0 flex items-center justify-center p-6"
       style={{ zIndex: `var(--z-${layer})` }}
       onPointerDown={(e) => {
         pressedBackdrop.current = e.target === e.currentTarget

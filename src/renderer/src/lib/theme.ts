@@ -39,6 +39,15 @@ export function applyAccent(accent: AppSettings['accent'] | undefined, systemAcc
   root.style.setProperty('--accent-fg', tokens.fg.join(' '))
 }
 
+/**
+ * Translucent overlay material where the compositor can afford it (plan 2.4):
+ * Windows and macOS. Linux stays opaque; backdrop-filter there is software.
+ */
+export function applyMaterial(platform: string | undefined): void {
+  const translucent = platform === 'win32' || platform === 'darwin'
+  document.documentElement.setAttribute('data-material', translucent ? 'translucent' : 'opaque')
+}
+
 /** Apply everything the shell derives from settings: palette, accent and language. */
 export function applyAppearance(settings: AppSettings, systemLocale: string, systemAccent?: string): void {
   applyTheme(settings.theme)

@@ -122,7 +122,7 @@ export default function RowMenu({ label, items }: { label: string; items: RowMen
           role="menu"
           aria-label={label}
           onKeyDown={onMenuKey}
-          className={`panel absolute right-0 min-w-[220px] p-1 shadow-lg ${upwards ? 'bottom-full mb-1' : 'top-full mt-1'}`}
+          className={`surface-float absolute right-0 min-w-[220px] p-1 ${upwards ? 'bottom-full mb-1' : 'top-full mt-1'}`}
           style={{ zIndex: 'var(--z-nav)' }}
         >
           {items.map((item) => (

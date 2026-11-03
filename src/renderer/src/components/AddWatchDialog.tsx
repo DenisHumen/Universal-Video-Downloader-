@@ -152,7 +152,7 @@ export default function AddWatchDialog({
   }
 
   return (
-    <Modal onClose={onClose} labelledBy={titleId} className="panel w-full max-w-lg overflow-hidden">
+    <Modal onClose={onClose} labelledBy={titleId} className="surface-dialog w-full max-w-lg overflow-hidden">
       <div className="flex items-center gap-3 border-b border-edge px-4 py-3">
         <h2 className="h2 flex-1" id={titleId}>
           {t('auto.addTitle')}

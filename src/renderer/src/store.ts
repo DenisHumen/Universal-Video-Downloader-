@@ -16,7 +16,7 @@ import type { AppInfo } from '../../preload/index'
 import { applyDownloadsChanged } from './lib/downloads'
 import { accessChanged, DetectCache, InflightDetects } from './lib/detectCache'
 import { isProbablyUrl } from './lib/format'
-import { applyAppearance } from './lib/theme'
+import { applyAppearance, applyMaterial } from './lib/theme'
 
 /** Recent successful detects; see lib/detectCache.ts. Not state: nothing renders from it. */
 export const detectCache = new DetectCache()
@@ -142,6 +142,7 @@ async function runInit(set: SetState, get: GetState): Promise<void> {
     window.api.listDownloads()
   ])
   applyAppearance(settings, appInfo.locale, appInfo.systemAccent)
+  applyMaterial(appInfo.platform)
   set({
     appInfo,
     settings,
