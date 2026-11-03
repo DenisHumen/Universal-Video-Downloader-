@@ -72,7 +72,11 @@ jobs:
             fi
             echo "The draft for $GITHUB_REF_NAME already exists; the runners will upload into it."
           else
-            gh release create "$GITHUB_REF_NAME" --draft --verify-tag --title "${GITHUB_REF_NAME#v}" --notes ""
+            # The macOS floor goes in at creation, so it survives even if the
+            # (continue-on-error) body step below fails. Electron 45's own
+            # Info.plist and binaries say 13.0; updater-rules.ts reads this line
+            # back (offeredToThisMac), and release-notes.test.ts keeps both equal.
+            gh release create "$GITHUB_REF_NAME" --draft --verify-tag --title "${GITHUB_REF_NAME#v}" --notes "Requires macOS 13 or later."
           fi
 
   build:
@@ -275,6 +279,9 @@ jobs:
           BASE="https://github.com/$REPO/releases/download/$TAG"
 
           {
+            # Kept from draft creation above: the updater reads it (offeredToThisMac).
+            echo "Requires macOS 13 or later."
+            echo
             echo "### Which file do I need?"
             echo
             echo "| Your computer | Download |"
