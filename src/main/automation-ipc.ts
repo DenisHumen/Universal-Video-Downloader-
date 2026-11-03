@@ -203,8 +203,8 @@ export function registerAutomationIpc(): void {
           : kind === 'proxy'
             ? SECRET.proxyPassword()
             : SECRET.telegramToken()
-      // Answers once it is on disk, so a quit right after cannot lose it.
-      await setSecret(key, value)
+      // Answers once it is on disk, so a quit right after cannot lose it; false when it is not.
+      return setSecret(key, value)
     }
   )
 

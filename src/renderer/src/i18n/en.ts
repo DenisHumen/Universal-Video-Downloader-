@@ -843,6 +843,7 @@ export const en = {
   'settings.noShares': 'none yet',
   'settings.telegram': 'Telegram notifications',
   'settings.telegramHint': 'the same bot the notify step uses. set it up here or there, whichever you reach first.',
+  'settings.secretSessionOnly': 'the password could not be saved securely, so it is saved for this session only',
   'settings.secretsVolatile': 'this system has no key store, so passwords last only until the app closes',
   'settings.background': 'keep watching in the background',
   'settings.backgroundHint': 'schedules run while the window is open. turn this on to keep them running from the tray after you close it.',

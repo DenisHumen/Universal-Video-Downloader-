@@ -644,7 +644,7 @@ export function installMockApi(): void {
     autoRetryRun: async () => ({ started: true }),
     autoTestSmb: async () => 'Connected.',
     autoTestTelegram: async () => 'Connected.',
-    autoSetSecret: async () => undefined,
+    autoSetSecret: async () => true,
     autoSecretState: async () => ({ telegram: false, smb: {}, proxy: false, persists: true }),
     getLogPath: async () => 'C:/mock/uvd.log',
     onAutomationChanged: () => () => undefined,

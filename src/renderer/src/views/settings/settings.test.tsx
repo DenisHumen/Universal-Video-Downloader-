@@ -145,3 +145,18 @@ describe('every page passes axe', () => {
     expect(await axeViolations(document.body)).toEqual([])
   })
 })
+
+describe('the proxy password (review nice-to-have)', () => {
+  it('says so when the password could only be kept for this session', async () => {
+    await app(1220)
+    await act(async () => useStore.getState().saveSettings({ proxy: 'http://me@proxy.example:8080' }))
+    const original = window.api.autoSetSecret
+    window.api.autoSetSecret = async () => false
+    act(() => useStore.getState().openSettings('network/proxy#password'))
+    const field = (await screen.findByLabelText('proxy password', { exact: false })) as HTMLInputElement
+    fireEvent.change(field, { target: { value: 'hunter2' } })
+    await act(async () => fireEvent.keyDown(field, { key: 'Enter' }))
+    expect(await screen.findByText(/saved for this session only/)).toBeTruthy()
+    window.api.autoSetSecret = original
+  })
+})

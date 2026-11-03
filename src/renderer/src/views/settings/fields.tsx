@@ -127,6 +127,8 @@ export function ProxyRows({ value, onCommit }: { value: string; onCommit: (v: st
   const secrets = useSecretState()
   const [draft, setDraft] = useState(value)
   const [pw, setPw] = useState('')
+  /** The last password typed could not be sealed: it lasts until the app closes. */
+  const [sessionOnly, setSessionOnly] = useState(false)
   useEffect(() => setDraft(value), [value])
   useEffect(secrets.refresh, [value, secrets.refresh])
   const valid = isProxyValue(draft)
@@ -139,7 +141,10 @@ export function ProxyRows({ value, onCommit }: { value: string; onCommit: (v: st
   const savePw = (text: string): void => {
     if (!text || !hasUser) return
     setPw('')
-    void window.api.autoSetSecret('proxy', '', text).then(secrets.refresh)
+    void window.api.autoSetSecret('proxy', '', text).then((saved) => {
+      setSessionOnly(!saved)
+      secrets.refresh()
+    })
   }
   // Leaving the page with a field still focused saves it too (a shortcut switches views without a blur).
   const latest = useRef({ draft, pw, commit, savePw })
@@ -154,7 +159,9 @@ export function ProxyRows({ value, onCommit }: { value: string; onCommit: (v: st
 
   const pwHint = !hasUser
     ? t('settings.proxyPasswordNoUser')
-    : secrets.persists
+    : sessionOnly && secrets.persists
+      ? t('settings.secretSessionOnly')
+      : secrets.persists
       ? t('settings.proxyPasswordHint')
       : t('settings.secretsVolatile')
 
