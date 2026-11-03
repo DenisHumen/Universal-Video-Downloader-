@@ -12,228 +12,247 @@ Generated from the `ui-ux-pro-max` database, then reconciled with what actually
 shipped — every value below is the implemented one, not the generator's default.
 The generator proposed a navy/green enterprise palette on a "documentation
 landing" pattern; the app is a desktop tool, so the palette was rebuilt as
-monochrome + a single blue and the pattern discarded.
+monochrome + a single accent and the pattern discarded. §1–6 were rewritten
+for 4.0 (coalition plan, item 2.8); §7–8 describe the 3.x shell until the
+4.0 shell (plan 4.2) replaces it.
 
 **Implementation:** `src/renderer/src/index.css` (tokens + component classes) ·
-`tailwind.config.js` (token → utility mapping) · `src/renderer/src/lib/motion.ts`
-(motion vocabulary). `npm run check:contrast` gates the palette.
+`tailwind.config.js` (token → utility mapping, type scale) ·
+`src/shared/accent.ts` (accents, system-accent clamp) ·
+`src/shared/theme-boot.ts` (theme before first paint). `npm run check:contrast`
+gates the palette, `npm run visual` diffs every view against committed
+baselines.
 
 ---
 
 ## 1. Principles
 
-1. **One saturated colour.** Everything else is a neutral plane or a text tier.
-   The accent appears at full strength in exactly one place per screen.
-2. **Rules, not shadows.** Elevation is a hairline plus a flat fill. No blur, no
-   glow, no gradient, no ambient light source.
-3. **Data is mono.** Every measurement, path, identifier and count is set in
-   JetBrains Mono with tabular figures. Prose and labels are Inter.
-4. **Structure over decoration.** Indicators are part of the layout — the active
-   tab's rule sits on the bar's own hairline — not shapes floating behind
-   content. Where structure would be *too quiet to read*, it loses: queue
-   progress is a real bar, not the row's border.
-5. **Motion explains, never decorates.** Nothing animates while idle.
+4.0 keeps the 3.x system's discipline and amends one of its rules on purpose
+(see 1.2). The redesign brief: a visibly modern refresh of every view and menu,
+not a new personality.
+
+1. **One saturated colour, the user's choice.** Everything else is a neutral
+   plane or a text tier. The accent (Blue by default; Violet, Teal, Orange,
+   Pink, Graphite or the OS accent) appears at full strength once per screen.
+2. **Rules for structure, shadows for elevation.** *Amended in 4.0.* 3.x said
+   "no shadow, no blur". Planes that sit *in* the layout (sheet, card, field,
+   list row) still separate with a hairline and a fill step, never a shadow.
+   Things that *float above* it (menus, popovers, toasts, dialogs) now cast a
+   tokenised shadow (`--shadow-2/3`) and sit on `--surface-3`, because a
+   hairline alone could not tell a menu from the card beneath it. Blur exists
+   only as the overlay *material* (§2.4): opt-in per platform, with an opaque
+   fallback, a reduce-transparency override and a contrast gate. Still absent:
+   glow, gradients, ambient light.
+3. **Data is mono.** Measurements, paths, identifiers and counts are JetBrains
+   Mono with tabular figures. Prose and labels are Inter. Mono is no longer
+   used for *labels* (the uppercase mono `.label` goes in 5.8).
+4. **Structure over decoration.** Indicators are part of the layout. Where
+   structure would be too quiet to read, it loses: progress is a real bar.
+5. **Motion explains, never decorates.** Nothing animates while idle, all new
+   motion is CSS, and nothing load-bearing depends on the frame clock (§6).
+6. **Tokens only.** No hardcoded colour, size, radius, shadow or duration in a
+   component. A value that is not a token is either added to the scale on
+   purpose or not used. `stylesheet.test.ts` refuses arbitrary type sizes and
+   millisecond literals.
 
 ## 2. Colour tokens
 
-Declared as `R G B` triples on `[data-theme]` so Tailwind can alpha them and a
-theme swap is one attribute on `<html>`. Two themes, no accent picker.
+`R G B` triples on `[data-theme]` (Night is also the unqualified default), so
+Tailwind can alpha them and a theme swap is one attribute on `<html>`. The
+theme is stamped by the preload before first paint (`shared/theme-boot.ts`),
+and the native window background is derived from `--bg`.
 
-| Token | Role | Night | Day |
+### 2.1 Planes, lines and text
+
+| Token | Role | Tailwind | Night | Day |
+|---|---|---|---|---|
+| `--bg` | window canvas, sidebar | `canvas` | `10 10 13` | `238 238 242` |
+| `--surface` | content sheet, cards (`.panel`) | `raise` | `20 20 24` | `255 255 255` |
+| `--surface-2` | fields, wells, quiet controls | `sink` | `28 28 33` | `246 246 249` |
+| `--surface-3` | floating planes: menus, popovers, toasts, dialogs | `float` | `34 34 40` | `255 255 255` |
+| `--line` | hairline | `edge` | `44 44 52` | `222 222 228` |
+| `--line-soft` | dividers inside a sheet or card | `edge-soft` | `32 32 38` | `236 236 240` |
+| `--line-strong` | emphasised border | `edge-strong` | `63 63 70` | `198 198 206` |
+| `--text` | primary | `ink` | `244 244 245` | `12 12 16` |
+| `--text-2` | secondary | `ink-2` | `170 170 180` | `78 78 88` |
+| `--text-3` | tertiary / meta | `ink-3` | `140 140 152` | `98 98 110` |
+| `--skeleton` | loading placeholder | — | `44 44 50` | `222 222 228` |
+| `--control-edge` | hairline round quiet/icon buttons | — | none | `--line` |
+
+Status colours are unchanged from 3.x: `--good`, `--warn`, `--bad`, and
+`--bad-fg` (the label on a solid `bad` fill, which flips between themes).
+
+### 2.2 Accent
+
+Each accent is a designed triple per theme, set under `[data-accent]`:
+**fill** (`--accent`, primary buttons and selected states), **ink**
+(`--accent-ink`, accent-coloured *text*: the fill never clears 4.5:1 as text on
+every plane) and **label on fill** (`--accent-fg`). Never write text in
+`--accent`.
+
+| Accent | Night fill / ink / label | Day fill / ink / label |
+|---|---|---|
+| Blue (default) | `61 99 255` / `140 170 255` / white | `37 78 235` / `30 64 214` / white |
+| Violet | `124 77 255` / `184 160 255` / white | `109 59 232` / `94 48 204` / white |
+| Teal | `13 148 136` / `78 214 196` / `10 10 13` | `15 118 110` / `13 102 95` / white |
+| Orange | `234 88 12` / `255 166 110` / `10 10 13` | `194 65 12` / `160 53 9`\* / white |
+| Pink | `219 39 119` / `249 150 196` / white | `190 24 93` / `165 20 80` / white |
+| Graphite | `228 228 231` / same / `12 12 16` | `24 24 27` / same / white |
+
+\* VD spec `170 56 10`, darkened one notch: on the hover tint (`accent/20` over
+`--bg`) it measured 4.18:1.
+
+**System accent** (`accent: 'system'`): the OS colour from
+`systemPreferences.getAccentColor()` (Windows, macOS) is clamped at runtime by
+`deriveAccent` (`shared/accent.ts`): the label is white or the theme's
+near-black, the fill is nudged away from the label until the pair clears 4.5:1,
+and the ink is moved towards white (Night) or black (Day) until it clears 4.5:1
+on every plane. If it cannot, or the OS reports none (Linux), Blue applies.
+
+### 2.3 Elevation
+
+| Token | Night | Day | Used by |
 |---|---|---|---|
-| `--bg` | window canvas | `#09090B` | `#F0F0F3` |
-| `--surface` | raised plane (`.panel`) | `#141417` | `#FFFFFF` |
-| `--surface-2` | inset plane (`.field`, `.well`) | `#1C1C20` | `#F8F8FA` |
-| `--line` | hairline | `#27272C` | `#E0E0E5` |
-| `--line-strong` | emphasised border | `#3F3F46` | `#C6C6CE` |
-| `--text` | primary | `#F4F4F5` | `#09090B` |
-| `--text-2` | secondary | `#A8A8B2` | `#52525B` |
-| `--text-3` | tertiary / meta | `#878792` | `#64646E` |
-| `--accent` | brand fill | `#2F5BFF` | `#254EEB` |
-| `--accent-fg` | label on accent fill | `#FFFFFF` | `#FFFFFF` |
-| `--accent-ink` | accent-coloured **text** | `#8AA8FF` | `#1E40D6` |
-| `--good` | success | `#4ADE80` | `#146B35` |
-| `--warn` | caution | `#FACC15` | `#865406` |
-| `--bad` | failure | `#FB7185` | `#B81C24` |
-| `--bad-fg` | label on a solid `bad` fill (the live badge) | `#09090B` | `#FFFFFF` |
-| `--control-edge` | hairline round quiet and icon buttons | none | `--line` |
-| `--skeleton` | loading placeholder plane (`.skeleton`) | `#2C2C32` | `#DEDEE4` |
+| `--shadow-1` | `inset 0 1px 0 rgb(255 255 255/.04), 0 1px 2px rgb(0 0 0/.4)` | `0 1px 2px rgb(0 0 0/.06)` | primary button, raised controls |
+| `--shadow-2` | `0 8px 24px -4px rgb(0 0 0/.5), 0 2px 6px rgb(0 0 0/.3)` | `… /.16, … /.08` | `.surface-float`: menus, popovers, toasts |
+| `--shadow-3` | `0 24px 64px -12px rgb(0 0 0/.6), 0 8px 16px -8px rgb(0 0 0/.4)` | `… /.28, … /.12` | `.surface-dialog` |
 
-**Why `--accent-ink` exists:** the fill colour never clears 4.5:1 as text on its
-own canvas. Accent text uses a lighter (Night) or darker (Day) cut of the same
-hue. **Never write text in `--accent`.**
+Dialogs sit over a `.scrim` (`--scrim` at 60%).
 
-**Gate:** `npm run check:contrast` verifies all 7 text colours against all 3
-planes in both themes, `--accent-fg` on `--accent` and `--bad-fg` on `--bad`,
-**and each status colour on a 12% tint of itself over each plane** — 64
-pairings, all ≥ 4.5:1. Tightest today: Day `--bad` on `--bad/12` over `--bg` at
-4.70:1. It also holds Day's button hairline (`--line`) to 1.12:1 against each
-plane: not text, so not 4.5:1, but enough that the edge can't quietly vanish.
-And it holds the one non-text plane that has to be *seen*, `--skeleton`, to
-1.3:1 against `--surface` (flattest today: Night at 1.33:1).
+### 2.4 Overlay material (the amendment's limits)
 
-> **Correction.** Skeletons were `--surface-2`, 1.1:1 on a panel, and at the
-> low point of their pulse a detecting card read as empty rather than busy.
-> The first proposed values (`42 42 48` / `226 226 232`) measured 1.29:1 in
-> both themes — just under the floor — and were nudged one step.
+`[data-material='translucent']` (set by the renderer on Windows and macOS)
+turns `.surface-float` into `--surface-3` at 86% with `blur(20px)
+saturate(1.4)`, and the scrim into 40% with `blur(6px)`. Rules:
 
-> **Correction.** White on Night's `--bad` is 2.69:1, and the live badge was
-> exactly that, at 9px. `--bad-fg` is the one label token that flips between
-> themes. Day's quiet buttons were a `--surface-2` fill at 1.06:1 on a white
-> panel — present, and invisible; `--control-edge` gives them a hairline there
-> instead of a darker fill, which would sink every button on the canvas.
+- **Opaque is the base.** Every translucent surface has a blur-free base rule;
+  one that carries text is fully opaque there.
+- **Linux never gets it.** `backdrop-filter` is software-rendered under the
+  GL most Linux desktops give Electron, and costs every frame behind a menu.
+- **The OS wins.** `prefers-reduced-transparency: reduce` restores the opaque
+  base everywhere (a user-facing "reduce transparency" setting arrives with
+  the window material, plan 4.3).
+- **Gated.** Text on a translucent surface is checked flattened over every
+  plane it can float on.
 
-> **Correction.** The tint checks were added after a live measurement caught
-> `.btn-danger` at 4.14:1 in Day while the gate reported the palette clean:
-> `bad` text on a `bad/12` fill puts the colour on *both* sides, so the margin
-> is far thinner than the same text on a plain plane. Checking text-on-plane
-> alone will never see it. Adding the case immediately turned up a second one
-> (`--warn` at 4.47:1); both colours were darkened.
+### 2.5 Gate
 
-Tailwind names: `canvas` · `raise` · `sink` · `edge` · `edge-strong` · `ink` ·
-`ink-2` · `ink-3` · `accent` · `accent-fg` · `accent-ink` · `good` · `warn` ·
-`bad` · `bad-fg`.
+`npm run check:contrast` reads index.css and fails under 4.5:1 for: every text
+colour on every plane (`--bg`, `--surface`, `--surface-2`, `--surface-3`) in
+both themes; status colours on a 12% tint of themselves; label-on-fill for
+`bad`; **every accent in every theme** (label on fill, ink on each plane, ink on
+the `accent/12` and `accent/20` tints); and **every translucent surface** on its
+opaque floor (plus the fallback/override checks above). It also holds Day's
+`--line` to 1.12:1 and `--skeleton` to 1.3:1 on `--surface`.
+
+The 3.x corrections still stand (skeleton contrast, `--bad-fg`,
+`--control-edge`, the tint checks that caught `.btn-danger` at 4.14:1).
 
 ## 3. Typography
 
-- **Inter Variable** — interface. Bundled via `@fontsource-variable/inter`.
-- **JetBrains Mono Variable** — all data. Bundled via
-  `@fontsource-variable/jetbrains-mono`. Applied with `.mono`, which sets
-  `font-variant-numeric: tabular-nums` so a column of percentages never shifts.
-**Five type roles**, and every screen is built from these rather than ad-hoc
-sizes:
+- **Inter Variable** for the interface, **JetBrains Mono Variable** for data
+  (`.mono`, tabular figures). Both bundled; the CSP blocks remote stylesheets.
 
-| Role | Size | Use |
+**The type scale** lives in `tailwind.config.js` (`fontSize`). Seven steps and
+nothing between them; `text-[Npx]` is refused by `stylesheet.test.ts`.
+
+| Token | Size | Use |
 |---|---|---|
-| `.h1` | 24px / 600 | The one heading per screen (Home sets it at 20px: the field, not the heading, is that screen's subject) |
-| `.h2` | 15px / 600 | A section inside a screen |
-| `.lead` | 14px, `--text-2`, max 62ch | The sentence under an `h1` |
-| `.hint` | 12px, `--text-2`, max 62ch | Explanation under a control |
-| `.label` | 11px mono, uppercase, 0.08em, `--text-2` | Marks a **group of controls** — never what a screen is |
+| `text-hero` | 28 / 1.15 / 600 | Home's one question |
+| `text-title` | 22 / 1.2 / 600 | A view's title (`.h1`) |
+| `text-section` | 16 / 1.35 | A section inside a view (`.h2`, 600) |
+| `text-body` | 14 | Prose, row titles, the body default |
+| `text-control` | 13 | Buttons, choices, menu items, nav |
+| `text-meta` | 12 | Secondary lines, hints (`.hint`) |
+| `text-caption` | 11 | Badges, keys, tags, short numerics |
 
-The roles live in the components layer, so a colour utility beside one wins
-(`label text-accent-ink`, `hint text-bad`). They used to sit after the
-utilities, and every such stamp and warning rendered in the role's own grey.
+The four UI sizes carry no line-height and keep the body's 1.5, so a label on
+a token sits where it did. Nothing carrying prose goes below 12px.
 
-Base body text is **14px / 1.5**. Nothing carrying prose goes below 12px; 11px
-is reserved for tags, badges, keys and short numerics.
-
-> **Correction.** The first cut ran on 13px body with 10px labels in `--text-3`,
-> and used `.label` as the home screen's headline — so the app's main question
-> was set smaller than its own metadata. Restraint is a job for colour and
-> spacing, never for legibility.
-
-Both faces are bundled, never fetched: the window's CSP blocks remote
-stylesheets and the app must look identical offline.
+**Copy voice (4.0):** sentence case in English and Russian ("Save location",
+not "save location" or "SAVE LOCATION"). The shell's strings switch first
+(nav, sidebar footer, view titles); the rest follows in 5.8. Mono uppercase
+`.label` is retired as views are restyled.
 
 ## 4. Shape
 
-Four steps, no in-between values.
-
 | Token | Value | Used for |
 |---|---|---|
-| `--r-1` | 6px | tags, icon buttons, episode toggles |
-| `--r-2` | 10px | fields, list rows, thumbnails |
-| `--r-3` | 16px | blocks, dialogs, the focal input |
-| `--r-pill` | 999px | buttons, choices, filter fields |
+| `--r-1` | 6px | tags, swatches, icon buttons, menu items |
+| `--r-2` | 8px | fields, buttons, choices, list rows |
+| `--r-3` | 12px | cards, menus, popovers, toasts, the content sheet |
+| `--r-4` | 16px | dialogs, the home input |
+| `--r-pill` | 999px | **only** badges, the switch and progress tracks |
 
-Tailwind: `rounded-1` · `rounded-2` · `rounded-3` · `rounded-full`.
+Tailwind: `rounded-1` … `rounded-4`, `rounded-pill`.
 
-> **Correction.** The ladder was 8/14/22. A thumbnail inside a field inside a
-> panel then read as three soft shapes rather than one structure, and nested
-> corners fought their parents; 6/10/16 keeps the steps distinct.
+> **Correction (4.0).** 3.x made buttons, choices and filter fields pills next
+> to square fields, which read as two systems in one row. Controls are r-2 now.
 
 ## 5. Components
 
-| Class | What it is |
+The 3.x classes remain until each view moves to the primitives (plan 3.1,
+`src/renderer/src/ui/`), which are token-only and tested:
+
+| Class / primitive | What it is |
 |---|---|
-| `.panel` | Raised plane: one hairline, one flat fill, no shadow |
-| `.well` | Inset plane, nests inside `.panel` |
-| `.btn-solid` | The one loud action per screen — accent fill, pill. A button whose job is done steps down to quiet (Home's "get" once its result is showing) |
-| `.btn-quiet` | Neutral filled control; in Day it carries a `--control-edge` hairline |
-| `.btn-base` | Shape only, never on its own — for a one-off state that brings its own fill (`btn-base bg-good/12 text-good`). It was `.btn`, and fourteen buttons used it bare and rendered as plain words; `stylesheet.test.ts` now fails on that |
-| `.btn-danger` | Destructive — `bad` at 12% |
-| `.btn-icon` | 36px square, filled surface, always visible |
-| `.btn-icon-bare` | 36px square, transparent — for toolbars on their own plane |
-| `.field` / `.field-lg` | Text entry; focus = accent border + 3px accent ring at 16% |
-| `.choice` / `.choice-on` | **The only single-select control.** A wrapping row of pills, min 36px; unselected carries a real fill, selected is solid accent |
-| `.tab` / `.tab-on` | Top-bar navigation; active marked by a 2px accent rule sitting on the bar's own hairline |
-| `.tag` | Read-only fact (extractor, container, count) |
-| `.kbd` | Keyboard key |
-| `.skeleton` | Placeholder plane in `--skeleton`; pulses in place |
-| `EmptyState` | The one "nothing here" layout: icon, heading, hint, and always a way out |
-| `TabStrip` | A tab row that scrolls with arrows, never a scrollbar. A `<nav>` with `aria-current`, not a tab list: it switches pages and has no tab panels |
-| `CaptionButtons` | Minimise, maximise/restore, close for Windows and Linux: full bar height, 46px wide, flush to the corner, close hover in the system's `#C42B1C` |
-| `RowMenu` | A row's secondary actions behind "⋯": `aria-haspopup="menu"`, focus into the menu on open and back on Esc, arrows/Home/End between items, Tab or an outside click closes. Opens upwards near the bottom of the window |
-| `DropOverlay` | Full-window 2px dashed accent frame, inset 8px, `bg-accent/6`, while a link is dragged over the window. Takes no pointer events: the drop lands on the window's own handler |
-| `Modal` | The one dialog shell: role and name on the panel, focus in on open and back on close, Tab kept inside, Esc for the top dialog only. Every dialog is built on it |
+| `.panel` | In-layout plane: hairline + `--surface`, no shadow |
+| `.well` | Inset plane inside a `.panel` |
+| `.surface-float` | Floating plane: `--surface-3`, r-3, `--shadow-2`; translucent material where enabled |
+| `.surface-dialog` | Dialog plane: `--surface-3`, r-4, `--shadow-3` |
+| `.scrim` | Behind a dialog |
+| `.btn-solid` | The one loud action per screen: accent fill, r-2, `inset 0 1px 0 rgb(255 255 255/.12)` + `--shadow-1` |
+| `.btn-quiet`, `.btn-danger`, `.btn-base` | As in 3.x, on r-2 |
+| `.btn-icon`, `.btn-icon-bare` | Icon-only. Visual box 28/34px, **hit area ≥ 36px**, `aria-label` required |
+| `.field` / `.field-lg` | Focus ring `0 0 0 3px` accent at 24%. Home's input: 52px, r-4, `--shadow-2` |
+| `.choice` | Independent choices; `SegmentedControl` (2–5 options) replaces it where one value is picked |
+| `Menu` / `Popover` | One positioning and focus implementation (lifted from `RowMenu` and `Modal`); items 30px |
+| `Dialog` | Wraps `Modal`: role and name on the panel, focus in and back, Tab kept inside, Esc for the top dialog |
+| `Tooltip` | 500ms delay; replaces `title` on icon-only controls |
+| `EmptyState` | 48px icon tile on `--surface-2` at r-3, 24px icon in accent ink, 16/600 title, 13px hint, a primary action, centred at ~40% height |
+| `CaptionButtons` | Windows and Linux min/max/close; never removed by a shell change |
 
-React: `components/Choice.tsx` (choice row), `components/EmptyState.tsx`, and
-`Switch` inside `SettingsView` (booleans).
+**Control heights:** 28 / 34 / 40 (sm / md / lg). Nav item 32, menu item 30,
+queue row 56. Nothing interactive has a hit area under 36px.
 
-**Minimum sizes.** Buttons 38px (`.btn-solid` 40px: the one loud control is
-also the easiest to hit), icon buttons and choices 36px, fields 42px.
-This sits under the 44px touch floor on purpose — the app is pointer-only
-Electron — but nothing goes below 36.
+**Focus** is an `outline` in `--accent`, offset 2px, on every control.
 
-**Focus** is an `outline`, not a ring with an offset colour: these controls sit
-on three different planes, so any single offset colour paints a wrong-coloured
-halo on two of them.
+Component classes must not collide with Tailwind utility names (the 3.x
+`.block` lesson).
 
-> **Rule: component classes must not collide with utility names.** The raised
-> plane was called `.block` at first — and Tailwind ships `.block` as the
-> `display: block` utility, so every element that merely wanted to be a block
-> silently gained a bordered, rounded, filled card. Field labels, capability
-> hints and the search thumbnail all rendered inside a stray panel. Check a
-> proposed class against Tailwind's utility names before adding it.
-
-**Deliberately absent:** segmented controls with a sliding indicator · sweeping
-shimmer gradients · hover lift · card borders inside grids · an icon on every
-list row · gradient text · glassmorphism · ambient light blobs · film grain.
+**Deliberately absent:** sliding segmented indicators · shimmer gradients ·
+hover lift · gradient text · glow · ambient blobs · film grain · blur outside
+the overlay material.
 
 ## 6. Motion
 
-One curve, three durations. Defined in `src/renderer/src/lib/motion.ts`.
+CSS custom properties in index.css; Tailwind points at them.
 
-- **Ease:** `cubic-bezier(0.2, 0, 0, 1)` — decelerate-emphasised.
-- **Durations:** `--t-fast` 160ms (hover, colour) · `--t-base` 240ms (entrances)
-  · `--t-slow` 320ms (height reveals).
-- **Springs:** dialogs `damping 30 / stiffness 320`; queue reorder
-  `damping 32 / stiffness 340`.
-- **The app's one entrance:** fade + 6px rise.
-- **Stagger:** 30ms per item, 8px rise. A longer cascade reads as slowness.
-- **Screen swaps:** the view host fades in on a CSS keyframe, `animate-view-in`
-  — opacity only, `--t-view` 120ms, no fill mode. Never framer-motion there:
-  its values step on `requestAnimationFrame`, and a tab switch in a throttled
-  window held the new view at opacity 0, a blank window, until the frame clock
-  came back. A keyframe with no fill mode leaves the element at full opacity
-  the moment it ends or is skipped.
-- **Timers that count** (the detect card's elapsed seconds, the taskbar
-  progress) are `setInterval`, for the same reason.
-- `prefers-reduced-motion: reduce` collapses every animation and transition.
+| Token | Value | Use |
+|---|---|---|
+| `--t-press` | 90ms | the down state of a control (`active:scale`) |
+| `--t-fast` | 140ms | hover, colour, small reveals |
+| `--t-base` | 200ms | entrances |
+| `--t-slow` | 260ms | height reveals |
+| `--t-view` | 120ms | the view host's fade (opacity only) |
+| `--ease` | `cubic-bezier(0.2, 0, 0, 1)` | everything by default |
+| `--ease-spring` | `cubic-bezier(0.3, 1.25, 0.5, 1)` | things that *arrive* (menu, toast); never colour |
 
-> **Nothing load-bearing may depend on the frame clock.** A throttled window —
-> a backgrounded downloader, which is the normal case here — stops firing
-> `requestAnimationFrame`, and with it framer-motion's `animate`, CSS
-> `scroll-behavior: smooth`, and the `scroll` event. Measured with the clock
-> stalled: progress bars froze at their initial width, smooth `scrollIntoView`
-> and `scrollBy` moved nothing, and tab arrows never updated. Progress,
-> scrolling a result into view, and arrow state are all plain styles, instant
-> scrolls and synchronous measurements now. Motion is for entrances only.
->
-> Related: `AnimatePresence mode="popLayout"` needs a ref on each child to
-> measure it. Function components cannot take one, so it silently failed to lift
-> exiting children out of flow — the reason three home-screen states once
-> stacked on top of each other. Exit animations were dropped from the state
-> swaps entirely.
->
-> **Anything dismissed by an external event must not have an exit animation.**
-> An `AnimatePresence` child stays mounted until its exit reports finished, so
-> a click-dismissed banner self-heals — you cannot click in a stalled window —
-> but state-dismissed ones do not. The engine-setup strip is hidden by the
-> engine becoming ready, and with animations frozen it went on announcing
-> "getting the download engine ready" indefinitely. Render those on state, and
-> animate only the appearing, in CSS.
+Rules (all carried over from 3.x, now binding for 4.0 work):
+
+- **New motion is CSS.** framer-motion moves to `LazyMotion` + `m` (plan 3.3)
+  and is not used for anything new. Its remaining transitions use the same
+  durations.
+- **No `requestAnimationFrame` motion** and **no transforms on the view host**:
+  a throttled (backgrounded) window stops the frame clock, which once left a
+  blank view at opacity 0. Screen swaps fade the host with a keyframe.
+- **No fill-mode dependence.** An element at rest is at its final state
+  whether its animation ran or not.
+- **Nothing dismissed by an external event has an exit animation.**
+- `prefers-reduced-motion: reduce` collapses every animation and transition;
+  `stylesheet.test.ts` checks the override and refuses millisecond literals
+  outside the tokens.
+- Timers that count (detect elapsed time, taskbar progress) are `setInterval`.
 
 ## 7. Layout
 
