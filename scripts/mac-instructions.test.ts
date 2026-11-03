@@ -1,3 +1,4 @@
+import { execFileSync } from 'child_process'
 import { readFileSync, statSync } from 'fs'
 import { describe, expect, it } from 'vitest'
 
@@ -103,7 +104,15 @@ describe('the macOS instructions', () => {
 
 describe('the DMG extras (fix script and PDF guide)', () => {
   it('ships the script executable, with LF line endings, under an ASCII name', () => {
-    expect(statSync(SCRIPT).mode & 0o777).toBe(0o755)
+    /*
+      The mode git records is what the DMG build checks out, on every runner.
+      The working tree's own mode depends on the umask (0o775 under 002) and
+      means nothing on Windows, so it is only checked for the owner's x bit,
+      and not at all on win32.
+    */
+    const staged = execFileSync('git', ['ls-files', '-s', '--', SCRIPT], { encoding: 'utf-8' })
+    if (staged.trim()) expect(staged.split(/\s+/)[0]).toBe('100755')
+    if (process.platform !== 'win32') expect(statSync(SCRIPT).mode & 0o100).toBe(0o100)
     expect(readFileSync(SCRIPT, 'utf-8')).not.toContain('\r')
     expect(SCRIPT).toMatch(/^[\x20-\x7e]+$/)
     expect(read('.gitattributes')).toMatch(/^\*\.command text eol=lf$/m)
