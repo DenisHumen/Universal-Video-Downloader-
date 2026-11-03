@@ -20,7 +20,7 @@ describe('describeCliCommand', () => {
     expect(pkg).toEqual({
       install: false,
       disabled: false,
-      hint: 'installed with the app at /usr/bin/uvd. uvd <link> in a terminal downloads without opening the window; uvd --help lists the options.'
+      hint: 'Installed with the app at /usr/bin/uvd. uvd <link> in a terminal downloads without opening the window; uvd --help lists the options.'
     })
     expect(describeCliCommand({ method: 'package', installed: false, path: '/usr/bin/uvd' }, en)?.hint).toMatch(
       /isn’t there now/
@@ -31,11 +31,11 @@ describe('describeCliCommand', () => {
     expect(describeCliCommand({ method: 'link', installed: false, path: '/usr/local/bin/uvd' }, en)).toEqual({
       install: true,
       disabled: false,
-      hint: 'put uvd in /usr/local/bin, and uvd <link> in a terminal downloads without opening the window.'
+      hint: 'Put uvd in /usr/local/bin, and uvd <link> in a terminal downloads without opening the window.'
     })
     expect(describeCliCommand({ method: 'link', installed: true, path: '/usr/local/bin/uvd' }, en)).toMatchObject({
       install: false,
-      hint: expect.stringMatching(/^installed at \/usr\/local\/bin\/uvd\./)
+      hint: expect.stringMatching(/^Installed at \/usr\/local\/bin\/uvd\./)
     })
   })
 
@@ -48,7 +48,7 @@ describe('describeCliCommand', () => {
   it('will not link an app still running from the disk image', () => {
     const row = describeCliCommand({ method: 'link', installed: false, temporary: true, path: '/usr/local/bin/uvd' }, en)
     expect(row).toMatchObject({ install: true, disabled: true })
-    expect(row?.hint).toMatch(/move it to Applications/)
+    expect(row?.hint).toMatch(/Move it to Applications/)
   })
 
   it('says when an AppImage’s folder is not on the PATH, before installing and after', () => {
@@ -63,7 +63,7 @@ describe('describeCliCommand', () => {
 
   it('speaks Russian too', () => {
     expect(describeCliCommand({ method: 'link', installed: false, path: '/usr/local/bin/uvd' }, ru)?.hint).toBe(
-      'поставьте uvd в /usr/local/bin, и команда uvd <ссылка> в терминале будет скачивать, не открывая окна.'
+      'Поставьте uvd в /usr/local/bin, и команда uvd <ссылка> в терминале будет скачивать, не открывая окна.'
     )
   })
 })

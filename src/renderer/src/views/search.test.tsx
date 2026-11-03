@@ -12,7 +12,7 @@ beforeEach(() => useStore.setState({ view: 'search' }))
 async function search(q: string): Promise<void> {
   render(<App />)
   await waitFor(() => expect(useStore.getState().ready).toBe(true))
-  const entry = (await screen.findByRole('textbox', { name: 'Search by title' })) as HTMLInputElement
+  const entry = (await screen.findByRole('textbox', { name: 'Search by Title' })) as HTMLInputElement
   // In the header bar, not on the page.
   expect(entry.closest('.ui-headerbar')).toBeTruthy()
   fireEvent.change(entry, { target: { value: q } })

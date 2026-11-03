@@ -33,7 +33,6 @@ import {
 } from '../../ui'
 import { formatRoute, type Route } from './router'
 import { ProxyRows, SpeedLimitField, TemplateRow } from './fields'
-import { useHint, useTitle } from './text'
 
 /*
   The panels and subpages of Settings, as GNOME Settings lays them out
@@ -145,8 +144,6 @@ function ModeToggle({ value, onChange }: { value: DownloadMode; onChange: (v: Do
 
 export function DownloadsPanel({ settings, set }: PanelProps): JSX.Element {
   const t = useT()
-  const title = useTitle()
-  const hint = useHint()
   const chooseFolder = async (): Promise<void> => {
     const dir = await window.api.chooseDirectory()
     if (dir) set('downloadDir', dir)
@@ -156,7 +153,7 @@ export function DownloadsPanel({ settings, set }: PanelProps): JSX.Element {
       <PreferencesGroup title={t('prefs.group.location')}>
         <ActionRow
           id="saveLocation"
-          title={title('settings.saveLocation')}
+          title={t('settings.saveLocation')}
           subtitle={<span className="selectable [overflow-wrap:anywhere]">{settings.downloadDir}</span>}
           monoSubtitle
           suffix={
@@ -167,8 +164,8 @@ export function DownloadsPanel({ settings, set }: PanelProps): JSX.Element {
         />
         <SwitchRow
           id="subfolders"
-          title={title('settings.subfolders')}
-          subtitle={hint(t('settings.subfoldersHint'))}
+          title={t('settings.subfolders')}
+          subtitle={t('settings.subfoldersHint')}
           checked={settings.createSubfolders}
           onChange={(v) => set('createSubfolders', v)}
         />
@@ -177,21 +174,21 @@ export function DownloadsPanel({ settings, set }: PanelProps): JSX.Element {
       <PreferencesGroup title={t('prefs.group.defaults')}>
         <ActionRow
           id="defaultMode"
-          title={title('settings.defaultMode')}
+          title={t('settings.defaultMode')}
           suffix={<ModeToggle value={settings.defaultMode} onChange={(v) => set('defaultMode', v)} />}
         />
         <ComboRow
           id="quality"
-          title={title('settings.defaultQuality')}
-          subtitle={hint(t('settings.defaultQualityHint'))}
+          title={t('settings.defaultQuality')}
+          subtitle={t('settings.defaultQualityHint')}
           value={settings.defaultQuality === 'audio' ? 'best' : settings.defaultQuality}
           onChange={(v) => set('defaultQuality', v as QualityPreset)}
           options={QUALITY.map((q) => ({ value: q.value, label: q.value === 'best' ? t('common.best') : q.label }))}
         />
         <ComboRow
           id="audioFormat"
-          title={title('settings.audioFormat')}
-          subtitle={hint(t('settings.audioFormatHint'))}
+          title={t('settings.audioFormat')}
+          subtitle={t('settings.audioFormatHint')}
           value={settings.audioFormat}
           onChange={(v) => set('audioFormat', v)}
           options={['mp3', 'm4a', 'opus', 'flac', 'wav', 'aac'].map((f) => ({ value: f, label: f.toUpperCase() }))}
@@ -201,39 +198,39 @@ export function DownloadsPanel({ settings, set }: PanelProps): JSX.Element {
       <PreferencesGroup title={t('prefs.group.queue')}>
         <ComboRow
           id="concurrent"
-          title={title('settings.concurrent')}
+          title={t('settings.concurrent')}
           value={String(settings.concurrentDownloads)}
           onChange={(v) => set('concurrentDownloads', Number(v))}
           options={['1', '2', '3', '4', '5', '6'].map((n) => ({ value: n, label: n }))}
         />
         <SwitchRow
           id="resume"
-          title={title('settings.resumeOnLaunch')}
-          subtitle={hint(t('settings.resumeOnLaunchHint'))}
+          title={t('settings.resumeOnLaunch')}
+          subtitle={t('settings.resumeOnLaunchHint')}
           checked={settings.resumeOnLaunch}
           onChange={(v) => set('resumeOnLaunch', v)}
         />
         <ComboRow
           id="keepFinished"
-          title={title('settings.keepFinished')}
-          subtitle={hint(t('settings.keepFinishedHint'))}
+          title={t('settings.keepFinished')}
+          subtitle={t('settings.keepFinishedHint')}
           value={String(settings.keepFinished ?? 0)}
           onChange={(v) => set('keepFinished', Number(v))}
           options={['0', '50', '100', '500', '1000'].map((n) => ({
             value: n,
-            label: n === '0' ? title('settings.keepFinished.all') : n
+            label: n === '0' ? t('settings.keepFinished.all') : n
           }))}
         />
         <ActionRow
           id="speedLimit"
-          title={title('settings.speedLimit')}
-          subtitle={hint(t('settings.speedLimitHint'))}
+          title={t('settings.speedLimit')}
+          subtitle={t('settings.speedLimitHint')}
           suffix={<SpeedLimitField value={settings.speedLimit} onCommit={(v) => set('speedLimit', v)} />}
         />
         <ComboRow
           id="playlistLimit"
-          title={title('settings.playlistLimit')}
-          subtitle={hint(t('settings.playlistLimitHint'))}
+          title={t('settings.playlistLimit')}
+          subtitle={t('settings.playlistLimitHint')}
           value={String(settings.playlistLimit)}
           onChange={(v) => set('playlistLimit', Number(v))}
           options={['50', '200', '500', '1000', '5000'].map((n) => ({ value: n, label: n }))}
@@ -247,14 +244,12 @@ export function DownloadsPanel({ settings, set }: PanelProps): JSX.Element {
 
 export function ProcessingPanel({ settings, set }: PanelProps): JSX.Element {
   const t = useT()
-  const title = useTitle()
-  const hint = useHint()
   const platform = useStore((s) => s.appInfo?.platform)
   const sw = (id: string, key: keyof AppSettings, label: TranslationKey, sub: TranslationKey): ReactNode => (
     <SwitchRow
       id={id}
-      title={title(label)}
-      subtitle={hint(t(sub))}
+      title={t(label)}
+      subtitle={t(sub)}
       checked={Boolean(settings[key])}
       onChange={(v) => set(key, v as never)}
     />
@@ -267,11 +262,11 @@ export function ProcessingPanel({ settings, set }: PanelProps): JSX.Element {
         {sw('chapters', 'embedChapters', 'settings.embedChapters', 'settings.embedChaptersHint')}
         {sw('embedSubtitles', 'embedSubtitles', 'settings.embedSubtitles', 'settings.embedSubtitlesHint')}
       </PreferencesGroup>
-      <PreferencesGroup title={t('prefs.group.subtitles')} footer={hint(t('settings.subtitleLanguagesHint'))}>
+      <PreferencesGroup title={t('prefs.group.subtitles')} footer={t('settings.subtitleLanguagesHint')}>
         {sw('writeSubtitles', 'writeSubtitles', 'settings.writeSubtitles', 'settings.writeSubtitlesHint')}
         <EntryRow
           id="subtitleLanguages"
-          title={title('settings.subtitleLanguages')}
+          title={t('settings.subtitleLanguages')}
           mono
           value={settings.subtitleLanguages}
           placeholder="en,ru"
@@ -283,7 +278,7 @@ export function ProcessingPanel({ settings, set }: PanelProps): JSX.Element {
         {sw('sponsorBlock', 'sponsorBlock', 'settings.sponsorBlock', 'settings.sponsorBlockHint')}
         {sw('compatible', 'preferCompatible', 'settings.preferCompatible', 'settings.preferCompatibleHint')}
       </PreferencesGroup>
-      <PreferencesGroup title={t('prefs.group.fileNames')} footer={hint(t('settings.filenameTemplateHint'))}>
+      <PreferencesGroup title={t('prefs.group.fileNames')} footer={t('settings.filenameTemplateHint')}>
         {sw('restrict', 'restrictFilenames', 'settings.restrictFilenames', 'settings.restrictFilenamesHint')}
         <TemplateRow
           value={settings.filenameTemplate}
@@ -305,16 +300,14 @@ export function ProcessingPanel({ settings, set }: PanelProps): JSX.Element {
 
 export function WatchingPanel({ settings, set, go }: PanelProps): JSX.Element {
   const t = useT()
-  const title = useTitle()
-  const hint = useHint()
   const shares = settings.smbTargets?.length ?? 0
   return (
     <PreferencesPage>
       <PreferencesGroup title={t('prefs.group.background')}>
         <SwitchRow
           id="background"
-          title={title('settings.background')}
-          subtitle={hint(t('settings.backgroundHint'))}
+          title={t('settings.background')}
+          subtitle={t('settings.backgroundHint')}
           checked={settings.automationEnabled}
           onChange={(v) => set('automationEnabled', v)}
         />
@@ -359,15 +352,13 @@ export function TelegramPage(): JSX.Element {
 
 export function DetectionPanel({ settings, set }: PanelProps): JSX.Element {
   const t = useT()
-  const title = useTitle()
-  const hint = useHint()
   return (
     <PreferencesPage>
       <PreferencesGroup title={t('prefs.group.fallback')}>
         <SwitchRow
           id="universal"
-          title={title('settings.universal')}
-          subtitle={hint(t('settings.universalHint'))}
+          title={t('settings.universal')}
+          subtitle={t('settings.universalHint')}
           checked={settings.universalFallback}
           onChange={(v) => set('universalFallback', v)}
         />
@@ -375,8 +366,8 @@ export function DetectionPanel({ settings, set }: PanelProps): JSX.Element {
       <PreferencesGroup title={t('prefs.group.services')}>
         <SwitchRow
           id="adult"
-          title={title('settings.adultServices')}
-          subtitle={hint(t('settings.adultServicesHint'))}
+          title={t('settings.adultServices')}
+          subtitle={t('settings.adultServicesHint')}
           checked={settings.showAdultServices}
           onChange={(v) => set('showAdultServices', v)}
         />
@@ -391,11 +382,9 @@ const baseName = (p: string): string => p.split(/[\\/]/).pop() || p
 
 export function AccessPanel({ settings, set, go }: PanelProps): JSX.Element {
   const t = useT()
-  const title = useTitle()
-  const hint = useHint()
   return (
     <PreferencesPage>
-      <PreferencesGroup title={t('prefs.group.browserCookies')} description={hint(t('settings.cookiesHint'))}>
+      <PreferencesGroup title={t('prefs.group.browserCookies')} description={t('settings.cookiesHint')}>
         <ComboRow
           id="cookies"
           title={t('prefs.row.cookiesFrom')}
@@ -420,8 +409,8 @@ export function AccessPanel({ settings, set, go }: PanelProps): JSX.Element {
         {/* On or off, never "send by itself": on still asks every time. */}
         <SwitchRow
           id="errorReports"
-          title={title('settings.errorReports')}
-          subtitle={hint(t('settings.errorReportsHint'))}
+          title={t('settings.errorReports')}
+          subtitle={t('settings.errorReportsHint')}
           checked={settings.errorReports !== 'off'}
           onChange={(v) => set('errorReports', v ? 'ask' : 'off')}
         />
@@ -432,14 +421,13 @@ export function AccessPanel({ settings, set, go }: PanelProps): JSX.Element {
 
 export function CookiesFilePage({ settings, set }: PanelProps): JSX.Element {
   const t = useT()
-  const hint = useHint()
   const choose = async (): Promise<void> => {
     const file = await window.api.chooseCookiesFile()
     if (file) set('cookiesFile', file)
   }
   return (
     <PreferencesPage>
-      <PreferencesGroup description={hint(t('settings.cookiesFileHint'))}>
+      <PreferencesGroup description={t('settings.cookiesFileHint')}>
         <ActionRow
           id="file"
           title={t('prefs.row.currentFile')}
@@ -576,13 +564,11 @@ export function SystemPanel({ go }: PanelProps): JSX.Element {
 
 export function StartupPage({ settings, set }: PanelProps): JSX.Element {
   const t = useT()
-  const title = useTitle()
-  const hint = useHint()
   const row = (id: string, key: keyof AppSettings, label: TranslationKey, sub: TranslationKey): ReactNode => (
     <SwitchRow
       id={id}
-      title={title(label)}
-      subtitle={hint(t(sub))}
+      title={t(label)}
+      subtitle={t(sub)}
       checked={Boolean(settings[key])}
       onChange={(v) => set(key, v as never)}
     />
@@ -601,8 +587,6 @@ export function StartupPage({ settings, set }: PanelProps): JSX.Element {
 
 export function UpdatesPage({ settings, set }: PanelProps): JSX.Element {
   const t = useT()
-  const title = useTitle()
-  const hint = useHint()
   const appInfo = useStore((s) => s.appInfo)
   const update = useStore((s) => s.update)
   const ytdlp = useStore((s) => s.ytdlp)
@@ -621,15 +605,15 @@ export function UpdatesPage({ settings, set }: PanelProps): JSX.Element {
       <PreferencesGroup>
         <SwitchRow
           id="autoUpdate"
-          title={title('settings.autoUpdate')}
-          subtitle={hint(t('settings.autoUpdateHint'))}
+          title={t('settings.autoUpdate')}
+          subtitle={t('settings.autoUpdateHint')}
           checked={settings.autoUpdate}
           onChange={(v) => set('autoUpdate', v)}
         />
         <ActionRow
           id="check"
           title={t('prefs.row.checkUpdates')}
-          subtitle={<span className="numeric">{hint(status)}</span>}
+          subtitle={<span className="numeric">{status}</span>}
           suffix={
             <button
               className="btn-quiet"
@@ -648,8 +632,8 @@ export function UpdatesPage({ settings, set }: PanelProps): JSX.Element {
         {appInfo?.manualUpdates && (
           <ActionRow
             id="manual"
-            title={title('settings.manualUpdates')}
-            subtitle={hint(t('settings.manualUpdatesHint'))}
+            title={t('settings.manualUpdates')}
+            subtitle={t('settings.manualUpdatesHint')}
             suffix={
               <button className="btn-quiet" onClick={() => window.api.openReleasesPage()}>
                 {t('common.open')}
@@ -659,7 +643,7 @@ export function UpdatesPage({ settings, set }: PanelProps): JSX.Element {
         )}
         <ActionRow
           id="engine"
-          title={title('settings.engine')}
+          title={t('settings.engine')}
           subtitle={<span className="numeric">{ytdlp.version ? `yt-dlp ${ytdlp.version}` : ytdlp.message || 'yt-dlp'}</span>}
           suffix={
             <button
@@ -706,8 +690,6 @@ const BACKUP_ERROR: Record<BackupError, TranslationKey> = {
  */
 export function BackupPage(): JSX.Element {
   const t = useT()
-  const title = useTitle()
-  const hint = useHint()
   const importBackup = useStore((s) => s.importBackup)
   const [busy, setBusy] = useState<'export' | 'import' | null>(null)
   const [result, setResult] = useState<ImportCounts | null>(null)
@@ -744,8 +726,8 @@ export function BackupPage(): JSX.Element {
       <PreferencesGroup>
         <ActionRow
           id="export"
-          title={title('settings.backupExport')}
-          subtitle={hint(t('settings.backupExportHint'))}
+          title={t('settings.backupExport')}
+          subtitle={t('settings.backupExportHint')}
           suffix={
             <button className="btn-quiet" onClick={exportNow} disabled={busy !== null}>
               {busy === 'export' && <Spinner />}
@@ -755,8 +737,8 @@ export function BackupPage(): JSX.Element {
         />
         <ActionRow
           id="import"
-          title={title('settings.backupImport')}
-          subtitle={hint(t('settings.backupImportHint'))}
+          title={t('settings.backupImport')}
+          subtitle={t('settings.backupImportHint')}
           suffix={
             <button className="btn-quiet" onClick={importNow} disabled={busy !== null}>
               {busy === 'import' && <Spinner />}
@@ -767,13 +749,13 @@ export function BackupPage(): JSX.Element {
       </PreferencesGroup>
       {result && (
         <div role="status" className="panel space-y-1 p-4 text-control text-ink">
-          <p>{hint(result.settings ? t('settings.backupResultSettings') : t('settings.backupResultSettingsSame'))}</p>
-          <p>{hint(t('settings.backupResultWatches', { added: result.watchesAdded, skipped: result.watchesSkipped }))}</p>
-          {result.watchesInvalid > 0 && <p>{hint(t('settings.backupResultInvalid', { n: result.watchesInvalid }))}</p>}
-          <p>{hint(t('settings.backupResultTargets', { n: result.targetsAdded }))}</p>
-          {result.folderKept && <p>{hint(t('settings.backupResultFolder'))}</p>}
-          <p className="pt-2 text-warn">{hint(t('settings.backupSecrets'))}</p>
-          {result.proxyPassword && <p className="text-warn">{hint(t('settings.backupResultProxy'))}</p>}
+          <p>{result.settings ? t('settings.backupResultSettings') : t('settings.backupResultSettingsSame')}</p>
+          <p>{t('settings.backupResultWatches', { added: result.watchesAdded, skipped: result.watchesSkipped })}</p>
+          {result.watchesInvalid > 0 && <p>{t('settings.backupResultInvalid', { n: result.watchesInvalid })}</p>}
+          <p>{t('settings.backupResultTargets', { n: result.targetsAdded })}</p>
+          {result.folderKept && <p>{t('settings.backupResultFolder')}</p>}
+          <p className="pt-2 text-warn">{t('settings.backupSecrets')}</p>
+          {result.proxyPassword && <p className="text-warn">{t('settings.backupResultProxy')}</p>}
         </div>
       )}
     </PreferencesPage>
@@ -782,8 +764,6 @@ export function BackupPage(): JSX.Element {
 
 function CliRow(): JSX.Element | null {
   const t = useT()
-  const title = useTitle()
-  const hint = useHint()
   const [status, setStatus] = useState<CliStatus | null>(null)
   const [installing, setInstalling] = useState(false)
   useEffect(() => {
@@ -801,8 +781,8 @@ function CliRow(): JSX.Element | null {
   return (
     <ActionRow
       id="cli"
-      title={title('settings.cli')}
-      subtitle={hint(row.hint)}
+      title={t('settings.cli')}
+      subtitle={row.hint}
       suffix={
         row.install && (
           <button
@@ -833,21 +813,19 @@ function CliRow(): JSX.Element | null {
 
 export function LogsPage({ settings, set }: PanelProps): JSX.Element {
   const t = useT()
-  const title = useTitle()
-  const hint = useHint()
   return (
     <PreferencesPage>
       <PreferencesGroup>
         <SwitchRow
           id="verbose"
-          title={title('settings.logVerbose')}
-          subtitle={hint(t('settings.logVerboseHint'))}
+          title={t('settings.logVerbose')}
+          subtitle={t('settings.logVerboseHint')}
           checked={settings.logVerbose}
           onChange={(v) => set('logVerbose', v)}
         />
         <ActionRow
           id="log"
-          title={title('settings.logRow')}
+          title={t('settings.logRow')}
           suffix={
             <button className="btn-quiet" onClick={async () => window.api.showInFolder(await window.api.getLogPath())}>
               {t('prefs.button.openLog')}
@@ -876,7 +854,6 @@ function debugInfo(info: ReturnType<typeof useStore.getState>['appInfo'], engine
 
 export function AboutPage({ go }: PanelProps): JSX.Element {
   const t = useT()
-  const hint = useHint()
   const appInfo = useStore((s) => s.appInfo)
   const engine = useStore((s) => s.ytdlp.version)
   return (
@@ -897,7 +874,7 @@ export function AboutPage({ go }: PanelProps): JSX.Element {
         >
           {appInfo?.version ?? '—'}
         </button>
-        <p className="mt-4 max-w-[48ch] text-meta text-ink-2">{hint(t('settings.about'))}</p>
+        <p className="mt-4 max-w-[48ch] text-meta text-ink-2">{t('settings.about')}</p>
       </div>
       <PreferencesGroup>
         <ActionRow id="website" title={t('prefs.about.website')} navigation onActivate={() => void window.api.openExternal(REPO)} />

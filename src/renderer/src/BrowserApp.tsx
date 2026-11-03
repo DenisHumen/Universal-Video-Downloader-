@@ -144,7 +144,7 @@ export default function BrowserApp(): JSX.Element {
       >
         <div className="flex shrink-0 items-center gap-2.5 pr-1">
           <Logo className="h-[18px] w-[18px] text-ink" />
-          <span className="mono hidden text-meta font-semibold uppercase tracking-[0.16em] text-ink sm:inline">
+          <span className="hidden text-heading text-ink sm:inline">
             {t('browser.title')}
           </span>
         </div>
@@ -243,7 +243,7 @@ export default function BrowserApp(): JSX.Element {
                   <p className="truncate text-control font-medium text-ink" title={entry.url}>
                     {entry.label}
                   </p>
-                  <p className="mono mt-1 text-caption uppercase tracking-[0.08em] text-ink-2">
+                  <p className="mt-1 text-meta font-bold text-ink-2">
                     {[entry.kind, entry.bytes ? formatBytes(entry.bytes) : null]
                       .filter(Boolean)
                       .join('  ·  ')}

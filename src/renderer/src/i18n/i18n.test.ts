@@ -85,9 +85,9 @@ describe('plural keys', () => {
   })
 
   it('agree the verb with the count where Russian needs it', () => {
-    expect(translatePlural('ru', 'auto.dubCount', 1)).toBe('доступна 1 озвучка')
-    expect(translatePlural('ru', 'auto.dubCount', 4)).toBe('доступны 4 озвучки')
-    expect(translatePlural('ru', 'auto.dubCount', 12)).toBe('доступно 12 озвучек')
+    expect(translatePlural('ru', 'auto.dubCount', 1)).toBe('Доступна 1 озвучка')
+    expect(translatePlural('ru', 'auto.dubCount', 4)).toBe('Доступны 4 озвучки')
+    expect(translatePlural('ru', 'auto.dubCount', 12)).toBe('Доступно 12 озвучек')
   })
 
   it('use the singular only for exactly one in English', () => {

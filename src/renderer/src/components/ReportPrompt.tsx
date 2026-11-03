@@ -216,7 +216,7 @@ export default function ReportPrompt(props: ReportFailure): JSX.Element | null {
               void loadPreview()
             }}
             aria-expanded={detailsOpen}
-            className="mono mt-3 flex items-center gap-1 text-caption uppercase tracking-[0.08em] text-ink-2 transition-colors duration-fast ease-ease hover:text-ink"
+            className="mt-3 flex items-center gap-1 text-meta font-bold text-ink-2 transition-colors duration-fast ease-ease hover:text-ink"
           >
             {t('report.details')}
             <m.span animate={{ rotate: detailsOpen ? 180 : 0 }} transition={{ duration: 0.16 }}>

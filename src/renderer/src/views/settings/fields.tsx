@@ -6,7 +6,6 @@ import { useT } from '../../i18n'
 import { EntryRow, useRowTitleId } from '../../ui'
 import { templateExample, type TemplateExampleOptions } from '../../lib/templateExample'
 import { useSecretState } from '../../components/AutomationForms'
-import { useHint, useTitle } from './text'
 
 /*
   The settings fields that can refuse a value, carried over from the 4.0
@@ -70,7 +69,6 @@ export function TemplateRow({
   example: TemplateExampleOptions
 }): JSX.Element {
   const t = useT()
-  const title = useTitle()
   const [draft, setDraft] = useState(value)
   useEffect(() => setDraft(value), [value])
   const safe = isSafeTemplate(draft)
@@ -79,7 +77,7 @@ export function TemplateRow({
     <>
       <EntryRow
         id="template"
-        title={title('settings.filenameTemplate')}
+        title={t('settings.filenameTemplate')}
         mono
         value={draft}
         invalid={!safe}
@@ -122,8 +120,6 @@ export function TemplateRow({
  */
 export function ProxyRows({ value, onCommit }: { value: string; onCommit: (v: string) => Promise<void> }): JSX.Element {
   const t = useT()
-  const title = useTitle()
-  const hint = useHint()
   const secrets = useSecretState()
   const [draft, setDraft] = useState(value)
   const [pw, setPw] = useState('')
@@ -169,7 +165,7 @@ export function ProxyRows({ value, onCommit }: { value: string; onCommit: (v: st
     <>
       <EntryRow
         id="address"
-        title={title('settings.proxy')}
+        title={t('settings.proxy')}
         mono
         value={draft}
         placeholder={t('settings.proxyPlaceholder')}
@@ -181,7 +177,7 @@ export function ProxyRows({ value, onCommit }: { value: string; onCommit: (v: st
       />
       <EntryRow
         id="password"
-        title={title('settings.proxyPassword')}
+        title={t('settings.proxyPassword')}
         type="password"
         value={pw}
         disabled={!hasUser}
@@ -192,7 +188,7 @@ export function ProxyRows({ value, onCommit }: { value: string; onCommit: (v: st
         onKeyDown={(e) => e.key === 'Enter' && savePw(pw)}
       />
       <div className="ui-row text-meta text-ink-2" role="note">
-        {!valid ? <span className="text-bad">{t('settings.proxyInvalid')}</span> : hint(pwHint)}
+        {!valid ? <span className="text-bad">{t('settings.proxyInvalid')}</span> : pwHint}
       </div>
     </>
   )

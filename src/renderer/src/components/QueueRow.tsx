@@ -458,7 +458,7 @@ function QueueRow({ item, index, animateIn = true, heading }: Props): JSX.Elemen
                 onClick={() => setLogOpen((v) => !v)}
                 aria-expanded={logOpen}
                 aria-controls={logOpen ? logId : undefined}
-                className="mono mt-2 flex items-center gap-1 text-caption uppercase tracking-[0.08em] text-ink-2 transition-colors duration-fast ease-ease hover:text-ink"
+                className="mt-2 flex items-center gap-1 text-meta font-bold text-ink-2 transition-colors duration-fast ease-ease hover:text-ink"
               >
                 {t('queue.log')}
                 <m.span animate={{ rotate: logOpen ? 180 : 0 }} transition={{ duration: 0.16 }}>

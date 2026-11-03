@@ -413,16 +413,14 @@ body {
     max-width: 62ch;
   }
 
-  /* Marks a group of controls. Small and uppercase, but no longer *tiny*: at
-     10px in the third text tier this was decorative rather than readable. */
+  /* Marks a group of controls: GNOME's group title (heading 14/700, the text
+     colour). 5.8 dropped the mono uppercase label; mono is for numbers, paths
+     and ids only. */
   .label {
-    font-family: theme('fontFamily.mono');
-    font-size: theme('fontSize.caption');
-    line-height: 1.2;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
-    color: rgb(var(--text-2));
+    font-size: theme('fontSize.heading');
+    line-height: 1.3;
+    font-weight: 700;
+    color: rgb(var(--text));
   }
 }
 

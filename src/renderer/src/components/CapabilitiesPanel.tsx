@@ -9,8 +9,7 @@ import {
   Search
 } from '../ui/icons'
 import { useStore } from '../store'
-import { useI18n, useT, type TranslationKey } from '../i18n'
-import { sentenceCase, titleCase } from '../lib/caps'
+import { useT, type TranslationKey } from '../i18n'
 
 interface Capability {
   icon: JSX.Element
@@ -30,7 +29,6 @@ interface Capability {
  */
 export default function CapabilitiesPanel(): JSX.Element {
   const t = useT()
-  const language = useI18n((st) => st.language)
   const setView = useStore((s) => s.setView)
 
   const items: Capability[] = [
@@ -65,7 +63,7 @@ export default function CapabilitiesPanel(): JSX.Element {
 
   return (
     <section>
-      <h3 className="mb-3 text-heading text-ink">{titleCase(t('cap.title'), language)}</h3>
+      <h3 className="mb-3 text-heading text-ink">{t('cap.title')}</h3>
       <ul className="ui-boxed-list">
         {items.map((item) => {
           const interactive = Boolean(item.action)
@@ -100,7 +98,7 @@ export default function CapabilitiesPanel(): JSX.Element {
                         interactive ? 'group-hover:text-accent-ink' : ''
                       }`}
                     >
-                      {titleCase(t(item.title), language)}
+                      {t(item.title)}
                     </span>
                     {interactive && (
                       <ArrowUpRight
@@ -109,7 +107,7 @@ export default function CapabilitiesPanel(): JSX.Element {
                       />
                     )}
                   </span>
-                  <span className="mt-0.5 block text-meta text-ink-2">{sentenceCase(t(item.body))}</span>
+                  <span className="mt-0.5 block text-meta text-ink-2">{t(item.body)}</span>
                 </span>
               </div>
             </li>

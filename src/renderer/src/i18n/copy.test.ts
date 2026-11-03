@@ -75,3 +75,32 @@ describe('copy (D7)', () => {
     for (const key of LABELS) expect(en[key].endsWith('.'), key).toBe(false)
   })
 })
+
+/*
+  5.8: every string is written in its final case. Nothing recases at display
+  time any more (lib/caps.ts and settings/text.ts went), so a string that
+  starts in lower case is shown in lower case.
+*/
+describe('copy pass (5.8)', () => {
+  // Fragments composed into a sentence, units, and placeholders that show what to type.
+  const FRAGMENT = /^(time\.|settings\.proxyPlaceholder$|auto\.(in|ago)$|shortcuts\.or$|format\.plusAudio$)/
+
+  it.each([
+    ['en', en],
+    ['ru', ru]
+  ] as const)('%s starts every sentence and label with a capital', (_lang, dict) => {
+    const lower = Object.entries(dict)
+      .filter(([key]) => !FRAGMENT.test(key))
+      .flatMap(([key, value]) => (value as string).split('|').map((form) => [key, form] as const))
+      .filter(([, form]) => /^\p{Ll}/u.test(form) && !/^(uvd|yt-dlp|macOS|cookies\.txt|iOS)\b/.test(form))
+      .map(([key]) => key)
+    expect(lower).toEqual([])
+  })
+
+  it('has no display-time recasing shim left', async () => {
+    const { readdirSync, existsSync } = await import('fs')
+    const { join } = await import('path')
+    expect(existsSync(join(__dirname, '../lib/caps.ts'))).toBe(false)
+    expect(readdirSync(join(__dirname, '../views/settings'))).not.toContain('text.ts')
+  })
+})

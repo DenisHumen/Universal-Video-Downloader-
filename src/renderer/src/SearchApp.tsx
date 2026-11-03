@@ -63,7 +63,7 @@ export default function SearchApp(): JSX.Element {
       >
         <div className="flex items-center gap-2.5">
           <Logo className="h-[18px] w-[18px] text-ink" />
-          <span className="mono text-meta font-semibold uppercase tracking-[0.16em] text-ink">
+          <span className="text-heading text-ink">
             {t('nav.search')}
           </span>
         </div>

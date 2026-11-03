@@ -7,7 +7,6 @@ import { describeError } from '../lib/errors'
 import { telegramChanged } from '../lib/emphasis'
 import { emptyTarget, pathOf, ShareForm, TelegramForm, useSecretState } from './AutomationForms'
 import ConfirmDialog from './ConfirmDialog'
-import { sentenceCase } from '../lib/caps'
 import type { SmbTarget } from '@shared/automation'
 
 /**
@@ -112,11 +111,11 @@ export default function AutomationSettings({
 
   return (
     <>
-      {!secrets.persists && <p className="mb-3 text-meta text-bad">{sentenceCase(t('settings.secretsVolatile'))}</p>}
+      {!secrets.persists && <p className="mb-3 text-meta text-bad">{t('settings.secretsVolatile')}</p>}
 
       {part !== 'telegram' && (
       <div className="panel p-4">
-        <p className="text-meta text-ink-2">{sentenceCase(t('settings.sharesHint'))}</p>
+        <p className="text-meta text-ink-2">{t('settings.sharesHint')}</p>
 
         <div className="mt-3 space-y-1.5">
           {targets.length === 0 && <p className="hint">{t('settings.noShares')}</p>}
@@ -201,7 +200,7 @@ export default function AutomationSettings({
 
       {part !== 'shares' && (
       <div className="panel p-4">
-        <p className="mb-3 text-meta text-ink-2">{sentenceCase(t('settings.telegramHint'))}</p>
+        <p className="mb-3 text-meta text-ink-2">{t('settings.telegramHint')}</p>
         <TelegramForm
           token={token}
           onToken={setToken}
