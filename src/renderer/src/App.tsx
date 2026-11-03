@@ -1,6 +1,6 @@
 import { useEffect } from 'react'
 import { useStore } from './store'
-import TopBar from './components/TopBar'
+import Shell from './shell/Shell'
 import UpdateBanner from './components/UpdateBanner'
 import EngineNotice from './components/EngineNotice'
 import HomeView from './views/HomeView'
@@ -25,6 +25,7 @@ export default function App(): JSX.Element {
   const view = useStore((s) => s.view)
   const settings = useStore((s) => s.settings)
   const init = useStore((s) => s.init)
+  const platform = useStore((s) => s.appInfo?.platform)
 
   useEffect(() => {
     void init()
@@ -35,23 +36,28 @@ export default function App(): JSX.Element {
 
   return (
     <>
-      <TopBar />
       <Toasts />
       {/* Outcomes as text, for anyone not watching the window. */}
       <LiveRegion />
       <ShortcutsOverlay />
       {dragging && <DropOverlay />}
 
-      {/*
-        Notices are full-width strips pinned under the chrome, not floating
-        cards: they're part of the window's structure while they exist, and
-        pushing content down is honest about that.
-      */}
-      <EngineNotice />
-      <UpdateBanner />
-      <MacNotice />
-      <ClipboardPrompt />
-
+      <Shell
+        platform={platform}
+        /*
+          Notices are full-width strips pinned under the sheet's top, not
+          floating cards: they're part of the window's structure while they
+          exist, and pushing content down is honest about that.
+        */
+        notices={
+          <>
+            <EngineNotice />
+            <UpdateBanner />
+            <MacNotice />
+            <ClipboardPrompt />
+          </>
+        }
+      >
       <main className="relative flex min-h-0 flex-1 flex-col">
         {ready ? (
           <div
@@ -92,6 +98,7 @@ export default function App(): JSX.Element {
           </div>
         )}
       </main>
+      </Shell>
     </>
   )
 }

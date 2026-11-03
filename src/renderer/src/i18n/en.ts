@@ -43,6 +43,13 @@ export const en = {
   'nav.search': 'search',
   'nav.settings': 'settings',
   'nav.label': 'sections',
+  // ---- 4.0 sidebar footer ----
+  'shell.language': 'Language',
+  'shell.language.auto': 'Match the system',
+  'shell.language.en': 'English',
+  'shell.language.ru': 'Русский',
+  'shell.downloading': 'Downloading',
+  'shell.overall': 'Downloading, {percent}% overall',
 
   // ---- title bar ----
   'window.minimize': 'minimize',
@@ -521,8 +528,6 @@ export const en = {
   'stamp.error': 'error',
 
   // ---- screen reader announcements ----
-  'a11y.scrollLeft': 'scroll left',
-  'a11y.scrollRight': 'scroll right',
   'a11y.downloadFinished': '{title} finished downloading',
   'a11y.downloadFailed': '{title} failed. {error}',
 

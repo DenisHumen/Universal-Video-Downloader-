@@ -110,14 +110,16 @@ const SCENES = [
   }
 ]
 
-/** Both themes at both widths in English, and both themes at 720 in Russian. */
+/** Both themes at both widths in English, both themes at 720 in Russian, and Russian at the 1000 px breakpoint. */
 const PASSES = [
   { theme: 'night', width: 1220, lang: 'en' },
   { theme: 'day', width: 1220, lang: 'en' },
   { theme: 'night', width: 720, lang: 'en' },
   { theme: 'day', width: 720, lang: 'en' },
   { theme: 'night', width: 720, lang: 'ru' },
-  { theme: 'day', width: 720, lang: 'ru' }
+  { theme: 'day', width: 720, lang: 'ru' },
+  // The sidebar's breakpoint (plan 4.2): the full sidebar's longest labels, in Russian.
+  { theme: 'night', width: 1000, lang: 'ru' }
 ]
 
 const STILL = `

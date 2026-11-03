@@ -36,6 +36,13 @@ export const ru: Dictionary = {
   'nav.search': 'поиск',
   'nav.settings': 'настройки',
   'nav.label': 'разделы',
+  // ---- 4.0 sidebar footer ----
+  'shell.language': 'Язык',
+  'shell.language.auto': 'Как в системе',
+  'shell.language.en': 'English',
+  'shell.language.ru': 'Русский',
+  'shell.downloading': 'Загрузка',
+  'shell.overall': 'Загрузка, всего {percent}%',
 
   // ---- title bar ----
   'window.minimize': 'свернуть',
@@ -508,8 +515,6 @@ export const ru: Dictionary = {
   'stamp.clipboard': 'буфер',
   'stamp.error': 'ошибка',
 
-  'a11y.scrollLeft': 'прокрутить влево',
-  'a11y.scrollRight': 'прокрутить вправо',
   'a11y.downloadFinished': '{title} — загрузка завершена',
   'a11y.downloadFailed': '{title} — ошибка. {error}',
 
