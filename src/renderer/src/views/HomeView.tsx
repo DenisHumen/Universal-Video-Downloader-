@@ -371,7 +371,6 @@ export default function HomeView(): JSX.Element {
     }
     if (!ok) return
     reset()
-    setView('downloads')
   }
 
   /*
@@ -433,7 +432,6 @@ export default function HomeView(): JSX.Element {
     if (!ok) return
     // Stops the detect too: the queue resolves the link for itself.
     reset()
-    setView('downloads')
   }
   // The window listener is registered once; it calls whatever this render's is.
   const downloadNowRef = useRef(downloadNow)
@@ -469,7 +467,6 @@ export default function HomeView(): JSX.Element {
     if (!ok) return
     setBatchText('')
     setBatchOpen(false)
-    setView('downloads')
   }
 
   /** What the download button restates: `1080p · MP4 · ~412 MB`. */

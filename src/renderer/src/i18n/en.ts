@@ -85,6 +85,7 @@ export const en = {
   'home.clipboardFound': 'link on your clipboard',
   'home.clipboardUse': 'use it',
   'home.addedToQueue': 'added to the queue',
+  'toast.viewQueue': 'view in queue',
   'home.startFailed': 'could not start the download',
   'home.liveHint':
     'this is a live stream — it records from now until you stop it, so there is no length to trim and no percentage to report.',

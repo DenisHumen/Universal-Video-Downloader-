@@ -28,7 +28,6 @@ const OVERSCAN = 6
 export default function PlaylistCard({ info, onDone, saveDir, onSaveDirChange }: Props): JSX.Element {
   const t = useT()
   const tp = useTp()
-  const setView = useStore((s) => s.setView)
   const settings = useStore((s) => s.settings)
   const saveSettings = useStore((s) => s.saveSettings)
   /*
@@ -125,7 +124,6 @@ export default function PlaylistCard({ info, onDone, saveDir, onSaveDirChange }:
     }
     if (!ok) return
     onDone()
-    setView('downloads')
   }
 
   const chosen = entries.filter((e) => selected.has(e.url))

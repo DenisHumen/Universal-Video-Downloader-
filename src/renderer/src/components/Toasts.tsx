@@ -90,6 +90,18 @@ function ToastCard({ toast }: { toast: Toast }): JSX.Element {
       <span className="min-w-0 flex-1 text-[14px] text-ink [overflow-wrap:anywhere]">
         {toast.message}
       </span>
+      {toast.action && (
+        <button
+          type="button"
+          className="-my-1 shrink-0 rounded-1 px-2 py-1 text-[13px] font-semibold text-accent-ink hover:bg-sink"
+          onClick={() => {
+            toast.action?.run()
+            useToasts.getState().dismiss(toast.id)
+          }}
+        >
+          {toast.action.label}
+        </button>
+      )}
       <button
         type="button"
         className="btn-icon-bare -my-0.5 h-6 w-6"

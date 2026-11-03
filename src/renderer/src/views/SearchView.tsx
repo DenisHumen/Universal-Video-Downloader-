@@ -82,7 +82,6 @@ function queryFromHash(): string {
 
 export default function SearchView({ settings, embedded = false }: Props): JSX.Element {
   const t = useT()
-  const setView = useStore((s) => s.setView)
   const pendingQuery = useStore((s) => s.pendingQuery)
   const takePendingQuery = useStore((s) => s.takePendingQuery)
   const [query, setQuery] = useState(embedded ? '' : queryFromHash)
@@ -469,7 +468,6 @@ export default function SearchView({ settings, embedded = false }: Props): JSX.E
               info={picker}
               onDone={() => {
                 setPicker(null)
-                if (embedded) setView('downloads')
               }}
               saveDir={pickerDir}
               onSaveDirChange={setPickerDir}

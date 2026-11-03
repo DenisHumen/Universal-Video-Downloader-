@@ -10,8 +10,8 @@ import {
 } from '@shared/types'
 import { useT } from '../i18n'
 import { toast } from '../lib/toast'
+import { viewQueueAction } from '../lib/queue'
 import { describeError } from '../lib/errors'
-import { useStore } from '../store'
 import TrimEditor from './TrimEditor'
 import Choice from './Choice'
 import Modal from './Modal'
@@ -30,7 +30,6 @@ const RESOLUTIONS = ['keep', '1080', '720', '480', '360'] as const
 export default function MediaJobModal({ item, mode, onClose }: Props): JSX.Element {
   const t = useT()
   const titleId = useId()
-  const setView = useStore((s) => s.setView)
   const [duration, setDuration] = useState<number | undefined>(item.duration)
   const [hasAudio, setHasAudio] = useState(true)
   const [hasVideo, setHasVideo] = useState(item.mode !== 'audio')
@@ -104,9 +103,8 @@ export default function MediaJobModal({ item, mode, onClose }: Props): JSX.Eleme
       return
     }
     setBusy(false)
-    toast(t('home.addedToQueue'), 'success')
+    toast(t('home.addedToQueue'), 'success', viewQueueAction())
     onClose()
-    setView('downloads')
   }
 
   const containers = audioOnly ? AUDIO_CONTAINERS : VIDEO_CONTAINERS

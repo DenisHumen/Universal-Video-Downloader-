@@ -2,15 +2,22 @@ import { create } from 'zustand'
 
 export type ToastKind = 'info' | 'success' | 'error'
 
+/** One follow-up a toast can offer, such as "view in queue". Pressing it also dismisses the toast. */
+export interface ToastAction {
+  label: string
+  run: () => void
+}
+
 export interface Toast {
   id: number
   message: string
   kind: ToastKind
+  action?: ToastAction
 }
 
 interface ToastState {
   toasts: Toast[]
-  push: (message: string, kind?: ToastKind) => void
+  push: (message: string, kind?: ToastKind, action?: ToastAction) => void
   dismiss: (id: number) => void
   /** Stop the countdown while someone is reading or reaching for the toast. */
   pause: (id: number) => void
@@ -24,6 +31,9 @@ interface ToastState {
   step - errors that, for some actions, appear nowhere else on screen.
 */
 export const TOAST_MS: Record<ToastKind, number> = { info: 3400, success: 3400, error: 8000 }
+
+/** A toast with a button stays long enough to reach for it. */
+export const ACTION_MS = 6000
 
 /** However little was left when the pointer arrived, leave time to look again. */
 export const RESUME_MIN_MS = 1500
@@ -51,13 +61,13 @@ let seq = 0
 
 export const useToasts = create<ToastState>((set, get) => ({
   toasts: [],
-  push: (message, kind = 'info') => {
+  push: (message, kind = 'info', action) => {
     const id = ++seq
-    const toasts = [...get().toasts, { id, message, kind }]
+    const toasts = [...get().toasts, { id, message, kind, action }]
     // The oldest go first: whatever just happened is what the user is waiting on.
     for (const old of toasts.splice(0, Math.max(0, toasts.length - MAX_TOASTS))) disarm(old.id)
     set({ toasts })
-    arm(id, TOAST_MS[kind])
+    arm(id, action ? Math.max(ACTION_MS, TOAST_MS[kind]) : TOAST_MS[kind])
   },
   dismiss: (id) => {
     disarm(id)
@@ -76,5 +86,5 @@ export const useToasts = create<ToastState>((set, get) => ({
   }
 }))
 
-export const toast = (message: string, kind?: ToastKind): void =>
-  useToasts.getState().push(message, kind)
+export const toast = (message: string, kind?: ToastKind, action?: ToastAction): void =>
+  useToasts.getState().push(message, kind, action)

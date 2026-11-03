@@ -34,7 +34,6 @@ export default function StreamingCard({
   titleId
 }: Props): JSX.Element {
   const t = useT()
-  const setView = useStore((s) => s.setView)
   const requestWatch = useStore((s) => s.requestWatch)
   const settings = useStore((s) => s.settings)
   const s = info.streaming!
@@ -167,7 +166,6 @@ export default function StreamingCard({
     }
     if (!ok) return
     onDone()
-    setView('downloads')
   }
 
   const queueMovie = async (): Promise<void> => {
@@ -188,7 +186,6 @@ export default function StreamingCard({
     }
     if (!ok) return
     onDone()
-    setView('downloads')
   }
 
   const episodesOfSeason = currentSeason?.episodes ?? []
