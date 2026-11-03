@@ -133,3 +133,36 @@ export function pickDownload(assets: ReleaseAsset[] | undefined, kind: InstallKi
   )
   return match?.browser_download_url
 }
+
+/**
+ * The oldest macOS each Electron the app has shipped on still runs on, as a
+ * Darwin major (macOS 11 is Darwin 20, 12 is 21, 13 is 22). Electron 38
+ * dropped macOS 11 and Electron 44 dropped macOS 12, so a build on Electron
+ * 45 needs macOS 13; electron-builder.yml says so in the app's Info.plist too.
+ */
+export const MAC_MINIMUM_DARWIN = 22
+
+/**
+ * The macOS a release says it needs, as a Darwin major: its notes carry
+ * "Requires macOS 13 or later". Undefined when they do not say.
+ */
+export function requiredDarwin(notes: string | undefined): number | undefined {
+  const match = /requires macOS (\d{2})(?:\.\d+)? or later/i.exec(notes ?? '')
+  if (!match) return undefined
+  const macos = Number(match[1])
+  // macOS 11 onwards: the Darwin major is the macOS major plus nine.
+  return macos >= 11 ? macos + 9 : undefined
+}
+
+/**
+ * Whether a Mac on Darwin `osRelease` (`os.release()`, e.g. "21.6.0") may be
+ * offered a release. A Mac the release no longer runs on is not: it would
+ * download an app that refuses to open. Anything else, or anything that
+ * cannot be read, is offered as before.
+ */
+export function offeredToThisMac(osRelease: string, notes: string | undefined): boolean {
+  const needed = requiredDarwin(notes)
+  const darwin = Number.parseInt(osRelease, 10)
+  if (needed === undefined || !Number.isFinite(darwin)) return true
+  return darwin >= needed
+}
