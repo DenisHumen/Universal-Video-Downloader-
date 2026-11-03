@@ -6,6 +6,7 @@ import {
   ipcMain,
   Notification,
   shell,
+  systemPreferences,
   type IpcMainInvokeEvent
 } from 'electron'
 import { IPC } from '@shared/ipc'
@@ -318,7 +319,8 @@ export function registerIpc({ getWindow, openSearchWindow, onSettingsChanged }: 
     locale: app.getLocale(),
     manualUpdates: isManualPlatform(),
     ytdlp: getYtdlpStatus(),
-    update: getUpdateStatus()
+    update: getUpdateStatus(),
+    systemAccent: systemAccent()
   }))
   // Window controls act on the window the call came from (main or search).
   ipcMain.handle(IPC.windowMinimize, (e) => BrowserWindow.fromWebContents(e.sender)?.minimize())
@@ -414,4 +416,17 @@ function syncOsState(getWindow: () => BrowserWindow | null): void {
   }
   const avg = active.reduce((sum, d) => sum + (d.percent || 0), 0) / active.length / 100
   win.setProgressBar(Math.max(0.02, Math.min(1, avg)))
+}
+
+/**
+ * The OS accent as `rrggbb`, where the OS has one (Windows, macOS). Linux has
+ * no such API; `accent: 'system'` then falls back to Blue in the renderer.
+ */
+function systemAccent(): string | undefined {
+  if (process.platform !== 'win32' && process.platform !== 'darwin') return undefined
+  try {
+    return systemPreferences.getAccentColor().slice(0, 6) || undefined
+  } catch {
+    return undefined
+  }
 }

@@ -170,7 +170,7 @@ async function shoot(browser, scene, pass) {
     const errors = []
     page.on('pageerror', (e) => errors.push(e.message))
     await page.goto(`${BASE}/?still`)
-    await page.waitForFunction(() => window.__uvdStore?.getState().ready === true, null, { timeout: 15_000 })
+    await page.waitForFunction(() => window.__uvdStore?.getState().ready === true, null, { timeout: 30_000 })
     await page.addStyleTag({ content: STILL })
     await page.evaluate(DRIVER)
     await page.evaluate(
@@ -221,6 +221,9 @@ async function main() {
   try {
     await waitForServer(server)
     browser = await chromium.launch()
+    // Warm the dev server once: its first transform of the app (and any dep
+    // re-optimisation, which reloads the page) must not land inside a shot.
+    await shoot(browser, SCENES[0], PASSES[0]).catch(() => undefined)
     const queue = [...jobs]
     const results = []
     const worker = async () => {
@@ -228,7 +231,8 @@ async function main() {
         const { scene, pass } = queue.shift()
         const name = fileName(scene, pass)
         try {
-          const png = await shoot(browser, scene, pass)
+          // One retry: a cold module or a slow worker is not a visual change.
+          const png = await shoot(browser, scene, pass).catch(() => shoot(browser, scene, pass))
           if (UPDATE || OUT_DIR) {
             writeFileSync(join(target, name), png)
             results.push(`  • ${name}`)

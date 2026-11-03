@@ -25,8 +25,10 @@ describe('migrate', () => {
     expect(migrate({ theme: 'chartreuse' }).theme).toBe('night')
   })
 
-  it('drops the accent that the redesign removed', () => {
-    expect('accent' in migrate({ accent: 'violet' })).toBe(false)
+  it('keeps an accent 4.0 ships and drops one it does not', () => {
+    expect(migrate({ accent: 'violet' }).accent).toBe('violet')
+    expect(migrate({ accent: 'system' }).accent).toBe('system')
+    expect('accent' in migrate({ accent: 'chartreuse' })).toBe(false)
   })
 
   it('clamps the numbers a hand-edited file could put out of range', () => {

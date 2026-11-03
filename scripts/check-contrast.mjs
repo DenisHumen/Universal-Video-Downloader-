@@ -62,9 +62,20 @@ function fail(message) {
   process.exitCode = 1
 }
 
+/**
+ * Accents (plan 2.2): each is a fill / ink / label triple per theme, set under
+ * `[data-accent]` (Night, unqualified) and `[data-theme='day'][data-accent]`.
+ * Blue is the theme blocks' own default. Every accent in every theme passes
+ * the same checks as Blue: label on fill, ink on every plane, and ink on the
+ * accent tints the UI paints selected states with.
+ */
+const ACCENTS = ['blue', 'violet', 'teal', 'orange', 'pink', 'graphite']
+const ACCENT_VARS = ['--accent', '--accent-ink', '--accent-fg']
+const ACCENT_TINTS = [0.12, 0.2]
+
 /** Pull every `--name: r g b` out of a theme block. */
 function readTheme(selector) {
-  const block = css.match(new RegExp(`${selector}\\s*\\{([^}]*)\\}`, 's'))
+  const block = css.match(new RegExp(`(?:^|\\n|,\\s*)${selector}\\s*\\{([^}]*)\\}`, 's'))
   if (!block) return null
   const vars = {}
   for (const m of block[1].matchAll(/(--[\w-]+):\s*(\d+\s+\d+\s+\d+)\s*;/g)) {
@@ -91,6 +102,8 @@ let hairlines = 0
 let faintest = { ratio: Infinity, what: '' }
 let planes = 0
 let flattest = { ratio: Infinity, what: '' }
+let accentChecks = 0
+let worstAccent = { ratio: Infinity, what: '' }
 
 for (const { name, selector } of THEMES) {
   const vars = readTheme(selector)
@@ -177,6 +190,42 @@ for (const { name, selector } of THEMES) {
     if (ratio < PLANE_MIN) fail(`${what} → ${ratio.toFixed(2)}:1 (needs ${PLANE_MIN}:1)`)
   }
 
+  for (const accent of ACCENTS) {
+    const merged = { ...vars }
+    if (accent !== 'blue') {
+      const night = readTheme(`\\[data-accent='${accent}'\\]`)
+      const day = name === 'day' ? readTheme(`\\[data-theme='day'\\]\\[data-accent='${accent}'\\]`) : {}
+      if (!night || !day) {
+        fail(`accent "${accent}" has no ${night ? 'day' : 'night'} block in index.css`)
+        continue
+      }
+      for (const v of ACCENT_VARS) {
+        if (!(name === 'day' ? day[v] : night[v])) fail(`${name} · accent "${accent}" is missing ${v}`)
+      }
+      Object.assign(merged, night, day)
+    }
+    const [fill, ink, fg] = ACCENT_VARS.map((v) => merged[v])
+    if (!fill || !ink || !fg) continue
+    const pairs = [[`--accent-fg on --accent`, contrast(fill, fg)]]
+    for (const planeVar of PLANE_VARS) {
+      const plane = merged[planeVar]
+      if (!plane) continue
+      pairs.push([`--accent-ink on ${planeVar}`, contrast(ink, plane)])
+      for (const alpha of ACCENT_TINTS) {
+        pairs.push([
+          `--accent-ink on --accent/${alpha * 100} over ${planeVar}`,
+          contrast(ink, composite(fill, plane, alpha))
+        ])
+      }
+    }
+    for (const [label, ratio] of pairs) {
+      accentChecks++
+      const what = `${name} · ${accent} · ${label}`
+      if (ratio < worstAccent.ratio) worstAccent = { ratio, what }
+      if (ratio < AA_NORMAL) fail(`${what} → ${ratio.toFixed(2)}:1 (needs ${AA_NORMAL}:1)`)
+    }
+  }
+
   if (name === 'day') {
     const line = vars['--line']
     if (!line) {
@@ -197,11 +246,15 @@ for (const { name, selector } of THEMES) {
 }
 
 if (process.exitCode) {
-  console.error(`\n${checks + hairlines + planes} pairings checked — see failures above.`)
+  console.error(`\n${checks + hairlines + planes + accentChecks} pairings checked — see failures above.`)
 } else {
   console.log(
     `✓ ${checks} theme/text/plane pairings all clear ${AA_NORMAL}:1 ` +
       `(tightest: ${worst.what} at ${worst.ratio.toFixed(2)}:1)`
+  )
+  console.log(
+    `✓ ${accentChecks} accent × theme pairings all clear ${AA_NORMAL}:1 ` +
+      `(tightest: ${worstAccent.what} at ${worstAccent.ratio.toFixed(2)}:1)`
   )
   console.log(
     `✓ ${hairlines} day hairlines all clear ${HAIRLINE_MIN}:1 ` +

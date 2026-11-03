@@ -141,7 +141,7 @@ async function runInit(set: SetState, get: GetState): Promise<void> {
     window.api.getSettings(),
     window.api.listDownloads()
   ])
-  applyAppearance(settings, appInfo.locale)
+  applyAppearance(settings, appInfo.locale, appInfo.systemAccent)
   set({
     appInfo,
     settings,
@@ -295,14 +295,14 @@ export const useStore = create<AppState>((set, get) => ({
   saveSettings: async (partial) => {
     const next = await window.api.setSettings(partial)
     forgetDetectsIfAccessChanged(get().settings, next)
-    applyAppearance(next, get().appInfo?.locale ?? 'en')
+    applyAppearance(next, get().appInfo?.locale ?? 'en', get().appInfo?.systemAccent)
     set({ settings: next })
   },
 
   resetSettings: async () => {
     const next = await window.api.resetSettings()
     forgetDetectsIfAccessChanged(get().settings, next)
-    applyAppearance(next, get().appInfo?.locale ?? 'en')
+    applyAppearance(next, get().appInfo?.locale ?? 'en', get().appInfo?.systemAccent)
     set({ settings: next })
   },
 
@@ -315,7 +315,7 @@ export const useStore = create<AppState>((set, get) => ({
     const outcome = await window.api.importBackup()
     if (outcome.ok) {
       forgetDetectsIfAccessChanged(get().settings, outcome.settings)
-      applyAppearance(outcome.settings, get().appInfo?.locale ?? 'en')
+      applyAppearance(outcome.settings, get().appInfo?.locale ?? 'en', get().appInfo?.systemAccent)
       set({ settings: outcome.settings })
     }
     return outcome

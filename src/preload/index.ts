@@ -39,6 +39,8 @@ export interface AppInfo {
   manualUpdates: boolean
   ytdlp: YtDlpStatus
   update: UpdateStatus
+  /** The OS accent colour as `rrggbb` on Windows and macOS. */
+  systemAccent?: string
 }
 
 function on<T>(channel: string, cb: (payload: T) => void): () => void {

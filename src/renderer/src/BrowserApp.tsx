@@ -52,7 +52,7 @@ export default function BrowserApp(): JSX.Element {
   useEffect(() => {
     void (async () => {
       const [settings, info] = await Promise.all([window.api.getSettings(), window.api.getAppInfo()])
-      applyAppearance(settings, info.locale)
+      applyAppearance(settings, info.locale, info.systemAccent)
       setIsMac(info.platform === 'darwin')
     })()
     const offState = window.api.onBrowserState(setState)

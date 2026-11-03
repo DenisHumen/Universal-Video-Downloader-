@@ -53,6 +53,7 @@ const settings = (over: Partial<AppSettings> = {}): AppSettings => ({
   autoUpdate: true,
   resumeOnLaunch: true,
   theme: 'night',
+  accent: 'blue',
   language: 'auto',
   notifications: true,
   clipboardWatch: false,

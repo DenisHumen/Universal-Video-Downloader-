@@ -17,7 +17,7 @@ export default function SearchApp(): JSX.Element {
   useEffect(() => {
     void (async () => {
       const [next, info] = await Promise.all([window.api.getSettings(), window.api.getAppInfo()])
-      applyAppearance(next, info.locale)
+      applyAppearance(next, info.locale, info.systemAccent)
       setSettings(next)
       setIsMac(info.platform === 'darwin')
       // Share settings with the store so the embedded StreamingCard (anime
@@ -36,7 +36,7 @@ export default function SearchApp(): JSX.Element {
     const refresh = (): void => {
       void window.api.getSettings().then((next) => {
         const info = useStore.getState().appInfo
-        if (info) applyAppearance(next, info.locale)
+        if (info) applyAppearance(next, info.locale, info.systemAccent)
         setSettings(next)
         useStore.setState({ settings: next })
       })

@@ -22,6 +22,7 @@
 
 import { AUDIO_CONTAINERS, SUPPORTED_COOKIE_BROWSERS, type AppSettings } from './types'
 import { proxyUser, splitProxyPassword } from './proxy'
+import { isAccentChoice } from './accent'
 import { normalizeUrl } from './urls'
 import {
   DEFAULT_REMOTE_PATH,
@@ -155,6 +156,7 @@ const SETTING_CHECKS: Record<keyof BackupSettings, Check> = {
   resumeOnLaunch: isBool,
   keepFinished: isNumber,
   theme: isText,
+  accent: (v) => isAccentChoice(v),
   language: oneOf(['auto', 'en', 'ru']),
   notifications: isBool,
   clipboardWatch: isBool,

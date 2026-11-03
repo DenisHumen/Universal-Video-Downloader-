@@ -78,9 +78,10 @@
   --text: 244 244 245;
   --text-2: 170 170 180;
   --text-3: 140 140 152;
-  --accent: 47 91 255;
+  /* Blue, the default accent. The others are under [data-accent] below. */
+  --accent: 61 99 255;
   --accent-fg: 255 255 255;
-  --accent-ink: 138 168 255;
+  --accent-ink: 140 170 255;
   --good: 74 222 128;
   --warn: 250 204 21;
   --bad: 251 113 133;
@@ -120,6 +121,64 @@
   --bad: 184 28 36;
   --bad-fg: 255 255 255;
   --control-edge: rgb(var(--line));
+}
+
+/* ---- Accents (plan 2.2) ----
+   fill / ink / label-on-fill per accent and theme. Night first, unqualified,
+   so it is also what a document without data-theme gets; Day overrides with
+   the more specific selector. Blue is the theme blocks' own default.
+   Every value here is gated by scripts/check-contrast.mjs. */
+[data-accent='violet'] {
+  --accent: 124 77 255;
+  --accent-ink: 184 160 255;
+  --accent-fg: 255 255 255;
+}
+[data-accent='teal'] {
+  --accent: 13 148 136;
+  --accent-ink: 78 214 196;
+  --accent-fg: 10 10 13;
+}
+[data-accent='orange'] {
+  --accent: 234 88 12;
+  --accent-ink: 255 166 110;
+  --accent-fg: 10 10 13;
+}
+[data-accent='pink'] {
+  --accent: 219 39 119;
+  --accent-ink: 249 150 196;
+  --accent-fg: 255 255 255;
+}
+[data-accent='graphite'] {
+  --accent: 228 228 231;
+  --accent-ink: 228 228 231;
+  --accent-fg: 12 12 16;
+}
+[data-theme='day'][data-accent='violet'] {
+  --accent: 109 59 232;
+  --accent-ink: 94 48 204;
+  --accent-fg: 255 255 255;
+}
+[data-theme='day'][data-accent='teal'] {
+  --accent: 15 118 110;
+  --accent-ink: 13 102 95;
+  --accent-fg: 255 255 255;
+}
+[data-theme='day'][data-accent='orange'] {
+  --accent: 194 65 12;
+  /* VD spec 170 56 10, darkened one notch: at that value the ink on the
+     hover tint (accent/20 over --bg) was 4.18:1. */
+  --accent-ink: 160 53 9;
+  --accent-fg: 255 255 255;
+}
+[data-theme='day'][data-accent='pink'] {
+  --accent: 190 24 93;
+  --accent-ink: 165 20 80;
+  --accent-fg: 255 255 255;
+}
+[data-theme='day'][data-accent='graphite'] {
+  --accent: 24 24 27;
+  --accent-ink: 24 24 27;
+  --accent-fg: 255 255 255;
 }
 
 * {

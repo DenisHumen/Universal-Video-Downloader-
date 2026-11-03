@@ -43,6 +43,7 @@ const settings: AppSettings = {
   resumeOnLaunch: true,
   keepFinished: 0,
   theme: 'night',
+  accent: 'blue',
   language: 'auto',
   notifications: true,
   clipboardWatch: false,

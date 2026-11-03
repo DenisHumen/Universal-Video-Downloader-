@@ -1,3 +1,4 @@
+import type { AccentChoice } from './accent'
 import type { SmbTarget } from './automation'
 // Shared types used by the main process, preload bridge and renderer.
 
@@ -489,6 +490,8 @@ export interface AppSettings {
    */
   keepFinished: number
   theme: ThemeId
+  /** The accent colour (see shared/accent.ts); `system` follows the OS where it reports one. */
+  accent: AccentChoice
   language: LanguageId
   /** Show a desktop notification when a download finishes. */
   notifications: boolean

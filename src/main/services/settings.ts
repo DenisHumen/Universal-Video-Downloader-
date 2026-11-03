@@ -3,6 +3,7 @@ import { homedir } from 'os'
 import { join } from 'path'
 import { LEGACY_THEMES, THEMES, type AppSettings, type ThemeId } from '@shared/types'
 import { isSafeTemplate } from '@shared/filename'
+import { isAccentChoice } from '@shared/accent'
 import { normaliseRate } from '@shared/rate'
 import { normaliseSmbTarget } from '@shared/automation'
 import { proxyUser, splitProxyPassword } from '@shared/proxy'
@@ -75,6 +76,7 @@ function defaults(): AppSettings {
     resumeOnLaunch: true,
     keepFinished: 0,
     theme: 'night',
+    accent: 'blue',
     language: 'auto',
     notifications: true,
     clipboardWatch: false,
@@ -101,7 +103,12 @@ export function migrate(raw: Record<string, unknown>): Partial<AppSettings> {
   if (raw.theme !== undefined && !THEMES.includes(raw.theme as ThemeId)) {
     next.theme = LEGACY_THEMES[String(raw.theme)] ?? 'night'
   }
-  delete next.accent
+  /*
+    3.x dropped the accent picker and deleted the field; 4.0 brings it back.
+    A name it ships is kept (a 2.x 'violet' still means violet), anything else
+    goes, and the default applies.
+  */
+  if (next.accent !== undefined && !isAccentChoice(next.accent)) delete next.accent
   if (typeof next.concurrentDownloads === 'number') {
     next.concurrentDownloads = Math.min(8, Math.max(1, Math.round(next.concurrentDownloads)))
   }
