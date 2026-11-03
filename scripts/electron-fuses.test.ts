@@ -16,6 +16,9 @@ import {
 /** The wire Electron 33.4.11 ships with, read out of its electron.exe. */
 const ELECTRON_33 = '10110001'
 
+/** The wire Electron 45.2.1 ships with, read out of its Linux executable: WasmTrapHandlers on top. */
+const ELECTRON_45 = '101100011'
+
 /** As much of an Electron binary as the fuses need: some code, the wire, more code. */
 function binary(wire = ELECTRON_33, { version = WIRE_VERSION, copies = 1 } = {}): Buffer {
   const code = (n: number): Buffer => Buffer.alloc(n, 0xcc)
@@ -48,6 +51,16 @@ describe('reading the fuse wire', () => {
       OnlyLoadAppFromAsar: 'off',
       LoadBrowserProcessSpecificV8Snapshot: 'off',
       GrantFileProtocolExtraPrivileges: 'on'
+    })
+  })
+
+  it('names the fuse Electron 45 added after the first eight', () => {
+    const buf = binary(ELECTRON_45)
+    const [wire] = fuseWires(buf)
+    expect(wire.length).toBe(FUSES.length)
+    expect(fuseStates(buf, wire)).toMatchObject({
+      GrantFileProtocolExtraPrivileges: 'on',
+      WasmTrapHandlers: 'on'
     })
   })
 
@@ -87,6 +100,14 @@ describe('flipping the fuses', () => {
     const changed = [...before.keys()].filter((i) => before[i] !== after[i])
     const start = fuseWires(before)[0].start
     expect(changed).toEqual([0, 2, 3, 5].map((i) => start + i))
+  })
+
+  // The ninth fuse is not one this app sets; it stays as Electron ships it.
+  it('leaves the fuses after the first eight alone in Electron 45', () => {
+    const buf = binary(ELECTRON_45)
+    expect(flipFuses(buf)).toBe(1)
+    expect(wireOf(buf)).toEqual(['000001011'])
+    expect(fuseProblems(buf)).toEqual([])
   })
 
   it('is the same app the second time', () => {
@@ -141,6 +162,7 @@ describe('what ships', () => {
   it('leaves asar integrity and cookie encryption as Electron sets them', () => {
     expect(Object.keys(SHIPPED_FUSES)).not.toContain('EnableEmbeddedAsarIntegrityValidation')
     expect(Object.keys(SHIPPED_FUSES)).not.toContain('EnableCookieEncryption')
+    expect(Object.keys(SHIPPED_FUSES)).not.toContain('WasmTrapHandlers')
     for (const name of Object.keys(SHIPPED_FUSES)) expect(FUSES).toContain(name)
   })
 })

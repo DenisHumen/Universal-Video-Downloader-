@@ -33,7 +33,10 @@ export const SENTINEL = 'dL7pKGdnNz796PbbjQWNKmHXBZaB9tsX'
 /** The only wire version there is. Another one means the fuse order below is stale. */
 export const WIRE_VERSION = 1
 
-/** Wire version 1, in wire order. Electron 33 carries the first eight. */
+/**
+ * Wire version 1, in wire order. Electron 33 carries the first eight; Electron
+ * 45 carries all nine (build/fuses/fuses.json5 in the Electron repository).
+ */
 export const FUSES = [
   'RunAsNode',
   'EnableCookieEncryption',
@@ -42,7 +45,8 @@ export const FUSES = [
   'EnableEmbeddedAsarIntegrityValidation',
   'OnlyLoadAppFromAsar',
   'LoadBrowserProcessSpecificV8Snapshot',
-  'GrantFileProtocolExtraPrivileges'
+  'GrantFileProtocolExtraPrivileges',
+  'WasmTrapHandlers'
 ]
 
 /**
@@ -51,7 +55,8 @@ export const FUSES = [
  *    Windows, where electron-builder 25 embeds no integrity resource to check,
  *    and Linux does not support it at all;
  *  - EnableCookieEncryption converts the cookie store one way only, and can
- *    bring up keyring prompts on Linux. A decision of its own, not this one.
+ *    bring up keyring prompts on Linux. A decision of its own, not this one;
+ *  - WasmTrapHandlers is on by default and only makes WebAssembly faster.
  */
 export const SHIPPED_FUSES = {
   RunAsNode: false,
