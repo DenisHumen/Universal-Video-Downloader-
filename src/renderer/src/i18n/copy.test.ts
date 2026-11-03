@@ -58,6 +58,19 @@ describe('copy (D7)', () => {
     }
   })
 
+  /*
+    A header toggle that switches the view into a mode asks for nothing more,
+    so it has no ellipsis - and one in a header read as a truncated label.
+  */
+  it('keeps header-bar actions short and without an ellipsis, in both languages', () => {
+    for (const key of ['home.batchHeader', 'queue.pauseAll', 'queue.resumeAll'] as TranslationKey[]) {
+      for (const dict of [en, ru]) {
+        expect(dict[key].endsWith('…'), key).toBe(false)
+        expect(dict[key].length, key).toBeLessThanOrEqual(18)
+      }
+    }
+  })
+
   it('puts no full stop at the end of a label', () => {
     for (const key of LABELS) expect(en[key].endsWith('.'), key).toBe(false)
   })

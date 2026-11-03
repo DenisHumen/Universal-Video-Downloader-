@@ -846,6 +846,13 @@ textarea,
   .ui-headerbar-end {
     @apply justify-end;
   }
+  /* A header action never shrinks or ellipsises: a view gives a short label,
+     or an icon with a tooltip where the bar is narrow (HeaderSlot). */
+  .ui-headerbar-start > *,
+  .ui-headerbar-end > *,
+  .ui-headerbar-end > * > * {
+    @apply shrink-0 whitespace-nowrap;
+  }
   .ui-headerbar-title {
     max-width: calc(100% - 120px);
     @apply pointer-events-none absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 truncate text-heading text-ink;

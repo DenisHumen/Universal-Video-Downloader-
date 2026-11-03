@@ -585,6 +585,7 @@ export default function HomeView(): JSX.Element {
               className="btn-icon-bare w-auto gap-2 px-2.5 text-control font-bold"
               onClick={() => setBatchOpen((v) => !v)}
               aria-label={t('home.batchOpen')}
+              aria-pressed={batchOpen}
               aria-expanded={batchOpen}
               aria-controls={batchOpen ? batchPanelId : undefined}
             >

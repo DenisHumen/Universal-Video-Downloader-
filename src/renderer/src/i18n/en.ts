@@ -173,7 +173,7 @@ export const en = {
   'home.batchHint': 'one link per line — each becomes its own download',
   'home.batchAdd': 'queue {count} link|queue {count} links',
   'home.batchOpen': 'Paste Several Links at Once…',
-  'home.batchHeader': 'Several Links…',
+  'home.batchHeader': 'Several Links',
   'home.universal': 'found by universal detection',
   'home.universalHint':
     'the engine didn’t know this site, so the app opened the page and captured the stream itself.',
