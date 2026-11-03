@@ -93,6 +93,12 @@ interface AppState {
   /** The site's own title and poster for the link being detected, when it has one. */
   detectPreview: DetectPreview | null
   shortcutsOpen: boolean
+  /** The sidebar as an overlay (below 860 px, or while Settings asks for room) is showing. */
+  sidebarOverlayOpen: boolean
+  /** Settings at 860-1099 px folds the app sidebar away so there is never a double rail (A1.1). */
+  sidebarFolded: boolean
+  /** Where Settings is: `<panel>[/<subpage>][#<row>]` (views/settings/router.ts). */
+  settingsRoute: string
 
   init: () => Promise<void>
   setView: (view: ViewId) => void
@@ -104,6 +110,11 @@ interface AppState {
   dismissUpdate: () => void
   dismissClipboardLink: () => void
   setShortcutsOpen: (open: boolean) => void
+  setSidebarOverlayOpen: (open: boolean) => void
+  setSidebarFolded: (folded: boolean) => void
+  /** Open Settings, at `route` or where it was last (Ctrl+, , About, Fix buttons, deep links). */
+  openSettings: (route?: string) => void
+  setSettingsRoute: (route: string) => void
   /** Home started detecting this link: its stage starts over, from resolving. */
   beginDetect: (url: string, requestId: string) => void
   /** Home stopped waiting - a result, an error, a cancel, or it went away. */
@@ -289,13 +300,17 @@ export const useStore = create<AppState>((set, get) => ({
   detect: null,
   detectPreview: null,
   shortcutsOpen: false,
+  sidebarOverlayOpen: false,
+  sidebarFolded: false,
+  settingsRoute: 'appearance',
 
   init: () => {
     if (!initPromise) initPromise = runInit(set, get)
     return initPromise
   },
 
-  setView: (view) => set({ view }),
+  // Choosing a section closes the overlay sidebar, as GNOME's split view does.
+  setView: (view) => set({ view, sidebarOverlayOpen: false }),
 
   saveSettings: async (partial) => {
     const next = await window.api.setSettings(partial)
@@ -334,6 +349,11 @@ export const useStore = create<AppState>((set, get) => ({
   dismissUpdate: () => set({ updateDismissed: true }),
   dismissClipboardLink: () => set({ clipboardLink: null }),
   setShortcutsOpen: (open) => set({ shortcutsOpen: open }),
+  setSidebarOverlayOpen: (open) => set({ sidebarOverlayOpen: open }),
+  setSidebarFolded: (folded) => set({ sidebarFolded: folded }),
+  openSettings: (route) =>
+    set((s) => ({ view: 'settings', settingsRoute: route ?? s.settingsRoute, sidebarOverlayOpen: false })),
+  setSettingsRoute: (route) => set({ settingsRoute: route }),
   beginDetect: (url, requestId) =>
     set({ detect: { stage: 'resolving', url, requestId }, detectPreview: previews.get(requestId) ?? null }),
   endDetect: () => {

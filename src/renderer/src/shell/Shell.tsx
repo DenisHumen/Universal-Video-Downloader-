@@ -1,43 +1,100 @@
-import type { ReactNode } from 'react'
-import CaptionButtons from '../components/CaptionButtons'
-import { useMediaQuery } from '../hooks/useMediaQuery'
+import { useEffect, useRef, useState, type ReactNode, type UIEvent } from 'react'
+import { useStore, type ViewId } from '../store'
+import { useT } from '../i18n'
+import { HeaderBar } from '../ui'
 import Sidebar from './Sidebar'
+import { NAV_ALL } from './nav'
+import { SidebarToggle, WindowControls } from './WindowControls'
+import { SIDEBAR_PINNED_FROM, useShellLayout } from './layout'
 
 interface Props {
   /** From the preload (appInfo.platform), so tests can render the shell as any OS. */
   platform: NodeJS.Platform | undefined
-  /** Full-width strips pinned under the sheet's top: engine setup, update, notices. */
+  /** Full-width banners under the content header: engine setup, update, notices. */
   notices?: ReactNode
   children: ReactNode
 }
 
-/** Where the sidebar collapses to its icon rail (plan 4.2). */
-export const RAIL_BELOW = 1000
+/** Kept for callers of the 4.0 shell. */
+export const RAIL_BELOW = SIDEBAR_PINNED_FROM
+
+/** Views that draw their own header bars (Settings has two panes, each with one). */
+const OWN_HEADER: ViewId[] = ['settings']
 
 /**
- * The 4.0 window (plan 4.2): a sidebar on the canvas and the content in an
- * inset sheet on `--surface` with a 12 px top-left corner (plus a hairline on
- * its top and left edges in Night, where the plane step alone is too faint).
+ * The window (A1.1 + the user's GNOME Settings reference): the v4 inset sheet
+ * (--surface, 12 px top-left corner, --sheet-edge) beside a GNOME sidebar on
+ * --sidebar. Each pane has its own 46 px header bar: the sidebar's carries
+ * the app name and primary menu, the content's the section title, centred,
+ * with the sidebar toggle at the start when the sidebar is an overlay, and
+ * the caption buttons at the end.
  *
- * Window chrome keeps working on every OS ([v2] SE-1):
- *  - the sheet's 36 px top strip and the sidebar's top are drag regions, and
- *    everything interactive inside them is `no-drag`;
- *  - minimise / maximise / close sit at the sheet's top-right on Windows and
- *    Linux, flush with the window corner;
- *  - on macOS the native traffic lights sit in the sidebar's (empty) top.
- * shell.test.tsx renders this as win32, linux and darwin and checks all three.
+ * Below 860 px (or while Settings folds it, 860-1099) the sidebar is an
+ * overlay over the sheet with a scrim; Esc or a click outside closes it.
+ * There is never a double rail and never an icon rail (A1.1).
+ *
+ * Window chrome on every OS (tests in shell.test.tsx): both header bars are
+ * drag regions with no-drag controls; Linux draws GNOME's round caption
+ * buttons in button-layout order, Windows reserves room for its caption
+ * overlay, macOS keeps the traffic lights in the sidebar header.
  */
 export default function Shell({ platform, notices, children }: Props): JSX.Element {
-  const wide = useMediaQuery(`(min-width: ${RAIL_BELOW}px)`)
-  const isMac = platform === 'darwin'
+  const t = useT()
+  const view = useStore((s) => s.view)
+  const { pinned } = useShellLayout()
+  const overlayOpen = useStore((s) => s.sidebarOverlayOpen)
+  const setOverlayOpen = useStore((s) => s.setSidebarOverlayOpen)
+  const [scrolled, setScrolled] = useState(false)
+  const sheet = useRef<HTMLDivElement>(null)
+
+  // The header's shade shows once the content under it has scrolled (AdwHeaderBar).
+  const onScroll = (e: UIEvent<HTMLDivElement>): void => {
+    const target = e.target as HTMLElement
+    if (target !== sheet.current) setScrolled(target.scrollTop > 0)
+  }
+  useEffect(() => setScrolled(false), [view])
+
+  useEffect(() => {
+    if (pinned || !overlayOpen) return
+    const onKey = (e: KeyboardEvent): void => {
+      if (e.key === 'Escape') {
+        e.preventDefault()
+        e.stopPropagation()
+        setOverlayOpen(false)
+      }
+    }
+    window.addEventListener('keydown', onKey, true)
+    return () => window.removeEventListener('keydown', onKey, true)
+  }, [pinned, overlayOpen, setOverlayOpen])
+
+  const section = NAV_ALL.find((s) => s.id === view)
+  const ownHeader = OWN_HEADER.includes(view)
 
   return (
-    <div className="flex min-h-0 flex-1">
-      <Sidebar platform={platform} rail={!wide} />
-      <div className="app-sheet relative flex min-w-0 flex-1 flex-col overflow-hidden rounded-tl-3 bg-raise">
-        <div className="drag-region flex h-9 shrink-0 items-stretch justify-end" data-uvd="sheet-drag">
-          {!isMac && <CaptionButtons />}
-        </div>
+    <div className="relative flex min-h-0 flex-1">
+      {(pinned || overlayOpen) && <Sidebar platform={platform} overlay={!pinned} />}
+      {!pinned && overlayOpen && (
+        <div className="scrim absolute inset-0" style={{ zIndex: 'var(--z-chrome)' }} onClick={() => setOverlayOpen(false)} aria-hidden="true" />
+      )}
+      <div
+        ref={sheet}
+        className={`app-sheet relative flex min-w-0 flex-1 flex-col overflow-hidden bg-raise ${pinned ? 'rounded-tl-3' : ''}`}
+        onScrollCapture={onScroll}
+      >
+        {!ownHeader && (
+          <HeaderBar
+            data-uvd="sheet-drag"
+            shade={scrolled}
+            title={section ? t(section.label) : undefined}
+            start={
+              <>
+                <WindowControls side="start" where="content" />
+                <SidebarToggle />
+              </>
+            }
+            end={<WindowControls side="end" where="content" />}
+          />
+        )}
         {notices}
         {children}
       </div>

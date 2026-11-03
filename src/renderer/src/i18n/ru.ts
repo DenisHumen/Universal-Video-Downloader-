@@ -36,24 +36,16 @@ export const ru: Dictionary = {
   'nav.search': 'Поиск',
   'nav.settings': 'Настройки',
   'nav.label': 'Разделы',
-  // ---- 4.0 sidebar footer ----
-  'shell.language': 'Язык',
-  'shell.language.auto': 'Как в системе',
-  'shell.language.en': 'English',
-  'shell.language.ru': 'Русский',
-  'shell.downloading': 'Загрузка',
-  'shell.overall': 'Загрузка, всего {percent}%',
+  // ---- shell (D5) ----
+  'shell.sidebar': 'Боковая панель',
+  'shell.mainMenu': 'Главное меню',
+  'shell.about': 'О приложении',
 
   // ---- title bar ----
   'window.minimize': 'Свернуть',
   'window.maximize': 'Развернуть',
   'window.restore': 'Свернуть в окно',
   'window.close': 'Закрыть',
-  'engine.ready': 'Движок готов',
-  'engine.downloading': 'Движок {percent}%',
-  'engine.checking': 'Движок…',
-  'engine.error': 'Ошибка движка',
-  'engine.idle': 'Движок',
   'engine.setupLabel': 'установка',
   'engine.setupTitle': 'готовлю движок загрузок',
   'engine.setupOnce': 'один раз, около 30 МБ',

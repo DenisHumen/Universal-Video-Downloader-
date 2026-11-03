@@ -20,7 +20,7 @@ export interface NavSection {
   id: ViewId
   label: TranslationKey
   icon: IconComponent
-  /** The digit of its Ctrl/⌘ shortcut (lib/shortcuts.ts). */
+  /** Its Ctrl/⌘ key (lib/shortcuts.ts): 1..N in sidebar order; Settings is ','. */
   key: string
 }
 
@@ -32,6 +32,6 @@ export const NAV_MAIN: NavSection[] = [
 ]
 
 /** Pinned to the bottom of the sidebar. */
-export const NAV_BOTTOM: NavSection[] = [{ id: 'settings', label: 'nav.settings', icon: Settings, key: '5' }]
+export const NAV_BOTTOM: NavSection[] = [{ id: 'settings', label: 'nav.settings', icon: Settings, key: ',' }]
 
 export const NAV_ALL: NavSection[] = [...NAV_MAIN, ...NAV_BOTTOM]

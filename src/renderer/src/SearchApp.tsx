@@ -20,6 +20,8 @@ export default function SearchApp(): JSX.Element {
       applyAppearance(next, info.locale, info.systemAccent)
       setSettings(next)
       setIsMac(info.platform === 'darwin')
+      // The caption buttons read the platform and GNOME's button order from the store.
+      useStore.setState({ appInfo: info })
       // Share settings with the store so the embedded StreamingCard (anime
       // picker) honours the user's default quality.
       useStore.setState({ settings: next, appInfo: info })

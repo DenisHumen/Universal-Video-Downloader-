@@ -1001,6 +1001,38 @@ textarea,
     @apply inline-block shrink-0;
   }
 
+  /* ---- Shell (D5) ---- */
+  .ui-app-sidebar {
+    background-color: rgb(var(--sidebar));
+  }
+  /* Below 860 px (or folded by Settings): over the sheet, with a scrim behind. */
+  .ui-app-sidebar-overlay {
+    box-shadow: var(--shadow-3);
+    @apply absolute inset-y-0 left-0;
+  }
+  /* A GNOME caption button: a 24 px circle at .10 inside a 36 px target. */
+  .ui-caption {
+    @apply no-drag inline-flex h-9 w-9 cursor-pointer items-center justify-center text-ink outline-none;
+  }
+  .ui-caption-circle {
+    transition: background-color var(--t-fast) var(--ease);
+    @apply inline-flex h-6 w-6 items-center justify-center rounded-pill bg-fill/10;
+  }
+  .ui-caption:hover .ui-caption-circle {
+    @apply bg-fill/15;
+  }
+  .ui-caption:active .ui-caption-circle {
+    @apply bg-fill/25;
+  }
+  .ui-caption:focus-visible .ui-caption-circle {
+    outline: 2px solid rgb(var(--accent) / 0.5);
+    outline-offset: 1px;
+  }
+  /* Windows' caption overlay (titleBarOverlay) owns this corner. */
+  .ui-titlebar-overlay-space {
+    width: calc(100vw - env(titlebar-area-x, 0px) - env(titlebar-area-width, calc(100vw - 138px)));
+    @apply h-full shrink-0;
+  }
   /* ---- Shell ---- */
   .app-sheet {
     border-top: 1px solid var(--sheet-edge);

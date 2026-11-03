@@ -126,3 +126,31 @@ screenshot of the desktop can be taken here (see Method).
 | `error_color` / `success_color` / `warning_color` | #C7162B / #109B26 / #F99B11 | same |
 | headerbar `min-height` | 46 px | 46 px |
 | common radii | 5, 6, 12 px; switch 14 px | |
+
+## Cross-check: the user's own GNOME Settings screenshot
+
+The user sent a screenshot of their GNOME Settings (Network panel, dark Yaru,
+`docs/v4-demo/user-gnome-settings-reference.png`). Where it differs from the
+renders above, the screenshot wins unless the contrast gate forbids it.
+
+| | Screenshot | Calibration | Used |
+|---|---|---|---|
+| Sidebar / its header | 48 | 48 | 48 |
+| Content / its header | 44 | 44 | 44 |
+| Pane divider | 31 | 31 | 31 |
+| Sidebar group separator | 79 | — | `--fill` at .15 (= 78 on 48) |
+| Selected sidebar row | 69 | 69 | `--fill` .10 |
+| Hovered sidebar row | 62 | — | `--fill` .07 (= 62) |
+| Boxed-list card | 61 | 61 | 61 |
+| Round caption button | 64, ~24 px | 64 | `--fill` .10, 24 px circle |
+| Switch on | 233 84 32 | 233 84 32 | `--accent-bright` (raw Yaru orange, non-text) |
+| Sidebar row height | ~44 | 36 (navigation-sidebar) | **44** (Settings' own rows) |
+| Boxed row height | ~54 | 50 | ≥ 50, ~54 with the body line-height |
+| Content clamp | ~560 | — | 600 max (AdwClamp), measured 560 at that width |
+| Window corners | rounded | — | **square** (E4 veto: rounding needs `transparent: true`; deviation recorded) |
+
+Structure copied from it: sidebar header with the title centred and a menu
+button at the end; groups split by thin separators; a centred panel title in
+the content header with round caption buttons; bold group titles with an
+optional flat "+" on the title line; rows of an optional leading icon, the
+label, then a switch, a flat icon button, or a dim value and a chevron.

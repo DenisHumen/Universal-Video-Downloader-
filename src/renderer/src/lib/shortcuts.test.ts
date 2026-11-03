@@ -43,14 +43,14 @@ describe('shortcut list', () => {
 })
 
 describe('chordAction', () => {
-  it('switches views with the digits in tab order', () => {
-    expect(['1', '2', '3', '4', '5'].map((key) => chordAction(key))).toEqual([
+  it('switches sections with the digits in sidebar order, and Settings is Ctrl+, only (D5)', () => {
+    expect(['1', '2', '3', '4'].map((key) => chordAction(key))).toEqual([
       'home',
       'search',
       'downloads',
-      'automation',
-      'settings'
+      'automation'
     ])
+    expect(chordAction('5')).toBeUndefined()
   })
 
   it('keeps the letter and comma aliases, with or without Shift', () => {

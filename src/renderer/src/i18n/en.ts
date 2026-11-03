@@ -43,24 +43,16 @@ export const en = {
   'nav.search': 'Search',
   'nav.settings': 'Settings',
   'nav.label': 'Sections',
-  // ---- 4.0 sidebar footer ----
-  'shell.language': 'Language',
-  'shell.language.auto': 'Match the system',
-  'shell.language.en': 'English',
-  'shell.language.ru': 'Русский',
-  'shell.downloading': 'Downloading',
-  'shell.overall': 'Downloading, {percent}% overall',
+  // ---- shell (D5) ----
+  'shell.sidebar': 'Sidebar',
+  'shell.mainMenu': 'Main Menu',
+  'shell.about': 'About UVD',
 
   // ---- title bar ----
   'window.minimize': 'Minimize',
   'window.maximize': 'Maximize',
   'window.restore': 'Restore',
   'window.close': 'Close',
-  'engine.ready': 'Engine ready',
-  'engine.downloading': 'Engine {percent}%',
-  'engine.checking': 'Engine…',
-  'engine.error': 'Engine error',
-  'engine.idle': 'Engine',
   'engine.setupLabel': 'setup',
   'engine.setupTitle': 'getting the download engine ready',
   'engine.setupOnce': 'one time, about 30 MB',

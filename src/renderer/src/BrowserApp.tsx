@@ -20,6 +20,7 @@ import { enter } from './lib/motion'
 import { toast } from './lib/toast'
 import { formatBytes } from './lib/format'
 import { applyAppearance } from './lib/theme'
+import { useStore } from './store'
 import { t as tNow, useT } from './i18n'
 
 const PANEL_WIDTH = 300
@@ -54,6 +55,8 @@ export default function BrowserApp(): JSX.Element {
       const [settings, info] = await Promise.all([window.api.getSettings(), window.api.getAppInfo()])
       applyAppearance(settings, info.locale, info.systemAccent)
       setIsMac(info.platform === 'darwin')
+      // The caption buttons read the platform and GNOME's button order from the store.
+      useStore.setState({ appInfo: info })
     })()
     const offState = window.api.onBrowserState(setState)
     const offMedia = window.api.onBrowserMedia(setMedia)
