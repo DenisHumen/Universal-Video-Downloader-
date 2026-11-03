@@ -4,6 +4,7 @@ import type { ExportOutcome, ImportOutcome } from '@shared/backup'
 import type { SeriesOffer } from '../main/automation-ipc'
 import { contextBridge, ipcRenderer } from 'electron'
 import { IPC } from '@shared/ipc'
+import { themeFromArgv } from '@shared/theme-boot'
 import type {
   AppSettings,
   BrowserMedia,
@@ -195,3 +196,16 @@ const api = {
 export type UvdApi = typeof api
 
 contextBridge.exposeInMainWorld('api', api)
+
+/*
+  The theme, before first paint. Main resolved it and passed it as a switch
+  (see theme-boot.ts); the stylesheet's default is Night, so without this a
+  Day window flashed dark until the async settings call came back.
+*/
+const bootTheme = themeFromArgv(process.argv)
+if (bootTheme) {
+  const stamp = (): void => document.documentElement?.setAttribute('data-theme', bootTheme)
+  stamp()
+  // The preload can run before <html> exists; stamp again as soon as it does.
+  document.addEventListener('readystatechange', stamp, { once: true })
+}

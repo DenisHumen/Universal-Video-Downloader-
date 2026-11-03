@@ -1,5 +1,6 @@
-import type { BrowserWindow, BrowserWindowConstructorOptions } from 'electron'
+import { nativeTheme, type BrowserWindow, type BrowserWindowConstructorOptions } from 'electron'
 import { IPC } from '@shared/ipc'
+import { WINDOW_BACKGROUND, paintedTheme, themeArgument } from '@shared/theme-boot'
 
 const isMac = process.platform === 'darwin'
 
@@ -40,4 +41,17 @@ export function forwardMaximized(win: BrowserWindow): void {
   }
   win.on('maximize', send)
   win.on('unmaximize', send)
+}
+
+/**
+ * The theme a new window opens in: its native background, and the switch the
+ * preload reads to stamp `data-theme` before first paint (see theme-boot.ts).
+ * Spread `additionalArguments` into the window's `webPreferences`.
+ */
+export function themeOptions(theme: string | undefined): {
+  backgroundColor: string
+  additionalArguments: string[]
+} {
+  const painted = paintedTheme(theme, nativeTheme.shouldUseDarkColors)
+  return { backgroundColor: WINDOW_BACKGROUND[painted], additionalArguments: [themeArgument(painted)] }
 }

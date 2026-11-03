@@ -15,7 +15,7 @@ import { startDownload } from './downloader'
 import { getSettings } from './settings'
 import { mt } from './locale'
 import { rendererIndex, wireNavigation } from './navigation'
-import { chromeOptions, forwardMaximized } from './window-chrome'
+import { chromeOptions, forwardMaximized, themeOptions } from './window-chrome'
 import { log } from './log'
 import type { BrowserMedia, BrowserState, DownloadItem, DownloadRequest } from '@shared/types'
 
@@ -200,18 +200,20 @@ export function openBrowserWindow(initialUrl?: string): void {
   media.clear()
   candidateHeaders.clear()
 
+  const theme = themeOptions(getSettings().theme)
   win = new BrowserWindow({
     width: 1280,
     height: 860,
     minWidth: 900,
     minHeight: 600,
     show: false,
-    backgroundColor: '#08080a',
+    backgroundColor: theme.backgroundColor,
     // The shell draws its own title bar, like the app's other windows.
     ...chromeOptions(),
     icon: icon(),
     webPreferences: {
       preload: shellPreload(),
+      additionalArguments: theme.additionalArguments,
       contextIsolation: true,
       nodeIntegration: false,
       // The shell holds the bridge; same reasoning as the main window's.

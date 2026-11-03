@@ -38,7 +38,7 @@ import {
 } from './services/downloader'
 import { startClipboardWatch, stopClipboardWatch } from './services/clipboard'
 import { rendererIndex, wireNavigation } from './services/navigation'
-import { chromeOptions, forwardMaximized } from './services/window-chrome'
+import { chromeOptions, forwardMaximized, themeOptions } from './services/window-chrome'
 import { currentLanguage, mt, type MainLanguage } from './services/locale'
 import type { AppSettings, PendingDelivery } from '@shared/types'
 import { cliArgvFrom } from './cli/format'
@@ -114,17 +114,19 @@ function wireWindow(win: BrowserWindow, showWhenReady = true): void {
 }
 
 function windowOptions(width: number, height: number): Electron.BrowserWindowConstructorOptions {
+  const theme = themeOptions(getSettings().theme)
   return {
     width,
     height,
     minWidth: 760,
     minHeight: 560,
     show: false,
-    backgroundColor: '#08080a',
+    backgroundColor: theme.backgroundColor,
     ...chromeOptions(),
     icon: isMac ? undefined : loadIcon('app.png'),
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
+      additionalArguments: theme.additionalArguments,
       contextIsolation: true,
       nodeIntegration: false,
       /*
