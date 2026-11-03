@@ -54,7 +54,7 @@ describe('applyTheme', () => {
       applyTheme('system')
       expect(root.getAttribute('data-theme')).toBe('night')
       dark = false
-      listener?.()
+      ;(listener as (() => void) | null)?.()
       expect(root.getAttribute('data-theme')).toBe('day')
       applyTheme('night')
       expect(listener).toBeNull()
