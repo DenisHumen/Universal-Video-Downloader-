@@ -46,7 +46,13 @@ beforeAll(async () => {
       }
     },
     plugins: [react()],
-    build: { outDir: out, emptyOutDir: true, minify: 'esbuild', reportCompressedSize: false }
+    build: {
+      outDir: out,
+      emptyOutDir: true,
+      minify: 'esbuild',
+      reportCompressedSize: false,
+      assetsInlineLimit: (file: string) => (file.endsWith('.svg') ? false : undefined)
+    }
   })
   const dir = join(out, 'assets')
   assets = readdirSync(dir)
@@ -72,6 +78,11 @@ describe('renderer bundle budget', () => {
     expect(fonts.length).toBeGreaterThanOrEqual(2)
     const total = fonts.reduce((n, f) => n + readFileSync(join(dir, f)).length, 0)
     expect(total, `fonts are ${total} B`).toBeLessThanOrEqual(BUDGET.fonts)
+  })
+
+  it('ships the icons as separate SVG files, not inlined', () => {
+    const svgs = readdirSync(join(out, 'assets')).filter((f) => f.endsWith('.svg'))
+    expect(svgs.length).toBeGreaterThan(40)
   })
 
   it('keeps the stylesheet within budget', () => {

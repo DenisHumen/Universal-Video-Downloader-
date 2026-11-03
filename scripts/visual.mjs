@@ -81,7 +81,7 @@ const SCENES = [
     name: 'menu',
     setup: `
       __uvdShot.seedQueue(); await __uvdShot.view('downloads');
-      const trigger = document.querySelector('[aria-haspopup="menu"]');
+      const trigger = document.querySelector('main [aria-haspopup="menu"]');
       if (!trigger) throw new Error('no row menu on screen');
       trigger.click();
       await new Promise((r) => setTimeout(r, 200));

@@ -11,7 +11,6 @@ import {
   EmptyState,
   Field,
   Icon,
-  ICON_STROKE,
   IconButton,
   Menu,
   SegmentedControl,
@@ -49,15 +48,15 @@ describe('icons (plan 3.2)', () => {
     readdirSync(dir, { withFileTypes: true }).flatMap((e) =>
       e.isDirectory() ? walk(join(dir, e.name)) : /\.tsx?$/.test(e.name) ? [join(dir, e.name)] : []
     )
-  it('imports lucide-react only inside ui/', () => {
+  it('takes icons only from ui/icons (lucide is gone; Yaru symbolics replace it)', () => {
     const offenders = walk(root)
-      .filter((f) => !f.startsWith(join(root, 'ui')))
-      .filter((f) => /from ['"]lucide-react['"]/.test(readFileSync(f, 'utf-8')))
+      .filter((f) => /from ['"]lucide-react['"]|resources\/icons\//.test(readFileSync(f, 'utf-8')))
+      .filter((f) => !f.endsWith(join('ui', 'icons.tsx')) && !f.endsWith('ui.test.tsx'))
       .map((f) => f.slice(root.length + 1))
     expect(offenders).toEqual([])
   })
 
-  it('draws at sm 14 / md 16 / lg 24 with a 1.75 stroke', () => {
+  it('draws Yaru symbolics at sm 14 / md 16 / lg 24, as separate files in currentColor', () => {
     const { container } = render(
       <>
         <Icon icon={Download} size="sm" />
@@ -65,16 +64,13 @@ describe('icons (plan 3.2)', () => {
         <Icon icon={Download} size="lg" label="Download" />
       </>
     )
-    const svgs = [...container.querySelectorAll('svg')]
-    expect(svgs.map((s) => s.getAttribute('width'))).toEqual(['14', '16', '24'])
-    expect(svgs.every((s) => s.getAttribute('stroke-width') === String(ICON_STROKE))).toBe(true)
-    expect(svgs[0].getAttribute('aria-hidden')).toBe('true')
+    const icons = [...container.querySelectorAll<HTMLElement>('.uvd-icon')]
+    expect(icons.map((i) => i.style.width)).toEqual(['14px', '16px', '24px'])
+    for (const i of icons) expect(i.style.getPropertyValue('--icon')).toMatch(/folder-download-symbolic\.svg/)
+    // A file URL, never an inlined data: URI (E5).
+    expect(icons[0].style.getPropertyValue('--icon')).not.toMatch(/data:/)
+    expect(icons[0].getAttribute('aria-hidden')).toBe('true')
     expect(screen.getByRole('img', { name: 'Download' })).toBeTruthy()
-  })
-
-  it('gives the re-exported glyphs the same stroke by default', () => {
-    const { container } = render(<Download size={16} />)
-    expect(container.querySelector('svg')?.getAttribute('stroke-width')).toBe(String(ICON_STROKE))
   })
 })
 

@@ -304,6 +304,15 @@ body {
   -webkit-app-region: no-drag;
 }
 
+/* A symbolic icon (ui/icons.tsx): the SVG as a mask, painted in the text colour. */
+.uvd-icon {
+  display: inline-block;
+  flex-shrink: 0;
+  background-color: currentColor;
+  -webkit-mask: var(--icon) center / contain no-repeat;
+  mask: var(--icon) center / contain no-repeat;
+}
+
 /* Numbers in the interface font, with tabular figures so a column of
    percentages, speeds or times never shifts (A1: they leave mono). */
 .numeric {
