@@ -180,6 +180,8 @@ const api = {
   isWindowMaximized: (): Promise<boolean> => ipcRenderer.invoke(IPC.windowIsMaximized),
   /** Every maximise and restore, including the ones the caption button did not cause. */
   onMaximizedChange: (cb: (maximized: boolean) => void) => on<boolean>(IPC.evtWindowState, cb),
+  /** The OS switched light/dark (main's nativeTheme). */
+  onNativeTheme: (cb: () => void) => on<void>(IPC.evtNativeTheme, cb),
 
   // Events
   onDownloadProgress: (cb: (p: DownloadProgress) => void) =>

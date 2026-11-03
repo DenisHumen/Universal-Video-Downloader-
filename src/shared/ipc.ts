@@ -69,6 +69,8 @@ export const IPC = {
   evtUpdateStatus: 'event:update-status',
   /** Whether the receiving window is maximised, after any change: boolean. */
   evtWindowState: 'event:window-state',
+  /** The OS colour scheme changed; a "system" theme repaints. */
+  evtNativeTheme: 'event:native-theme',
   evtSearchQuery: 'event:search-query',
   evtDetectStatus: 'event:detect-status',
   /** Title, uploader and poster from oEmbed, ahead of the detect: DetectPreview. */

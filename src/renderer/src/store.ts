@@ -246,6 +246,11 @@ async function runInit(set: SetState, get: GetState): Promise<void> {
   window.api.onNavigate((view) => {
     if (isViewId(view)) set({ view })
   })
+  // The OS switched light/dark: a "system" theme and a clamped system accent repaint (E3a).
+  window.api.onNativeTheme(() => {
+    const settings = get().settings
+    if (settings) applyAppearance(settings, get().appInfo?.locale ?? 'en', get().appInfo?.systemAccent)
+  })
 
   /*
     Collect anything main tried to hand us before this point. IPC does not

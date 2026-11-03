@@ -640,7 +640,8 @@ export function installMockApi(): void {
     autoSecretState: async () => ({ telegram: false, smb: {}, proxy: false, persists: true }),
     getLogPath: async () => 'C:/mock/uvd.log',
     onAutomationChanged: () => () => undefined,
-    onNavigate: () => () => undefined
+    onNavigate: () => () => undefined,
+    onNativeTheme: () => () => undefined
   }
   window.api = api
 }

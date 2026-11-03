@@ -39,7 +39,13 @@ import {
 } from './services/downloader'
 import { startClipboardWatch, stopClipboardWatch } from './services/clipboard'
 import { rendererIndex, wireNavigation } from './services/navigation'
-import { chromeOptions, forwardMaximized, themeOptions } from './services/window-chrome'
+import {
+  chromeOptions,
+  followNativeTheme,
+  forwardMaximized,
+  settleNativeTheme,
+  themeOptions
+} from './services/window-chrome'
 import { currentLanguage, mt, type MainLanguage } from './services/locale'
 import type { AppSettings, PendingDelivery } from '@shared/types'
 import { cliArgvFrom } from './cli/format'
@@ -617,15 +623,13 @@ if (cliArgs) {
       app.setAppUserModelId('com.denishumen.universalvideodownloader')
     }
 
-    // Windows lets the taskbar flip between light and dark while we run.
+    // The OS scheme can change while we run (and, on Linux, arrives just after whenReady: E3a).
     nativeTheme.on('updated', () => {
       tray?.setImage(trayImage())
-      // Theme "system": the window's own background follows the OS as the page does.
-      const { backgroundColor } = themeOptions(getSettings().theme)
-      for (const win of BrowserWindow.getAllWindows()) {
-        if (!win.isDestroyed()) win.setBackgroundColor(backgroundColor)
-      }
+      followNativeTheme(() => BrowserWindow.getAllWindows(), () => getSettings().theme)
     })
+    // On Linux the scheme is not known yet at whenReady; wait for it (<= 200 ms) before the first window.
+    await settleNativeTheme(nativeTheme, process.platform)
 
     registerIpc({
       getWindow: () => mainWindow,
