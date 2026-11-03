@@ -1,13 +1,36 @@
 import type { AppSettings, ThemeId } from '@shared/types'
 import { deriveAccent, parseColor, type Rgb } from '@shared/accent'
+import { paintedTheme } from '@shared/theme-boot'
 import { resolveLanguage, useI18n } from '../i18n'
+
+const DARK = '(prefers-color-scheme: dark)'
+/** The listener that keeps `system` in step with the OS while it is chosen. */
+let followSystem: (() => void) | null = null
+let lastAccent: { accent: AppSettings['accent'] | undefined; system?: string } = { accent: undefined }
 
 /**
  * Themes live entirely in CSS variables, so switching one is a single attribute
  * change on <html> — instant, no re-render, no flash of the old palette.
+ *
+ * `system` paints Night or Day from `prefers-color-scheme`, which Electron
+ * drives from the OS (nativeTheme), and repaints when the OS switches.
  */
 export function applyTheme(theme: ThemeId): void {
-  document.documentElement.setAttribute('data-theme', theme)
+  const media = window.matchMedia(DARK)
+  if (followSystem) {
+    media.removeEventListener?.('change', followSystem)
+    followSystem = null
+  }
+  const paint = (): void => {
+    document.documentElement.setAttribute('data-theme', paintedTheme(theme, media.matches))
+    // A clamped system accent depends on the planes it sits on.
+    if (lastAccent.accent === 'system') applyAccent('system', lastAccent.system)
+  }
+  paint()
+  if (theme === 'system') {
+    followSystem = paint
+    media.addEventListener?.('change', paint)
+  }
 }
 
 const ACCENT_VARS = ['--accent', '--accent-ink', '--accent-fg'] as const
@@ -19,6 +42,7 @@ const PLANES = ['--bg', '--surface', '--surface-2', '--surface-3'] as const
  * what shows wherever the OS reports none or its colour cannot be made to pass.
  */
 export function applyAccent(accent: AppSettings['accent'] | undefined, systemAccent?: string): void {
+  lastAccent = { accent, system: systemAccent }
   const root = document.documentElement
   for (const v of ACCENT_VARS) root.style.removeProperty(v)
   if (accent !== 'system') {

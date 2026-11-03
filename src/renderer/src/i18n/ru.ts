@@ -235,6 +235,7 @@ export const ru: Dictionary = {
   'settings.theme': 'тема',
   'settings.theme.night': 'ночь',
   'settings.theme.day': 'день',
+  'settings.theme.system': 'как в системе',
 
   'settings.saveLocation': 'папка загрузок',
   'settings.subfolders': 'раскладывать по папкам',

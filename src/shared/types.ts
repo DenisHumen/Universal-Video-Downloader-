@@ -411,14 +411,14 @@ export interface DownloadProgress {
 }
 
 /**
- * Two themes, one accent.
+ * Night, Day, or System (4.0, plan 4.4), which follows the OS (Electron's
+ * nativeTheme, i.e. `prefers-color-scheme` in the renderer) and switches live.
+ * Only Night and Day are ever painted; see `PaintedTheme` in theme-boot.ts.
  *
- * The previous build shipped four palettes and seven accents — 28 combinations,
- * of which only the default was ever really designed. The system now carries a
- * single saturated colour, so the only choice left is the one that depends on
- * the room you're sitting in.
+ * 3.x had collapsed four palettes into these two because only the default had
+ * ever been designed; System adds no palette, it picks one of the two.
  */
-export const THEMES = ['night', 'day'] as const
+export const THEMES = ['night', 'day', 'system'] as const
 export type ThemeId = (typeof THEMES)[number]
 
 /** Palettes that existed before the redesign, mapped onto the two that remain. */

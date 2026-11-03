@@ -21,6 +21,10 @@ describe('migrate', () => {
     expect(migrate({ theme: 'night' }).theme).toBe('night')
   })
 
+  it('keeps System, which follows the OS', () => {
+    expect(migrate({ theme: 'system' }).theme).toBe('system')
+  })
+
   it('falls back to night for a theme nobody has ever heard of', () => {
     expect(migrate({ theme: 'chartreuse' }).theme).toBe('night')
   })

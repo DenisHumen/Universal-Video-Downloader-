@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { applyAccent } from './theme'
+import { applyAccent, applyTheme } from './theme'
 
 describe('applyAccent', () => {
   const root = document.documentElement
@@ -25,5 +25,41 @@ describe('applyAccent', () => {
     expect(root.style.getPropertyValue('--accent')).toMatch(/^\d+ \d+ \d+$/)
     applyAccent('teal')
     expect(root.style.getPropertyValue('--accent')).toBe('')
+  })
+})
+
+describe('applyTheme', () => {
+  const root = document.documentElement
+
+  it('paints Night and Day as chosen', () => {
+    applyTheme('day')
+    expect(root.getAttribute('data-theme')).toBe('day')
+    applyTheme('night')
+    expect(root.getAttribute('data-theme')).toBe('night')
+  })
+
+  it('follows the OS on System, live, and stops when another theme is chosen', () => {
+    let dark = true
+    let listener: (() => void) | null = null
+    const real = window.matchMedia
+    window.matchMedia = ((query: string) => ({
+      get matches() {
+        return query.includes('dark') && dark
+      },
+      media: query,
+      addEventListener: (_: string, cb: () => void) => (listener = cb),
+      removeEventListener: () => (listener = null)
+    })) as unknown as typeof window.matchMedia
+    try {
+      applyTheme('system')
+      expect(root.getAttribute('data-theme')).toBe('night')
+      dark = false
+      listener?.()
+      expect(root.getAttribute('data-theme')).toBe('day')
+      applyTheme('night')
+      expect(listener).toBeNull()
+    } finally {
+      window.matchMedia = real
+    }
   })
 })

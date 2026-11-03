@@ -608,7 +608,14 @@ if (cliArgs) {
     }
 
     // Windows lets the taskbar flip between light and dark while we run.
-    nativeTheme.on('updated', () => tray?.setImage(trayImage()))
+    nativeTheme.on('updated', () => {
+      tray?.setImage(trayImage())
+      // Theme "system": the window's own background follows the OS as the page does.
+      const { backgroundColor } = themeOptions(getSettings().theme)
+      for (const win of BrowserWindow.getAllWindows()) {
+        if (!win.isDestroyed()) win.setBackgroundColor(backgroundColor)
+      }
+    })
 
     registerIpc({
       getWindow: () => mainWindow,

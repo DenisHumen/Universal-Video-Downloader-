@@ -95,7 +95,8 @@ const SettingsQuery = createContext<{ query: string; sectionHit: boolean }>({
 
 const THEME_LABEL: Record<ThemeId, TranslationKey> = {
   night: 'settings.theme.night',
-  day: 'settings.theme.day'
+  day: 'settings.theme.day',
+  system: 'settings.theme.system'
 }
 
 const QUALITY_OPTIONS: { value: QualityPreset; label: string }[] = [

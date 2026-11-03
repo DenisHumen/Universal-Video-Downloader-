@@ -243,6 +243,7 @@ export const en = {
   'settings.theme': 'theme',
   'settings.theme.night': 'night',
   'settings.theme.day': 'day',
+  'settings.theme.system': 'system',
 
   'settings.saveLocation': 'save location',
   'settings.subfolders': 'sort into subfolders',
