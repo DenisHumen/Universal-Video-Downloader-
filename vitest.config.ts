@@ -2,7 +2,10 @@ import { resolve } from 'path'
 import { defineConfig } from 'vitest/config'
 
 /**
- * Unit tests cover the pure logic only — URL scoring, error classification,
+ * Most unit tests cover pure logic; component tests (`*.test.tsx`) render in
+ * jsdom with @testing-library and an axe pass (see test/setup-dom.ts).
+ *
+ * Originally unit tests covered the pure logic only — URL scoring, error classification,
  * quality selection, formatting, version comparison and translation coverage.
  * Anything that needs Electron lives behind those helpers on purpose. The
  * packaging checks in scripts/ are pure in the same way, and tested alongside.
@@ -16,7 +19,9 @@ export default defineConfig({
   },
   test: {
     environment: 'node',
-    include: ['src/**/*.test.ts', 'scripts/**/*.test.ts'],
+    environmentMatchGlobs: [['src/renderer/**/*.test.tsx', 'jsdom']],
+    setupFiles: ['test/setup-dom.ts'],
+    include: ['src/**/*.test.ts', 'src/**/*.test.tsx', 'scripts/**/*.test.ts'],
     reporters: 'default'
   }
 })
