@@ -52,7 +52,7 @@ export const BACKUP_VERSION = 1
  * The settings a backup carries. The shares and the Telegram chat travel on
  * their own, because they are merged rather than replaced.
  */
-export type BackupSettings = Partial<Omit<AppSettings, 'smbTargets' | 'telegramChatId'>>
+export type BackupSettings = Partial<Omit<AppSettings, 'smbTargets' | 'telegramChatId' | 'setupDone'>>
 
 export interface Backup {
   format: typeof BACKUP_FORMAT

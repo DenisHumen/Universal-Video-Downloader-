@@ -58,7 +58,7 @@ const QUALITY: { value: QualityPreset; label: string }[] = [
   { value: '360', label: '360p' }
 ]
 
-const ACCENT_LABEL: Record<AccentChoice, TranslationKey> = {
+export const ACCENT_LABEL: Record<AccentChoice, TranslationKey> = {
   orange: 'prefs.accent.orange',
   blue: 'prefs.accent.blue',
   teal: 'prefs.accent.teal',

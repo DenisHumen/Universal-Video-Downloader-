@@ -52,6 +52,7 @@ export default function Sidebar({ platform, overlay }: Props): JSX.Element {
               { label: t('palette.title'), onSelect: () => useStore.getState().setPaletteOpen(true) },
               { label: t('shortcuts.title'), onSelect: () => openShortcuts(true) },
               { label: t('browser.open'), onSelect: () => void window.api.openBrowser() },
+              { label: t('setup.menu'), onSelect: () => useStore.getState().setSetupOpen(true) },
               'separator',
               { label: t('shell.about'), onSelect: () => openSettings('system/about') }
             ]}

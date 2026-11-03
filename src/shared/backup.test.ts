@@ -63,6 +63,7 @@ const settings = (over: Partial<AppSettings> = {}): AppSettings => ({
   cookiesFromBrowser: '',
   cookiesFile: '',
   errorReports: 'ask',
+  setupDone: true,
   ...over
 })
 

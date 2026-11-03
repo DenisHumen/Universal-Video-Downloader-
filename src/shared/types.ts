@@ -516,6 +516,12 @@ export interface AppSettings {
    * every time — there is deliberately no setting that sends on its own.
    */
   errorReports: 'ask' | 'off'
+  /**
+   * The first-run setup (6.3) was finished or skipped. It shows once; the
+   * primary menu opens it again. Not carried in a backup: it is about this
+   * install, not about the user's choices.
+   */
+  setupDone: boolean
 }
 
 export const SUPPORTED_COOKIE_BROWSERS = [

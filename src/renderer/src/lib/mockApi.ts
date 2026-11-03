@@ -61,7 +61,9 @@ const settings: AppSettings = {
   proxy: '',
   cookiesFromBrowser: '',
   cookiesFile: '',
-  errorReports: 'ask'
+  errorReports: 'ask',
+  // The preview and tests start past the first-run setup; ?firstRun=1 shows it.
+  setupDone: !/[?&]firstRun=1/.test(typeof location === 'undefined' ? '' : location.search)
 }
 
 const appInfo: AppInfo = {

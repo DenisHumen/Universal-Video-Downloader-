@@ -107,6 +107,13 @@ const SCENES = [
       if (!document.querySelector('[role="dialog"],[role="alertdialog"]')) throw new Error('dialog did not open');
     `
   },
+  // First-run setup (6.3), its last step: notifications, style and accent.
+  {
+    name: 'setup',
+    setup: `await __uvdShot.view('home'); __uvdStore.getState().setSetupOpen(true); await new Promise((r) => setTimeout(r, 150));
+      document.querySelector('[data-uvd="setup-next"]').click(); await new Promise((r) => setTimeout(r, 100));
+      document.querySelector('[data-uvd="setup-next"]').click(); await new Promise((r) => setTimeout(r, 200))`
+  },
   {
     name: 'palette',
     setup: `await __uvdShot.view('home'); __uvdStore.getState().setPaletteOpen(true); await new Promise((r) => setTimeout(r, 200))`

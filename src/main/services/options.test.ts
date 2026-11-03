@@ -54,6 +54,7 @@ function settings(overrides: Partial<AppSettings> = {}): AppSettings {
     cookiesFromBrowser: '',
     cookiesFile: '',
     errorReports: 'ask',
+    setupDone: true,
     ...overrides
   }
 }

@@ -95,6 +95,9 @@ interface AppState {
   shortcutsOpen: boolean
   /** The Ctrl/⌘+K command palette (plan 4.5). */
   paletteOpen: boolean
+  /** The first-run setup (6.3), shown once and again from the primary menu. */
+  setupOpen: boolean
+  setSetupOpen: (open: boolean) => void
   /**
    * The Library's badge rule (5.3): files finished in this session since the
    * Library was last opened. Opening it clears the count.
@@ -315,6 +318,7 @@ export const useStore = create<AppState>((set, get) => ({
   detectPreview: null,
   shortcutsOpen: false,
   paletteOpen: false,
+  setupOpen: false,
   libraryUnseen: 0,
   sidebarOverlayOpen: false,
   sidebarFolded: false,
@@ -367,6 +371,7 @@ export const useStore = create<AppState>((set, get) => ({
   dismissClipboardLink: () => set({ clipboardLink: null }),
   setShortcutsOpen: (open) => set({ shortcutsOpen: open }),
   setPaletteOpen: (open) => set({ paletteOpen: open }),
+  setSetupOpen: (open) => set({ setupOpen: open }),
   setSidebarOverlayOpen: (open) => set({ sidebarOverlayOpen: open }),
   setSidebarFolded: (folded) => set({ sidebarFolded: folded }),
   openSettings: (route) =>

@@ -86,7 +86,8 @@ function defaults(): AppSettings {
     proxy: '',
     cookiesFromBrowser: '',
     cookiesFile: '',
-    errorReports: 'ask'
+    errorReports: 'ask',
+    setupDone: false
   }
 }
 
@@ -108,6 +109,11 @@ export function migrate(raw: Record<string, unknown>): Partial<AppSettings> {
     A name it ships is kept (a 2.x 'violet' still means violet), anything else
     goes, and the default applies.
   */
+  /*
+    An install that already has settings is not a first run: the setup (6.3)
+    is for new installs. It stays reachable from the primary menu.
+  */
+  if (raw.setupDone === undefined && Object.keys(raw).length > 0) next.setupDone = true
   if (next.accent !== undefined) {
     const accent = migrateAccent(next.accent)
     if (accent) next.accent = accent

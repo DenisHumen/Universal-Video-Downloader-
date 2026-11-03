@@ -9,6 +9,7 @@ function settings(overrides: Partial<AppSettings> = {}): AppSettings {
   return {
     downloadDir: '/tmp',
     errorReports: 'ask',
+    setupDone: true,
     playlistNumbering: true,
     playlistFolder: true,
     concurrentDownloads: 3,
