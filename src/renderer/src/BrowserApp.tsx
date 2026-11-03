@@ -172,7 +172,7 @@ export default function BrowserApp(): JSX.Element {
           </button>
         </div>
 
-        <label className="field flex min-w-0 flex-1 cursor-text items-center gap-2 rounded-full px-3 py-1.5">
+        <label className="field flex min-w-0 flex-1 cursor-text items-center gap-2 px-3 py-1.5">
           {state.loading && <Loader2 size={12} className="shrink-0 animate-spin text-ink-3" />}
           <input
             value={address}

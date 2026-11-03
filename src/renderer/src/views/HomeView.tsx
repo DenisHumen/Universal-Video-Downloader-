@@ -1076,7 +1076,7 @@ function DetectingCard({
         <div className="skeleton h-9 w-full rounded-2" />
         <div className="flex flex-wrap gap-1.5">
           {Array.from({ length: 6 }).map((_, i) => (
-            <div key={i} className="skeleton h-8 w-[72px] rounded-full" />
+            <div key={i} className="skeleton h-8 w-[72px] rounded-2" />
           ))}
         </div>
       </div>

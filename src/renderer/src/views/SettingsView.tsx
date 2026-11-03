@@ -890,7 +890,7 @@ export default function SettingsView(): JSX.Element {
           readers to expect arrow keys that did nothing. aria-current marks
           the section in view.
         */}
-        <label className="field mx-2 mb-3 flex shrink-0 cursor-text items-center gap-2 rounded-full px-3 py-1.5">
+        <label className="field mx-2 mb-3 flex shrink-0 cursor-text items-center gap-2 px-3 py-1.5">
           <Search size={14} className="shrink-0 text-ink-3" />
           <input
             type="search"

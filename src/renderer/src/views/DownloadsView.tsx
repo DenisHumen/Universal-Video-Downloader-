@@ -246,7 +246,7 @@ export default function DownloadsView(): JSX.Element {
           />
           {/* A label, so the whole pill is the target — the padding around a bare
               input is dead to the pointer. */}
-          <label className="field ml-auto flex min-w-[220px] max-w-[300px] flex-1 cursor-text items-center gap-2 rounded-full px-4 py-1.5">
+          <label className="field ml-auto flex min-w-[220px] max-w-[300px] flex-1 cursor-text items-center gap-2 px-4 py-1.5">
             <Search size={15} className="shrink-0 text-ink-3" />
             <input
               value={query}

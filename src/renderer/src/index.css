@@ -26,13 +26,14 @@
  * ==================================================================== */
 
 :root {
-  /* ---- Shape. Four steps, no in-between values. ---- */
-  /* Tightened one step: at 8/14/22 a thumbnail, a field and the panel round
-     it read as three soft shapes rather than one structure; at 6/10/16 the
-     ladder still reads, and nested corners stop fighting their parents. */
-  --r-1: 6px; /* tags, swatches, icon buttons */
-  --r-2: 10px; /* fields, buttons, list rows */
-  --r-3: 16px; /* blocks, dialogs */
+  /* ---- Shape. 6/8/12/16 (4.0), no in-between values. ----
+     The pill is kept for things that are *meant* to read as capsules: badges,
+     the switch and progress tracks. Buttons, choices and fields are r-2: a
+     pill button beside a square field read as two different systems. */
+  --r-1: 6px; /* tags, swatches, icon buttons, menu items */
+  --r-2: 8px; /* fields, buttons, choices, list rows */
+  --r-3: 12px; /* cards, menus, popovers, the content sheet */
+  --r-4: 16px; /* dialogs, the home input */
   --r-pill: 999px;
 
   /* ---- Motion. Decelerate-emphasised: starts immediately, lands soft. ---- */
@@ -337,7 +338,7 @@ textarea,
    * grey body text. `stylesheet.test.ts` fails on a bare one now.
    */
   .btn-base {
-    border-radius: var(--r-pill);
+    border-radius: var(--r-2);
     /* 38px minimum. Desktop pointing is more forgiving than touch, so this
        sits under the 44px touch floor by design — but 32px, which is where
        these started, is small for anyone whose hands aren't steady. */
@@ -407,7 +408,7 @@ textarea,
   /* The home screen's focal input: the same field at display scale. */
   .field-lg {
     @apply field px-5 py-4 text-[16px];
-    border-radius: var(--r-3);
+    border-radius: var(--r-4);
   }
 
   /* ---------------- Choices ---------------- */
@@ -422,7 +423,7 @@ textarea,
    * outlined word says "this is a button you may press".
    */
   .choice {
-    border-radius: var(--r-pill);
+    border-radius: var(--r-2);
     min-height: 36px;
     transition:
       background-color var(--t-fast) var(--ease),

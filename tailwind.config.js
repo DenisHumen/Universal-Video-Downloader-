@@ -69,7 +69,9 @@ module.exports = {
       borderRadius: {
         1: 'var(--r-1)',
         2: 'var(--r-2)',
-        3: 'var(--r-3)'
+        3: 'var(--r-3)',
+        4: 'var(--r-4)',
+        pill: 'var(--r-pill)'
       },
       // Status fills sit at 12% — enough to read as a tinted plane, light
       // enough that the status text on top keeps its verified contrast.
