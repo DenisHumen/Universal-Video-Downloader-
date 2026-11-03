@@ -127,6 +127,15 @@ const PASSES = [
   { theme: 'night', width: 1000, lang: 'ru' }
 ]
 
+/** `--demo`: the set shown to the user at a checkpoint (en at 1220/1000/720 and ru at 720, both themes). */
+const DEMO_PASSES = ['night', 'day'].flatMap((theme) => [
+  { theme, width: 1220, lang: 'en' },
+  { theme, width: 1000, lang: 'en' },
+  { theme, width: 720, lang: 'en' },
+  { theme, width: 720, lang: 'ru' }
+])
+const RUN_PASSES = process.argv.includes('--demo') ? DEMO_PASSES : PASSES
+
 const STILL = `
   *, *::before, *::after {
     transition: none !important;
@@ -219,7 +228,7 @@ function compare(actual, expected) {
 
 async function main() {
   const scenes = SCENES.filter((s) => !ONLY || s.name.includes(ONLY))
-  const jobs = scenes.flatMap((scene) => PASSES.map((pass) => ({ scene, pass })))
+  const jobs = scenes.flatMap((scene) => RUN_PASSES.map((pass) => ({ scene, pass })))
   const target = OUT_DIR ? resolve(OUT_DIR) : UPDATE ? BASELINE : ACTUAL
   mkdirSync(target, { recursive: true })
   if (!UPDATE && !OUT_DIR) {
@@ -235,7 +244,7 @@ async function main() {
     browser = await chromium.launch()
     // Warm the dev server once: its first transform of the app (and any dep
     // re-optimisation, which reloads the page) must not land inside a shot.
-    await shoot(browser, SCENES[0], PASSES[0]).catch(() => undefined)
+    await shoot(browser, SCENES[0], RUN_PASSES[0]).catch(() => undefined)
     const queue = [...jobs]
     const results = []
     const worker = async () => {
