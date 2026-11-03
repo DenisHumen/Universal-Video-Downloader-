@@ -366,6 +366,13 @@ export function registerIpc({ getWindow, openSearchWindow, onSettingsChanged }: 
  */
 const notified = new Set<string>()
 
+/**
+ * Notifications still on screen. Nothing else refers to one once `show()` has
+ * returned, so the garbage collector could take it - and its click handler
+ * with it - while it was still waiting to be clicked.
+ */
+const shown = new Set<Notification>()
+
 export function forgetNotified(id: string): void {
   notified.delete(id)
 }
@@ -381,18 +388,22 @@ function maybeNotify(item: DownloadItem): void {
         body: item.title,
         silent: false
       })
+      shown.add(n)
       n.on('click', () => {
+        shown.delete(n)
         if (done && item.filepath) shell.showItemInFolder(item.filepath)
         else getWindowForNotification()?.show()
       })
+      n.on('close', () => shown.delete(n))
       /*
         Since Electron 42 macOS posts through UNNotification, which refuses an
         app without a real signature (the ad-hoc sealed builds) and says so
         here instead of showing anything.
       */
-      n.on('failed', (_e, error) =>
+      n.on('failed', (_e, error) => {
+        shown.delete(n)
         log.warn('app', 'A notification could not be shown', { why: error })
-      )
+      })
       n.show()
     }
   }
