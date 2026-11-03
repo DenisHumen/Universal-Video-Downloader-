@@ -5,7 +5,10 @@ import {
   checkDue,
   installerSuffix,
   mayCheckInBackground,
+  MAC_MINIMUM_DARWIN,
+  offeredToThisMac,
   pickDownload,
+  requiredDarwin,
   type ReleaseAsset
 } from './updater-rules'
 
@@ -113,5 +116,33 @@ describe('checkDue', () => {
 
   it('does not let a clock moved back hold checks off', () => {
     expect(checkDue(NOW, NOW + 24 * CHECK_EVERY, 0)).toBe(true)
+  })
+})
+
+describe('the macOS a release needs', () => {
+  const NOTES = 'Electron 45 underneath.\n\nRequires macOS 13 or later.\n'
+
+  it('reads it from the release notes as a Darwin major', () => {
+    expect(requiredDarwin(NOTES)).toBe(22)
+    expect(requiredDarwin('requires macOS 12.0 or later')).toBe(21)
+    expect(requiredDarwin('Fixes a crash on macOS 13.')).toBeUndefined()
+    expect(requiredDarwin(undefined)).toBeUndefined()
+  })
+
+  it('is what this build needs: Electron 45 runs on macOS 13 and later', () => {
+    expect(MAC_MINIMUM_DARWIN).toBe(22)
+  })
+
+  // macOS 11 is Darwin 20, 12 is 21, 13 is 22.
+  it('is not offered to a Mac older than that', () => {
+    expect(offeredToThisMac('20.6.0', NOTES)).toBe(false)
+    expect(offeredToThisMac('21.6.0', NOTES)).toBe(false)
+    expect(offeredToThisMac('22.1.0', NOTES)).toBe(true)
+    expect(offeredToThisMac('25.0.0', NOTES)).toBe(true)
+  })
+
+  it('is offered as before when the notes do not say, or the OS cannot be read', () => {
+    expect(offeredToThisMac('20.6.0', 'Bug fixes.')).toBe(true)
+    expect(offeredToThisMac('', NOTES)).toBe(true)
   })
 })

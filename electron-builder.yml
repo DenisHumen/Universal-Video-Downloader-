@@ -83,6 +83,9 @@ mac:
   extraResources:
     - from: build/uvd
       to: bin/uvd
+  # Electron 44 and later do not run on macOS 12 or older; with this, Finder
+  # says so instead of the app crashing at launch.
+  minimumSystemVersion: '13.0'
   extendInfo:
     NSCameraUsageDescription: This app does not use the camera.
     NSMicrophoneUsageDescription: This app does not use the microphone.
