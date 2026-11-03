@@ -75,7 +75,10 @@ const SCENES = [
   { name: 'activity', setup: `__uvdShot.seedQueue(); await __uvdShot.view('downloads')` },
   {
     name: 'search',
-    setup: `await __uvdShot.view('search'); await __uvdShot.search('big buck bunny')`
+    // Waits for the quality probes to settle, so no badge is caught mid-probe.
+    setup: `await __uvdShot.view('search'); await __uvdShot.search('big buck bunny');
+      for (let i = 0; i < 80 && /Quality…|Качество…/.test(document.querySelector('main')?.textContent ?? document.body.textContent); i++)
+        await new Promise((r) => setTimeout(r, 100))`
   },
   { name: 'library', setup: `__uvdShot.seedQueue(); await __uvdShot.view('library'); await new Promise((r) => setTimeout(r, 300))` },
   { name: 'watching', setup: `${WATCH}; await __uvdShot.view('automation')` },
