@@ -15,7 +15,7 @@ import {
 import { rescheduledCheck } from './services/automation/backoff'
 import { checkNow, retryRun } from './services/automation/watcher'
 import { stopEpisode } from './services/automation/pipeline'
-import { testTarget } from './services/automation/smb'
+import { createSmbFolder, listSmbFolders, testTarget } from './services/automation/smb'
 import { shareForFolder } from './services/automation/share-folder'
 import { sendTest } from './services/automation/telegram'
 import { getSecretWhenReady, hasSecret, SECRET, secretsPersist, setSecret } from './services/secrets'
@@ -181,6 +181,26 @@ export function registerAutomationIpc(): void {
     async (_e, target: SmbTarget, password: string): Promise<string> => {
       const secret = password || (await getSecretWhenReady(SECRET.smbPassword(target.id))) || ''
       return testTarget(target, secret)
+    }
+  )
+
+  /*
+    The in-app folder browser, for a share the OS has not mounted. Same
+    password rule as the test: the one being typed, else the one stored.
+  */
+  ipcMain.handle(
+    IPC.autoListShareFolders,
+    async (_e, target: SmbTarget, password: string, folder: string): Promise<string[]> => {
+      const secret = password || (await getSecretWhenReady(SECRET.smbPassword(target.id))) || ''
+      return listSmbFolders(target, secret, String(folder ?? ''))
+    }
+  )
+
+  ipcMain.handle(
+    IPC.autoCreateShareFolder,
+    async (_e, target: SmbTarget, password: string, parent: string, name: string): Promise<string> => {
+      const secret = password || (await getSecretWhenReady(SECRET.smbPassword(target.id))) || ''
+      return createSmbFolder(target, secret, String(parent ?? ''), String(name ?? ''))
     }
   )
 

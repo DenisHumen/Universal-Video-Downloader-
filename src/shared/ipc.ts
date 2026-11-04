@@ -103,6 +103,8 @@ export const IPC = {
   autoRetryRun: 'auto:retry-run',
   autoTestSmb: 'auto:test-smb',
   autoChooseShareFolder: 'auto:choose-share-folder',
+  autoListShareFolders: 'auto:list-share-folders',
+  autoCreateShareFolder: 'auto:create-share-folder',
   autoTestTelegram: 'auto:test-telegram',
   autoSetSecret: 'auto:set-secret',
   autoSecretState: 'auto:secret-state',

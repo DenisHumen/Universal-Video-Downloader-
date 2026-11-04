@@ -286,3 +286,67 @@ export async function testTarget(input: SmbTarget, password: string): Promise<st
     }
   }
 }
+
+/** A share-relative folder, in the separator the protocol wants. */
+const toRemote = (folder: string): string => folder.split(/[\\/]+/).filter(Boolean).join(SEP)
+
+/** Connect, run one thing against the share, and always hang up. */
+async function onShare<T>(input: SmbTarget, password: string, run: (tree: Client) => Promise<T>): Promise<T> {
+  const target = normaliseSmbTarget(input)
+  const { client, tree } = await connect(target, password)
+  try {
+    return await run(tree)
+  } catch (err) {
+    throw err instanceof SmbError ? err : toSmbError(err, target.host)
+  } finally {
+    try {
+      await client.close()
+    } catch {
+      /* already gone */
+    }
+  }
+}
+
+/**
+ * The folders directly under one folder of a share, for the in-app browser.
+ *
+ * Only folders: a file is not somewhere an episode can be sent. "." and ".."
+ * go, and so does what a file manager hides by default - names starting with
+ * a dot, and anything the server marks hidden ($RECYCLE.BIN, System Volume
+ * Information). Sorted the way people read a list, ignoring case.
+ */
+export async function listSmbFolders(input: SmbTarget, password: string, folder: string): Promise<string[]> {
+  return onShare(input, password, async (tree) => {
+    const entries: { filename: string; type?: string; fileAttributes?: string[] }[] = await tree.readDirectory(
+      toRemote(folder)
+    )
+    return entries
+      .filter((e) => e.type === 'Directory' || Boolean(e.fileAttributes?.includes('Directory')))
+      .filter((e) => e.filename !== '.' && e.filename !== '..' && !e.filename.startsWith('.'))
+      .filter((e) => !e.fileAttributes?.includes('Hidden'))
+      .map((e) => e.filename)
+      .sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base', numeric: true }))
+  })
+}
+
+/** Characters no SMB name may hold. */
+const BAD_NAME = /[\\/:*?"<>|]/
+
+/**
+ * Make one folder inside another, for "New Folder" in the browser. Answers
+ * with the new folder's share-relative path, '/'-separated.
+ */
+export async function createSmbFolder(
+  input: SmbTarget,
+  password: string,
+  parent: string,
+  name: string
+): Promise<string> {
+  const clean = name.trim()
+  if (!clean || clean === '.' || clean === '..' || BAD_NAME.test(clean)) {
+    throw new SmbError('The share does not accept that file name.', 'path')
+  }
+  const parts = [...parent.split(/[\\/]+/).filter(Boolean), clean]
+  await onShare(input, password, (tree) => tree.createDirectory(parts.join(SEP)))
+  return parts.join('/')
+}
