@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Check, FolderOpen, Loader2 } from '../ui/icons'
+import { Check, FolderOpen, FolderUp, Loader2 } from '../ui/icons'
+import ShareFolderDialog from './ShareFolderDialog'
 import { useStore } from '../store'
 import { useT } from '../i18n'
 import { toast } from '../lib/toast'
@@ -223,6 +224,17 @@ export function ShareForm({
     }
   }
 
+  /*
+    The OS dialog needs the share mounted first. With the server, the share
+    and a login known, the app can walk the share itself instead.
+  */
+  const [walking, setWalking] = useState(false)
+  const pickOnShare = (folder: string): void => {
+    setWalking(false)
+    setText(formatSmbPath({ host: target.host, share: target.share, folder }))
+    onTarget({ ...target, path: folder })
+  }
+
   const test = async (): Promise<void> => {
     setTesting(true)
     try {
@@ -287,10 +299,30 @@ export function ShareForm({
         placeholder={pathOf(target)}
         hint={t('auto.shareLabelHint')}
       />
-      <button className="btn-quiet" onClick={() => void test()} disabled={testing || !ready}>
-        {testing ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />}
-        {t('auto.testConnection')}
-      </button>
+      <div className="flex flex-wrap items-center gap-2">
+        <button className="btn-quiet" onClick={() => void test()} disabled={testing || !ready}>
+          {testing ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />}
+          {t('auto.testConnection')}
+        </button>
+        <button
+          type="button"
+          className="btn-quiet"
+          onClick={() => setWalking(true)}
+          disabled={!ready}
+          title={t('auto.shareFolderBrowseHint')}
+        >
+          <FolderUp size={14} />
+          {t('auto.shareFolderBrowse')}
+        </button>
+      </div>
+      {walking && (
+        <ShareFolderDialog
+          target={target}
+          password={password}
+          onPick={pickOnShare}
+          onClose={() => setWalking(false)}
+        />
+      )}
     </div>
   )
 }

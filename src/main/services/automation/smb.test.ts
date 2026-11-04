@@ -15,7 +15,14 @@ const h = vi.hoisted(() => ({
   files: new Map<string, string>(),
   /** Statuses the next creates are refused with, in order, before the usual rule applies. */
   refuse: [] as number[],
-  created: [] as string[]
+  created: [] as string[],
+  /** What readDirectory answers, by the path asked for. */
+  listing: new Map<string, { filename: string; type: string; fileAttributes: string[] }[]>(),
+  /** What readDirectory and createDirectory were asked for. */
+  read: [] as string[],
+  dirs: [] as string[],
+  /** A status the next readDirectory is refused with. */
+  readRefuse: undefined as number | undefined
 }))
 
 vi.mock('node-smb2', async () => {
@@ -23,7 +30,14 @@ vi.mock('node-smb2', async () => {
   const refusal = (status: number): unknown => ({ header: { status } })
   const tree = {
     exists: async (path: string) => h.files.has(path),
-    createDirectory: async () => undefined,
+    createDirectory: async (path: string) => {
+      h.dirs.push(path)
+    },
+    readDirectory: async (path = '') => {
+      h.read.push(path)
+      if (h.readRefuse !== undefined) throw refusal(h.readRefuse)
+      return h.listing.get(path) ?? []
+    },
     removeFile: async (path: string) => {
       h.files.delete(path)
     },
@@ -59,7 +73,7 @@ vi.mock('node-smb2', async () => {
 })
 vi.mock('../log', () => ({ log: { info: vi.fn(), warn: vi.fn(), error: vi.fn() } }))
 
-const { toSmbError, uploadFile } = await import('./smb')
+const { createSmbFolder, listSmbFolders, toSmbError, uploadFile } = await import('./smb')
 
 const target: SmbTarget = {
   id: 'nas',
@@ -170,5 +184,78 @@ describe('uploadFile', () => {
     h.files.set(final, 'the old copy')
     await uploadFile(target, 'example', local, 'Series', 'ep.mkv')
     expect(h.files.get(final)).toBe('video')
+  })
+})
+
+/*
+  The in-app folder browser. The library answers with every entry, files and
+  "." and ".." among them; only folders somebody would pick are worth a row.
+*/
+describe('listSmbFolders', () => {
+  const dir = (filename: string, ...extra: string[]) => ({
+    filename,
+    type: 'Directory',
+    fileAttributes: ['Directory', ...extra]
+  })
+  const file = (filename: string) => ({ filename, type: 'File', fileAttributes: ['Archive'] })
+
+  beforeEach(() => {
+    h.listing.clear()
+    h.read = []
+    h.dirs = []
+    h.readRefuse = undefined
+  })
+
+  it('keeps only folders, without "." and "..", sorted ignoring case', async () => {
+    h.listing.set('', [
+      dir('.'),
+      dir('..'),
+      dir('video'),
+      file('notes.txt'),
+      dir('Backups'),
+      dir('archive'),
+      file('Zed.mkv')
+    ])
+    expect(await listSmbFolders(target, 'pw', '')).toEqual(['archive', 'Backups', 'video'])
+  })
+
+  it('leaves out what a file manager hides', async () => {
+    h.listing.set('', [dir('.snapshots'), dir('$RECYCLE.BIN', 'Hidden', 'System'), dir('media')])
+    expect(await listSmbFolders(target, 'pw', '')).toEqual(['media'])
+  })
+
+  it('sorts numbered folders the way people count', async () => {
+    h.listing.set('', [dir('Season 10'), dir('Season 2'), dir('Season 1')])
+    expect(await listSmbFolders(target, 'pw', '')).toEqual(['Season 1', 'Season 2', 'Season 10'])
+  })
+
+  it('asks for a nested folder in the separator the protocol wants', async () => {
+    h.listing.set(['video', 'series'].join(SEP), [dir('Severance')])
+    expect(await listSmbFolders(target, 'pw', '/video/series/')).toEqual(['Severance'])
+    expect(h.read).toEqual([['video', 'series'].join(SEP)])
+  })
+
+  it('says why, in words, when the server refuses', async () => {
+    h.readRefuse = 0xc0000034
+    await expect(listSmbFolders(target, 'pw', 'gone')).rejects.toMatchObject({
+      message: 'That path does not exist on the share.',
+      kind: 'path'
+    })
+  })
+})
+
+describe('createSmbFolder', () => {
+  beforeEach(() => {
+    h.dirs = []
+  })
+
+  it('makes the folder inside its parent and answers with its path', async () => {
+    expect(await createSmbFolder(target, 'pw', 'video/series', ' New Show ')).toBe('video/series/New Show')
+    expect(h.dirs).toEqual([['video', 'series', 'New Show'].join(SEP)])
+  })
+
+  it.each(['', '  ', '..', 'a/b', 'what?'])('refuses the name %j without asking the server', async (name) => {
+    await expect(createSmbFolder(target, 'pw', '', name)).rejects.toMatchObject({ kind: 'path' })
+    expect(h.dirs).toEqual([])
   })
 })

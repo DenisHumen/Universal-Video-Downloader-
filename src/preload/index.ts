@@ -167,6 +167,12 @@ const api = {
   /** The system folder dialog, answered with the share the folder is on. */
   autoChooseShareFolder: (current: SmbTarget, title: string): Promise<ShareFolderPick> =>
     ipcRenderer.invoke(IPC.autoChooseShareFolder, current, title),
+  /** The folders under one folder of a share, by the app's own SMB connection. */
+  autoListShareFolders: (target: SmbTarget, password: string, folder: string): Promise<string[]> =>
+    ipcRenderer.invoke(IPC.autoListShareFolders, target, password, folder),
+  /** Make a folder on a share; answers with its share-relative path. */
+  autoCreateShareFolder: (target: SmbTarget, password: string, parent: string, name: string): Promise<string> =>
+    ipcRenderer.invoke(IPC.autoCreateShareFolder, target, password, parent, name),
   autoTestTelegram: (token: string, chatId: string): Promise<string> =>
     ipcRenderer.invoke(IPC.autoTestTelegram, token, chatId),
   /** One way. There is no channel that reads a secret back. */

@@ -265,6 +265,16 @@ const mockWatches: Watch[] = []
 const mockEpisodes = (n: number): EpisodeRef[] =>
   Array.from({ length: n }, (_, i) => ({ season: 1, episode: i + 1 }))
 
+/** The folders on the preview's one share, keyed by their share-relative path. */
+const mockShareTree: Record<string, string[]> = {
+  '': ['video', 'music', 'Backups'],
+  video: ['series', 'films'],
+  'video/series': ['Severance', 'The Bear'],
+  'video/films': [],
+  music: [],
+  Backups: []
+}
+
 export function installMockApi(): void {
   const browserState: BrowserState = {
     url: '',
@@ -656,6 +666,23 @@ export function installMockApi(): void {
     autoChooseShareFolder: async () => ({
       location: { host: '192.168.1.10', share: 'shared', folder: 'video/series', username: 'denis' }
     }),
+    // A small share to walk around in the preview: folders by their '/'-joined path.
+    autoListShareFolders: async (_target, _password, folder) => {
+      const key = folder.split(/[\\/]+/).filter(Boolean).join('/')
+      return [...(mockShareTree[key] ?? [])].sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }))
+    },
+    autoCreateShareFolder: async (_target, _password, parent, name) => {
+      const key = parent.split(/[\\/]+/).filter(Boolean).join('/')
+      const clean = name.trim()
+      const here = (mockShareTree[key] ??= [])
+      if (here.some((n) => n.toLowerCase() === clean.toLowerCase())) {
+        throw new Error('A file with that name already exists on the share.')
+      }
+      here.push(clean)
+      const path = key ? `${key}/${clean}` : clean
+      mockShareTree[path] = []
+      return path
+    },
     autoTestTelegram: async () => 'Connected.',
     autoSetSecret: async () => true,
     autoSecretState: async () => ({ telegram: false, smb: {}, proxy: false, persists: true }),
