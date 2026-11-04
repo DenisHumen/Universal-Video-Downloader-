@@ -90,8 +90,24 @@ const SHOTS = [
     `
   },
   {
+    name: 'library',
+    setup: `
+      window.__uvdShot.seedQueue();
+      await window.__uvdShot.view('library');
+      await new Promise((r) => setTimeout(r, 300));
+    `
+  },
+  {
     name: 'settings',
-    setup: `await window.__uvdShot.view('settings')`
+    setup: `window.__uvdStore.getState().openSettings('downloads'); await new Promise((r) => setTimeout(r, 300))`
+  },
+  {
+    name: 'palette',
+    setup: `
+      await window.__uvdShot.view('home');
+      window.__uvdStore.getState().setPaletteOpen(true);
+      await new Promise((r) => setTimeout(r, 300));
+    `
   }
 ]
 
@@ -109,7 +125,7 @@ async function shoot(win, theme) {
       no longer looks the way it should.
     */
     const error = await win.webContents.executeJavaScript(
-      `(async () => { try { ${shot.setup}; return null } catch (e) { return String(e && e.message || e) } })()`,
+      `(async () => { try { window.__uvdStore.getState().setPaletteOpen(false); ${shot.setup}; return null } catch (e) { return String(e && e.message || e) } })()`,
       true
     )
     if (error) {
@@ -160,6 +176,8 @@ app.whenReady().then(async () => {
   // The mock bridge and the store both need a mounted app behind them.
   await wait(1500)
   await win.webContents.executeJavaScript(DRIVER, true)
+  // A still is a still: a page caught halfway through its slide-in is blank.
+  await win.webContents.insertCSS('*, *::before, *::after { transition: none !important; animation: none !important; }')
 
   console.log(`Capturing from ${BASE}…`)
   for (const theme of THEME === 'both' ? ['night', 'day'] : [THEME]) {
