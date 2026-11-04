@@ -13,7 +13,7 @@ import { engineKnowsHost, normalizeUrl } from '@shared/urls'
 import { watchFailing } from '@shared/automation'
 import type { ImportOutcome } from '@shared/backup'
 import type { AppInfo } from '../../preload/index'
-import { applyDownloadsChanged } from './lib/downloads'
+import { applyDownloadProgress, applyDownloadsChanged } from './lib/downloads'
 import { accessChanged, DetectCache, InflightDetects } from './lib/detectCache'
 import { isProbablyUrl } from './lib/format'
 import { applyAppearance } from './lib/theme'
@@ -189,27 +189,11 @@ async function runInit(set: SetState, get: GetState): Promise<void> {
     if (next !== list) set({ downloads: next })
   })
 
-  window.api.onDownloadProgress((p: DownloadProgress) => {
+  // One store update per batch, however many downloads moved.
+  window.api.onDownloadProgress((batch: DownloadProgress[]) => {
     const list = get().downloads
-    const idx = list.findIndex((d) => d.id === p.id)
-    if (idx === -1) return
-    const next = [...list]
-    next[idx] = {
-      ...next[idx],
-      state: p.state,
-      percent: p.percent,
-      // Which half of the job is running, and whether it can say how far along
-      // it is. Post-processing reports neither speed nor a percentage, so these
-      // are what stop the row looking frozen.
-      phase: p.phase,
-      postprocess: p.postprocess,
-      indeterminate: p.indeterminate,
-      speed: p.speed,
-      eta: p.eta,
-      downloadedBytes: p.downloadedBytes,
-      totalBytes: p.totalBytes
-    }
-    set({ downloads: next })
+    const next = applyDownloadProgress(list, batch)
+    if (next !== list) set({ downloads: next })
   })
 
   window.api.onYtdlpStatus((s) => set({ ytdlp: s }))

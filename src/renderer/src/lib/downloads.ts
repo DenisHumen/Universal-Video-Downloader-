@@ -1,4 +1,4 @@
-import type { DownloadItem, DownloadsChanged } from '@shared/types'
+import type { DownloadItem, DownloadProgress, DownloadsChanged } from '@shared/types'
 
 /**
  * Apply one batch from the main process to the queue, in a single pass.
@@ -42,6 +42,41 @@ export function applyDownloadsChanged(
   if (!fresh.size) return kept
   const added = [...fresh.values()].sort((a, b) => b.createdAt - a.createdAt)
   return [...added, ...kept]
+}
+
+/**
+ * Apply one batch of progress ticks to the queue: one copy, one store update.
+ *
+ * Ticks for rows the list does not hold (removed since) are ignored, and a
+ * batch that touches nothing returns the same array. Later ticks for an id win,
+ * though main already sends only the latest per id.
+ */
+export function applyDownloadProgress(list: DownloadItem[], batch: DownloadProgress[]): DownloadItem[] {
+  if (!batch.length) return list
+  const at = new Map<string, number>()
+  list.forEach((item, i) => at.set(item.id, i))
+  let next: DownloadItem[] | null = null
+  for (const p of batch) {
+    const i = at.get(p.id)
+    if (i === undefined) continue
+    next ??= list.slice()
+    next[i] = {
+      ...next[i],
+      state: p.state,
+      percent: p.percent,
+      // Which half of the job is running, and whether it can say how far along
+      // it is. Post-processing reports neither speed nor a percentage, so these
+      // are what stop the row looking frozen.
+      phase: p.phase,
+      postprocess: p.postprocess,
+      indeterminate: p.indeterminate,
+      speed: p.speed,
+      eta: p.eta,
+      downloadedBytes: p.downloadedBytes,
+      totalBytes: p.totalBytes
+    }
+  }
+  return next ?? list
 }
 
 const LIVE: ReadonlySet<DownloadItem['state']> = new Set(['detecting', 'downloading', 'processing', 'queued'])
