@@ -367,10 +367,11 @@ export function registerIpc({ getWindow, openSearchWindow, onSettingsChanged }: 
   registerBrowserIpc()
 
   // ---- Forward service events to the renderer ----
-  // Coalesced per turn, so a bulk action is one message; see queue-events.ts.
+  // Coalesced per turn, so a bulk action is one message, and progress per
+  // PROGRESS_FLUSH_MS, so many downloads are one tick message; see queue-events.ts.
   forwardQueueEvents(downloadEvents, {
     changed: (batch) => send(IPC.evtDownloadsChanged, batch),
-    progress: (p) => send(IPC.evtDownloadProgress, p),
+    progress: (batch) => send(IPC.evtDownloadProgress, batch),
     notify: maybeNotify,
     forget: forgetNotified,
     syncOs: () => syncOsState(getWindow)

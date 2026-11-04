@@ -208,8 +208,9 @@ const api = {
   onNativeTheme: (cb: () => void) => on<void>(IPC.evtNativeTheme, cb),
 
   // Events
-  onDownloadProgress: (cb: (p: DownloadProgress) => void) =>
-    on<DownloadProgress>(IPC.evtDownloadProgress, cb),
+  /** The latest tick of every download that moved, one message per ~120 ms (queue-events.ts). */
+  onDownloadProgress: (cb: (batch: DownloadProgress[]) => void) =>
+    on<DownloadProgress[]>(IPC.evtDownloadProgress, cb),
   /** Updated and removed entries, one message per turn of the main process. */
   onDownloadsChanged: (cb: (change: DownloadsChanged) => void) =>
     on<DownloadsChanged>(IPC.evtDownloadsChanged, cb),

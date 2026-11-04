@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import type { DownloadItem } from '@shared/types'
-import { applyDownloadsChanged, groupQueue, liveDownloads, overallPercent, recentFinished } from './downloads'
+import type { DownloadItem, DownloadProgress } from '@shared/types'
+import { applyDownloadProgress, applyDownloadsChanged, groupQueue, liveDownloads, overallPercent, recentFinished } from './downloads'
 
 function item(id: string, createdAt: number, overrides: Partial<DownloadItem> = {}): DownloadItem {
   return {
@@ -17,6 +17,25 @@ function item(id: string, createdAt: number, overrides: Partial<DownloadItem> = 
 }
 
 const ids = (list: DownloadItem[]): string[] => list.map((d) => d.id)
+
+describe('applyDownloadProgress', () => {
+  const list = [item('c', 30, { state: 'downloading', percent: 5 }), item('b', 20), item('a', 10, { state: 'downloading', percent: 1 })]
+  const tick = (id: string, percent: number): DownloadProgress => ({ id, state: 'downloading', percent, speed: 1000 })
+
+  it('applies every tick of a batch in one copy', () => {
+    const next = applyDownloadProgress(list, [tick('a', 40), tick('c', 60)])
+    expect(next).not.toBe(list)
+    expect(next.map((d) => d.percent)).toEqual([60, 100, 40])
+    expect(next[0].speed).toBe(1000)
+    expect(next[1]).toBe(list[1])
+    expect(list[0].percent).toBe(5)
+  })
+
+  it('ignores ticks for rows the list no longer holds', () => {
+    expect(applyDownloadProgress(list, [tick('gone', 50)])).toBe(list)
+    expect(applyDownloadProgress(list, [])).toBe(list)
+  })
+})
 
 describe('applyDownloadsChanged', () => {
   // Newest first, as listDownloads returns it.
