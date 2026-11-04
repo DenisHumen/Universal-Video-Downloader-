@@ -18,6 +18,9 @@ const BY_CODE: Partial<Record<AppErrorCode, FixKind>> = {
   // Sign-in, age gate; "members only" arrives as signIn or as a cookie hint.
   signIn: 'cookies',
   ageRestricted: 'cookies',
+  // YouTube's bot check lifts for a signed-in browser's cookies; a locked browser needs another one picked.
+  botCheck: 'cookies',
+  cookiesLocked: 'cookies',
   // Blocked, unsupported, empty: a person in a browser can often get past it.
   forbidden: 'browser',
   geo: 'browser',

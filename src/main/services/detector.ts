@@ -423,6 +423,8 @@ const DEFINITIVE: ReadonlySet<AppErrorCode> = new Set<AppErrorCode>([
   'ageRestricted',
   'rateLimited',
   'signIn',
+  'botCheck',
+  'cookiesLocked',
   'geo',
   'drm',
   'upcoming',

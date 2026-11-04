@@ -688,6 +688,10 @@ export const en = {
   'err.ageRestricted': 'This content is age-restricted.',
   'err.rateLimited': 'The site is rate-limiting us. Wait a minute and retry, or set a proxy.',
   'err.signIn': 'This video requires you to be signed in.',
+  'err.botCheck':
+    'YouTube is asking this computer to prove it is not a bot. That is about your network, not this video: cookies from a browser where you are signed in to YouTube get past it, or try again later or from another network.',
+  'err.cookiesLocked':
+    "Your browser's cookies could not be read. Close the browser and try again; on Windows, Chrome and Edge keep them locked even then, so choose Firefox or an exported cookies.txt in settings → access.",
   'err.forbidden': 'The site refused the request.',
   'err.geo': 'This video is not available in your region.',
   'err.drm': 'This video is DRM-protected and cannot be downloaded.',

@@ -17,6 +17,8 @@ const KEYS: Record<AppErrorCode, TranslationKey> = {
   ageRestricted: 'err.ageRestricted',
   rateLimited: 'err.rateLimited',
   signIn: 'err.signIn',
+  botCheck: 'err.botCheck',
+  cookiesLocked: 'err.cookiesLocked',
   forbidden: 'err.forbidden',
   geo: 'err.geo',
   drm: 'err.drm',

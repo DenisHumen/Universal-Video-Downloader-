@@ -72,6 +72,9 @@ const REPORTABLE: Record<AppErrorCode, boolean> = {
   geo: false,
   ageRestricted: false,
   signIn: false,
+  botCheck: false,
+  // The user's own cookies setting, which the developer cannot change.
+  cookiesLocked: false,
   drm: false,
   unavailable: false,
   // What the user typed, or a setting of theirs the engine refused.

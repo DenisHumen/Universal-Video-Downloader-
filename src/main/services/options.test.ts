@@ -368,6 +368,32 @@ describe('classifyYtdlpError', () => {
     expect(code('ERROR: [youtube] x: The uploader has not made this video available in your country')).toBe('geo')
     expect(code('ERROR: [site] 1: This video is not available in your region')).toBe('geo')
   })
+
+  // Every YouTube video from a flagged network said it needed an account.
+  it("tells YouTube's bot check apart from a video that needs an account", () => {
+    const said = (apostrophe: string): string =>
+      `ERROR: [youtube] 3R_wuGXCNW0: Sign in to confirm you${apostrophe}re not a bot. This helps protect our community. ` +
+      'Use --cookies-from-browser or --cookies for the authentication. See  https://github.com/yt-dlp/yt-dlp/wiki/FAQ#how-do-i-pass-cookies-to-yt-dlp  for how to manually pass cookies.'
+    for (const apostrophe of ['’', "'"]) {
+      const result = classifyYtdlpError(said(apostrophe), false)
+      expect(result.code).toBe('botCheck')
+      // The sentence already says what cookies do here; the hint would repeat it.
+      expect(result.cookieHint).toBe(false)
+    }
+    expect(classifyYtdlpError('ERROR: [youtube] x: Join this channel to get access to members-only content', false).code).toBe(
+      'signIn'
+    )
+  })
+
+  // "Use cookies" was the advice for a cookies setting that had just failed.
+  it('says when the cookies setting itself could not be read', () => {
+    expect(
+      classifyYtdlpError('ERROR: Failed to decrypt with DPAPI. See  https://github.com/yt-dlp/yt-dlp/issues/10927  for more info', true).code
+    ).toBe('cookiesLocked')
+    expect(
+      classifyYtdlpError('ERROR: Could not copy Chrome cookie database. See  https://github.com/yt-dlp/yt-dlp/issues/7271  for more info', true).code
+    ).toBe('cookiesLocked')
+  })
 })
 
 /*

@@ -140,6 +140,35 @@ const RULES: Rule[] = [
     code: 'postprocess',
     message: 'Post-processing failed - the video downloaded but could not be merged or converted.'
   },
+  /*
+    The cookies setting itself failing, before any site was asked. The engine
+    cannot copy a running Chrome's cookie database, and on Windows it cannot
+    decrypt Chrome's or Edge's at all since they moved to app-bound encryption.
+    Without this the run fell through to "sign in" below, by way of the word
+    "cookies" in the engine's advice, and told someone who had just switched
+    cookies on to switch cookies on.
+  */
+  {
+    re: /failed to decrypt with dpapi|could not copy (?:chrome )?cookie database|app.?bound encryption/,
+    code: 'cookiesLocked',
+    message:
+      "Your browser's cookies could not be read. Close the browser and try again; on Windows, Chrome " +
+      'and Edge keep them locked even then, so choose Firefox or an exported cookies.txt in Settings → Access.'
+  },
+  /*
+    YouTube refusing this network, not this video: "Sign in to confirm you're
+    not a bot". It reads like a members-only video, and the "sign in" rule took
+    it, so every video from a flagged address said it needed an account. It is
+    cleared by cookies from a signed-in browser, or by waiting, or by another
+    network - never by anything about the video. The apostrophe is a curly one.
+  */
+  {
+    re: /confirm you.{0,3}re not a bot/,
+    code: 'botCheck',
+    message:
+      'YouTube is asking this computer to prove it is not a bot. That is about your network, not this video: ' +
+      'cookies from a browser where you are signed in to YouTube get past it, or try again later or from another network.'
+  },
   {
     re: /\b410\b|http error 404|\bgone\b|\b404\b|has been removed|video.*deleted|video.*not found|no such video/,
     code: 'unavailable',

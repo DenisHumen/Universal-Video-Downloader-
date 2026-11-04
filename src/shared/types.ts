@@ -114,6 +114,10 @@ export type AppErrorCode =
   | 'ageRestricted'
   | 'rateLimited'
   | 'signIn'
+  /** YouTube asking this network to prove it is not a bot - not about the video. */
+  | 'botCheck'
+  /** The cookies setting could not be read: a locked or encrypted browser profile. */
+  | 'cookiesLocked'
   | 'forbidden'
   | 'geo'
   | 'drm'
