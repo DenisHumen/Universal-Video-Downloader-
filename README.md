@@ -20,7 +20,8 @@ and finds the stream itself on pages nobody wrote an extractor for.
 
 <br />
 
-<img src="docs/screenshots/detected.png" alt="A pasted YouTube link: the video card, format and quality rows that say what you will get, and a Download · 1080p · MP4 button" width="88%" />
+<a href="docs/assets/tour.mp4?raw=true"><img src="docs/assets/tour.webp" alt="A 20-second tour: a link is pasted and detected, the queue, the library, title search, a watched series, the command palette and the built-in browser sign-in settings" width="88%" /></a>
+<br /><sub>▶ <a href="docs/assets/tour.mp4?raw=true">the same tour as an MP4</a></sub>
 
 </div>
 
@@ -102,10 +103,10 @@ uvd https://www.youtube.com/watch?v=jNQXAC9IVRw
 | **One progress bar** | Download and the work after it (merging, converting, cutting) in one bar, with the step named. Pause, resume, retry, cancel. |
 | **Cut and convert** | Download only the part you need, re-cut finished files, convert to MP4 / MKV / WebM / MOV / GIF or extract MP3 / M4A / FLAC / OPUS. |
 | **Search by title** | YouTube, SoundCloud, Dailymotion, Bilibili, Niconico and the YummyAnime catalogue, one service or all at once. PornHub too, once switched on in Settings. |
-| **Built-in browser** | For the stubborn page: open it, press play, and every stream it loads appears in a side panel, one click from the queue. |
+| **Built-in browser** | For the stubborn page: open it, press play, and every stream it loads appears in a side panel, one click from the queue. Sign in to a site there once and you stay signed in: across restarts, for downloads from that site, and with the password saved and filled in next time. |
 | **Series and playlists** | Voiceovers, seasons and episodes on HDrezka, YummyAnime and AniLiberty; playlists and channels as a pickable list; a whole list of links at once. |
 | **Watch a series** | New episodes downloaded, renamed, sent to an SMB share and announced in Telegram, on a schedule. |
-| **Sign-in videos** | Age-gated and members-only videos with cookies from your browser or a `cookies.txt`. |
+| **Sign-in videos** | Age-gated and members-only videos: sign in once in the built-in browser, or use cookies from your browser or a `cookies.txt`. |
 | **Keyboard first** | <kbd>Ctrl</kbd>+<kbd>K</kbd> opens a command palette for any section, action, setting or recent download; <kbd>Ctrl</kbd>+<kbd>1</kbd>…<kbd>5</kbd> switch sections, <kbd>Ctrl</kbd>+<kbd>,</kbd> opens Settings. |
 | **Extras** | Subtitles, thumbnails and chapters embedded, SponsorBlock, per-site folders, filename template, speed limit, proxy, day and night themes with nine accent colours, notifications that open the right row, and a backup file that carries settings and watched series to a new computer. |
 
@@ -129,7 +130,7 @@ uvd https://www.youtube.com/watch?v=jNQXAC9IVRw
 ## A site doesn't work?
 
 1. **Switch on cookies.** *Settings → Access & Cookies*, then pick the browser you're signed in with. Age gates, login walls and "members only" go away. Close that browser while downloading; it locks its cookie database.
-2. **Use the built-in browser.** Open the page there and press play; every stream it requests appears in the side panel. A consent banner you dismiss or a login you complete is remembered.
+2. **Use the built-in browser.** Open the page there and press play; every stream it requests appears in the side panel. A consent banner you dismiss or a login you complete is remembered, and downloads use that login whenever no other cookies are set.
 3. **Send a report.** When a link fails, the app offers to send the developer the link, the error and the engine's output. Nothing is sent unless you click, and paths, passwords and tokens are removed first.
 4. **Or [open an issue](https://github.com/DenisHumen/Universal-Video-Downloader-/issues/new)** with the link and the *engine output* from the queue row.
 
@@ -161,7 +162,7 @@ Paste a link to a series page, choose the translation (dubs carry different epis
 | --- | --- |
 | **download** | Always first, through the normal queue: pause, retry and history work as usual. |
 | **rename** | A template with `{title}` `{season}` `{episode}` `{season2}` `{episode2}` `{quality}` `{year}`, plus find/replace rules for the title. |
-| **send to a share** | Uploads to an SMB share and creates missing folders; can delete the local copy afterwards. |
+| **send to a share** | Uploads to an SMB share and creates missing folders; can delete the local copy afterwards. The folder is picked with *Browse…* (a share the system has mounted) or *Browse Share…* (walked right in the app), no path to type. |
 | **notify in Telegram** | A message from your own bot when an episode arrives, or fails. |
 
 Checks run on a schedule with back-off on failures (15 minutes at the shortest); **check now** runs one at once. *Settings → Watching* keeps schedules running from the tray when the window is closed and can start the app with the system. The SMB password and the Telegram token are encrypted by the operating system's key store. Design notes: [`docs/automation.md`](docs/automation.md).
@@ -182,7 +183,7 @@ Settings follow GNOME Settings: eight panels in a list on the left, subpages tha
 | **Post-processing** | Embed thumbnail / metadata / chapters / subtitles, `.srt` files, subtitle languages, SponsorBlock, prefer H.264 + AAC, filename template |
 | **Watching** | Background watching; *Network Shares* (SMB) and *Telegram* as their own pages |
 | **Detection** | The hidden-browser pass for unknown sites, the search services |
-| **Access & Cookies** | Cookies from Chrome, Firefox, Edge, Safari, Brave, Chromium, Opera, Vivaldi, or a *Cookies File*; error reports |
+| **Access & Cookies** | *Built-in Browser* (stay signed in, saved passwords, sign out of every site); cookies from Chrome, Firefox, Edge, Safari, Brave, Chromium, Opera, Vivaldi, or a *Cookies File*; error reports |
 | **Network** | A *Proxy* for the engine and for the app's own requests |
 | **System** | *Startup & Notifications* (start with the system, tray icon, clipboard watcher, notifications), *Updates* (checked every six hours: Windows and the AppImage install the new version, macOS and the `.deb` / `.rpm` open its download), *Backup*, *Logs & Command Line*, *About* |
 
