@@ -15,7 +15,7 @@
  * Empty is valid: it means the system's own network.
  */
 const PROXY =
-  /^(?:[a-z][a-z0-9+.-]*:\/\/)?(?:[^\s@\/]+@)?(?:\[[0-9a-f:.]+\]|[^\s:\/@\[\]?#;,=]+)(?::(\d{1,5}))?\/?$/i
+  /^(?:[a-z][a-z0-9+.-]*:\/\/)?(?:[^\s@/]+@)?(?:\[[0-9a-f:.]+\]|[^\s:/@[\]?#;,=]+)(?::(\d{1,5}))?\/?$/i
 
 export function isProxyValue(value: string): boolean {
   const trimmed = value.trim()

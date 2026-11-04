@@ -1,7 +1,7 @@
 import { useEffect, useId, useRef, useState } from 'react'
 import { AnimatePresence, m } from 'framer-motion'
 import { staggerChild, staggerParent } from '../lib/motion'
-import { AlertTriangle, ArrowRight, Check, Download, Loader2, RotateCw, Search, SearchX, X } from '../ui/icons'
+import { AlertTriangle, ArrowRight, Check, Download, Loader2, RotateCw, Search, SearchX } from '../ui/icons'
 import { Dropdown, EmptyState, Icon, Spinner, ToggleGroup } from '../ui'
 import HeaderSlot from '../shell/HeaderSlot'
 import type {

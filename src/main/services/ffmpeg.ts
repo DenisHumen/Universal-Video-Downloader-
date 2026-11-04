@@ -10,7 +10,7 @@ import { groupSpawnOptions, killTree } from './process'
  */
 export function ffmpegPath(): string | undefined {
   try {
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
     const ffmpegStatic = require('ffmpeg-static') as string | null
     if (!ffmpegStatic) return undefined
     let p = ffmpegStatic

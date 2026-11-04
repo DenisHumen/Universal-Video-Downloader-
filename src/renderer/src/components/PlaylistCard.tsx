@@ -45,7 +45,7 @@ export default function PlaylistCard({ info, onDone, saveDir, onSaveDirChange }:
   const [rangeFrom, setRangeFrom] = useState('1')
   const [rangeTo, setRangeTo] = useState('')
 
-  const entries = info.entries || []
+  const entries = useMemo(() => info.entries || [], [info.entries])
 
   /*
     Only the rows on screen are built.

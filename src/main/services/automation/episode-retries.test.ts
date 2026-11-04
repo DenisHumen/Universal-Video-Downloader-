@@ -181,7 +181,6 @@ const watch = (): Watch => ({
   createdAt: 1
 })
 
-const e4 = { season: 1, episode: 4 }
 const seen4 = (w: Watch | undefined): boolean => Boolean(w?.seen.some((s) => s.episode === 4))
 
 describe('an episode that fails', () => {

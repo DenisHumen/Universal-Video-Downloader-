@@ -19,5 +19,5 @@ export function isSafeTemplate(template: string): boolean {
   const value = template.trim()
   if (!value) return true
   if (/^([a-zA-Z]:|\\|\/)/.test(value)) return false
-  return !value.split(/[\\\/]+/).includes('..')
+  return !value.split(/[\\/]+/).includes('..')
 }

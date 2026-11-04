@@ -102,8 +102,14 @@ export function extractMember(zip, name) {
         const len = zip.readUInt16LE(extra + 2)
         if (id === 0x0001) {
           let p = extra + 4
-          if (size === 0xffffffff) (size = Number(zip.readBigUInt64LE(p))), (p += 8)
-          if (packed === 0xffffffff) (packed = Number(zip.readBigUInt64LE(p))), (p += 8)
+          if (size === 0xffffffff) {
+            size = Number(zip.readBigUInt64LE(p))
+            p += 8
+          }
+          if (packed === 0xffffffff) {
+            packed = Number(zip.readBigUInt64LE(p))
+            p += 8
+          }
           if (local === 0xffffffff) local = Number(zip.readBigUInt64LE(p))
         }
         extra += 4 + len

@@ -126,7 +126,8 @@ export function ProxyRows({ value, onCommit }: { value: string; onCommit: (v: st
   /** The last password typed could not be sealed: it lasts until the app closes. */
   const [sessionOnly, setSessionOnly] = useState(false)
   useEffect(() => setDraft(value), [value])
-  useEffect(secrets.refresh, [value, secrets.refresh])
+  const refreshSecrets = secrets.refresh
+  useEffect(() => refreshSecrets(), [value, refreshSecrets])
   const valid = isProxyValue(draft)
   const hasUser = Boolean(proxyUser(valid ? draft : value))
 

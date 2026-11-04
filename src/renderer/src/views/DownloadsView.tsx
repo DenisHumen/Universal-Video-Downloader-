@@ -3,7 +3,6 @@ import {
   CircleX,
   FolderOpen,
   Inbox,
-  Pause,
   Play,
   Plus,
   RotateCw,

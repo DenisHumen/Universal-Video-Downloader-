@@ -126,7 +126,7 @@ const POSITIVE: { re: RegExp; bonus: number }[] = [
   { re: /(master|index|playlist|manifest)\.m3u8/i, bonus: 14 },
   { re: /\/(hls|dash|stream|video|media)\//i, bonus: 6 },
   // Underscores count as a boundary: `movie_1080p.mp4` carries a resolution too.
-  { re: /(?:^|[\/_.-])(?:4320|2160|1440|1080|720)p?(?=[\/_.\-?#&]|$)/i, bonus: 4 }
+  { re: /(?:^|[/_.-])(?:4320|2160|1440|1080|720)p?(?=[/_.\-?#&]|$)/i, bonus: 4 }
 ]
 
 /**
@@ -137,7 +137,7 @@ const POSITIVE: { re: RegExp; bonus: number }[] = [
 export function heightOf(url: string): number {
   const path = url.split(/[?#]/)[0]
   let height = 0
-  for (const m of path.matchAll(/(?:^|[\/_.-])(4320|2160|1440|1080|720|576|480|360|240)p?(?=[\/_.-]|$)/gi)) {
+  for (const m of path.matchAll(/(?:^|[/_.-])(4320|2160|1440|1080|720|576|480|360|240)p?(?=[/_.-]|$)/gi)) {
     height = Number(m[1])
   }
   return height

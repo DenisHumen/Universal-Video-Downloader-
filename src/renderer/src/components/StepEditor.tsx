@@ -1,5 +1,5 @@
-import { useEffect, useId, useMemo, useState } from 'react'
-import { Loader2, Plus, Trash2, X } from '../ui/icons'
+import { useEffect, useMemo, useState } from 'react'
+import { Loader2, Plus, Trash2 } from '../ui/icons'
 import { useT } from '../i18n'
 import { useStore } from '../store'
 import { toast } from '../lib/toast'
@@ -73,7 +73,6 @@ export default function StepEditor({
   onClose: () => void
 }): JSX.Element {
   const t = useT()
-  const titleId = useId()
   const settings = useStore((s) => s.settings)
   const saveSettings = useStore((s) => s.saveSettings)
   const targets = settings?.smbTargets ?? []
