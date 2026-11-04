@@ -63,6 +63,27 @@ const WATCH = `
   });
 `
 
+/** A watch whose chain is only the download, so every other step is one "+" away. */
+const WATCH_BARE = WATCH.replace(`,
+      { id: 'n', kind: 'notify', enabled: true }`, '')
+
+/** Types into an entry the way a person does, so React's onChange runs. */
+const TYPE = `
+  const __uvdType = (input, value) => {
+    if (!input) throw new Error('no entry to type into');
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(input, value);
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+  };
+`
+
+/**
+ * The automation forms are panels of fields, not whole views, so they take a
+ * subset of the passes: both themes at full width in English, plus the 720 px
+ * Russian pass for the share forms, whose labels and readout run longest.
+ */
+const FORM_PASSES = (pass) => (pass.width === 1220 && pass.lang === 'en') || (pass.width === 720 && pass.lang === 'ru')
+const WIDE_EN = (pass) => pass.width === 1220 && pass.lang === 'en'
+
 /** Every view, plus the menu, dialog and toast states. */
 const SCENES = [
   { name: 'home', setup: `await __uvdShot.view('home')` },
@@ -116,6 +137,49 @@ const SCENES = [
     setup: `await __uvdShot.view('home'); __uvdStore.getState().setSetupOpen(true); await new Promise((r) => setTimeout(r, 150));
       document.querySelector('[data-uvd="setup-next"]').click(); await new Promise((r) => setTimeout(r, 100));
       document.querySelector('[data-uvd="setup-next"]').click(); await new Promise((r) => setTimeout(r, 200))`
+  },
+  // Settings › Watching › Network Shares › Add a Share, filled in: the host/share/folder readout under the path.
+  {
+    name: 'share-form',
+    passes: FORM_PASSES,
+    setup: `${TYPE}
+      __uvdStore.getState().openSettings('watching/shares'); await new Promise((r) => setTimeout(r, 300));
+      const add = document.querySelector('[data-uvd="share-add"]');
+      if (!add) throw new Error('no add-share control on screen');
+      add.click(); await new Promise((r) => setTimeout(r, 200));
+      const fields = [...document.querySelectorAll('main input.field')];
+      if (fields.length < 4) throw new Error('share form did not open');
+      __uvdType(fields[0], '//nas.local/media/anime/Frieren');
+      __uvdType(fields[1], 'denis');
+      await new Promise((r) => setTimeout(r, 150));
+      if (!document.querySelector('main dl')) throw new Error('no host/share/folder readout');`
+  },
+  // Settings › Watching › Telegram, as first met: nothing stored yet.
+  {
+    name: 'telegram-form',
+    passes: WIDE_EN,
+    setup: `__uvdStore.getState().openSettings('watching/telegram'); await new Promise((r) => setTimeout(r, 300));
+      if (!document.querySelector('main input[type="password"]')) throw new Error('telegram form not on screen')`
+  },
+  // The step editor, from the chain's "+ Upload" on the Watching view: the share form inside a sheet.
+  {
+    name: 'step-upload',
+    passes: FORM_PASSES,
+    setup: `${WATCH_BARE}; await __uvdShot.view('automation');
+      const go = document.querySelector('[data-uvd="step-add-upload"]');
+      if (!go) throw new Error('no add-upload control on screen');
+      go.click(); await new Promise((r) => setTimeout(r, 250));
+      if (!document.querySelector('[role="dialog"]')) throw new Error('step editor did not open')`
+  },
+  // The same sheet from "+ Notify": the Telegram form inside it.
+  {
+    name: 'step-notify',
+    passes: WIDE_EN,
+    setup: `${WATCH_BARE}; await __uvdShot.view('automation');
+      const go = document.querySelector('[data-uvd="step-add-notify"]');
+      if (!go) throw new Error('no add-notify control on screen');
+      go.click(); await new Promise((r) => setTimeout(r, 250));
+      if (!document.querySelector('[role="dialog"]')) throw new Error('step editor did not open')`
   },
   {
     name: 'palette',
@@ -245,7 +309,10 @@ function compare(actual, expected) {
 
 async function main() {
   const scenes = SCENES.filter((s) => !ONLY || s.name.includes(ONLY))
-  const jobs = scenes.flatMap((scene) => RUN_PASSES.map((pass) => ({ scene, pass })))
+  // A scene may name the passes it needs (`passes`); the rest take every one.
+  const jobs = scenes.flatMap((scene) =>
+    RUN_PASSES.filter((pass) => !scene.passes || scene.passes(pass)).map((pass) => ({ scene, pass }))
+  )
   const target = OUT_DIR ? resolve(OUT_DIR) : UPDATE ? BASELINE : ACTUAL
   mkdirSync(target, { recursive: true })
   if (!UPDATE && !OUT_DIR) {
