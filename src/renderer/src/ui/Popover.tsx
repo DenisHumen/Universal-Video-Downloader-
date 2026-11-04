@@ -95,6 +95,8 @@ export function usePopover(): UsePopover {
 /** Room a panel wants below its trigger before it opens upwards instead. */
 const ROOM_BELOW = 240
 const GAP = 4
+/** What a fitted panel keeps clear of the window edge. */
+const EDGE = 12
 
 interface PopoverProps {
   state: UsePopover
@@ -107,6 +109,8 @@ interface PopoverProps {
   onKeyDown?: (e: KeyboardEvent<HTMLDivElement>) => void
   /** Focus the first focusable thing inside on open (a menu does its own). */
   autoFocus?: boolean
+  /** Cap the panel at the room it has and let it scroll (a long list). */
+  fit?: boolean
 }
 
 export default function Popover({
@@ -117,7 +121,8 @@ export default function Popover({
   label,
   className,
   onKeyDown,
-  autoFocus = true
+  autoFocus = true,
+  fit = false
 }: PopoverProps): JSX.Element | null {
   const [style, setStyle] = useState<CSSProperties | null>(null)
 
@@ -133,9 +138,14 @@ export default function Popover({
       position: 'fixed',
       zIndex: 'var(--z-overlay)' as unknown as number,
       ...(up ? { bottom: window.innerHeight - r.top + GAP } : { top: r.bottom + GAP }),
-      ...(align === 'end' ? { right: window.innerWidth - r.right } : { left: r.left })
+      ...(align === 'end' ? { right: window.innerWidth - r.right } : { left: r.left }),
+      ...(fit && {
+        maxHeight: Math.max(120, (up ? r.top : window.innerHeight - r.bottom) - GAP - EDGE),
+        overflowY: 'auto' as const,
+        minWidth: r.width
+      })
     })
-  }, [state.open, state.triggerRef, align])
+  }, [state.open, state.triggerRef, align, fit])
 
   useEffect(() => {
     if (!state.open || !style || !autoFocus) return

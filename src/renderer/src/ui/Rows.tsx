@@ -4,11 +4,11 @@ import {
   useId,
   useState,
   type InputHTMLAttributes,
-  type ReactNode,
-  type SelectHTMLAttributes
+  type ReactNode
 } from 'react'
 import { cx } from './cx'
 import Switch from './Switch'
+import Dropdown from './Dropdown'
 import { GoNext, PanDown, ViewConceal, ViewReveal } from './icons'
 
 /*
@@ -203,36 +203,15 @@ interface ComboRowProps extends Omit<RowProps, 'suffix' | 'onActivate' | 'value'
   value: string
   options: ComboOption[]
   onChange: (value: string) => void
-  selectProps?: SelectHTMLAttributes<HTMLSelectElement>
 }
 
-/**
- * AdwComboRow: the chosen value, dim, with a drop-down arrow. A native
- * <select> does the choosing (the most accessible list there is), styled as
- * the row's suffix.
- */
-export function ComboRow({ value, options, onChange, selectProps, ...row }: ComboRowProps): JSX.Element {
+/** AdwComboRow: the chosen value, dim, with a drop-down arrow that opens a GNOME list. */
+export function ComboRow({ value, options, onChange, ...row }: ComboRowProps): JSX.Element {
   return (
     <ActionRowWithControl
       {...row}
       control={(titleId) => (
-        <span className="relative flex shrink-0 items-center">
-          <select
-            aria-labelledby={titleId}
-            className="ui-combo"
-            value={value}
-            onChange={(e) => onChange(e.target.value)}
-            disabled={row.disabled}
-            {...selectProps}
-          >
-            {options.map((o) => (
-              <option key={o.value} value={o.value}>
-                {o.label}
-              </option>
-            ))}
-          </select>
-          <PanDown size={16} className="pointer-events-none absolute right-1.5 text-ink" />
-        </span>
+        <Dropdown aria-labelledby={titleId} value={value} options={options} onChange={onChange} disabled={row.disabled} />
       )}
     />
   )

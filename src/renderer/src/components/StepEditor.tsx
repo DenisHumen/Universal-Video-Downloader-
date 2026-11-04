@@ -7,6 +7,7 @@ import { describeError } from '../lib/errors'
 import { STEP_LABEL } from '../lib/automationLabels'
 import { emptyTarget, pathOf, ShareForm, TelegramForm, useSecretState } from './AutomationForms'
 import Dialog from '../ui/Dialog'
+import Dropdown from '../ui/Dropdown'
 import {
   DEFAULT_REMOTE_PATH,
   DEFAULT_RENAME_TEMPLATE,
@@ -268,19 +269,13 @@ export default function StepEditor({
             {targets.length > 0 && (
               <div>
                 <p className="label mb-1.5">{t('auto.share')}</p>
-                <select
-                  className="field w-full text-control"
+                <Dropdown
+                  variant="field"
                   aria-label={t('auto.share')}
                   value={targetId}
-                  onChange={(e) => setTargetId(e.target.value)}
-                >
-                  {targets.map((x) => (
-                    <option key={x.id} value={x.id}>
-                      {x.name}
-                    </option>
-                  ))}
-                  <option value={NEW_SHARE}>{t('auto.shareNew')}</option>
-                </select>
+                  onChange={setTargetId}
+                  options={[...targets.map((x) => ({ value: x.id, label: x.name })), { value: NEW_SHARE, label: t('auto.shareNew') }]}
+                />
               </div>
             )}
 

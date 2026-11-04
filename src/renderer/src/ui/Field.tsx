@@ -1,7 +1,6 @@
 import {
   forwardRef,
   type InputHTMLAttributes,
-  type SelectHTMLAttributes,
   type TextareaHTMLAttributes
 } from 'react'
 import { cx } from './cx'
@@ -24,19 +23,3 @@ export const TextArea = forwardRef<HTMLTextAreaElement, TextareaHTMLAttributes<H
     return <textarea ref={ref} className={cx('ui-field', className)} {...rest} />
   }
 )
-
-export interface SelectProps extends Omit<SelectHTMLAttributes<HTMLSelectElement>, 'size'> {
-  size?: 'md' | 'lg'
-}
-
-/** A native select, restyled: the OS list is the most accessible picker there is. */
-export const Select = forwardRef<HTMLSelectElement, SelectProps>(function Select(
-  { size = 'md', className, children, ...rest },
-  ref
-) {
-  return (
-    <select ref={ref} className={cx('ui-field', size === 'lg' && 'ui-field-lg', className)} {...rest}>
-      {children}
-    </select>
-  )
-})

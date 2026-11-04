@@ -1,8 +1,8 @@
 import { useEffect, useId, useRef, useState } from 'react'
 import { AnimatePresence, m } from 'framer-motion'
 import { staggerChild, staggerParent } from '../lib/motion'
-import { AlertTriangle, ArrowRight, Check, ChevronDown, Download, Loader2, RotateCw, Search, SearchX, X } from '../ui/icons'
-import { EmptyState, Icon, Spinner, ToggleGroup } from '../ui'
+import { AlertTriangle, ArrowRight, Check, Download, Loader2, RotateCw, Search, SearchX, X } from '../ui/icons'
+import { Dropdown, EmptyState, Icon, Spinner, ToggleGroup } from '../ui'
 import HeaderSlot from '../shell/HeaderSlot'
 import type {
   AppErrorCode,
@@ -466,16 +466,7 @@ function ServiceFilter({
         <ToggleGroup label={label} value={value} onChange={onChange} options={options} />
       </div>
       {!fits && (
-        <span className="relative inline-flex items-center">
-          <select aria-label={label} className="ui-combo btn-quiet pr-8" value={value} onChange={(e) => onChange(e.target.value as SearchScope)}>
-            {options.map((o) => (
-              <option key={o.value} value={o.value}>
-                {o.label}
-              </option>
-            ))}
-          </select>
-          <ChevronDown size={16} className="pointer-events-none absolute right-2 text-ink" />
-        </span>
+        <Dropdown variant="button" aria-label={label} value={value} options={options} onChange={(v) => onChange(v as SearchScope)} />
       )}
     </div>
   )

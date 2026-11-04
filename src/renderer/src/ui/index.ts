@@ -4,7 +4,8 @@
  */
 export { default as Button, type ButtonProps, type ButtonVariant, type ControlSize } from './Button'
 export { default as IconButton, type IconButtonProps } from './IconButton'
-export { Field, TextArea, Select, type FieldProps, type SelectProps } from './Field'
+export { Field, TextArea, type FieldProps } from './Field'
+export { default as Dropdown, type DropdownOption, type DropdownProps } from './Dropdown'
 export { default as Switch, type SwitchProps } from './Switch'
 export { default as Checkbox, type CheckboxProps } from './Checkbox'
 export { default as SegmentedControl, ToggleGroup, type Segment } from './SegmentedControl'
