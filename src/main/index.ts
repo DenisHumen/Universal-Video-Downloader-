@@ -39,7 +39,12 @@ import {
   shutdownDownloads,
   isEngineBusy
 } from './services/downloader'
-import { startClipboardWatch, stopClipboardWatch } from './services/clipboard'
+import {
+  looksLikeLink,
+  readClipboardText,
+  startClipboardWatch,
+  stopClipboardWatch
+} from './services/clipboard'
 import { rendererIndex, wireNavigation } from './services/navigation'
 import {
   chromeOptions,
@@ -56,6 +61,7 @@ import { refreshCliScript } from './services/cli-install'
 import { taskbarProgress } from './services/taskbar'
 import { coalesce } from './services/coalesce'
 import { infoCache } from './services/info-store'
+import { closeHidesWindow, trayStatusLine } from './services/tray-menu'
 
 const isMac = process.platform === 'darwin'
 let mainWindow: BrowserWindow | null = null
@@ -179,17 +185,20 @@ function createWindow(hidden = false): void {
       the same as watching, though: without background watching, closing the
       window stops the schedules, as the switch's hint says it does.
     */
-    const settings = getSettings()
-    if (!quitting && (settings.trayEnabled || settings.automationEnabled) && tray) {
+    if (closeHidesWindow({ quitting, hasTray: tray !== null, settings: getSettings() })) {
       event.preventDefault()
-      mainWindow?.hide()
-      if (!settings.automationEnabled) stopWatcher()
+      hideMainWindow()
     }
   })
 
   // Schedules run whenever the window is up, however it came back: the tray,
   // a second launch, a notification, the dock.
-  mainWindow.on('show', () => startWatcher())
+  mainWindow.on('show', () => {
+    startWatcher()
+    refreshTrayMenu()
+  })
+  // The tray's Show/Hide item says what clicking it will do.
+  mainWindow.on('hide', refreshTrayMenu)
 
   mainWindow.on('closed', () => {
     stopTaskbar()
@@ -258,6 +267,33 @@ function deliver(channel: string, slot: 'link' | 'view', value: string): void {
     return
   }
   pending[slot] = value
+}
+
+/** Hide the main window to the tray, as closing it does while the tray is on. */
+function hideMainWindow(): void {
+  mainWindow?.hide()
+  // Hidden is not watching: without background watching, the schedules stop.
+  if (!getSettings().automationEnabled) stopWatcher()
+}
+
+/**
+ * The tray's "Paste link": the window comes up and the link on the clipboard
+ * goes straight to Home, as if it had been pasted into the field there. It is
+ * asked for outright, so it skips the clipboard strip that only suggests one.
+ * Clipboard text that is not a link just brings the window up.
+ */
+async function pasteLinkFromClipboard(): Promise<void> {
+  const text = await readClipboardText()
+  showMainWindow()
+  if (!looksLikeLink(text)) return
+  const wc = mainWindow?.webContents
+  /*
+    A window that is up takes it straight to Home. One still loading (it had
+    been closed, or not opened yet) gets it the way a link from a second
+    launch arrives: parked, and offered by the clipboard strip once it is ready.
+  */
+  if (rendererReady && wc && !wc.isDestroyed()) wc.send(IPC.evtPasteLink, text)
+  else deliver(IPC.evtClipboardLink, 'link', text)
 }
 
 /** Everything main tried to say while nothing was listening. Clears it. */
@@ -472,28 +508,69 @@ function buildMenu(): void {
   menuLanguage = currentLanguage()
 }
 
+/*
+  The tray (6.5). On Linux Electron draws it as a StatusNotifierItem, which KDE,
+  Cinnamon, XFCE and most panels show as is; stock GNOME shows nothing at all
+  until the AppIndicator extension is installed (Ubuntu ships it on). Nothing
+  here can tell whether a host is listening, which is one more reason the
+  window is only ever hidden while the user has asked for the tray.
+*/
+
+/** The tray's status line as last drawn, so an unchanged queue rebuilds nothing. */
+let trayStatus = ''
+
+/**
+ * The tray's context menu, built afresh each time.
+ *
+ * Linux reads a StatusNotifierItem menu once per `setContextMenu`, so changing
+ * a label on a built menu shows nothing there; a whole new menu is the
+ * portable way to change the status line and the Show/Hide item.
+ */
+function trayMenu(): Electron.Menu {
+  const visible = Boolean(mainWindow && !mainWindow.isDestroyed() && mainWindow.isVisible())
+  return Menu.buildFromTemplate([
+    { label: trayStatus, enabled: false },
+    { type: 'separator' },
+    visible
+      ? { label: mt('tray.hide'), click: hideMainWindow }
+      : { label: mt('tray.show'), click: showMainWindow },
+    { label: mt('tray.paste'), click: () => void pasteLinkFromClipboard() },
+    { type: 'separator' },
+    { label: mt('menu.pauseAll'), click: () => pauseAll() },
+    { label: mt('menu.resumeAll'), click: () => resumeAll() },
+    { type: 'separator' },
+    {
+      label: mt('tray.quit'),
+      click: () => {
+        // A quit for real: the window's close handler lets it through, and
+        // before-quit still flushes secrets, settings and history.
+        quitting = true
+        app.quit()
+      }
+    }
+  ])
+}
+
+function refreshTrayMenu(): void {
+  if (!tray || tray.isDestroyed()) return
+  trayStatus = trayStatusLine(listDownloads(), mt)
+  tray.setContextMenu(trayMenu())
+}
+
+/** The status line follows the queue, rebuilt at most once a second and only when it reads differently. */
+const refreshTrayStatus = coalesce(() => {
+  if (!tray || tray.isDestroyed()) return
+  if (trayStatusLine(listDownloads(), mt) !== trayStatus) refreshTrayMenu()
+}, 1000)
+
 function buildTray(): void {
   if (tray) return
   try {
     tray = new Tray(trayImage())
     tray.setToolTip('Universal Video Downloader')
-    tray.setContextMenu(
-      Menu.buildFromTemplate([
-        { label: mt('tray.open'), click: showMainWindow },
-        { type: 'separator' },
-        { label: mt('menu.pauseAll'), click: () => pauseAll() },
-        { label: mt('menu.resumeAll'), click: () => resumeAll() },
-        { type: 'separator' },
-        {
-          label: mt('tray.quit'),
-          click: () => {
-            quitting = true
-            app.quit()
-          }
-        }
-      ])
-    )
+    refreshTrayMenu()
     tray.on('click', showMainWindow)
+    for (const name of QUEUE_CHANGES) downloadEvents.on(name, refreshTrayStatus)
   } catch (err) {
     // Background watching relies on the tray to keep a closed window findable.
     log.error('app', 'Tray unavailable', { error: String(err) })
@@ -523,6 +600,7 @@ function trayImage(): Electron.NativeImage {
 }
 
 function destroyTray(): void {
+  for (const name of QUEUE_CHANGES) downloadEvents.off(name, refreshTrayStatus)
   tray?.destroy()
   tray = null
 }

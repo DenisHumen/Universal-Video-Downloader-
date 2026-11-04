@@ -207,6 +207,7 @@ const api = {
   onDetectStatus: (cb: (s: DetectStatus) => void) => on<DetectStatus>(IPC.evtDetectStatus, cb),
   onDetectPreview: (cb: (p: DetectPreview) => void) => on<DetectPreview>(IPC.evtDetectPreview, cb),
   onClipboardLink: (cb: (url: string) => void) => on<string>(IPC.evtClipboardLink, cb),
+  onPasteLink: (cb: (url: string) => void) => on<string>(IPC.evtPasteLink, cb),
   onNavigate: (cb: (view: string) => void) => on<string>(IPC.evtNavigate, cb),
   onFocusRow: (cb: (id: string) => void) => on<string>(IPC.evtFocusRow, cb)
 }

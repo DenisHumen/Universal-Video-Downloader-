@@ -439,7 +439,7 @@ export const en = {
   'settings.notificationsHint': 'Tell me when a download finishes',
   'settings.clipboardWatch': 'Watch the Clipboard',
   'settings.clipboardWatchHint': 'Offer to download links you copy in other apps',
-  'settings.tray': 'Keep Running in the Tray',
+  'settings.tray': 'Keep Running in the Tray When the Window Is Closed',
   'settings.trayHint': 'Closing the window keeps downloads going',
   'settings.errorReports': 'Offer to send error reports to the developer',
   'settings.errorReportsHint':

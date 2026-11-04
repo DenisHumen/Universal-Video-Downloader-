@@ -8,6 +8,11 @@ import { clipboard } from 'electron'
 
 const URL_RE = /^(https?:\/\/|www\.)\S+\.\S+/i
 
+/** Whether clipboard text is a link worth offering: what the watcher and the tray's "Paste link" accept. */
+export function looksLikeLink(text: string): boolean {
+  return URL_RE.test(text) && text.length < 2048
+}
+
 let timer: NodeJS.Timeout | null = null
 let lastSeen = ''
 let deliver: (url: string) => void = () => {}
@@ -59,7 +64,7 @@ export function startClipboardWatch(onLink: (url: string) => void): void {
       if (run !== generation) return
       if (!text || text === lastSeen) return
       lastSeen = text
-      if (URL_RE.test(text) && text.length < 2048) deliver(text)
+      if (looksLikeLink(text)) deliver(text)
     })
   }, 1200)
 }
