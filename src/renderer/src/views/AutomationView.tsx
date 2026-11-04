@@ -437,7 +437,7 @@ export default function AutomationView(): JSX.Element {
                   missing.length > 0 ? (
                     <div className="flex flex-wrap gap-2 pt-1">
                       {missing.map((kind) => (
-                        <button key={kind} type="button" className="btn-quiet" onClick={() => setEditing(kind)}>
+                        <button key={kind} type="button" className="btn-quiet" onClick={() => setEditing(kind)} data-uvd={`step-add-${kind}`}>
                           <Plus size={14} /> {t(STEP_LABEL[kind])}
                         </button>
                       ))}

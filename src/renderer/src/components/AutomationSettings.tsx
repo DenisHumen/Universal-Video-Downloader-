@@ -190,7 +190,7 @@ export default function AutomationSettings({
           )}
 
           {editing === null && (
-            <button className="btn-quiet" onClick={startNew}>
+            <button className="btn-quiet" onClick={startNew} data-uvd="share-add">
               <Plus size={14} /> {t('settings.addShare')}
             </button>
           )}
