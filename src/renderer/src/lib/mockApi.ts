@@ -557,6 +557,7 @@ export function installMockApi(): void {
     // No network in the preview build; a YouTube link still gets its poster from the id.
     onDetectPreview: () => () => undefined,
     onClipboardLink: () => () => undefined,
+    onPasteLink: () => () => undefined,
     takePending: async () => ({}),
     /*
       A sample report, so the prompt's preview and every state after "send" can

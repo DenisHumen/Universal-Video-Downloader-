@@ -452,7 +452,7 @@ export const ru: Dictionary = {
   'settings.notificationsHint': 'Сообщать о завершении загрузки',
   'settings.clipboardWatch': 'Следить за буфером обмена',
   'settings.clipboardWatchHint': 'Предлагать скачать ссылки, скопированные в других программах',
-  'settings.tray': 'Оставаться в трее',
+  'settings.tray': 'Оставаться в трее после закрытия окна',
   'settings.trayHint': 'Закрытие окна не прерывает загрузки',
   'settings.errorReports': 'Предлагать отправить отчёт об ошибке разработчику',
   'settings.errorReportsHint':

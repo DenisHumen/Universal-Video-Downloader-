@@ -243,6 +243,8 @@ async function runInit(set: SetState, get: GetState): Promise<void> {
     if (get().downloads.some((d) => normalizeUrl(d.sourceUrl || d.url) === link)) return
     set({ clipboardLink: url })
   })
+  // The tray's "Paste link": asked for outright, so it goes straight to Home.
+  window.api.onPasteLink((url) => get().requestDetect(url))
   /*
     A watch that fails at four in the morning must be visible from every
     screen, not only from the one nobody is looking at. The count is what
