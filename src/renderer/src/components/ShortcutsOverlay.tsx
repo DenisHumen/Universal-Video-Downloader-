@@ -1,4 +1,4 @@
-import { Fragment, useId } from 'react'
+import { Fragment } from 'react'
 import { AnimatePresence } from 'framer-motion'
 import { useStore } from '../store'
 import { useT } from '../i18n'
@@ -7,7 +7,6 @@ import Dialog from '../ui/Dialog'
 
 export default function ShortcutsOverlay(): JSX.Element {
   const t = useT()
-  const titleId = useId()
   const open = useStore((s) => s.shortcutsOpen)
   const setOpen = useStore((s) => s.setShortcutsOpen)
   const isMac = useStore((s) => s.appInfo?.platform === 'darwin')

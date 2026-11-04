@@ -1,5 +1,3 @@
-import type { ThemeId } from './types'
-
 /**
  * The theme a window opens in, decided in main before the window exists.
  *

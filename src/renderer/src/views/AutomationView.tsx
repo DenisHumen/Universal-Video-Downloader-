@@ -2,9 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { m } from 'framer-motion'
 import {
   Check,
-  Clock,
   Download,
-  Film,
   FolderUp,
   Loader2,
   Pencil,

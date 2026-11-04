@@ -1,5 +1,5 @@
-import { useEffect, useId, useState } from 'react'
-import { Loader2, X } from '../ui/icons'
+import { useEffect, useState } from 'react'
+import { Loader2 } from '../ui/icons'
 import {
   AUDIO_CONTAINERS,
   VIDEO_CONTAINERS,
@@ -29,7 +29,6 @@ const RESOLUTIONS = ['keep', '1080', '720', '480', '360'] as const
 /** Trim or convert a file that's already downloaded. */
 export default function MediaJobModal({ item, mode, onClose }: Props): JSX.Element {
   const t = useT()
-  const titleId = useId()
   const [duration, setDuration] = useState<number | undefined>(item.duration)
   const [hasAudio, setHasAudio] = useState(true)
   const [hasVideo, setHasVideo] = useState(item.mode !== 'audio')
