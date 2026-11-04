@@ -62,6 +62,8 @@ const settings = (over: Partial<AppSettings> = {}): AppSettings => ({
   proxy: '',
   cookiesFromBrowser: '',
   cookiesFile: '',
+  browserStaySignedIn: true,
+  browserSavePasswords: true,
   errorReports: 'ask',
   setupDone: true,
   ...over

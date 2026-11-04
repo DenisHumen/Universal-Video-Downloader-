@@ -35,6 +35,10 @@ export const IPC = {
   browserClearMedia: 'browser:clear-media',
   browserDownload: 'browser:download',
   browserState: 'browser:state',
+  browserLoginAnswer: 'browser:login-answer',
+  browserLogins: 'browser:logins',
+  browserForgetLogins: 'browser:forget-logins',
+  browserSignOut: 'browser:sign-out',
   downloadPauseAll: 'download:pause-all',
   downloadResumeAll: 'download:resume-all',
   downloadPrioritize: 'download:prioritize',
@@ -85,6 +89,7 @@ export const IPC = {
   evtBrowserMedia: 'event:browser-media',
   /** A download the page itself started went to the queue. */
   evtBrowserQueued: 'event:browser-queued',
+  evtBrowserLoginOffer: 'event:browser-login-offer',
   evtClipboardLink: 'event:clipboard-link',
   evtNavigate: 'event:navigate',
   /** A notification was clicked: show this queue row (6.4). */

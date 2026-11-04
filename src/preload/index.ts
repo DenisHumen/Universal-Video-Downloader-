@@ -9,6 +9,7 @@ import type { ButtonLayout } from '@shared/desktop'
 import type { LibraryPage, LibraryQuery } from '@shared/library'
 import type {
   AppSettings,
+  BrowserLoginOffer,
   BrowserMedia,
   BrowserState,
   CliInstallResult,
@@ -28,7 +29,8 @@ import type {
   SearchResponse,
   SearchScope,
   UpdateStatus,
-  YtDlpStatus
+  YtDlpStatus,
+  SavedSiteLogins
 } from '@shared/types'
 
 export interface AppInfo {
@@ -107,6 +109,15 @@ const api = {
   onBrowserState: (cb: (state: BrowserState) => void) => on<BrowserState>(IPC.evtBrowserState, cb),
   onBrowserMedia: (cb: (media: BrowserMedia[]) => void) => on<BrowserMedia[]>(IPC.evtBrowserMedia, cb),
   onBrowserQueued: (cb: () => void) => on<void>(IPC.evtBrowserQueued, () => cb()),
+  onBrowserLoginOffer: (cb: (offer: BrowserLoginOffer) => void) =>
+    on<BrowserLoginOffer>(IPC.evtBrowserLoginOffer, cb),
+  browserLoginAnswer: (answer: 'save' | 'never' | 'dismiss'): Promise<void> =>
+    ipcRenderer.invoke(IPC.browserLoginAnswer, answer),
+  browserLogins: (): Promise<SavedSiteLogins[]> => ipcRenderer.invoke(IPC.browserLogins),
+  /** One site's saved passwords, or every site's with no origin. */
+  browserForgetLogins: (origin?: string): Promise<boolean> =>
+    ipcRenderer.invoke(IPC.browserForgetLogins, origin),
+  browserSignOut: (): Promise<void> => ipcRenderer.invoke(IPC.browserSignOut),
 
   pauseAll: (): Promise<void> => ipcRenderer.invoke(IPC.downloadPauseAll),
   resumeAll: (): Promise<void> => ipcRenderer.invoke(IPC.downloadResumeAll),

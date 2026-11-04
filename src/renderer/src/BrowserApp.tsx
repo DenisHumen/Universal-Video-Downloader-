@@ -12,8 +12,8 @@ import {
   Trash2,
   X
 } from './ui/icons'
-import type { BrowserMedia, BrowserState } from '@shared/types'
-import { ToastViewport as Toasts } from './ui'
+import type { BrowserLoginOffer, BrowserMedia, BrowserState } from '@shared/types'
+import { Banner, ToastViewport as Toasts } from './ui'
 import Logo from './components/Logo'
 import CaptionButtons from './components/CaptionButtons'
 import { enter } from './lib/motion'
@@ -48,6 +48,7 @@ export default function BrowserApp(): JSX.Element {
   const [editing, setEditing] = useState(false)
   const [queued, setQueued] = useState<Set<string>>(new Set())
   const [isMac, setIsMac] = useState(false)
+  const [offer, setOffer] = useState<BrowserLoginOffer | null>(null)
   const stageRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -66,11 +67,13 @@ export default function BrowserApp(): JSX.Element {
       hook would answer in whatever language was set before settings loaded.
     */
     const offQueued = window.api.onBrowserQueued(() => toast(tNow('browser.queued'), 'success'))
+    const offOffer = window.api.onBrowserLoginOffer(setOffer)
     void window.api.browserRefreshState()
     return () => {
       offState()
       offMedia()
       offQueued()
+      offOffer()
     }
   }, [])
 
@@ -116,6 +119,13 @@ export default function BrowserApp(): JSX.Element {
       observer.disconnect()
     }
   }, [])
+
+  const answer = (choice: 'save' | 'never' | 'dismiss'): void => {
+    setOffer(null)
+    void window.api.browserLoginAnswer(choice).then(() => {
+      if (choice === 'save') toast(t('browser.loginSaved'), 'success')
+    })
+  }
 
   const go = (): void => {
     setEditing(false)
@@ -209,6 +219,36 @@ export default function BrowserApp(): JSX.Element {
 
         {!isMac && <CaptionButtons />}
       </header>
+
+      {/*
+        AdwBanner under the header bar, as GNOME Web asks. The page moves down
+        for it rather than being covered: the stage below re-reports its box.
+      */}
+      {offer && (
+        <Banner
+          title={
+            offer.username
+              ? t(offer.update ? 'browser.loginUpdate' : 'browser.loginSave', {
+                  user: offer.username,
+                  site: offer.site
+                })
+              : t('browser.loginSaveSite', { site: offer.site })
+          }
+          action={
+            <div className="flex shrink-0 items-center gap-1.5">
+              <button className="btn-quiet" onClick={() => answer('never')}>
+                {t('browser.loginNever')}
+              </button>
+              <button className="btn-quiet" onClick={() => answer('dismiss')}>
+                {t('browser.loginNotNow')}
+              </button>
+              <button className="btn-solid" onClick={() => answer('save')}>
+                {offer.update ? t('browser.loginUpdateButton') : t('browser.loginSaveButton')}
+              </button>
+            </div>
+          }
+        />
+      )}
 
       {/* Page + the streams found on it */}
       <div className="relative flex min-h-0 flex-1">

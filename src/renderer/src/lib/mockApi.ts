@@ -60,6 +60,8 @@ const settings: AppSettings = {
   logVerbose: false,
   proxy: '',
   cookiesFromBrowser: '',
+  browserStaySignedIn: true,
+  browserSavePasswords: true,
   cookiesFile: '',
   errorReports: 'ask',
   // The preview and tests start past the first-run setup; ?firstRun=1 shows it.
@@ -408,6 +410,11 @@ export function installMockApi(): void {
     },
     // The preview has no page that could start a download of its own.
     onBrowserQueued: () => () => undefined,
+    onBrowserLoginOffer: () => () => undefined,
+    browserLoginAnswer: async () => undefined,
+    browserLogins: async () => [{ origin: 'https://example.com', usernames: ['denis'] }],
+    browserForgetLogins: async () => true,
+    browserSignOut: async () => undefined,
     pauseAll: async () => undefined,
     resumeAll: async () => undefined,
     retryFailed: async () => undefined,

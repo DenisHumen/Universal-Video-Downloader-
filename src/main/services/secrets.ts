@@ -302,5 +302,7 @@ export function holdQuitForSecrets(event: { preventDefault(): void }, quit: () =
 export const SECRET = {
   smbPassword: (targetId: string): string => `smb.${targetId}.password`,
   telegramToken: (): string => 'telegram.token',
-  proxyPassword: (): string => 'proxy.password'
+  proxyPassword: (): string => 'proxy.password',
+  /** Passwords saved in the built-in browser, one JSON blob. */
+  browserLogins: (): string => 'browser.logins'
 }

@@ -10,6 +10,7 @@ import { engineKnowsHost, isAbsoluteUrl, looksLikeCollection, normalizeUrl } fro
 import { reportDetectFailure, type DetectVerdict } from './report'
 import { infoKey, infoReusable } from './info-cache'
 import { infoCache } from './info-store'
+import { browserCookiesFile } from './browser-logins'
 import type { DetectTrace } from '@shared/report'
 import type {
   AppErrorCode,
@@ -654,7 +655,7 @@ async function probeCollection(url: string, signal?: AbortSignal): Promise<Media
     ...PROBE_SOCKET_TIMEOUT,
     '--playlist-end',
     String(settings.playlistLimit),
-    ...accessArgs(settings),
+    ...accessArgs(settings, browserCookiesFile()),
     '--',
     url
   ]
@@ -697,7 +698,7 @@ async function probeWithEngine(
     '--encoding',
     'utf-8',
     ...PROBE_SOCKET_TIMEOUT,
-    ...accessArgs(settings),
+    ...accessArgs(settings, browserCookiesFile()),
     ...headerArgs(resolved.headers)
   ]
   if (resolved.referer) args.push('--referer', resolved.referer)

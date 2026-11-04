@@ -7,6 +7,7 @@ import {
   type DownloadMode,
   type LanguageId,
   type QualityPreset,
+  type SavedSiteLogins,
   type ThemeId
 } from '@shared/types'
 import type { BackupError, ImportCounts } from '@shared/backup'
@@ -382,8 +383,59 @@ const baseName = (p: string): string => p.split(/[\\/]/).pop() || p
 
 export function AccessPanel({ settings, set, go }: PanelProps): JSX.Element {
   const t = useT()
+  const [signOut, setSignOut] = useState(false)
   return (
     <PreferencesPage>
+      {/*
+        First: signing in on the site itself is what most people try, and it
+        works with nothing else set up - the engine is given the browser's
+        cookies whenever no other cookies are chosen below.
+      */}
+      <PreferencesGroup title={t('prefs.group.builtInBrowser')} description={t('prefs.group.builtInBrowserHint')}>
+        <SwitchRow
+          id="browserStaySignedIn"
+          title={t('prefs.row.browserSignedIn')}
+          subtitle={t('prefs.row.browserSignedInHint')}
+          checked={settings.browserStaySignedIn}
+          onChange={(v) => set('browserStaySignedIn', v)}
+        />
+        <SwitchRow
+          id="browserSavePasswords"
+          title={t('prefs.row.browserPasswords')}
+          subtitle={t('prefs.row.browserPasswordsHint')}
+          checked={settings.browserSavePasswords}
+          onChange={(v) => set('browserSavePasswords', v)}
+        />
+        <ActionRow
+          id="passwords"
+          title={t('prefs.sub.passwords')}
+          navigation
+          onActivate={() => go({ panel: 'access', sub: ['passwords'] })}
+        />
+        <ActionRow
+          id="signOut"
+          title={t('prefs.row.signOutSites')}
+          subtitle={t('prefs.row.signOutSitesHint')}
+          suffix={
+            <button className="btn-danger" onClick={() => setSignOut(true)}>
+              {t('prefs.button.signOut')}
+            </button>
+          }
+        />
+      </PreferencesGroup>
+      {signOut && (
+        <ConfirmDialog
+          title={t('prefs.confirm.signOut')}
+          body={t('prefs.confirm.signOutBody')}
+          confirmLabel={t('prefs.button.signOut')}
+          onConfirm={async () => {
+            setSignOut(false)
+            await window.api.browserSignOut()
+            toast(t('prefs.toast.signedOut'), 'success')
+          }}
+          onCancel={() => setSignOut(false)}
+        />
+      )}
       <PreferencesGroup title={t('prefs.group.browserCookies')} description={t('settings.cookiesHint')}>
         <ComboRow
           id="cookies"
@@ -415,6 +467,65 @@ export function AccessPanel({ settings, set, go }: PanelProps): JSX.Element {
           onChange={(v) => set('errorReports', v ? 'ask' : 'off')}
         />
       </PreferencesGroup>
+    </PreferencesPage>
+  )
+}
+
+/** Sites with saved passwords. The passwords themselves never reach this window. */
+export function PasswordsPage(): JSX.Element {
+  const t = useT()
+  const [sites, setSites] = useState<SavedSiteLogins[] | null>(null)
+  const [confirmAll, setConfirmAll] = useState(false)
+  const load = (): void => void window.api.browserLogins().then(setSites)
+  useEffect(load, [])
+  const forget = async (origin?: string): Promise<void> => {
+    await window.api.browserForgetLogins(origin)
+    load()
+  }
+  if (!sites) return <PreferencesPage><Spinner /></PreferencesPage>
+  return (
+    <PreferencesPage>
+      <PreferencesGroup description={t('prefs.passwordsHint')}>
+        {sites.length === 0 && <ActionRow id="none" title={t('prefs.passwordsNone')} />}
+        {sites.map((s) => (
+          <ActionRow
+            key={s.origin}
+            id={s.origin}
+            title={s.origin.replace(/^https:\/\//, '')}
+            subtitle={s.usernames.filter(Boolean).join(', ') || undefined}
+            suffix={
+              <button className="btn-quiet" onClick={() => void forget(s.origin)}>
+                {t('common.remove')}
+              </button>
+            }
+          />
+        ))}
+      </PreferencesGroup>
+      {sites.length > 0 && (
+        <PreferencesGroup>
+          <ActionRow
+            id="forgetAll"
+            title={t('prefs.row.forgetPasswords')}
+            suffix={
+              <button className="btn-danger" onClick={() => setConfirmAll(true)}>
+                {t('common.clear')}
+              </button>
+            }
+          />
+        </PreferencesGroup>
+      )}
+      {confirmAll && (
+        <ConfirmDialog
+          title={t('prefs.confirm.forgetPasswords')}
+          body={t('prefs.confirm.forgetPasswordsBody')}
+          confirmLabel={t('common.clear')}
+          onConfirm={async () => {
+            setConfirmAll(false)
+            await forget()
+          }}
+          onCancel={() => setConfirmAll(false)}
+        />
+      )}
     </PreferencesPage>
   )
 }
@@ -1037,6 +1148,8 @@ export function pageFor(route: Route, props: PanelProps): ReactNode {
       return <AccessPanel {...props} />
     case 'access/cookies-file':
       return <CookiesFilePage {...props} />
+    case 'access/passwords':
+      return <PasswordsPage />
     case 'network':
       return <NetworkPanel {...props} />
     case 'network/proxy':

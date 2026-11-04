@@ -85,6 +85,8 @@ function defaults(): AppSettings {
     showAdultServices: false,
     proxy: '',
     cookiesFromBrowser: '',
+    browserStaySignedIn: true,
+    browserSavePasswords: true,
     cookiesFile: '',
     errorReports: 'ask',
     setupDone: false

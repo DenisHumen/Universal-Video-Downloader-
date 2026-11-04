@@ -166,6 +166,8 @@ const SETTING_CHECKS: Record<keyof BackupSettings, Check> = {
   proxy: isText,
   cookiesFromBrowser: (v) => v === '' || oneOf(SUPPORTED_COOKIE_BROWSERS)(v),
   cookiesFile: isText,
+  browserStaySignedIn: isBool,
+  browserSavePasswords: isBool,
   errorReports: oneOf(['ask', 'off'])
 }
 

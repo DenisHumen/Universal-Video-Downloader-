@@ -53,6 +53,8 @@ function settings(overrides: Partial<AppSettings> = {}): AppSettings {
     proxy: '',
     cookiesFromBrowser: '',
     cookiesFile: '',
+    browserStaySignedIn: true,
+    browserSavePasswords: true,
     errorReports: 'ask',
     setupDone: true,
     ...overrides
@@ -71,6 +73,15 @@ describe('accessArgs', () => {
   it('prefers an explicit cookies file over the browser', () => {
     const args = accessArgs(settings({ cookiesFile: '/c.txt', cookiesFromBrowser: 'chrome' }))
     expect(args).toEqual(['--cookies', '/c.txt'])
+  })
+
+  it('uses the built-in browser sign-ins only when nothing else is set', () => {
+    expect(accessArgs(settings(), '/jar.txt')).toEqual(['--cookies', '/jar.txt'])
+    expect(accessArgs(settings({ cookiesFromBrowser: 'firefox' }), '/jar.txt')).toEqual([
+      '--cookies-from-browser',
+      'firefox'
+    ])
+    expect(accessArgs(settings({ cookiesFile: '/c.txt' }), '/jar.txt')).toEqual(['--cookies', '/c.txt'])
   })
 
   it('falls back to the browser when no file is set', () => {

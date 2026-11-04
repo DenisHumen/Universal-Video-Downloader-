@@ -7,12 +7,15 @@ import type { AppErrorCode, AppSettings } from '@shared/types'
  * particular — put in front of their videos. The proxy is not an argument any
  * more; see `proxyEnv`.
  */
-export function accessArgs(settings: AppSettings): string[] {
+export function accessArgs(settings: AppSettings, browserJar?: string): string[] {
   const args: string[] = []
   if (settings.cookiesFile) {
     args.push('--cookies', settings.cookiesFile)
   } else if (settings.cookiesFromBrowser) {
     args.push('--cookies-from-browser', settings.cookiesFromBrowser)
+  } else if (browserJar) {
+    // Signed in to the site in the built-in browser: the download goes as that user too.
+    args.push('--cookies', browserJar)
   }
   return args
 }

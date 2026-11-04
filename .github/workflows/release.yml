@@ -282,6 +282,10 @@ jobs:
             # Kept from draft creation above: the updater reads it (offeredToThisMac).
             echo "Requires macOS 13 or later."
             echo
+            # Versions before 3.26.2 cannot tell a Mac it is too old for this
+            # release, so they offer it anyway; this is where those people land.
+            echo "On macOS 11 or 12? Keep [3.26.2](https://github.com/$REPO/releases/tag/v3.26.2), the last version that runs there."
+            echo
             echo "### Which file do I need?"
             echo
             echo "| Your computer | Download |"

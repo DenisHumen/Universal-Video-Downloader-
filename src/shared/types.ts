@@ -516,6 +516,13 @@ export interface AppSettings {
   /** Optional path to a Netscape-format cookies.txt file (takes precedence over the browser). */
   cookiesFile: string
   /**
+   * Stay signed in to sites in the built-in browser across restarts, and give
+   * the engine its cookies when no other cookies are set. On by default.
+   */
+  browserStaySignedIn: boolean
+  /** Offer to save passwords typed into the built-in browser, and fill them in. */
+  browserSavePasswords: boolean
+  /**
    * Offer to send the developer a report when a link fails. 'ask' still asks
    * every time — there is deliberately no setting that sends on its own.
    */
@@ -797,4 +804,19 @@ export interface SearchResponse {
   results?: SearchResult[]
   error?: string
   errorCode?: AppErrorCode
+}
+
+/** The built-in browser offering to keep a password just typed. */
+export interface BrowserLoginOffer {
+  /** The site's host, for the sentence. */
+  site: string
+  username: string
+  /** A password for that username is saved already, and this one differs. */
+  update: boolean
+}
+
+/** A site with saved passwords, as Settings lists it: never the passwords. */
+export interface SavedSiteLogins {
+  origin: string
+  usernames: string[]
 }

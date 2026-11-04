@@ -17,6 +17,17 @@ import { mt } from './locale'
 import { rendererIndex, wireNavigation } from './navigation'
 import { chromeOptions, forwardMaximized, themeOptions } from './window-chrome'
 import { log } from './log'
+import {
+  flushBrowserCookies,
+  forgetLogins,
+  listLogins,
+  loginsFor,
+  neverForSite,
+  offerFor,
+  saveLogin,
+  signOutOfSites
+} from './browser-logins'
+import { loginOrigin, type SavedLogin } from './browser-logins-rules'
 import type { BrowserMedia, BrowserState, DownloadItem, DownloadRequest } from '@shared/types'
 
 /**
@@ -58,6 +69,56 @@ let releasePage: (() => void) | null = null
 let picking = false
 
 const media = new Map<string, BrowserMedia>()
+
+/** Sign-in popups the page opened, by webContents id: they may report a login too. */
+const popups = new Set<number>()
+
+/** The login the shell is asking about, until it is answered or the page moves on. */
+let offered: { origin: string; login: SavedLogin } | null = null
+
+function offerLogin(origin: string, login: SavedLogin): void {
+  const kind = offerFor(origin, login)
+  if (!kind || !win || win.isDestroyed()) return
+  offered = { origin, login }
+  win.webContents.send(IPC.evtBrowserLoginOffer, {
+    site: new URL(origin).host,
+    username: login.username,
+    update: kind === 'update'
+  })
+}
+
+/** Hand a saved login to the page, if there is one for where it now is. */
+function fillLogin(wc: Electron.WebContents): void {
+  const origin = loginOrigin(wc.getURL())
+  const login = origin ? loginsFor(origin)[0] : undefined
+  if (login) wc.send('browser-site:fill', login)
+}
+
+/**
+ * Sign-in popups are real windows now.
+ *
+ * Every window.open used to be loaded into the page itself, which is fine for
+ * a link and fatal for "Sign in with Google": that flow opens a popup and
+ * reports back to the page that opened it, and with no popup there was nobody
+ * to report to. A window opened with a size (a popup, not a tab) gets its own
+ * small window in the same session, so whatever it signs in to stays signed in.
+ */
+function popupOptions(): Electron.BrowserWindowConstructorOptions {
+  return {
+    width: 520,
+    height: 700,
+    parent: win ?? undefined,
+    autoHideMenuBar: true,
+    icon: icon(),
+    webPreferences: {
+      session: browsingSession(),
+      preload: sitePreload(),
+      contextIsolation: true,
+      nodeIntegration: false,
+      sandbox: true
+    }
+  }
+}
 
 function shellPreload(): string {
   return join(__dirname, '../preload/index.js')
@@ -259,11 +320,25 @@ export function openBrowserWindow(initialUrl?: string): void {
     queue: (download) => void queuePageDownload(download)
   })
   wc.setUserAgent(UA)
-  wc.setWindowOpenHandler(({ url }) => {
-    // Keep popups inside the browser rather than spawning stray windows.
-    if (/^https?:\/\//i.test(url)) void wc.loadURL(url, { userAgent: UA })
+  wc.setWindowOpenHandler(({ url, disposition }) => {
+    if (!/^https?:\/\//i.test(url)) return { action: 'deny' }
+    if (disposition === 'new-window') return { action: 'allow', overrideBrowserWindowOptions: popupOptions() }
+    // A link meant for a new tab: this browser has one page, so it opens here.
+    void wc.loadURL(url, { userAgent: UA })
     return { action: 'deny' }
   })
+  wc.on('did-create-window', (child) => {
+    const id = child.webContents.id
+    popups.add(id)
+    child.webContents.setUserAgent(UA)
+    child.webContents.on('dom-ready', () => fillLogin(child.webContents))
+    child.webContents.setWindowOpenHandler(({ url }) => {
+      if (/^https?:\/\//i.test(url)) void child.webContents.loadURL(url, { userAgent: UA })
+      return { action: 'deny' }
+    })
+    child.on('closed', () => popups.delete(id))
+  })
+  wc.on('dom-ready', () => fillLogin(wc))
   wc.on('did-start-loading', () => sendState())
   wc.on('did-stop-loading', () => sendState())
   wc.on('did-navigate-in-page', () => sendState())
@@ -288,6 +363,9 @@ export function openBrowserWindow(initialUrl?: string): void {
   })
   win.on('ready-to-show', () => win?.show())
   win.on('closed', () => {
+    // Sign-ins made in this window are on disk before anything else can go wrong.
+    void flushBrowserCookies()
+    offered = null
     detach?.()
     detach = null
     releasePage?.()
@@ -419,7 +497,33 @@ export function registerBrowserIpc(): void {
     sendMedia()
   })
 
+  // ---- passwords ----
+  ipcMain.handle(IPC.browserLoginAnswer, async (_e, answer: 'save' | 'never' | 'dismiss') => {
+    const pending = offered
+    offered = null
+    if (!pending) return
+    if (answer === 'save') await saveLogin(pending.origin, pending.login)
+    else if (answer === 'never') await neverForSite(pending.origin)
+  })
+
+  ipcMain.handle(IPC.browserLogins, () => listLogins())
+  ipcMain.handle(IPC.browserForgetLogins, (_e, origin?: string) =>
+    forgetLogins(typeof origin === 'string' ? origin : undefined)
+  )
+  ipcMain.handle(IPC.browserSignOut, () => signOutOfSites())
+
   // ---- messages from the site preload ----
+  ipcMain.on('browser-site:login', (event, typed: { username?: unknown; password?: unknown }) => {
+    const own = event.sender.id === view?.webContents.id || popups.has(event.sender.id)
+    if (!own || typeof typed?.password !== 'string' || !typed.password) return
+    // The site is whatever the sending frame is showing, never what the page claims.
+    const origin = loginOrigin(event.senderFrame?.url || event.sender.getURL())
+    if (!origin) return
+    offerLogin(origin, {
+      username: typeof typed.username === 'string' ? typed.username.slice(0, 256) : '',
+      password: typed.password.slice(0, 1024)
+    })
+  })
   ipcMain.on('browser-site:pick', (_e, result: { kind: string; src?: string; poster?: string }) => {
     picking = false
     sendState()

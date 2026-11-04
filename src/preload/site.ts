@@ -36,12 +36,10 @@ function ensureOverlay(): HTMLDivElement {
     position: 'fixed',
     pointerEvents: 'none',
     zIndex: '2147483647',
-    /* The system's one saturated colour. This was still the violet the
-       redesign replaced, so the app's own overlay was off-brand on every page
-       it appeared on. */
-    border: '2px solid #2f5bff',
+    /* The system's one saturated colour: Yaru orange, as the app's accent. */
+    border: '2px solid #e95420',
     borderRadius: '6px',
-    background: 'rgba(47, 91, 255, 0.16)',
+    background: 'rgba(233, 84, 32, 0.16)',
     transition: 'all 60ms linear',
     display: 'none'
   } satisfies Partial<CSSStyleDeclaration>)
@@ -216,4 +214,131 @@ function reportDomMedia(): void {
 window.addEventListener('DOMContentLoaded', () => {
   reportDomMedia()
   setInterval(reportDomMedia, 2500)
+})
+
+/*
+  Passwords.
+
+  When a password is sent - a form submitted, Enter in a password box, a click
+  on the button beside it - the login is reported so the browser can offer to
+  keep it. The main process decides whether to ask, and takes the site from
+  the frame that sent this, never from anything the page says. When main has a
+  login for the site it sends it back, and it is typed into the first password
+  form that appears, without submitting anything.
+*/
+const CHANNEL_LOGIN = 'browser-site:login'
+const CHANNEL_FILL = 'browser-site:fill'
+
+function visible(el: HTMLElement): boolean {
+  const box = el.getBoundingClientRect()
+  return box.width > 0 && box.height > 0 && getComputedStyle(el).visibility !== 'hidden'
+}
+
+function passwordFields(root: ParentNode = document): HTMLInputElement[] {
+  return Array.from(root.querySelectorAll<HTMLInputElement>('input[type="password"]')).filter(visible)
+}
+
+/** The username box that goes with a password box: the last text-like field before it. */
+function usernameFor(password: HTMLInputElement): HTMLInputElement | undefined {
+  const scope: ParentNode = password.form ?? document
+  const fields = Array.from(
+    scope.querySelectorAll<HTMLInputElement>(
+      'input[autocomplete="username"], input[type="email"], input[type="text"], input[type="tel"], input:not([type])'
+    )
+  ).filter(visible)
+  const tagged = fields.find((f) => f.autocomplete === 'username')
+  if (tagged) return tagged
+  const before = fields.filter(
+    (f) => f.compareDocumentPosition(password) & Node.DOCUMENT_POSITION_FOLLOWING
+  )
+  return before[before.length - 1] ?? fields[0]
+}
+
+let lastSent = ''
+function reportLogin(password: HTMLInputElement | undefined): void {
+  if (!password || !password.value) return
+  // A new-password box on a sign-up or change form is still the password to keep.
+  const username = usernameFor(password)?.value.trim() ?? ''
+  const key = username + '\u0000' + password.value
+  if (key === lastSent) return
+  lastSent = key
+  ipcRenderer.send(CHANNEL_LOGIN, { username, password: password.value })
+}
+
+document.addEventListener(
+  'submit',
+  (event) => {
+    const form = event.target as HTMLFormElement | null
+    if (form) reportLogin(passwordFields(form).pop())
+  },
+  true
+)
+document.addEventListener(
+  'keydown',
+  (event) => {
+    const el = event.target as HTMLInputElement | null
+    if (event.key === 'Enter' && el?.type === 'password') reportLogin(el)
+  },
+  true
+)
+document.addEventListener(
+  'click',
+  (event) => {
+    const button = (event.target as Element | null)?.closest?.('button, input[type="submit"], [role="button"]')
+    if (!button) return
+    const filled = passwordFields().filter((p) => p.value)
+    if (filled.length) reportLogin(filled[filled.length - 1])
+  },
+  true
+)
+
+/** Type into a field the way a person would, so frameworks that watch input see it. */
+function typeInto(field: HTMLInputElement, value: string): void {
+  const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set
+  setter?.call(field, value)
+  field.dispatchEvent(new Event('input', { bubbles: true }))
+  field.dispatchEvent(new Event('change', { bubbles: true }))
+}
+
+let pendingFill: { username: string; password: string } | null = null
+let fillObserver: MutationObserver | null = null
+
+function tryFill(): boolean {
+  if (!pendingFill) return true
+  const password = passwordFields().find((p) => !p.value && p.autocomplete !== 'new-password')
+  const user = password ? usernameFor(password) : undefined
+  // A two-step sign-in shows the username first, on its own.
+  const loneUser =
+    !password &&
+    document.querySelector<HTMLInputElement>('input[autocomplete="username"], input[type="email"]')
+  if (password) {
+    if (user && !user.value && pendingFill.username) typeInto(user, pendingFill.username)
+    typeInto(password, pendingFill.password)
+    lastSent = (pendingFill.username || '') + '\u0000' + pendingFill.password
+    pendingFill = null
+    return true
+  }
+  if (loneUser && visible(loneUser) && !loneUser.value && pendingFill.username) {
+    typeInto(loneUser, pendingFill.username)
+  }
+  return false
+}
+
+ipcRenderer.on(CHANNEL_FILL, (_e, login: { username: string; password: string }) => {
+  pendingFill = login
+  if (tryFill()) return
+  fillObserver?.disconnect()
+  fillObserver = new MutationObserver(() => {
+    if (tryFill()) {
+      fillObserver?.disconnect()
+      fillObserver = null
+    }
+  })
+  fillObserver.observe(document.documentElement, { childList: true, subtree: true })
+  // Not forever: a page with no sign-in form has no use for the password.
+  setTimeout(() => {
+    fillObserver?.disconnect()
+    fillObserver = null
+    pendingFill = null
+  }, 60_000)
 })

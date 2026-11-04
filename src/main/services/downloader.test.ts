@@ -48,6 +48,8 @@ function settings(overrides: Partial<AppSettings> = {}): AppSettings {
     proxy: '',
     cookiesFromBrowser: '',
     cookiesFile: '',
+    browserStaySignedIn: true,
+    browserSavePasswords: true,
     ...overrides
   }
 }

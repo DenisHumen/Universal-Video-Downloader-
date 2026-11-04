@@ -36,7 +36,8 @@ const TEXT = {
     blocked: 'If macOS blocks the script too',
     blockedBody:
       'Open System Settings › Privacy & Security, scroll down, and click “Open Anyway” next to the blocked item. Or simply paste the command above into Terminal: that always works.',
-    once: 'You need this once after each install or update.'
+    once: 'You need this once after each install or update.',
+    old: 'Needs macOS 13 Ventura or later. On macOS 11 or 12 this version will not open: keep version 3.26.2 from the releases page, the last one that runs there.'
   },
   ru: {
     title: `Как открыть ${productName} на macOS`,
@@ -50,7 +51,8 @@ const TEXT = {
     blocked: 'Если macOS блокирует и скрипт',
     blockedBody:
       'Откройте «Системные настройки» › «Конфиденциальность и безопасность», прокрутите вниз и нажмите «Всё равно открыть» рядом с заблокированным объектом. Или просто вставьте команду выше в «Терминал» — это работает всегда.',
-    once: 'Это нужно один раз после каждой установки или обновления.'
+    once: 'Это нужно один раз после каждой установки или обновления.',
+    old: 'Нужна macOS 13 Ventura или новее. На macOS 11 и 12 эта версия не откроется: оставайтесь на версии 3.26.2 со страницы релизов — последней, которая там работает.'
   }
 }
 
@@ -69,6 +71,7 @@ const page = (t) => `
   <h2>${esc(t.blocked)}</h2>
   <p>${esc(t.blockedBody)}</p>
   <p class="once">${esc(t.once)}</p>
+  <p class="once">${esc(t.old)}</p>
 </section>`
 
 const html = `<!doctype html><html><head><meta charset="utf-8"><style>

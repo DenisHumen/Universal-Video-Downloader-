@@ -56,6 +56,7 @@ import { refreshCliScript } from './services/cli-install'
 import { taskbarProgress } from './services/taskbar'
 import { coalesce } from './services/coalesce'
 import { infoCache } from './services/info-store'
+import { flushBrowserCookies, initBrowserLogins } from './services/browser-logins'
 
 const isMac = process.platform === 'darwin'
 let mainWindow: BrowserWindow | null = null
@@ -558,6 +559,7 @@ function applySettings(settings: AppSettings): void {
     startClipboardWatch((url) => deliver(IPC.evtClipboardLink, 'link', url))
   } else {
     stopClipboardWatch()
+    void flushBrowserCookies()
   }
 
   /*
@@ -630,6 +632,8 @@ if (cliArgs) {
     // Before any request is made: the proxy the user set applies to our own too.
     void applyProxy(getSettings())
     answerProxyLoginsForPages()
+    // Sign-ins made in the built-in browser: kept across restarts, and handed to the engine.
+    initBrowserLogins()
 
     if (process.platform === 'win32') {
       app.setAppUserModelId('com.denishumen.universalvideodownloader')

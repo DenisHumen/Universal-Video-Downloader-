@@ -56,6 +56,7 @@ import { isAbsoluteUrl, normalizeUrl } from '@shared/urls'
 import { infoKey, isStaleInfoError } from './info-cache'
 import { infoCache } from './info-store'
 import { numberedName } from '@shared/playlist'
+import { browserCookiesFile } from './browser-logins'
 import { hasTrim } from '@shared/types'
 import type {
   AppErrorCode,
@@ -551,7 +552,7 @@ export function buildArgs(
     fetches five fragments at a time and reports bytes, and ffmpeg does neither.
   */
   if (item.hlsViaFfmpeg) args.push('--downloader', 'm3u8:ffmpeg')
-  args.push(...accessArgs(settings))
+  args.push(...accessArgs(settings, browserCookiesFile()))
   args.push(...headerArgs(item.headers))
   if (item.referer) args.push('--referer', item.referer)
   if (settings.restrictFilenames) args.push('--restrict-filenames')
