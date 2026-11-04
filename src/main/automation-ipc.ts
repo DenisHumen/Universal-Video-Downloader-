@@ -1,4 +1,5 @@
-import { ipcMain, BrowserWindow } from 'electron'
+import { existsSync } from 'fs'
+import { dialog, ipcMain, BrowserWindow } from 'electron'
 import { randomUUID } from 'crypto'
 import { IPC } from '@shared/ipc'
 import { describeSeries } from './services/automation/detect'
@@ -15,6 +16,7 @@ import { rescheduledCheck } from './services/automation/backoff'
 import { checkNow, retryRun } from './services/automation/watcher'
 import { stopEpisode } from './services/automation/pipeline'
 import { testTarget } from './services/automation/smb'
+import { shareForFolder } from './services/automation/share-folder'
 import { sendTest } from './services/automation/telegram'
 import { getSecretWhenReady, hasSecret, SECRET, secretsPersist, setSecret } from './services/secrets'
 import { logFilePath } from './services/log'
@@ -22,13 +24,16 @@ import { getSettings } from './services/settings'
 import { coalesce } from './services/coalesce'
 import {
   exactDuplicate,
+  formatSmbPath,
   inheritedSeen,
+  normaliseSmbTarget,
   settleRunError,
   type AddedWatch,
   type CheckSummary,
   type EpisodeRef,
   type RetryAnswer,
   type Run,
+  type ShareFolderPick,
   type SmbTarget,
   type Watch
 } from '@shared/automation'
@@ -176,6 +181,36 @@ export function registerAutomationIpc(): void {
     async (_e, target: SmbTarget, password: string): Promise<string> => {
       const secret = password || (await getSecretWhenReady(SECRET.smbPassword(target.id))) || ''
       return testTarget(target, secret)
+    }
+  )
+
+  /*
+    No typing the path: the system dialog already browses the network, and the
+    folder it answers with is on a share the OS has mounted somewhere. Start it
+    where those mounts are, so the shares are the first thing on screen.
+  */
+  ipcMain.handle(
+    IPC.autoChooseShareFolder,
+    async (event, current: SmbTarget, title: string): Promise<ShareFolderPick> => {
+      const win = BrowserWindow.fromWebContents(event.sender) ?? undefined
+      const target = normaliseSmbTarget(current)
+      const unc = formatSmbPath({ host: target.host, share: target.share, folder: target.path ?? '' })
+      const start =
+        process.platform === 'win32'
+          ? unc || undefined
+          : process.platform === 'darwin'
+            ? '/Volumes'
+            : [`/run/user/${process.getuid?.() ?? 1000}/gvfs`].find((p) => existsSync(p))
+      const options: Electron.OpenDialogOptions = {
+        title: String(title || ''),
+        defaultPath: start,
+        properties: ['openDirectory', 'createDirectory']
+      }
+      const result = win ? await dialog.showOpenDialog(win, options) : await dialog.showOpenDialog(options)
+      if (result.canceled || !result.filePaths.length) return null
+      const picked = result.filePaths[0]
+      const location = await shareForFolder(picked)
+      return location ? { location } : { local: picked }
     }
   )
 

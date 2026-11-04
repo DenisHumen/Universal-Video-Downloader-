@@ -841,7 +841,15 @@ export const en = {
   'auto.shareNew': 'A different share…',
   'auto.sharePath': 'Path',
   'auto.sharePathHint':
-    'The whole path, written the way you would type it into an address bar. Any folder that is not there yet gets created',
+    'Choose the folder with Browse, or paste the whole path the way you would type it into an address bar. Any folder that is not there yet gets created',
+  'auto.shareBrowse': 'Browse…',
+  'auto.shareBrowseTitle': 'Choose a network folder',
+  'auto.shareLocal.linux':
+    'That folder is on this computer, not on the network. Open the share in Files (Other Locations → Connect to Server), then pick a folder on it',
+  'auto.shareLocal.darwin':
+    'That folder is on this computer, not on the network. Connect to the server in Finder (⌘K), then pick a folder on it',
+  'auto.shareLocal.win32':
+    'That folder is on this computer, not on the network. Pick a folder under Network, or on a mapped network drive',
   'auto.shareFolder': 'Folder',
   'auto.shareRoot': 'The share itself',
   'auto.shareHost': 'Server',

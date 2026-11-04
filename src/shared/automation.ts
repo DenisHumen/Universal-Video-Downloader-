@@ -741,6 +741,16 @@ export interface SmbLocation {
   folder: string
 }
 
+/** A folder picked in the system dialog, worked back to the share it is on. */
+export interface PickedShare extends SmbLocation {
+  /** The login the OS mounted it with, when it kept one. */
+  username?: string
+  domain?: string
+}
+
+/** What browsing for a share folder came back with: a share, a folder on this computer, or nothing. */
+export type ShareFolderPick = { location: PickedShare } | { local: string } | null
+
 /**
  * Split the thing people actually write into the three parts SMB needs.
  *

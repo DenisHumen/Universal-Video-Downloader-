@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Check, Loader2 } from '../ui/icons'
+import { Check, FolderOpen, Loader2 } from '../ui/icons'
+import { useStore } from '../store'
 import { useT } from '../i18n'
 import { toast } from '../lib/toast'
 import { describeError } from '../lib/errors'
@@ -71,7 +72,8 @@ function Field({
   onChange,
   placeholder,
   type = 'text',
-  hint
+  hint,
+  action
 }: {
   label: string
   value: string
@@ -79,19 +81,31 @@ function Field({
   placeholder?: string
   type?: 'text' | 'password'
   hint?: string
+  /** A button beside the entry, as GTK puts one at the end of a linked box. */
+  action?: JSX.Element
 }): JSX.Element {
+  const input = (
+    <input
+      type={type}
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      placeholder={placeholder}
+      aria-label={label}
+      className="field mono w-full min-w-0 text-control"
+      spellCheck={false}
+    />
+  )
   return (
     <div>
       <p className="label mb-1.5">{label}</p>
-      <input
-        type={type}
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        placeholder={placeholder}
-        aria-label={label}
-        className="field mono w-full text-control"
-        spellCheck={false}
-      />
+      {action ? (
+        <div className="flex items-center gap-1.5">
+          {input}
+          {action}
+        </div>
+      ) : (
+        input
+      )}
       {hint && <p className="hint mt-1">{hint}</p>}
     </div>
   )
@@ -170,6 +184,45 @@ export function ShareForm({
 
   const ready = Boolean(target.host && target.share && target.username)
 
+  /*
+    Or no typing at all. The system dialog browses the network the way the
+    file manager does; main works the folder picked back to the share it is
+    on, and brings the login along when the OS mounted it with one.
+  */
+  const platform = useStore((s) => s.appInfo?.platform)
+  const [browsing, setBrowsing] = useState(false)
+  const browse = async (): Promise<void> => {
+    setBrowsing(true)
+    try {
+      const picked = await window.api.autoChooseShareFolder(target, t('auto.shareBrowseTitle'))
+      if (!picked) return
+      if ('local' in picked) {
+        const key =
+          platform === 'darwin'
+            ? 'auto.shareLocal.darwin'
+            : platform === 'win32'
+              ? 'auto.shareLocal.win32'
+              : 'auto.shareLocal.linux'
+        toast(t(key), 'error')
+        return
+      }
+      const { location } = picked
+      setText(formatSmbPath(location))
+      onTarget({
+        ...target,
+        host: location.host,
+        share: location.share,
+        path: location.folder,
+        username: target.username || location.username || '',
+        domain: target.domain || location.domain || ''
+      })
+    } catch (err) {
+      toast(describeError(err), 'error')
+    } finally {
+      setBrowsing(false)
+    }
+  }
+
   const test = async (): Promise<void> => {
     setTesting(true)
     try {
@@ -189,6 +242,18 @@ export function ShareForm({
         onChange={setPath}
         placeholder={PLACEHOLDER}
         hint={t('auto.sharePathHint')}
+        action={
+          <button
+            type="button"
+            className="btn-quiet shrink-0"
+            onClick={() => void browse()}
+            disabled={browsing}
+            title={t('auto.shareBrowseTitle')}
+          >
+            {browsing ? <Loader2 size={14} className="animate-spin" /> : <FolderOpen size={14} />}
+            {t('auto.shareBrowse')}
+          </button>
+        }
       />
 
       {(target.host || target.share) && (

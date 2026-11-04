@@ -645,6 +645,9 @@ export function installMockApi(): void {
     },
     autoRetryRun: async () => ({ started: true }),
     autoTestSmb: async () => 'Connected.',
+    autoChooseShareFolder: async () => ({
+      location: { host: '192.168.1.10', share: 'shared', folder: 'video/series', username: 'denis' }
+    }),
     autoTestTelegram: async () => 'Connected.',
     autoSetSecret: async () => true,
     autoSecretState: async () => ({ telegram: false, smb: {}, proxy: false, persists: true }),

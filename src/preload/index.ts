@@ -1,4 +1,4 @@
-import type { AddedWatch, CheckSummary, RetryAnswer, Run, SmbTarget, Watch } from '@shared/automation'
+import type { AddedWatch, CheckSummary, RetryAnswer, Run, ShareFolderPick, SmbTarget, Watch } from '@shared/automation'
 import type { ReportPreview, SendOutcome } from '@shared/report'
 import type { ExportOutcome, ImportOutcome } from '@shared/backup'
 import type { SeriesOffer } from '../main/automation-ipc'
@@ -153,6 +153,9 @@ const api = {
   autoRetryRun: (runId: string): Promise<RetryAnswer> => ipcRenderer.invoke(IPC.autoRetryRun, runId),
   autoTestSmb: (target: SmbTarget, password: string): Promise<string> =>
     ipcRenderer.invoke(IPC.autoTestSmb, target, password),
+  /** The system folder dialog, answered with the share the folder is on. */
+  autoChooseShareFolder: (current: SmbTarget, title: string): Promise<ShareFolderPick> =>
+    ipcRenderer.invoke(IPC.autoChooseShareFolder, current, title),
   autoTestTelegram: (token: string, chatId: string): Promise<string> =>
     ipcRenderer.invoke(IPC.autoTestTelegram, token, chatId),
   /** One way. There is no channel that reads a secret back. */
