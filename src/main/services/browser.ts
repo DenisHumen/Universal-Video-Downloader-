@@ -1,8 +1,8 @@
-import { BrowserWindow, WebContentsView, ipcMain, nativeImage, shell } from 'electron'
+import { BrowserWindow, WebContentsView, ipcMain, nativeImage, shell, type WebContents } from 'electron'
 import { join } from 'path'
 import { randomUUID } from 'crypto'
 import { IPC } from '@shared/ipc'
-import { UA } from '../resolvers/http'
+import { BROWSER_UA, isGoogleSignIn, SIGN_IN_UA } from './browser-identity'
 import {
   attachCapture,
   browsingSession,
@@ -24,11 +24,18 @@ import {
   loginsFor,
   neverForSite,
   offerFor,
+  importSignIns,
   saveLogin,
   signOutOfSites
 } from './browser-logins'
 import { loginOrigin, type SavedLogin } from './browser-logins-rules'
-import type { BrowserMedia, BrowserState, DownloadItem, DownloadRequest } from '@shared/types'
+import {
+  SUPPORTED_COOKIE_BROWSERS,
+  type BrowserMedia,
+  type BrowserState,
+  type DownloadItem,
+  type DownloadRequest
+} from '@shared/types'
 
 /**
  * The built-in browser.
@@ -254,7 +261,7 @@ export function openBrowserWindow(initialUrl?: string): void {
   if (win && !win.isDestroyed()) {
     if (win.isMinimized()) win.restore()
     win.focus()
-    if (initialUrl) void view?.webContents.loadURL(normalizeInput(initialUrl), { userAgent: UA })
+    if (initialUrl) void view?.webContents.loadURL(normalizeInput(initialUrl))
     return
   }
 
@@ -286,7 +293,7 @@ export function openBrowserWindow(initialUrl?: string): void {
     used to load right there, a remote page holding the full preload bridge;
     it now opens in the page view, which is where a dropped link was meant to go.
   */
-  wireNavigation(win, (url) => void view?.webContents.loadURL(url, { userAgent: UA }))
+  wireNavigation(win, (url) => void view?.webContents.loadURL(url))
   forwardMaximized(win)
 
   view = new WebContentsView({
@@ -319,21 +326,21 @@ export function openBrowserWindow(initialUrl?: string): void {
     onScreen: () => Boolean(win && !win.isDestroyed() && win.isVisible()),
     queue: (download) => void queuePageDownload(download)
   })
-  wc.setUserAgent(UA)
+  followIdentity(wc)
   wc.setWindowOpenHandler(({ url, disposition }) => {
     if (!/^https?:\/\//i.test(url)) return { action: 'deny' }
     if (disposition === 'new-window') return { action: 'allow', overrideBrowserWindowOptions: popupOptions() }
     // A link meant for a new tab: this browser has one page, so it opens here.
-    void wc.loadURL(url, { userAgent: UA })
+    void wc.loadURL(url)
     return { action: 'deny' }
   })
   wc.on('did-create-window', (child) => {
     const id = child.webContents.id
     popups.add(id)
-    child.webContents.setUserAgent(UA)
+    followIdentity(child.webContents)
     child.webContents.on('dom-ready', () => fillLogin(child.webContents))
     child.webContents.setWindowOpenHandler(({ url }) => {
-      if (/^https?:\/\//i.test(url)) void child.webContents.loadURL(url, { userAgent: UA })
+      if (/^https?:\/\//i.test(url)) void child.webContents.loadURL(url)
       return { action: 'deny' }
     })
     child.on('closed', () => popups.delete(id))
@@ -390,7 +397,24 @@ export function openBrowserWindow(initialUrl?: string): void {
     sendMedia()
   })
 
-  void wc.loadURL(normalizeInput(initialUrl || 'https://duckduckgo.com'), { userAgent: UA })
+  void wc.loadURL(normalizeInput(initialUrl || 'https://duckduckgo.com'))
+}
+
+/**
+ * Chrome everywhere, Firefox on Google's sign-in pages: see browser-identity.ts.
+ * The headers are rewritten on the way out in capture.ts; this is the same name
+ * for the page's own scripts, which read `navigator.userAgent`. A redirect can
+ * land on the sign-in page as well as a link can, so both are watched.
+ */
+function followIdentity(contents: WebContents): void {
+  contents.setUserAgent(BROWSER_UA)
+  const follow = (details: { url: string; isMainFrame: boolean; isSameDocument: boolean }): void => {
+    if (!details.isMainFrame || details.isSameDocument) return
+    const ua = isGoogleSignIn(details.url) ? SIGN_IN_UA : BROWSER_UA
+    if (contents.getUserAgent() !== ua) contents.setUserAgent(ua)
+  }
+  contents.on('did-start-navigation', follow)
+  contents.on('did-redirect-navigation', follow)
 }
 
 function defaultFormat(): Pick<DownloadRequest, 'mode' | 'quality'> {
@@ -470,7 +494,7 @@ async function queuePageDownload(download: QueuedPageDownload): Promise<void> {
 export function registerBrowserIpc(): void {
   ipcMain.handle(IPC.browserOpen, (_e, url?: string) => openBrowserWindow(url))
   ipcMain.handle(IPC.browserNavigate, (_e, url: string) => {
-    void view?.webContents.loadURL(normalizeInput(url), { userAgent: UA })
+    void view?.webContents.loadURL(normalizeInput(url))
   })
   ipcMain.handle(IPC.browserBack, () => {
     if (view?.webContents.navigationHistory.canGoBack()) view.webContents.navigationHistory.goBack()
@@ -511,6 +535,11 @@ export function registerBrowserIpc(): void {
     forgetLogins(typeof origin === 'string' ? origin : undefined)
   )
   ipcMain.handle(IPC.browserSignOut, () => signOutOfSites())
+  ipcMain.handle(IPC.browserImportSignIns, (_e, browser: unknown) =>
+    typeof browser === 'string' && (SUPPORTED_COOKIE_BROWSERS as readonly string[]).includes(browser)
+      ? importSignIns(browser)
+      : { ok: false, why: 'failed' }
+  )
 
   // ---- messages from the site preload ----
   ipcMain.on('browser-site:login', (event, typed: { username?: unknown; password?: unknown }) => {
@@ -542,11 +571,11 @@ export function registerBrowserIpc(): void {
     if (!/^https?:\/\//i.test(result.src)) return
     if (result.kind === 'link') {
       // The user pointed at a thumbnail — open that page and keep watching.
-      void view?.webContents.loadURL(result.src, { userAgent: UA })
+      void view?.webContents.loadURL(result.src)
       return
     }
     if (result.kind === 'iframe') {
-      void view?.webContents.loadURL(result.src, { userAgent: UA })
+      void view?.webContents.loadURL(result.src)
       return
     }
     rememberCandidate({
@@ -555,7 +584,7 @@ export function registerBrowserIpc(): void {
       // A source the user pointed at directly outranks anything we guessed.
       score: 130,
       source: 'picked',
-      headers: { Referer: view?.webContents.getURL() ?? '', 'User-Agent': UA }
+      headers: { Referer: view?.webContents.getURL() ?? '', 'User-Agent': BROWSER_UA }
     })
   })
 
@@ -579,7 +608,7 @@ export function registerBrowserIpc(): void {
           kind,
           score,
           source: 'dom',
-          headers: { Referer: view?.webContents.getURL() ?? '', 'User-Agent': UA }
+          headers: { Referer: view?.webContents.getURL() ?? '', 'User-Agent': BROWSER_UA }
         })
       }
     }

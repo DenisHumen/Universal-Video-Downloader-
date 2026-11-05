@@ -1,4 +1,4 @@
-import { ipcRenderer } from 'electron'
+import { contextBridge, ipcRenderer } from 'electron'
 
 /**
  * Preload for the *site* view inside the built-in browser.
@@ -10,6 +10,24 @@ import { ipcRenderer } from 'electron'
  * for sites where automatic detection comes up empty: the user simply points
  * at the video.
  */
+
+/*
+  On Google's sign-in page the browser says it is Firefox (see
+  browser-identity.ts in the main process), and Firefox has no
+  navigator.userAgentData. Chromium's would still name Chromium, so it goes,
+  before any of the page's own scripts can read it.
+*/
+if (location.protocol === 'https:' && /^accounts\.(google|youtube)\.com$/.test(location.hostname)) {
+  try {
+    contextBridge.executeInMainWorld({
+      func: () => {
+        delete (Navigator.prototype as { userAgentData?: unknown }).userAgentData
+      }
+    })
+  } catch {
+    /* an older page world: the headers alone still say Firefox */
+  }
+}
 
 const CHANNEL_PICK = 'browser-site:pick'
 const CHANNEL_MEDIA = 'browser-site:media'

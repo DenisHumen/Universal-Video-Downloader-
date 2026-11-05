@@ -1,11 +1,17 @@
 import { app, type Cookie } from 'electron'
-import { chmodSync, renameSync, writeFileSync } from 'fs'
+import { spawn } from 'child_process'
+import { chmodSync, readFileSync, renameSync, rmSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { browsingSession } from '../resolvers/universal/capture'
 import { getSettings } from './settings'
 import { getSecret, SECRET, setSecret } from './secrets'
 import { log } from './log'
+import { ytdlpBinaryPath, ytdlpSpawnOptions } from './ytdlp'
+import type { SignInImport } from '@shared/types'
 import {
+  fromNetscape,
+  importFailure,
+  siteCount,
   netscapeCount,
   persistentCopy,
   saveKind,
@@ -102,6 +108,69 @@ export async function signOutOfSites(): Promise<void> {
   await ses.clearCache()
   writeJar([])
   log.info('browser', 'Signed out of every site in the built-in browser')
+}
+
+/**
+ * Sign the built-in browser in wherever another browser on this computer is.
+ *
+ * The one way into a site that will not let an embedded browser sign in -
+ * Google above all - and a quicker one into every other. The engine already
+ * reads browsers' cookies for downloads, decryption and all, so it is asked to
+ * write them out, and they are set here. It needs a URL to do anything, so it
+ * is given one that is not a URL: it reads the browser, fails on that at once
+ * without going near the network, and writes the cookies out on its way out.
+ */
+export async function importSignIns(browser: string): Promise<SignInImport> {
+  const file = join(app.getPath('userData'), `import-${process.pid}-${Date.now()}.txt`)
+  try {
+    const stderr = await new Promise<string>((resolve) => {
+      const child = spawn(
+        ytdlpBinaryPath(),
+        ['--ignore-config', '--no-warnings', '--cookies-from-browser', browser, '--cookies', file, '--skip-download', 'uvd-cookie-export'],
+        ytdlpSpawnOptions()
+      )
+      let err = ''
+      child.stderr?.setEncoding('utf8')
+      child.stderr?.on('data', (d: string) => (err += d))
+      const timer = setTimeout(() => child.kill(), 120_000)
+      child.on('error', (e) => {
+        clearTimeout(timer)
+        resolve(String(e))
+      })
+      child.on('close', () => {
+        clearTimeout(timer)
+        resolve(err)
+      })
+    })
+    let text = ''
+    try {
+      text = readFileSync(file, 'utf8')
+    } catch {
+      /* nothing was written: the browser could not be read */
+    }
+    const cookies = fromNetscape(text, Date.now() / 1000)
+    if (cookies.length === 0) {
+      const why = /Extracted 0 cookies/i.test(stderr) ? 'empty' : importFailure(stderr)
+      log.warn('browser', 'Could not import sign-ins', { browser, why, detail: stderr.split('\n').filter((l) => l && !l.includes('uvd-cookie-export')).join(' ').slice(-400) })
+      return { ok: false, why }
+    }
+    const ses = browsingSession()
+    const set: typeof cookies = []
+    for (const cookie of cookies) {
+      try {
+        await ses.cookies.set(cookie)
+        set.push(cookie)
+      } catch {
+        /* Chromium turns some down - a cookie for an IP, say. The rest still count. */
+      }
+    }
+    await flushBrowserCookies()
+    scheduleJar()
+    log.info('browser', 'Imported sign-ins', { browser, cookies: set.length })
+    return { ok: true, sites: siteCount(set) }
+  } finally {
+    rmSync(file, { force: true })
+  }
 }
 
 // ---------------------------------------------------------------------------

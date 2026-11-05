@@ -425,6 +425,7 @@ export function installMockApi(): void {
     browserLogins: async () => [{ origin: 'https://example.com', usernames: ['denis'] }],
     browserForgetLogins: async () => true,
     browserSignOut: async () => undefined,
+    browserImportSignIns: async () => ({ ok: true as const, sites: 12 }),
     pauseAll: async () => undefined,
     resumeAll: async () => undefined,
     retryFailed: async () => undefined,

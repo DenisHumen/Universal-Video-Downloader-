@@ -30,7 +30,8 @@ import type {
   SearchScope,
   UpdateStatus,
   YtDlpStatus,
-  SavedSiteLogins
+  SavedSiteLogins,
+  SignInImport
 } from '@shared/types'
 
 export interface AppInfo {
@@ -118,6 +119,8 @@ const api = {
   browserForgetLogins: (origin?: string): Promise<boolean> =>
     ipcRenderer.invoke(IPC.browserForgetLogins, origin),
   browserSignOut: (): Promise<void> => ipcRenderer.invoke(IPC.browserSignOut),
+  browserImportSignIns: (browser: string): Promise<SignInImport> =>
+    ipcRenderer.invoke(IPC.browserImportSignIns, browser),
 
   pauseAll: (): Promise<void> => ipcRenderer.invoke(IPC.downloadPauseAll),
   resumeAll: (): Promise<void> => ipcRenderer.invoke(IPC.downloadResumeAll),

@@ -1,10 +1,13 @@
 import { describe, expect, it } from 'vitest'
 import {
+  fromNetscape,
+  importFailure,
   KEEP_SESSION_COOKIE_S,
   loginOrigin,
   netscapeCount,
   persistentCopy,
   saveKind,
+  siteCount,
   toNetscape,
   withLogin
 } from './browser-logins-rules'
@@ -81,5 +84,51 @@ describe('saved passwords', () => {
     expect(saveKind(saved, { username: 'bob', password: '1' })).toBe('new')
     expect(withLogin(saved, { username: 'ann', password: '2' })).toEqual([{ username: 'ann', password: '2' }])
     expect(withLogin(saved, { username: 'bob', password: '3' })[0].username).toBe('bob')
+  })
+})
+
+describe('signing in from another browser', () => {
+  const jar = [
+    '# Netscape HTTP Cookie File',
+    '',
+    '#HttpOnly_.youtube.com\tTRUE\t/\tTRUE\t2000000000\tSID\ts',
+    'site.tv\tFALSE\t/watch\tFALSE\t0\tpref\ta\tb',
+    '.example.com\tTRUE\t/\tTRUE\t2000000000\t__Host-x\th',
+    '.old.tv\tTRUE\t/\tFALSE\t100\tgone\tx',
+    'broken line'
+  ].join('\n')
+
+  it('reads the engine’s export as cookies the browser can set', () => {
+    const cookies = fromNetscape(jar, 1_000)
+    expect(cookies).toEqual([
+      {
+        url: 'https://youtube.com/',
+        name: 'SID',
+        value: 's',
+        domain: '.youtube.com',
+        path: '/',
+        secure: true,
+        httpOnly: true,
+        expirationDate: 2000000000
+      },
+      { url: 'http://site.tv/watch', name: 'pref', value: 'a\tb', path: '/watch', secure: false, httpOnly: false },
+      {
+        url: 'https://example.com/',
+        name: '__Host-x',
+        value: 'h',
+        path: '/',
+        secure: true,
+        httpOnly: false,
+        expirationDate: 2000000000
+      }
+    ])
+    expect(siteCount(cookies)).toBe(3)
+  })
+
+  it('says why a browser could not be read', () => {
+    expect(importFailure('ERROR: could not find firefox cookies database in /x')).toBe('notFound')
+    expect(importFailure('ERROR: Could not copy Chrome cookie database. See …')).toBe('locked')
+    expect(importFailure('ERROR: Failed to decrypt with DPAPI')).toBe('encrypted')
+    expect(importFailure('something else')).toBe('failed')
   })
 })

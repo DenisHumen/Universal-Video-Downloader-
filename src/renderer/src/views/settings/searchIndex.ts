@@ -48,6 +48,7 @@ export const SEARCH_INDEX: IndexEntry[] = [
   { route: 'access#cookies', title: 'settings.cookies', hint: 'settings.cookiesHint' },
   { route: 'access/cookies-file', title: 'settings.cookiesFile', hint: 'settings.cookiesFileHint' },
   { route: 'access/passwords', title: 'prefs.sub.passwords', hint: 'prefs.row.browserPasswordsHint' },
+  { route: 'access/import', title: 'prefs.sub.importSignIns', hint: 'prefs.row.importSignInsHint' },
   { route: 'access', title: 'prefs.row.browserSignedIn', hint: 'prefs.row.browserSignedInHint' },
   { route: 'access#errorReports', title: 'settings.errorReports', hint: 'settings.errorReportsHint' },
   { route: 'network/proxy#address', title: 'settings.proxy' },

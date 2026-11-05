@@ -39,6 +39,7 @@ export const IPC = {
   browserLogins: 'browser:logins',
   browserForgetLogins: 'browser:forget-logins',
   browserSignOut: 'browser:sign-out',
+  browserImportSignIns: 'browser:import-sign-ins',
   downloadPauseAll: 'download:pause-all',
   downloadResumeAll: 'download:resume-all',
   downloadPrioritize: 'download:prioritize',

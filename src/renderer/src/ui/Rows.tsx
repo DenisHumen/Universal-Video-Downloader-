@@ -55,7 +55,7 @@ export function PreferencesGroup({ title, description, suffix, children, id, foo
   const titleId = useId()
   return (
     <section id={id} data-row={id} aria-labelledby={title ? titleId : undefined} className="space-y-3">
-      {(title || suffix) && (
+      {(title || description || suffix) && (
         <div className="flex items-end gap-3">
           <div className="min-w-0 flex-1">
             {title && (

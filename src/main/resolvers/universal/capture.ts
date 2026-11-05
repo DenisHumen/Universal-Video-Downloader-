@@ -3,6 +3,7 @@ import { UA } from '../http'
 import { log } from '../../services/log'
 import { scoreUrl, type MediaCandidate } from './candidates'
 import { downloadVerdict, floodGuard } from './page-downloads'
+import { BROWSER_UA, isGoogleSignIn, SIGN_IN_UA, signInHeaders } from '../../services/browser-identity'
 
 /**
  * Network media capture for a session.
@@ -134,8 +135,41 @@ export function browsingSession(): Session {
       download now; see `downloadVerdict` for what happens to what it starts.
     */
     ses.on('will-download', (event, item, wc) => onWillDownload(ses, event, item, wc))
+    ses.webRequest.onBeforeSendHeaders(passThrough)
   }
   return ses
+}
+
+/**
+ * A request's headers, with Google's sign-in pages sent as Firefox (see
+ * browser-identity.ts). The page a request comes from counts as well as its
+ * own URL: the sign-in page's scripts and images live on other hosts, and a
+ * Chrome client hint on any of them gives the game away.
+ */
+function identityHeaders(details: OnBeforeSendHeadersListenerDetails): Record<string, string> {
+  let page: string | undefined
+  // A page being navigated to is judged by itself: the one it leaves is still
+  // the webContents' URL then, and leaving Google must not take Firefox along.
+  if (details.resourceType !== 'mainFrame') {
+    try {
+      page = details.webContents?.getURL()
+    } catch {
+      /* the page is already gone */
+    }
+  }
+  if (isGoogleSignIn(details.url) || isGoogleSignIn(page)) return signInHeaders(details.requestHeaders, SIGN_IN_UA)
+  // The way out of Google: the page's name is switched back as it starts, but
+  // Chromium has already written the request for it with the old one.
+  if (details.requestHeaders['User-Agent'] === SIGN_IN_UA) return { ...details.requestHeaders, 'User-Agent': BROWSER_UA }
+  return details.requestHeaders
+}
+
+/** The header hook while nothing is capturing: it has to be there for sign-ins all the same. */
+function passThrough(
+  details: OnBeforeSendHeadersListenerDetails,
+  callback: (response: { requestHeaders: Record<string, string> }) => void
+): void {
+  callback({ requestHeaders: identityHeaders(details) })
 }
 
 /** Requests that only add noise (and slow the page down). */
@@ -221,13 +255,14 @@ function install(ses: Session): Installation {
   })
 
   ses.webRequest.onBeforeSendHeaders({ urls: ['<all_urls>'] }, (details, callback) => {
-    const headers = pickHeaders(details.requestHeaders)
+    const requestHeaders = identityHeaders(details)
+    const headers = pickHeaders(requestHeaders)
     if (state.recentHeaders.size > 400) state.recentHeaders.clear()
     state.recentHeaders.set(details.url, headers)
     if (MEDIA_EXT.test(details.url)) {
       emit(details.url, headers, { webContentsId: details.webContentsId })
     }
-    callback({ requestHeaders: details.requestHeaders })
+    callback({ requestHeaders })
   })
 
   /*
@@ -261,7 +296,7 @@ function install(ses: Session): Installation {
 
 function uninstall(ses: Session): void {
   ses.webRequest.onBeforeRequest(null)
-  ses.webRequest.onBeforeSendHeaders(null)
+  ses.webRequest.onBeforeSendHeaders(passThrough)
   ses.webRequest.onHeadersReceived(null)
   installations.delete(ses)
 }

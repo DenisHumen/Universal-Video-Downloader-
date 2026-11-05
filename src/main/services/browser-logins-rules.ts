@@ -123,3 +123,77 @@ export function saveKind(saved: SavedLogin[], typed: SavedLogin): 'same' | 'new'
 export function withLogin(saved: SavedLogin[], typed: SavedLogin): SavedLogin[] {
   return [typed, ...saved.filter((s) => s.username !== typed.username)]
 }
+
+/** A cookie as `session.cookies.set` takes it. */
+export interface CookieToSet {
+  url: string
+  name: string
+  value: string
+  domain?: string
+  path: string
+  secure: boolean
+  httpOnly: boolean
+  expirationDate?: number
+}
+
+/**
+ * The cookies in a Netscape file, ready for the built-in browser: what importing
+ * a sign-in from another browser reads, since the engine exports it as one.
+ * Expired ones are left out, and so is a line that is not a cookie.
+ */
+export function fromNetscape(text: string, nowS: number): CookieToSet[] {
+  const out: CookieToSet[] = []
+  for (const raw of text.split(/\r?\n/)) {
+    let line = raw
+    let httpOnly = false
+    if (line.startsWith('#HttpOnly_')) {
+      httpOnly = true
+      line = line.slice('#HttpOnly_'.length)
+    } else if (!line || line.startsWith('#')) continue
+    const f = line.split('\t')
+    if (f.length < 7) continue
+    const [domain, sub, path, secureFlag, expires, name] = f
+    const value = f.slice(6).join('\t')
+    const host = domain.replace(/^\./, '')
+    if (!host || !name) continue
+    const expiry = Number(expires)
+    if (expiry > 0 && expiry < nowS) continue
+    const secure = secureFlag === 'TRUE'
+    const cookiePath = path || '/'
+    out.push({
+      url: `${secure ? 'https' : 'http'}://${host}${cookiePath}`,
+      name,
+      value,
+      // As in persistentCopy: a domain makes it "and every subdomain", which a
+      // host-only cookie (and every __Host- one) must not become.
+      ...(sub === 'TRUE' && domain.startsWith('.') && !name.startsWith('__Host-') ? { domain } : {}),
+      path: cookiePath,
+      secure,
+      httpOnly,
+      ...(expiry > 0 ? { expirationDate: expiry } : {})
+    })
+  }
+  return out
+}
+
+/** How many sites some cookies are for, near enough: what the import tells the user. */
+export function siteCount(cookies: { url: string }[]): number {
+  const sites = new Set<string>()
+  for (const c of cookies) {
+    const host = new URL(c.url).hostname.split('.')
+    sites.add(host.slice(-2).join('.'))
+  }
+  return sites.size
+}
+
+export type ImportFailure = 'notFound' | 'locked' | 'encrypted' | 'failed'
+
+/** Why the engine could not read a browser's cookies, from what it printed. */
+export function importFailure(stderr: string): ImportFailure {
+  if (/could not find .*(cookies database|profile|directory)|no such file|not installed/i.test(stderr)) {
+    return 'notFound'
+  }
+  if (/could not copy .*cookie database|database is locked/i.test(stderr)) return 'locked'
+  if (/decrypt|app.bound|keyring|DPAPI|keychain/i.test(stderr)) return 'encrypted'
+  return 'failed'
+}

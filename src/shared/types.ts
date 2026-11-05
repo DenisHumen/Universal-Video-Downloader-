@@ -816,6 +816,11 @@ export interface BrowserLoginOffer {
 }
 
 /** A site with saved passwords, as Settings lists it: never the passwords. */
+/** What importing another browser's sign-ins came to. */
+export type SignInImport =
+  | { ok: true; sites: number }
+  | { ok: false; why: 'notFound' | 'locked' | 'encrypted' | 'empty' | 'failed' }
+
 export interface SavedSiteLogins {
   origin: string
   usernames: string[]

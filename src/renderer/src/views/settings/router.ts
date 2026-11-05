@@ -44,6 +44,7 @@ export const SUBPAGES: Record<string, TranslationKey> = {
   'watching/telegram': 'prefs.sub.telegram',
   'access/cookies-file': 'prefs.sub.cookiesFile',
   'access/passwords': 'prefs.sub.passwords',
+  'access/import': 'prefs.sub.importSignIns',
   'network/proxy': 'prefs.sub.proxy',
   'system/startup': 'prefs.sub.startup',
   'system/updates': 'prefs.sub.updates',

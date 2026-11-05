@@ -12,7 +12,7 @@ import {
 } from '@shared/types'
 import type { BackupError, ImportCounts } from '@shared/backup'
 import { useStore } from '../../store'
-import { useT, type TranslationKey } from '../../i18n'
+import { useT, useTp, type TranslationKey } from '../../i18n'
 import { toast } from '../../lib/toast'
 import { describeCliCommand } from '../../lib/cliCommand'
 import AutomationSettings from '../../components/AutomationSettings'
@@ -407,6 +407,13 @@ export function AccessPanel({ settings, set, go }: PanelProps): JSX.Element {
           onChange={(v) => set('browserSavePasswords', v)}
         />
         <ActionRow
+          id="importSignIns"
+          title={t('prefs.sub.importSignIns')}
+          subtitle={t('prefs.row.importSignInsHint')}
+          navigation
+          onActivate={() => go({ panel: 'access', sub: ['import'] })}
+        />
+        <ActionRow
           id="passwords"
           title={t('prefs.sub.passwords')}
           navigation
@@ -466,6 +473,57 @@ export function AccessPanel({ settings, set, go }: PanelProps): JSX.Element {
           checked={settings.errorReports !== 'off'}
           onChange={(v) => set('errorReports', v ? 'ask' : 'off')}
         />
+      </PreferencesGroup>
+    </PreferencesPage>
+  )
+}
+
+const browserName = (b: string): string => b.charAt(0).toUpperCase() + b.slice(1)
+
+/**
+ * Sign the built-in browser in from another one on this computer. The way into
+ * Google, which turns embedded browsers away, and a shortcut into every other
+ * site. Safari only exists on a Mac, so it is only offered there.
+ */
+export function ImportSignInsPage(): JSX.Element {
+  const t = useT()
+  const tp = useTp()
+  const platform = useStore((s) => s.appInfo?.platform)
+  const [busy, setBusy] = useState<string | null>(null)
+  const browsers = SUPPORTED_COOKIE_BROWSERS.filter((b) => b !== 'safari' || platform === 'darwin')
+  const run = async (browser: string): Promise<void> => {
+    setBusy(browser)
+    const result = await window.api.browserImportSignIns(browser)
+    setBusy(null)
+    const name = browserName(browser)
+    if (result.ok) {
+      toast(tp('prefs.toast.imported', result.sites, { browser: name }), 'success')
+      return
+    }
+    const why = {
+      notFound: t('prefs.import.notFound', { browser: name }),
+      locked: t('prefs.import.locked', { browser: name }),
+      encrypted: t('prefs.import.encrypted', { browser: name }),
+      empty: t('prefs.import.empty', { browser: name }),
+      failed: t('prefs.import.failed', { browser: name })
+    }[result.why]
+    toast(why, 'error')
+  }
+  return (
+    <PreferencesPage>
+      <PreferencesGroup description={t('prefs.importHint')}>
+        {browsers.map((b) => (
+          <ActionRow
+            key={b}
+            id={b}
+            title={browserName(b)}
+            suffix={
+              <button className="btn-quiet" disabled={busy !== null} onClick={() => void run(b)}>
+                {busy === b ? <Spinner /> : t('prefs.button.importSignIns')}
+              </button>
+            }
+          />
+        ))}
       </PreferencesGroup>
     </PreferencesPage>
   )
@@ -1150,6 +1208,8 @@ export function pageFor(route: Route, props: PanelProps): ReactNode {
       return <CookiesFilePage {...props} />
     case 'access/passwords':
       return <PasswordsPage />
+    case 'access/import':
+      return <ImportSignInsPage />
     case 'network':
       return <NetworkPanel {...props} />
     case 'network/proxy':
