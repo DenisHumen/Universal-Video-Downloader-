@@ -20,8 +20,12 @@ import react from '@vitejs/plugin-react'
 const BUDGET = {
   /** Bundled fonts (L2): upright Ubuntu Sans + Ubuntu Sans Mono, unsubset. 1.31 MB today. */
   fonts: 1_500_000,
-  /** Entry JS, gzip. 3.26.1 minified: ~180 kB; +15 kB headroom. */
-  entryJs: 195_000,
+  /**
+   * Entry JS, gzip. 3.26.1 minified: ~180 kB. 4.0.5: ~195 kB, the headroom
+   * spent on features rather than a dependency (Yaru rows, sign-ins, the share
+   * browser), so it is given back: +15 kB again from here.
+   */
+  entryJs: 210_000,
   /** All CSS, gzip. 3.26.1: ~11 kB. */
   css: 16_000
 }
