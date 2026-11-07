@@ -3,6 +3,7 @@ import { m } from 'framer-motion'
 import {
   Check,
   Download,
+  ExternalLink,
   FolderUp,
   Loader2,
   Pencil,
@@ -378,6 +379,10 @@ export default function AutomationView(): JSX.Element {
                 title={selected.title}
                 suffix={
                   <div className="flex items-center gap-1.5">
+                    {/* The series page itself, in the system browser: to see what came out, or check the dub. */}
+                    <button type="button" className="btn-quiet" onClick={() => void window.api.openExternal(selected.url)}>
+                      <ExternalLink size={14} /> {t('common.openInBrowser')}
+                    </button>
                     <button type="button" className="btn-quiet" onClick={() => void checkNow()} disabled={checking.has(selected.id)}>
                       {checking.has(selected.id) ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
                       {t('auto.checkNow')}
