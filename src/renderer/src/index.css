@@ -1065,6 +1065,10 @@ textarea,
     width: calc(100vw - env(titlebar-area-x, 0px) - env(titlebar-area-width, calc(100vw - 138px)));
     @apply h-full shrink-0;
   }
+  /* The same width, as room at the end of notices that reach the window's top edge. */
+  .ui-notices-clear-overlay {
+    padding-right: calc(100vw - env(titlebar-area-x, 0px) - env(titlebar-area-width, calc(100vw - 138px)));
+  }
   /* ---- Shell ---- */
   .app-sheet {
     border-top: 1px solid var(--sheet-edge);

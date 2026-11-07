@@ -105,7 +105,12 @@ export default function Shell({ platform, notices, children }: Props): JSX.Eleme
             }
           />
         )}
-        {notices}
+        {/*
+          A view with its own header (Settings) puts the notices at the very top
+          of the sheet, where Windows draws its caption overlay: the update
+          strip's button sat under Minimise. They keep that corner free there.
+        */}
+        {ownHeader && platform === 'win32' ? <div className="ui-notices-clear-overlay">{notices}</div> : notices}
         {children}
       </div>
     </div>
