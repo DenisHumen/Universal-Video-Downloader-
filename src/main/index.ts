@@ -735,6 +735,12 @@ if (cliArgs) {
     // so the downloader never imports it and clearing Activity cannot reach it.
     loadLibrary()
     downloadEvents.on('updated', (item) => recordFinished(item))
+    /*
+      Episodes a watch sent to a share before the Library learned to follow
+      them: their rows already say where the file went, the entries do not.
+      Only uploaded rows - everything else was recorded as it finished.
+    */
+    for (const item of listDownloads()) if (item.remotePath && !item.filepath) recordFinished(item)
     // electron-updater loads with the first check (see updater.ts), not here.
     buildMenu()
     const startHidden = shouldStartHidden(process.argv, getSettings(), openedAtLogin())

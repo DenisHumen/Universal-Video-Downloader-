@@ -9,6 +9,7 @@ import {
   isNewerLibrary,
   listLibrary,
   normaliseLibrary,
+  noteRemote,
   removeEntry,
   seedFromHistory,
   upsertEntry,
@@ -146,7 +147,17 @@ export function flushLibrary(): void {
 /** A download finished: upsert its file (by path). Anything that made no file is ignored. */
 export function recordFinished(item: DownloadItem): void {
   const entry = entryFromItem(item)
-  if (!entry) return
+  if (!entry) {
+    // Uploaded and deleted here: no file left, but the entry should say where it went.
+    if (item.state === 'completed' && item.remotePath) {
+      const next = noteRemote(lib, item.id, item.remotePath)
+      if (next !== lib) {
+        lib = next
+        changed()
+      }
+    }
+    return
+  }
   const next = upsertEntry(lib, entry)
   if (next === lib) return
   lib = next

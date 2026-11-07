@@ -198,6 +198,7 @@ export const en = {
   'library.yesterday': 'Yesterday',
   'library.otherSite': 'Other',
   'library.missing': 'File Missing',
+  'library.onShare': 'On the Share',
   'library.cut': 'Cut…',
   'library.convert': 'Convert…',
   'library.again': 'Download Again',

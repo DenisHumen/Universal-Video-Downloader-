@@ -113,6 +113,21 @@ export function upsertEntry(lib: LibraryFile, entry: LibraryEntry): LibraryFile 
   return { version: LIBRARY_VERSION, entries: sortNewest(entries) }
 }
 
+/**
+ * An entry's file went to a share and the copy here was deleted (a watch's
+ * upload step). The queue row then has no file at all, so `entryFromItem`
+ * skips it - and the entry kept pointing at a path that no longer exists,
+ * which the Library showed as "file not found". It keeps that path as its key
+ * and learns where the file is now.
+ */
+export function noteRemote(lib: LibraryFile, id: string, remotePath: string): LibraryFile {
+  const at = lib.entries.findIndex((e) => e.id === id)
+  if (at < 0 || lib.entries[at].remotePath === remotePath) return lib
+  const entries = lib.entries.slice()
+  entries[at] = { ...entries[at], remotePath }
+  return { version: LIBRARY_VERSION, entries }
+}
+
 export function removeEntry(lib: LibraryFile, id: string): LibraryFile {
   return { version: LIBRARY_VERSION, entries: lib.entries.filter((e) => e.id !== id) }
 }

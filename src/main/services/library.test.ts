@@ -3,7 +3,7 @@ import { tmpdir } from 'os'
 import { join } from 'path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { DownloadItem } from '@shared/types'
-import { entryFromItem, listLibrary, normaliseLibrary, seedFromHistory, upsertEntry, EMPTY_LIBRARY } from '@shared/library'
+import { entryFromItem, listLibrary, normaliseLibrary, noteRemote, seedFromHistory, upsertEntry, EMPTY_LIBRARY } from '@shared/library'
 
 /*
   Plan 5.3 [v2] SE-4: the Library store lands first, with its migration and
@@ -173,5 +173,25 @@ describe('isolation (SE-4)', () => {
       const src = readFileSync(join(__dirname, file), 'utf-8')
       expect(src, file).not.toMatch(/from ['"]\.\/library['"]|shared\/library/)
     }
+  })
+})
+
+// A watch uploaded the episode and deleted it here: the Library said "file not found".
+describe('an entry sent to a share', () => {
+  it('learns where the file went, keeping its path as the key', () => {
+    const lib = upsertEntry(EMPTY_LIBRARY, entryFromItem(done('a', '/d/ep.mp4', 100))!)
+    const moved = noteRemote(lib, 'a', 'anime/Show/S01E06.mp4')
+    expect(moved.entries[0]).toMatchObject({ filepath: '/d/ep.mp4', remotePath: 'anime/Show/S01E06.mp4' })
+    expect(noteRemote(moved, 'a', 'anime/Show/S01E06.mp4')).toBe(moved)
+    expect(noteRemote(moved, 'nope', 'x')).toBe(moved)
+  })
+
+  it('is recorded when the finished row loses its file to the upload', async () => {
+    const lib = await import('./library')
+    lib.loadLibrary()
+    lib.recordFinished(done('b', '/d/ep6.mp4', 200))
+    lib.recordFinished(done('b', undefined, 200, { remotePath: 'anime/Show/S01E06.mp4' }))
+    const [entry] = lib.queryLibrary({}).entries
+    expect(entry).toMatchObject({ id: 'b', filepath: '/d/ep6.mp4', remotePath: 'anime/Show/S01E06.mp4' })
   })
 })

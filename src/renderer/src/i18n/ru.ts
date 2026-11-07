@@ -191,6 +191,7 @@ export const ru: Dictionary = {
   'library.yesterday': 'Вчера',
   'library.otherSite': 'Другое',
   'library.missing': 'Файл не найден',
+  'library.onShare': 'На сетевой папке',
   'library.cut': 'Обрезать…',
   'library.convert': 'Конвертировать…',
   'library.again': 'Скачать снова',

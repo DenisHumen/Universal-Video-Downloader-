@@ -158,7 +158,14 @@ export default function LibraryView(): JSX.Element {
                           .join(' · ')}
                       </p>
                     </div>
-                    {gone && <span className="tag shrink-0 text-warn">{t('library.missing')}</span>}
+                    {/* Sent to a share by a watch and deleted here: not lost, just elsewhere. */}
+                    {gone && e.remotePath ? (
+                      <span className="tag shrink-0" title={e.remotePath}>
+                        {t('library.onShare')}
+                      </span>
+                    ) : (
+                      gone && <span className="tag shrink-0 text-warn">{t('library.missing')}</span>
+                    )}
                     <IconButton
                       label={t('common.play')}
                       icon={<Play size={16} />}
