@@ -329,7 +329,7 @@ export default function PlaylistCard({ info: detected, onDone, saveDir, onSaveDi
 
           {/* Before the buttons that act on the list: "Download All" means what is listed here. */}
           {info.listingCut && (
-            <div className="mt-2 flex flex-wrap items-center gap-2" role="status">
+            <div className="mt-2 flex flex-wrap items-center justify-between gap-2" role="status">
               <p className="hint min-w-0 flex-1">
                 {t(nextDepth ? 'playlist.cut' : 'playlist.cutDeepest', { count: entries.length })}
               </p>
