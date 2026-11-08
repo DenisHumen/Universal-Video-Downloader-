@@ -13,6 +13,9 @@
  * anyone hand-cropping a window at 3am and forgetting to redo it next release.
  *
  * Pass `--url` to point at a different server, and `--theme night|day|both`.
+ * `--lang=ru` takes the Russian set, into docs/screenshots/ru unless `--out` says otherwise.
+ * `--offscreen` renders without a window on screen, for a machine whose display is
+ * locked or asleep: capturePage then fails with "display surface not available".
  * `--scale=2` renders at twice the pixel density (for video, where a shot gets
  * zoomed into), and `--out=<dir>` writes somewhere other than docs/screenshots.
  */
@@ -32,8 +35,10 @@ const arg = (name, fallback) => {
 
 const BASE = arg('url', 'http://localhost:5174')
 const THEME = arg('theme', 'night')
-const outDir = resolve(root, arg('out', join('docs', 'screenshots')))
+const LANG = arg('lang', 'en')
+const outDir = resolve(root, arg('out', LANG === 'en' ? join('docs', 'screenshots') : join('docs', 'screenshots', LANG)))
 const SCALE = Number(arg('scale', '1')) || 1
+const OFFSCREEN = process.argv.includes('--offscreen')
 // Must be set before the app is ready; the window keeps its CSS size either way.
 if (SCALE !== 1) app.commandLine.appendSwitch('force-device-scale-factor', String(SCALE))
 const WIDTH = 1280
@@ -47,10 +52,6 @@ const wait = (ms) => new Promise((r) => setTimeout(r, ms))
  * that answer "can it do X": search, watching a series, settings.
  */
 const SHOTS = [
-  {
-    name: 'home',
-    setup: `await window.__uvdShot.view('home')`
-  },
   {
     name: 'detected',
     setup: `
@@ -76,8 +77,8 @@ const SHOTS = [
     name: 'watch',
     setup: `
       await window.api.autoAdd({
-        url: 'https://example.com/catalog/item/series', title: 'Frieren: Beyond Journey’s End',
-        provider: 'yummyani', translatorId: 'a', translatorName: 'AniLibria', quality: '1080p',
+        url: 'https://example.com/catalog/item/series', title: 'Big Buck Bunny: The Series',
+        provider: 'yummyani', translatorId: 'a', translatorName: 'Studio One', quality: '1080p',
         enabled: true, intervalMinutes: 360, nextCheckAt: Date.now() + 2 * 3600e3, failures: 0, seen: [],
         steps: [
           { id: 'd', kind: 'download', enabled: true },
@@ -99,6 +100,8 @@ const SHOTS = [
   },
   {
     name: 'settings',
+    // The one light picture: the README shows that there are two themes.
+    theme: 'day',
     setup: `window.__uvdStore.getState().openSettings('downloads'); await new Promise((r) => setTimeout(r, 300))`
   },
   {
@@ -108,13 +111,20 @@ const SHOTS = [
       window.__uvdStore.getState().setPaletteOpen(true);
       await new Promise((r) => setTimeout(r, 300));
     `
+  },
+  {
+    name: 'help',
+    setup: `window.__uvdStore.getState().openHelp('download'); await new Promise((r) => setTimeout(r, 300))`
   }
 ]
 
 let failures = 0
+/** The latest frame, when rendering off screen: there it is handed over rather than asked for. */
+let painted = null
 
-async function shoot(win, theme) {
+async function shoot(win, runTheme) {
   for (const shot of SHOTS) {
+    const theme = shot.theme ?? runTheme
     await win.webContents.executeJavaScript(
       `document.documentElement.setAttribute('data-theme', ${JSON.stringify(theme)}); true`
     )
@@ -135,10 +145,10 @@ async function shoot(win, theme) {
     }
     // Let the entry animation settle; the system runs on 240ms transitions.
     await wait(700)
-    const image = await win.webContents.capturePage()
+    const png = OFFSCREEN ? painted : (await win.webContents.capturePage()).toPNG()
     const suffix = theme === 'night' ? '' : `-${theme}`
     const file = join(outDir, `${shot.name}${suffix}.png`)
-    writeFileSync(file, image.toPNG())
+    writeFileSync(file, png)
     console.log(`  • ${file.replace(root, '.')}`)
   }
 }
@@ -157,25 +167,34 @@ app.whenReady().then(async () => {
   const win = new BrowserWindow({
     width: WIDTH,
     height: HEIGHT,
-    show: true,
+    show: !OFFSCREEN,
     backgroundColor: '#09090b',
     webPreferences: {
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: false,
-      backgroundThrottling: false
+      backgroundThrottling: false,
+      offscreen: OFFSCREEN
     }
   })
+  if (OFFSCREEN) {
+    win.webContents.setFrameRate(30)
+    win.webContents.on('paint', (_event, _dirty, image) => {
+      painted = image.toPNG()
+    })
+  }
 
   process.on('unhandledRejection', (err) => {
     console.error('Capture failed:', err)
     app.exit(1)
   })
 
-  await win.loadURL(BASE)
+  // `?still` lands every framer-motion animation on its end state: no half-faded dialogs.
+  await win.loadURL(`${BASE}/?still`)
   // The mock bridge and the store both need a mounted app behind them.
   await wait(1500)
   await win.webContents.executeJavaScript(DRIVER, true)
+  await win.webContents.executeJavaScript(`window.__uvdI18n.getState().setLanguage(${JSON.stringify(LANG)}); true`)
   // A still is a still: a page caught halfway through its slide-in is blank.
   await win.webContents.insertCSS('*, *::before, *::after { transition: none !important; animation: none !important; }')
 
