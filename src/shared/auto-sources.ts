@@ -97,6 +97,19 @@ export const AUTO_SOURCES: readonly AutoSource[] = [
   { id: 'soundcloud', name: 'SoundCloud', hosts: ['soundcloud.com'], isVideo: path(/^\/[^/]+\/(?!sets\/|tracks\/?$|likes\/?$|albums\/?$|reposts\/?$|popular-tracks\/?$)[^/?]+/) }
 ]
 
+/** The known site a link is on, whatever kind of page it is. */
+export function knownSiteFor(url: string): AutoSource | null {
+  let parsed: URL
+  try {
+    parsed = new URL(normalizeUrl(url))
+  } catch {
+    return null
+  }
+  if (!/^https?:$/.test(parsed.protocol)) return null
+  const host = parsed.hostname.toLowerCase().replace(/^www\./, '')
+  return AUTO_SOURCES.find((s) => s.hosts.some((h) => host === h || host.endsWith(`.${h}`))) ?? null
+}
+
 /** The source a link is a single video on, or null: an unknown site, or that site's home page, channel or search. */
 export function autoSourceFor(url: string): AutoSource | null {
   let parsed: URL

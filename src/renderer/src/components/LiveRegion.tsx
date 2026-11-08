@@ -7,6 +7,11 @@ import { useT } from '../i18n'
 /** States worth interrupting someone for. Progress is not one of them. */
 const ANNOUNCED: DownloadItem['state'][] = ['completed', 'error']
 
+/** Several outcomes as one sentence each. An error's own text already ends in a full stop. */
+export function announcement(messages: string[]): string {
+  return messages.map((m) => m.replace(/\.+$/, '')).join('. ')
+}
+
 /**
  * Speaks download outcomes to screen readers.
  *
@@ -62,7 +67,7 @@ export default function LiveRegion(): JSX.Element {
 
     seen.current = next
     primed.current = true
-    if (fresh.length) setMessage(fresh.join('. '))
+    if (fresh.length) setMessage(announcement(fresh))
   }, [downloads, ready, t])
 
   return (

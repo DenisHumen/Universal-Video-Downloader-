@@ -124,8 +124,8 @@ const SCENES = [
     name: 'dialog',
     setup: `
       __uvdShot.seedQueue(); await __uvdShot.view('downloads');
-      const go = document.querySelector('[data-uvd="clear-failed"]');
-      if (!go) throw new Error('no clear-failed control on screen');
+      const go = document.querySelector('[data-uvd="cancel-download"]');
+      if (!go) throw new Error('no cancel control on screen');
       go.click();
       await new Promise((r) => setTimeout(r, 200));
       if (!document.querySelector('[role="dialog"],[role="alertdialog"]')) throw new Error('dialog did not open');

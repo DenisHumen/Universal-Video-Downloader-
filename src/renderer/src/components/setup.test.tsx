@@ -7,7 +7,7 @@ import { en } from '../i18n/en'
 
 const SYSTEM = en['prefs.accent.system']
 
-/* 6.3: first-run setup, three skippable steps, shown once, reachable from the primary menu. */
+/* 6.3: first-run setup, two skippable steps, shown once, reachable from the primary menu. */
 
 beforeEach(() => {
   installMockApi()
@@ -26,6 +26,9 @@ describe('first-run setup (6.3)', () => {
     await app()
     const dialog = await screen.findByRole('dialog', { name: 'Where Should Downloads Go?' })
     expect(within(dialog).getByText('Step 1 of 2')).toBeTruthy()
+    // Every choice saves as it is made, so a Skip beside Next would do the same thing.
+    expect(within(dialog).queryByRole('button', { name: 'Skip' })).toBeNull()
+    expect(within(dialog).getByRole('button', { name: 'Skip Setup' })).toBeTruthy()
     await act(async () => fireEvent.click(within(dialog).getByRole('button', { name: /Change/ })))
     await waitFor(() => expect(useStore.getState().settings?.downloadDir).toBe('/home/me/Films'))
     await act(async () => fireEvent.click(within(dialog).getByRole('button', { name: 'Next' })))

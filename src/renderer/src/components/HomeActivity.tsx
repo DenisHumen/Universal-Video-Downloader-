@@ -7,6 +7,7 @@ import { liveDownloads, recentFailed, recentFinished } from '../lib/downloads'
 import { errorText } from '../lib/errors'
 import { STATE_META } from '../lib/states'
 import { toast } from '../lib/toast'
+import { showFile } from '../lib/showFile'
 
 /**
  * Home's idle state once something has been downloaded: what is moving now,
@@ -24,6 +25,11 @@ export default function HomeActivity(): JSX.Element {
   const live = liveDownloads(downloads)
   const recent = recentFinished(downloads)
   const failed = recentFailed(downloads)
+  // The OS answers with an error rather than throwing.
+  const openFile = (path: string): void =>
+    void window.api.openPath(path).then((why) => {
+      if (why) toast(t('queue.openFailed'), 'error')
+    })
 
   return (
     <div className="space-y-6">
@@ -69,23 +75,38 @@ export default function HomeActivity(): JSX.Element {
         <section>
           <h3 className="mb-3 text-heading text-ink">{t('home.recent')}</h3>
           <ul className="ui-boxed-list">
-            {recent.map((item) => (
+            {recent.map((item, i) => (
               <li key={item.id} className="ui-row min-h-[50px]">
                 <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-good" aria-hidden="true" />
                 <span className="min-w-0 flex-1 truncate text-control text-ink" title={item.title}>
                   {item.title}
                 </span>
-                {item.filepath && (
+                {/* What just finished is what gets opened next, so its row says so in words. */}
+                {item.filepath && i === 0 && (
+                  <>
+                    <button
+                      className="btn-quiet shrink-0"
+                      aria-label={`${t('common.open')}: ${item.title}`}
+                      onClick={() => openFile(item.filepath!)}
+                    >
+                      {t('common.open')}
+                    </button>
+                    <button
+                      className="btn-quiet shrink-0"
+                      aria-label={`${t('common.showInFolder')}: ${item.title}`}
+                      onClick={() => void showFile(item.filepath!)}
+                    >
+                      {t('common.showInFolder')}
+                    </button>
+                  </>
+                )}
+                {item.filepath && i > 0 && (
                   <>
                     <button
                       className="btn-icon-bare"
                       title={t('common.play')}
                       aria-label={`${t('common.play')}: ${item.title}`}
-                      onClick={() =>
-                        void window.api.openPath(item.filepath!).then((why) => {
-                          if (why) toast(t('queue.openFailed'), 'error')
-                        })
-                      }
+                      onClick={() => openFile(item.filepath!)}
                     >
                       <Play size={14} />
                     </button>
@@ -93,7 +114,7 @@ export default function HomeActivity(): JSX.Element {
                       className="btn-icon-bare"
                       title={t('common.showInFolder')}
                       aria-label={`${t('common.showInFolder')}: ${item.title}`}
-                      onClick={() => window.api.showInFolder(item.filepath!)}
+                      onClick={() => void showFile(item.filepath!)}
                     >
                       <FolderOpen size={14} />
                     </button>

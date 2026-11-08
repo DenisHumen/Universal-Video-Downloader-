@@ -1,4 +1,5 @@
 import type { AppErrorCode } from '@shared/types'
+import type { FixKind } from './fixes'
 
 /*
   Which button gets to be the loud one.
@@ -48,6 +49,16 @@ const TRANSIENT: ReadonlySet<AppErrorCode> = new Set<AppErrorCode>([
  */
 export function errorLead(code?: AppErrorCode): 'retry' | 'browser' {
   return code && TRANSIENT.has(code) ? 'retry' : 'browser'
+}
+
+/**
+ * The one solid button on the failed-detect card: the fix the failure calls
+ * for. A dropped connection is the exception, where the fix on file is a proxy
+ * setting, and somebody whose wifi blinked should be told to try again first.
+ */
+export function errorCardLead(code: AppErrorCode | undefined, fix: FixKind | null): 'fix' | 'retry' | 'browser' {
+  if (errorLead(code) === 'retry' && fix !== 'retryLater') return 'retry'
+  return fix ? 'fix' : 'browser'
 }
 
 /**

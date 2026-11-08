@@ -106,7 +106,6 @@ export default function VideoResult({
     outcomeResolution(outcome),
     outcome?.dynamicRange,
     outcome?.ext?.toUpperCase(),
-    outcome?.vcodec,
     outcome?.bytes ? `≈ ${formatBytes(outcome.bytes)}` : null
   ].filter(Boolean)
   const youGet = facts.length ? `${t('format.youGet')} ${facts.join(' · ')}` : undefined
@@ -196,7 +195,7 @@ export default function VideoResult({
       <PreferencesGroup footer={info.isLive ? t('home.liveHint') : undefined}>
         <ComboRow
           id="result-format"
-          title={t('common.format')}
+          title={t('common.whatToDownload')}
           value={mode}
           onChange={(v) => select({ mode: v as DownloadMode })}
           options={[

@@ -22,13 +22,14 @@ import { answerProxyLoginsForPages } from './services/proxy-auth'
 import { ensureYtdlp, scheduleEngineRefresh } from './services/ytdlp'
 import { scheduleUpdateChecks } from './services/updater'
 import { flushLog, initLog, log, setLogLevel } from './services/log'
-import { flushWatches } from './services/automation/store'
+import { flushWatches, listWatches } from './services/automation/store'
 import { startWatcher, stopWatcher } from './services/automation/watcher'
 import {
   autostartDesktopEntry,
   autostartNeedsApplying,
   HIDDEN_FLAG,
-  shouldStartHidden
+  shouldStartHidden,
+  watchesFromHiddenStart
 } from './services/autostart'
 import {
   downloadEvents,
@@ -271,11 +272,14 @@ function deliver(channel: string, slot: 'link' | 'view', value: string): void {
   pending[slot] = value
 }
 
+/** This session began at login with series to check: see `watchesFromHiddenStart`. */
+let watchingSinceLogin = false
+
 /** Hide the main window to the tray, as closing it does while the tray is on. */
 function hideMainWindow(): void {
   mainWindow?.hide()
   // Hidden is not watching: without background watching, the schedules stop.
-  if (!getSettings().automationEnabled) stopWatcher()
+  if (!getSettings().automationEnabled && !watchingSinceLogin) stopWatcher()
 }
 
 /**
@@ -809,12 +813,12 @@ if (cliArgs) {
       next check in six hours. Watches the user paused stay paused: `tick`
       skips them. Start-with-system is applied by applySettings above.
 
-      A launch that stays in the tray is a window hidden to the tray, and
-      schedules treat it as one: background watching, when it is on, already
-      started them in applySettings, and otherwise the window starts them when
-      it is first shown.
+      A launch that stays in the tray came from start-with-system, whose whole
+      point is that schedules survive a reboot, so it runs them too. Opening and
+      closing the window later does not stop them for this session.
     */
-    if (!startHidden) startWatcher()
+    watchingSinceLogin = watchesFromHiddenStart(startHidden, listWatches().length)
+    if (!startHidden || watchingSinceLogin) startWatcher()
 
     const initialLink = linkFromArgv(process.argv)
     if (initialLink) pending.link = initialLink
@@ -854,7 +858,7 @@ if (cliArgs) {
     */
     const settings = getSettings()
     // A process kept alive by the tray alone, or the macOS dock, is not watching.
-    if (!settings.automationEnabled) stopWatcher()
+    if (!settings.automationEnabled && !watchingSinceLogin) stopWatcher()
     if (!isMac && !settings.trayEnabled && !settings.automationEnabled) app.quit()
   })
 }

@@ -10,6 +10,7 @@ import {
   shell,
   type IpcMainInvokeEvent
 } from 'electron'
+import { access } from 'fs/promises'
 import { dirname } from 'path'
 import { IPC } from '@shared/ipc'
 import type {
@@ -276,7 +277,17 @@ export function registerIpc({ getWindow, openSearchWindow, onSettingsChanged }: 
     requireRenderer(event, IPC.openPath)
     return shell.openPath(path)
   })
-  ipcMain.handle(IPC.showInFolder, (_e, path: string) => shell.showItemInFolder(path))
+  // The OS call reports nothing, so a moved file used to mean a click that did nothing.
+  ipcMain.handle(IPC.showInFolder, async (event, path: string) => {
+    requireRenderer(event, IPC.showInFolder)
+    try {
+      await access(path)
+    } catch {
+      return false
+    }
+    shell.showItemInFolder(path)
+    return true
+  })
   ipcMain.handle(IPC.openExternal, (event, url: string) => {
     requireRenderer(event, IPC.openExternal)
     // Web pages, plus the one mailto an error report falls back to.

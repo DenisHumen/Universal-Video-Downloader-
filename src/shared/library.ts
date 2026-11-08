@@ -1,3 +1,4 @@
+import { knownSiteFor } from './auto-sources'
 import type { DownloadItem } from './types'
 
 /**
@@ -28,6 +29,25 @@ export interface LibraryEntry {
   /** A poster for it: the download's thumbnail address. */
   thumb?: string
   finishedAt: number
+}
+
+/**
+ * The site a Library entry is grouped under, or undefined when nothing says.
+ *
+ * Download Now, a batch and the terminal record no extractor, so their files
+ * went under "Other", apart from the same site's files that were detected first.
+ */
+export function librarySite(entry: Pick<LibraryEntry, 'url' | 'sourceUrl' | 'extractor'>): string | undefined {
+  const page = entry.sourceUrl || entry.url
+  const known = knownSiteFor(page)
+  if (known) return known.name
+  if (entry.extractor && !/^(universal|generic|browser)$/i.test(entry.extractor)) return entry.extractor
+  try {
+    const { protocol, hostname } = new URL(page)
+    return /^https?:$/.test(protocol) ? hostname.replace(/^www\./, '') : undefined
+  } catch {
+    return undefined
+  }
 }
 
 export interface LibraryFile {
@@ -183,7 +203,7 @@ export interface LibraryPage {
 export function listLibrary(lib: LibraryFile, q: LibraryQuery = {}): LibraryPage {
   const words = (q.query ?? '').toLowerCase().split(/\s+/).filter(Boolean)
   let list = lib.entries.filter((e) => words.every((w) => e.title.toLowerCase().includes(w)))
-  if (q.group === 'site') list = [...list].sort((a, b) => (a.extractor ?? '').localeCompare(b.extractor ?? '') || b.finishedAt - a.finishedAt)
+  if (q.group === 'site') list = [...list].sort((a, b) => (librarySite(a) ?? '').localeCompare(librarySite(b) ?? '') || b.finishedAt - a.finishedAt)
   if (q.group === 'series') list = [...list].sort((a, b) => (a.seriesId ?? '').localeCompare(b.seriesId ?? '') || b.finishedAt - a.finishedAt)
   const offset = Math.max(0, q.offset ?? 0)
   const limit = Math.min(500, Math.max(1, q.limit ?? 100))

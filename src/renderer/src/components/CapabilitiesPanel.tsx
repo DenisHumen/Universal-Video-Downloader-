@@ -40,12 +40,8 @@ export default function CapabilitiesPanel(): JSX.Element {
       action: () => setView('search')
     },
     { icon: <Scissors size={16} />, title: 'cap.trim.title', body: 'cap.trim.body' },
-    {
-      icon: <FileVideo size={16} />,
-      title: 'cap.convert.title',
-      body: 'cap.convert.body',
-      action: () => setView('downloads')
-    },
+    // No arrow: this list is only drawn before the first download, when there is nothing to convert yet.
+    { icon: <FileVideo size={16} />, title: 'cap.convert.title', body: 'cap.convert.body' },
     { icon: <ListVideo size={16} />, title: 'cap.channel.title', body: 'cap.channel.body' },
     {
       icon: <Radar size={16} />,

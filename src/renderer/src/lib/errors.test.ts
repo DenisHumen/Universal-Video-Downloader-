@@ -99,6 +99,16 @@ describe('errorReport', () => {
     )
   })
 
+  it('names the sign-in button, and only where that button is on offer', () => {
+    expect(en('err.cookieHint')).toContain(en('fix.cookies'))
+    expect(ru('err.cookieHint')).toContain(ru('fix.cookies'))
+    expect(errorText(en, { errorCode: 'unavailable', cookieHint: true })).toContain(en('err.cookieHint'))
+    // A sign-in failure already says to sign in.
+    expect(errorText(en, { errorCode: 'signIn', cookieHint: true })).toBe(en('err.signIn'))
+    // A network failure on such a site offers the proxy, so there is no such button to press.
+    expect(errorText(en, { errorCode: 'network', cookieHint: true })).toBe(en('err.network'))
+  })
+
   it('falls back to the log when the failure carries no message', () => {
     expect(errorReport(en, { log: 'the last lines of output' })).toBe(
       `${en('error.title')}\n\nthe last lines of output`

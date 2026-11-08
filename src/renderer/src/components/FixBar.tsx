@@ -24,6 +24,8 @@ export interface FixBarProps {
   copyText: string
   /** The report offer, when there is one for this failure. */
   report?: { open: boolean; onToggle: () => void }
+  /** Only the fix itself, as the screen's one solid button: its card arranges the rest. */
+  leadOnly?: boolean
 }
 
 const browserLabel = (b: string): string => b.charAt(0).toUpperCase() + b.slice(1)
@@ -42,7 +44,8 @@ export default function FixBar({
   onChangeFolder,
   retryKey,
   copyText,
-  report
+  report,
+  leadOnly = false
 }: FixBarProps): JSX.Element {
   const t = useT()
   const saveSettings = useStore((s) => s.saveSettings)
@@ -67,17 +70,18 @@ export default function FixBar({
     if (dir) onChangeFolder(dir)
   }
 
+  const fixClass = leadOnly ? 'btn-solid' : 'btn-quiet'
   const fixButton = (): JSX.Element | null => {
     switch (fix) {
       case 'cookiesFile':
         return (
-          <button type="button" className="btn-quiet" data-fix="cookiesFile" onClick={() => openSettings('access#cookies')}>
+          <button type="button" className={fixClass} data-fix="cookiesFile" onClick={() => openSettings('access#cookies')}>
             <ChannelSecure size={14} /> {t(FIX_LABEL.cookiesFile)}
           </button>
         )
       case 'proxy':
         return (
-          <button type="button" className="btn-quiet" data-fix="proxy" onClick={() => openSettings('network')}>
+          <button type="button" className={fixClass} data-fix="proxy" onClick={() => openSettings('network')}>
             <Globe size={14} /> {t(FIX_LABEL.proxy)}
           </button>
         )
@@ -104,7 +108,7 @@ export default function FixBar({
               { label: t('fix.cookiesSettings'), onSelect: () => openSettings('access#cookies') }
             ]}
             trigger={(props) => (
-              <button type="button" className="btn-quiet" data-fix="cookies" {...props}>
+              <button type="button" className={fixClass} data-fix="cookies" {...props}>
                 <ChannelSecure size={14} /> {t(FIX_LABEL.cookies)}
               </button>
             )}
@@ -112,19 +116,19 @@ export default function FixBar({
         )
       case 'browser':
         return (
-          <button type="button" className="btn-quiet" data-fix="browser" onClick={() => window.api.openBrowser(url || undefined)}>
+          <button type="button" className={fixClass} data-fix="browser" onClick={() => window.api.openBrowser(url || undefined)}>
             <Globe size={14} /> {t(FIX_LABEL.browser)}
           </button>
         )
       case 'audioOnly':
         return (
-          <button type="button" className="btn-quiet" data-fix="audioOnly" onClick={onAudioOnly}>
+          <button type="button" className={fixClass} data-fix="audioOnly" onClick={onAudioOnly}>
             <Multimedia size={14} /> {t(FIX_LABEL.audioOnly)}
           </button>
         )
       case 'changeFolder':
         return (
-          <button type="button" className="btn-quiet" data-fix="changeFolder" onClick={() => void changeFolder()}>
+          <button type="button" className={fixClass} data-fix="changeFolder" onClick={() => void changeFolder()}>
             <Folder size={14} /> {t(FIX_LABEL.changeFolder)}
           </button>
         )
@@ -132,7 +136,7 @@ export default function FixBar({
         return (
           <button
             type="button"
-            className="btn-quiet"
+            className={fixClass}
             data-fix="retryLater"
             disabled={waitingUntil !== undefined}
             onClick={() => scheduleRetry(retryKey, onRetry)}
@@ -149,6 +153,8 @@ export default function FixBar({
         return null
     }
   }
+
+  if (leadOnly) return <>{fixButton()}</>
 
   return (
     <div className="mt-2">

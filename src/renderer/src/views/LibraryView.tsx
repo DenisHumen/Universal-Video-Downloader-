@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import type { LibraryEntry, LibraryGroup } from '@shared/library'
+import { showFile } from '../lib/showFile'
+import { librarySite, type LibraryEntry, type LibraryGroup } from '@shared/library'
 import type { DownloadItem } from '@shared/types'
 import { useStore } from '../store'
 import { useI18n, useT } from '../i18n'
@@ -79,7 +80,7 @@ export default function LibraryView(): JSX.Element {
     for (const e of entries) {
       const title =
         group === 'site'
-          ? e.extractor || t('library.otherSite')
+          ? librarySite(e) || t('library.otherSite')
           : dayLabel(e.finishedAt, language, t('library.today'), t('library.yesterday'))
       const last = out[out.length - 1]
       if (last && last.title === title) last.rows.push(e)
@@ -180,7 +181,7 @@ export default function LibraryView(): JSX.Element {
                       label={t('common.showInFolder')}
                       icon={<FolderOpen size={16} />}
                       disabled={gone}
-                      onClick={() => void window.api.showInFolder(e.filepath)}
+                      onClick={() => void showFile(e.filepath)}
                     />
                     <Menu
                       label={t('queue.more')}

@@ -22,6 +22,9 @@ import { errorReport, errorText } from '../lib/errors'
 import { useT } from '../i18n'
 import { STATE_META } from '../lib/states'
 import { toast } from '../lib/toast'
+import { showFile } from '../lib/showFile'
+import { cancelLosesWork } from '../lib/downloads'
+import ConfirmDialog from './ConfirmDialog'
 import MediaJobModal, { type JobMode } from './MediaJobModal'
 import Thumbnail from './Thumbnail'
 import ReportPrompt, { useReportOffer } from './ReportPrompt'
@@ -55,6 +58,7 @@ function QueueRow({ item, index, animateIn = true, heading }: Props): JSX.Elemen
   // The engine output mounts only while open, so aria-controls is set only then.
   const logId = useId()
   const [jobModal, setJobModal] = useState<JobMode | null>(null)
+  const [confirmCancel, setConfirmCancel] = useState(false)
   const meta = STATE_META[item.state]
   const landed =
     item.filepath ?? (item.remotePath ? t('queue.onShare', { path: item.remotePath }) : undefined)
@@ -322,7 +326,7 @@ function QueueRow({ item, index, animateIn = true, heading }: Props): JSX.Elemen
                 className="btn-icon-bare"
                 title={t('common.showInFolder')}
                 aria-label={t('common.showInFolder')}
-                onClick={() => window.api.showInFolder(item.filepath!)}
+                onClick={() => void showFile(item.filepath!)}
               >
                 <FolderOpen size={15} />
               </button>
@@ -370,15 +374,16 @@ function QueueRow({ item, index, animateIn = true, heading }: Props): JSX.Elemen
               className="btn-icon-bare hover:text-bad"
               title={t('common.cancel')}
               aria-label={t('common.cancel')}
-              onClick={() => window.api.cancelDownload(item.id)}
+              data-uvd="cancel-download"
+              onClick={() => (cancelLosesWork(item) ? setConfirmCancel(true) : void window.api.cancelDownload(item.id))}
             >
               <X size={15} />
             </button>
           ) : (
             <button
               className="btn-icon-bare hover:text-bad"
-              title={t('common.remove')}
-              aria-label={t('common.remove')}
+              title={t('queue.removeRow')}
+              aria-label={t('queue.removeRow')}
               onClick={() => window.api.removeDownload(item.id)}
             >
               <Trash2 size={15} />
@@ -508,6 +513,21 @@ function QueueRow({ item, index, animateIn = true, heading }: Props): JSX.Elemen
       )}
 
       {jobModal && <MediaJobModal item={item} mode={jobModal} onClose={() => setJobModal(null)} />}
+      {/* Cancelling deletes the partial files, so a paused 95% is worth one question. */}
+      {confirmCancel && (running || item.state === 'paused') && (
+        <ConfirmDialog
+          title={t('queue.cancelConfirm')}
+          body={t('queue.cancelBody', {
+            amount: item.percent > 0 ? `${Math.round(item.percent)}%` : formatBytes(item.downloadedBytes)
+          })}
+          confirmLabel={t('queue.cancelButton')}
+          onConfirm={() => {
+            setConfirmCancel(false)
+            void window.api.cancelDownload(item.id)
+          }}
+          onCancel={() => setConfirmCancel(false)}
+        />
+      )}
     </div>
     </m.li>
   )

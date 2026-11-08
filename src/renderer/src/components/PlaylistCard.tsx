@@ -139,9 +139,9 @@ export default function PlaylistCard({ info, onDone, saveDir, onSaveDirChange }:
 
       <div className="space-y-5 p-4">
         <div>
-          <p className="label mb-2">{t('common.format')}</p>
+          <p className="label mb-2">{t('common.whatToDownload')}</p>
           <Choice
-            label={t('common.format')}
+            label={t('common.whatToDownload')}
             value={mode}
             onChange={(v) => setMode(v as DownloadMode)}
             options={[

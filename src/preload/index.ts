@@ -141,7 +141,7 @@ const api = {
   chooseDirectory: (): Promise<string | null> => ipcRenderer.invoke(IPC.chooseDirectory),
   chooseCookiesFile: (): Promise<string | null> => ipcRenderer.invoke(IPC.chooseCookiesFile),
   openPath: (path: string): Promise<string> => ipcRenderer.invoke(IPC.openPath, path),
-  showInFolder: (path: string): Promise<void> => ipcRenderer.invoke(IPC.showInFolder, path),
+  showInFolder: (path: string): Promise<boolean> => ipcRenderer.invoke(IPC.showInFolder, path),
   openExternal: (url: string): Promise<void> => ipcRenderer.invoke(IPC.openExternal, url),
   readClipboard: (): Promise<string> => ipcRenderer.invoke(IPC.clipboardRead),
 

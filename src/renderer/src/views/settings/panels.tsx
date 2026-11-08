@@ -785,7 +785,15 @@ export function StartupPage({ settings, set }: PanelProps): JSX.Element {
         {row('autostart', 'autostart', 'settings.autostart', 'settings.autostartHint')}
         {row('notifications', 'notifications', 'settings.notifications', 'settings.notificationsHint')}
         {row('clipboard', 'clipboardWatch', 'settings.clipboardWatch', 'settings.clipboardWatchHint')}
-        {row('tray', 'trayEnabled', 'settings.tray', 'settings.trayHint')}
+        {/* Background watching keeps the icon and hides the window on close, whatever this switch said. */}
+        <SwitchRow
+          id="tray"
+          title={t('settings.tray')}
+          subtitle={t(settings.automationEnabled ? 'settings.trayImplied' : 'settings.trayHint')}
+          checked={settings.trayEnabled || settings.automationEnabled}
+          disabled={settings.automationEnabled}
+          onChange={(v) => set('trayEnabled', v)}
+        />
       </PreferencesGroup>
     </PreferencesPage>
   )

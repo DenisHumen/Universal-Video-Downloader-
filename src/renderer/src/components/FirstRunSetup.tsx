@@ -82,11 +82,6 @@ function Steps({ settings, onClose }: { settings: AppSettings; onClose: () => vo
               {t('setup.skipAll')}
             </button>
           )}
-          {!last && (
-            <button type="button" className="btn-quiet" onClick={next} data-uvd="setup-skip">
-              {t('setup.skip')}
-            </button>
-          )}
           <button type="button" className="btn-solid" onClick={next} data-uvd="setup-next">
             {last ? t('setup.done') : t('setup.next')}
           </button>

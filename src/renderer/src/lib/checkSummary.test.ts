@@ -23,22 +23,22 @@ describe('describeCheck', () => {
     expect(describeCheck({ error: 'HTTP 503' }, en, date)).toEqual({ text: 'HTTP 503', kind: 'error' })
   })
 
-  it('counts what went to the queue', () => {
+  it('counts what went to My Downloads', () => {
     expect(describeCheck({ fresh: 3, queued: 3, paused: false }, en, date)).toEqual({
-      text: '3 new episodes are in the queue',
+      text: '3 new episodes are in My Downloads',
       kind: 'success'
     })
     expect(describeCheck({ fresh: 1, queued: 1, paused: false }, en, date).text).toBe(
-      'A new episode is in the queue'
+      'A new episode is in My Downloads'
     )
     expect(describeCheck({ fresh: 3, queued: 3, paused: false }, ru, date).text).toBe(
-      'Новых серий в очереди: 3'
+      'Новых серий в загрузках: 3'
     )
   })
 
   it('says when one check found more than it takes at once', () => {
     expect(describeCheck({ fresh: 40, queued: 25, paused: false }, en, date).text).toBe(
-      '40 new episodes found; 25 are in the queue, the rest come with the next check'
+      '40 new episodes found; 25 are in My Downloads, the rest come with the next check'
     )
   })
 

@@ -17,11 +17,22 @@ import type { DownloadItem, DownloadState } from '@shared/types'
 export const HISTORY_LOG_CHARS = 1000
 
 /**
- * What "clear finished" clears, and so what the keep-finished limit counts.
+ * Which clear button takes a row: the one for the section it is drawn in.
+ *
+ * A cancelled row sits under Failed, with a retry on it. Clear Failed used to
+ * skip it while Clear Finished, which has nothing to do with that section, took it.
+ */
+export function clearedBy(state: DownloadState): 'finished' | 'failed' | null {
+  if (state === 'completed') return 'finished'
+  return state === 'error' || state === 'canceled' ? 'failed' : null
+}
+
+/**
+ * What the keep-finished limit counts.
  *
  * A failure is not finished in this sense: it is the row still owed an answer,
  * with the error text and the retry on it, and it goes only when somebody
- * clears it on purpose.
+ * clears it on purpose. A cancelled row is owed nothing, so it may age out.
  */
 export function isFinished(state: DownloadState): boolean {
   return state === 'completed' || state === 'canceled'

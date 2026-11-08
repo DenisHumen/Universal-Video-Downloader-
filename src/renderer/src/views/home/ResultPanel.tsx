@@ -5,7 +5,9 @@ import type { AppSettings, MediaInfo } from '@shared/types'
 import { errorReport, errorText } from '../../lib/errors'
 import { fixFor } from '../../lib/fixes'
 import FixBar from '../../components/FixBar'
-import { errorLead } from '../../lib/emphasis'
+import { errorCardLead } from '../../lib/emphasis'
+import { toast } from '../../lib/toast'
+import { Menu, type MenuItem } from '../../ui'
 import { useT } from '../../i18n'
 import { useStore } from '../../store'
 import PlaylistCard from '../../components/PlaylistCard'
@@ -119,8 +121,25 @@ function ErrorCard({
 }): JSX.Element {
   const t = useT()
   const { error, errorCode, cookieHint, reported } = failure
-  const retryLeads = errorLead(errorCode) === 'retry'
+  const openSettings = useStore((s) => s.openSettings)
   const fix = fixFor(errorCode, cookieHint)
+  const lead = errorCardLead(errorCode, fix)
+  const copyText = errorReport(t, { error, errorCode, cookieHint })
+  const openBrowser = (): void => void window.api.openBrowser(url || undefined)
+  // Everything that is not the one button, so a beginner has one thing to press.
+  const others: MenuItem[] = [
+    ...(lead === 'retry' ? [] : [{ label: t('common.retry'), onSelect: onRetry }]),
+    ...(lead === 'browser' || fix === 'browser' ? [] : [{ label: t('browser.open'), onSelect: openBrowser }]),
+    ...(lead === 'retry' && fix === 'proxy' ? [{ label: t('fix.proxy'), onSelect: () => openSettings('network') }] : []),
+    {
+      label: t('fix.copyError'),
+      onSelect: () =>
+        void navigator.clipboard.writeText(copyText).then(
+          () => toast(t('common.copied'), 'success'),
+          () => undefined
+        )
+    }
+  ]
   return (
     <m.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={enter} className="panel overflow-hidden">
       <div className="flex items-center gap-2.5 border-b border-edge-soft px-4 py-3">
@@ -130,32 +149,41 @@ function ErrorCard({
       <div className="p-4">
         <p className="selectable break-words text-body leading-relaxed text-ink">{errorText(t, { error, errorCode, cookieHint })}</p>
         <div className="mt-4 flex flex-wrap items-center gap-2">
-          {/* The honest escape hatch, unless the fix below already is it. */}
-          {fix !== 'browser' && (
-            <button
-              type="button"
-              className={retryLeads || fix ? 'btn-quiet' : 'btn-solid'}
-              onClick={() => window.api.openBrowser(url || undefined)}
-            >
+          {lead === 'fix' && (
+            <FixBar
+              leadOnly
+              errorCode={errorCode}
+              cookieHint={cookieHint}
+              url={url}
+              retryKey={`detect:${url}`}
+              copyText={copyText}
+              onRetry={onRetry}
+              onAudioOnly={onAudioOnly}
+              onChangeFolder={onChangeFolder}
+            />
+          )}
+          {lead === 'retry' && (
+            <button type="button" className="btn-solid" onClick={onRetry}>
+              <RotateCw size={14} /> {t('common.retry')}
+            </button>
+          )}
+          {lead === 'browser' && (
+            <button type="button" className="btn-solid" onClick={openBrowser}>
               <Globe size={14} /> {t('browser.open')}
             </button>
           )}
-          <button type="button" className={retryLeads ? 'btn-solid' : 'btn-quiet'} onClick={onRetry}>
-            <RotateCw size={14} /> {t('common.retry')}
-          </button>
+          <Menu
+            label={t('home.otherOptions')}
+            align="start"
+            items={others}
+            trigger={(props) => (
+              <button type="button" className="btn-quiet" {...props}>
+                {t('home.otherOptions')}
+              </button>
+            )}
+          />
         </div>
-        {/* 6.2: what this failure's code says to try, then Report and Copy Error. */}
-        <FixBar
-          errorCode={errorCode}
-          cookieHint={cookieHint}
-          url={url}
-          retryKey={`detect:${url}`}
-          copyText={errorReport(t, { error, errorCode, cookieHint })}
-          onRetry={onRetry}
-          onAudioOnly={onAudioOnly}
-          onChangeFolder={onChangeFolder}
-        />
-        <p className="hint mt-3">{t('browser.openHint')}</p>
+        {(lead === 'browser' || fix === 'browser') && <p className="hint mt-3">{t('browser.openHint')}</p>}
         {/* Keyed by the failure, so a retry that fails again asks afresh. */}
         {reported && (
           <ReportPrompt key={reported.id} reportId={reported.id} stage="detect" url={reported.url} errorCode={errorCode} />
