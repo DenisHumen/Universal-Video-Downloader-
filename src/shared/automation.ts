@@ -118,10 +118,13 @@ export interface Watch {
   title: string
   thumbnail?: string
   provider: string
-  /** Which dub, and at what quality. Fixed per watch. */
+  /** Which dub: another one is another list of episodes, so it stays what the watch was made with. */
   translatorId: string
   translatorName?: string
+  /** At what quality. Can be changed, for the episodes from then on. */
   quality: string
+  /** Where this series is saved. Absent means the download folder in Settings. */
+  outputDir?: string
   enabled: boolean
   intervalMinutes: number
   /** Absolute wall-clock time, so a sleeping machine does not lose its place. */
@@ -465,6 +468,19 @@ export function watchingAlready(watches: Watch[], series: WatchIdentity): Watch 
 }
 
 /**
+ * The qualities a watch can be changed to.
+ *
+ * A fixed list, because knowing what the site offers takes a look at its page
+ * and this is one row on a settings screen. Any of them works: the resolvers
+ * take the best stream at or below the height they are given.
+ */
+export const WATCH_QUALITIES: readonly string[] = ['best', '1080p', '720p', '480p', '360p']
+
+/** `720` and `720p` are one quality: sites spell their lists both ways. */
+const sameQuality = (a: string, b: string): boolean =>
+  a === b || a.replace(/p$/i, '') === b.replace(/p$/i, '')
+
+/**
  * The watch a new one would be an exact copy of: same series, dub and quality.
  *
  * Such a copy has no purpose and does harm. Both ask the queue for the same
@@ -478,7 +494,23 @@ export function exactDuplicate(
   candidate: WatchIdentity & Pick<Watch, 'quality' | 'pending'>
 ): Watch | undefined {
   if (candidate.pending) return undefined
-  return watches.find((w) => !w.pending && w.quality === candidate.quality && sameDub(w, candidate))
+  return watches.find((w) => !w.pending && sameQuality(w.quality, candidate.quality) && sameDub(w, candidate))
+}
+
+/**
+ * The other watch this change would turn a watch into an exact copy of.
+ *
+ * `exactDuplicate` guards adding; a change of quality can get to the same place
+ * from a watch that was fine. Only a change that names the quality asks: pausing
+ * one of an old pair that predates the rule must still work.
+ */
+export function duplicateAfterEdit(watches: Watch[], id: string, patch: Partial<Watch>): Watch | undefined {
+  const current = watches.find((w) => w.id === id)
+  if (!current || patch.quality === undefined) return undefined
+  return exactDuplicate(
+    watches.filter((w) => w.id !== id),
+    { ...current, ...patch }
+  )
 }
 
 /**

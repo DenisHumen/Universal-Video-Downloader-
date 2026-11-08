@@ -32,6 +32,43 @@ describe('Watching (5.6)', () => {
     expect(screen.getByRole('heading', { name: 'Telegram' })).toBeTruthy()
   })
 
+  describe('changing a watch after it was made', () => {
+    const open = async (): Promise<void> => {
+      render(<App />)
+      await waitFor(() => expect(useStore.getState().ready).toBe(true))
+      await screen.findAllByText('No Poster Show')
+    }
+
+    it('saves a folder of its own for the series, and can go back to the default', async () => {
+      const [w] = await window.api.autoList()
+      vi.spyOn(window.api, 'chooseDirectory').mockResolvedValueOnce('/media/series')
+      const update = vi.spyOn(window.api, 'autoUpdate')
+      update.mockClear()
+      await open()
+      await act(async () => fireEvent.click(screen.getAllByRole('button', { name: 'Change…' })[0]))
+      await waitFor(() => expect(update).toHaveBeenCalledWith(w.id, { outputDir: '/media/series' }))
+      expect(await screen.findByText('/media/series')).toBeTruthy()
+      await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Use Default Folder' })))
+      await waitFor(() => expect(update).toHaveBeenCalledWith(w.id, { outputDir: undefined }))
+    })
+
+    it('refuses a quality that would make it a copy of another watch, and says so', async () => {
+      const [first] = await window.api.autoList()
+      await window.api.autoAdd({ ...first, id: undefined, quality: '480p' } as never)
+      const update = vi.spyOn(window.api, 'autoUpdate')
+      update.mockClear()
+      await open()
+      await act(async () => fireEvent.click(screen.getByRole('combobox', { name: 'Quality' })))
+      await act(async () => fireEvent.click(screen.getByRole('option', { name: '480p' })))
+      expect(update).not.toHaveBeenCalled()
+      expect(await screen.findByText(/already follows this series in this dub at 480p/)).toBeTruthy()
+      // A quality nobody has goes through.
+      await act(async () => fireEvent.click(screen.getByRole('combobox', { name: 'Quality' })))
+      await act(async () => fireEvent.click(screen.getByRole('option', { name: '720p' })))
+      await waitFor(() => expect(update).toHaveBeenCalledWith(first.id, { quality: '720p' }))
+    })
+  })
+
   it('opens the add dialog of entry rows from the header "+"', async () => {
     render(<App />)
     await waitFor(() => expect(useStore.getState().ready).toBe(true))

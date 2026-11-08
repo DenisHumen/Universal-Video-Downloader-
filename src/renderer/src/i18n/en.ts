@@ -843,6 +843,8 @@ export const en = {
   'bytes.TB': 'TB',
   'speed.perSecond': '/s',
   'auto.interval': 'How Often to Check',
+  'auto.nextEpisodes': 'For the episodes from now on',
+  'auto.qualityTaken': 'Another watch already follows this series in this dub at {quality}',
   'auto.checkNow': 'Check Now',
   'auto.checkNothing': 'Nothing new',
   'auto.checkQueuedOne': 'A new episode is in the queue',

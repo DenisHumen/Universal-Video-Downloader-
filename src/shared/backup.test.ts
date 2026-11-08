@@ -543,6 +543,22 @@ describe('planImport: shares', () => {
 })
 
 describe('planImport: watches', () => {
+  it('keeps a series folder that exists here, and forgets one that does not', () => {
+    const plan = planImport(
+      viaFile(
+        backupOf({
+          watches: [
+            watch({ url: 'https://example.com/a', outputDir: '/media/series' }),
+            watch({ url: 'https://example.com/b', outputDir: 'D:\\Old PC\\Series' })
+          ]
+        })
+      ),
+      { settings: settings(), watches: [] },
+      env((path) => path === '/media/series')
+    )
+    expect(plan.watches.map((w) => w.outputDir)).toEqual(['/media/series', undefined])
+  })
+
   it('adds a watch with what it has handled, under a fresh id, with its last check forgotten', () => {
     const plan = planImport(
       viaFile(

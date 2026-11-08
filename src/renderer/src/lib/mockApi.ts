@@ -277,6 +277,7 @@ declare global {
 }
 
 import {
+  duplicateAfterEdit,
   exactDuplicate,
   inheritedSeen,
   settleRunError,
@@ -676,6 +677,7 @@ export function installMockApi(): void {
     },
     autoUpdate: async (id, changes) => {
       const i = mockWatches.findIndex((x) => x.id === id)
+      if (duplicateAfterEdit(mockWatches, id, changes)) return mockWatches[i]
       // The same rule main applies, so dismissing or pausing behaves here as it does there.
       if (i >= 0) mockWatches[i] = { ...mockWatches[i], ...settleRunError(changes) }
       return mockWatches[i]

@@ -355,6 +355,7 @@ function cleanWatch(raw: Watch): Watch {
     translatorId: text(raw.translatorId),
     ...(typeof raw.translatorName === 'string' ? { translatorName: raw.translatorName } : {}),
     quality: text(raw.quality, 'best'),
+    ...(typeof raw.outputDir === 'string' && raw.outputDir ? { outputDir: raw.outputDir } : {}),
     enabled: raw.enabled,
     intervalMinutes: raw.intervalMinutes,
     nextCheckAt: 0,
@@ -573,8 +574,11 @@ export function planImport(
   const added: Watch[] = []
   let watchesSkipped = 0
   for (const imported of backup.watches) {
+    const { outputDir, ...portable } = imported
     const watch: Watch = {
-      ...imported,
+      ...portable,
+      // Like the download folder above: one that is not on this machine would only fail every episode.
+      ...(outputDir && env.exists(outputDir) ? { outputDir } : {}),
       steps: imported.steps.map((step) =>
         step.kind === 'upload' && targetIds.has(step.targetId)
           ? { ...step, targetId: targetIds.get(step.targetId) as string }

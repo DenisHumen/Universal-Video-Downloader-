@@ -822,6 +822,8 @@ export const ru: Dictionary = {
   'bytes.TB': 'ТБ',
   'speed.perSecond': '/с',
   'auto.interval': 'Как часто проверять',
+  'auto.nextEpisodes': 'Для серий, которые выйдут дальше',
+  'auto.qualityTaken': 'За этим сериалом в этой озвучке уже следит другая запись с качеством {quality}',
   'auto.checkNow': 'Проверить сейчас',
   'auto.checkNothing': 'Ничего нового',
   'auto.checkQueuedOne': 'Новая серия встала в очередь',
