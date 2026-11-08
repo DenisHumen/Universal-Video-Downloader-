@@ -3,7 +3,7 @@ import { m } from 'framer-motion'
 import { enter } from '../../lib/motion'
 import { CheckCircle2, Folder, FolderOpen, Loader2, Play } from '../../ui/icons'
 import { hasTrim, type AppSettings, type DownloadMode, type MediaInfo, type QualityPreset, type TrimRange } from '@shared/types'
-import { formatBytes, formatCount, formatDuration } from '../../lib/format'
+import { audioFormatLabel, formatBytes, formatCount, formatDuration } from '../../lib/format'
 import {
   availableHeights,
   heightLabel,
@@ -281,7 +281,7 @@ export default function VideoResult({
             subtitle={youGet}
             value={settings.audioFormat}
             onChange={onAudioFormat}
-            options={AUDIO_FORMATS.map((f) => ({ value: f, label: f.toUpperCase() }))}
+            options={AUDIO_FORMATS.map((f) => ({ value: f, label: audioFormatLabel(f) }))}
           />
         )}
         {mode === 'video' && videoFormats.length > 1 && (

@@ -591,7 +591,20 @@ export function outputTarget(
 
 /** An audio download into a container with no place for cover art. */
 function audioHasNoCover(item: DownloadItem, settings: AppSettings): boolean {
-  return item.mode === 'audio' && ['wav', 'aac'].includes(settings.audioFormat)
+  return item.mode === 'audio' && settings.audioFormat === 'wav'
+}
+
+/**
+ * What to ask the engine for, for a format picked in Settings.
+ *
+ * Its `aac` is a trap, checked on the real engine and ffmpeg: it writes bare ADTS
+ * audio and names the file `.m4a`, which is not what that name promises and which
+ * a good many players refuse. `--embed-metadata` happened to rewrap it properly
+ * when on; a cover on the bare file failed the whole download. Its `m4a` is the
+ * same sound, in the container the name says, so that is what "AAC" gets.
+ */
+export function engineAudioFormat(format: string): string {
+  return format === 'aac' ? 'm4a' : format
 }
 
 /**
@@ -695,7 +708,7 @@ export function buildArgs(
   )
 
   if (item.mode === 'audio') {
-    args.push('-f', qualityFormat('audio', item.audioLanguage), '-x', '--audio-format', settings.audioFormat, '--audio-quality', '0')
+    args.push('-f', qualityFormat('audio', item.audioLanguage), '-x', '--audio-format', engineAudioFormat(settings.audioFormat), '--audio-quality', '0')
   } else {
     if (item.formatId && item.formatId !== 'auto') {
       const inLanguage = item.audioLanguage ? `${item.formatId}+ba[language=${item.audioLanguage}]/` : ''
@@ -726,7 +739,7 @@ export function buildArgs(
 
   /*
     Unlike the thumbnail step below, this one is safe on every audio format, wav
-    and aac included: the engine only copies the streams into a new file, and a
+    included: the engine only copies the streams into a new file, and a
     container with no room for a tag drops it. Checked against the real engine and
     both ffmpegs, with Cyrillic titles, long descriptions and chapters.
   */
@@ -735,8 +748,8 @@ export function buildArgs(
   /*
     The engine's thumbnail step takes mp3, mkv, mka, ogg, opus, flac, m4a, mp4, m4v
     and mov, and raises an error on anything else - after the file is finished,
-    so a good .wav or .aac read as a failed download. Those two have nowhere to
-    put a picture, so the step is not asked for.
+    so a good .wav read as a failed download. It has nowhere to put a picture,
+    so the step is not asked for.
   */
   if (settings.embedThumbnail && !audioHasNoCover(item, settings)) args.push('--embed-thumbnail')
   if (settings.embedChapters && item.mode === 'video') args.push('--embed-chapters')

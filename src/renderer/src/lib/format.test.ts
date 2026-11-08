@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it } from 'vitest'
 import { useI18n } from '../i18n'
 import {
+  audioFormatLabel,
   formatBytes,
   formatCount,
   formatDuration,
@@ -54,6 +55,13 @@ describe('formatSpeed', () => {
   it('appends per second', () => {
     expect(formatSpeed(1536)).toBe('1.5 KB/s')
     expect(formatSpeed(1536, 'ru')).toBe('1,5 КБ/с')
+  })
+})
+
+describe('audioFormatLabel', () => {
+  it('says where AAC ends up', () => {
+    expect(audioFormatLabel('aac')).toBe('AAC (.m4a)')
+    expect(audioFormatLabel('mp3')).toBe('MP3')
   })
 })
 

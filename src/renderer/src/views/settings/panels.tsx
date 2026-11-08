@@ -15,6 +15,7 @@ import {
 } from '@shared/types'
 import type { BackupError, ImportCounts } from '@shared/backup'
 import { useStore } from '../../store'
+import { audioFormatLabel } from '../../lib/format'
 import { useT, useTp, type TranslationKey } from '../../i18n'
 import { toast } from '../../lib/toast'
 import { describeCliCommand } from '../../lib/cliCommand'
@@ -198,7 +199,7 @@ export function DownloadsPanel({ settings, set }: PanelProps): JSX.Element {
           subtitle={t('settings.audioFormatHint')}
           value={settings.audioFormat}
           onChange={(v) => set('audioFormat', v)}
-          options={['mp3', 'm4a', 'opus', 'flac', 'wav', 'aac'].map((f) => ({ value: f, label: f.toUpperCase() }))}
+          options={['mp3', 'm4a', 'opus', 'flac', 'wav', 'aac'].map((f) => ({ value: f, label: audioFormatLabel(f) }))}
         />
       </PreferencesGroup>
 
