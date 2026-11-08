@@ -8,6 +8,10 @@ describe('fix buttons (6.2): the error code decides the fix', () => {
   const cases: [AppErrorCode, ReturnType<typeof fixFor>][] = [
     ['signIn', 'cookies'],
     ['ageRestricted', 'cookies'],
+    ['siteBotCheck', 'browser'],
+    ['noStream', null],
+    ['premiumOnly', null],
+    ['playerChanged', null],
     ['forbidden', 'browser'],
     ['geo', 'proxy'],
     ['unsupportedPlayer', 'browser'],

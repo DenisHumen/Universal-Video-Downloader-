@@ -103,11 +103,11 @@ describe('parseStreamReply', () => {
 })
 
 /*
-  The resolver's own sentences are shown as written only when no rule in the
-  error classifier claims them. "Instead of the page" would have been claimed:
-  the age-restriction rule's bare "age" matches "page".
+  Each of the resolver's sentences has a code of its own, so it reaches the user
+  in their language. "Instead of the page" was once claimed by the wrong rule:
+  the age-restriction rule's bare "age" matched "page".
 */
-describe('rezka’s errors reach the user as written', () => {
+describe('rezka’s errors are classified', () => {
   const messages = (): string[] => {
     const out: string[] = []
     for (const raw of [
@@ -130,12 +130,14 @@ describe('rezka’s errors reach the user as written', () => {
     return out
   }
 
-  it('matches no classifier rule', () => {
-    const all = messages()
-    expect(all).toHaveLength(5)
-    for (const message of all) {
-      expect(classifyYtdlpError(message, false)).toEqual({ message, cookieHint: false })
-    }
+  it('each by what it means', () => {
+    expect(messages().map((message) => classifyYtdlpError(message, false).code)).toEqual([
+      'siteBotCheck',
+      'playerChanged',
+      'noStream',
+      'premiumOnly',
+      'playerChanged'
+    ])
   })
 })
 

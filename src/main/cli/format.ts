@@ -1,4 +1,4 @@
-import type { AppErrorCode, QualityPreset } from '@shared/types'
+import type { AppErrorCode, AppSettings, DownloadMode, QualityPreset } from '@shared/types'
 
 /**
  * The command line's words: what it accepts, what it prints while it works,
@@ -55,8 +55,8 @@ export interface CliOptions {
   /** A folder to save into instead of the one in Settings. */
   output?: string
   audio: boolean
-  /** The tallest video to take; `best` takes whatever the site has. */
-  quality: CliQuality
+  /** The tallest video to take; `best` takes whatever the site has. Absent: what Settings says. */
+  quality?: CliQuality
   help: boolean
   version: boolean
   /** What was wrong with the command line, if anything. */
@@ -64,15 +64,12 @@ export interface CliOptions {
 }
 
 export function parseCliArgs(args: string[]): CliOptions {
-  const options: CliOptions = { links: [], audio: false, quality: 'best', help: false, version: false }
-  // Whether -q was given at all, since `-q best -a` is as contradictory as `-q 720 -a`.
-  let qualityGiven = false
+  const options: CliOptions = { links: [], audio: false, help: false, version: false }
   const takeQuality = (flag: string, value: string | undefined): string | undefined => {
     if (!value) return `${flag} needs a quality after it: ${QUALITY_LIST}.`
     const quality = parseQuality(value)
     if (!quality) return `${flag} takes ${QUALITY_LIST}, not "${value}".`
     options.quality = quality
-    qualityGiven = true
     return undefined
   }
   for (let i = 0; i < args.length; i++) {
@@ -103,7 +100,7 @@ export function parseCliArgs(args: string[]): CliOptions {
     two together would download something other than what one of them says.
     Better to ask than to guess which one was meant.
   */
-  if (qualityGiven && options.audio && !options.error) {
+  if (options.quality && options.audio && !options.error) {
     options.error = '--quality picks a video size, so it does nothing with --audio. Leave one of them out.'
   }
   if (!options.help && !options.version && !options.error && options.links.length === 0) {
@@ -112,15 +109,41 @@ export function parseCliArgs(args: string[]): CliOptions {
   return options
 }
 
+/** What to fetch: the two fields of a queue item the command line decides. */
+export interface CliChoice {
+  mode: DownloadMode
+  quality: QualityPreset
+}
+
+/**
+ * What a run downloads: the flags, or else the app's default mode and quality.
+ *
+ * Either flag says all of it, whatever Settings has. `-q` asks for a video even
+ * when the app's default is sound only, and `-a` needs no height. A default
+ * quality of "audio" with the mode on video reads as `best`, the way the app's
+ * own automatic downloads read it.
+ */
+export function downloadChoice(
+  options: Pick<CliOptions, 'audio' | 'quality'>,
+  defaults: Pick<AppSettings, 'defaultMode' | 'defaultQuality'>
+): CliChoice {
+  if (options.audio) return { mode: 'audio', quality: 'audio' }
+  if (options.quality) return { mode: 'video', quality: options.quality }
+  if (defaults.defaultMode === 'audio') return { mode: 'audio', quality: 'audio' }
+  const quality = defaults.defaultQuality
+  return { mode: 'video', quality: !quality || quality === 'audio' ? 'best' : quality }
+}
+
 export const USAGE = `Usage: uvd <link> [<link> ...] [options]
 
-Downloads the video at each link in the best quality it offers, into your
-Downloads folder (or the folder chosen in the app's settings).
+Downloads each link with the default mode and quality from the app's settings
+(the best quality, until you change them), into your Downloads folder or the
+folder chosen there. The flags below override the settings for this run.
 
 Options:
   -q, --quality <best|2160|1440|1080|720|480|360>
-                         take at most this height (1080p and 4K work too);
-                         a site without it gives the best it has
+                         take a video of at most this height (1080p and 4K
+                         work too); a site without it gives the best it has
   -o, --output <folder>  save into this folder instead
   -a, --audio            save the audio only
   -V, --version          print the version

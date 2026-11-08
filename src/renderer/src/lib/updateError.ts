@@ -13,12 +13,18 @@ const MAX_CHARS = 160
  * error page's HTML, every response header - and Settings printed it as is, in
  * a block taller than the row's button. The log keeps all of that; here a
  * server that is not answering says so in the interface language, and anything
- * else is cut to its first line.
+ * else is a plain line in that language too. A first line of the updater's
+ * English was no use to anyone reading Russian: it goes in `updateErrorDetail`.
  */
 export function updateErrorText(t: TranslateFn, message: string | undefined): string {
   const raw = message?.trim()
   if (!raw) return t('update.failed')
-  if (NOT_ANSWERING.test(raw)) return t('update.notAnswering')
-  const first = raw.split(/\r?\n/)[0].trim()
+  return NOT_ANSWERING.test(raw) ? t('update.notAnswering') : t('update.failed')
+}
+
+/** The updater's own words for a tooltip: the first line, cut to a readable length. */
+export function updateErrorDetail(message: string | undefined): string | undefined {
+  const first = message?.trim().split(/\r?\n/)[0].trim()
+  if (!first) return undefined
   return first.length > MAX_CHARS ? `${first.slice(0, MAX_CHARS)}…` : first
 }

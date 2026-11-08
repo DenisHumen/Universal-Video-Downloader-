@@ -1570,7 +1570,7 @@ function fail(item: DownloadItem, rawError: string): void {
     retryTimers.set(item.id, timer)
     return
   }
-  const { code, message, cookieHint } = classifyYtdlpError(rawError, hasCookies(getSettings()))
+  const { code, message, cookieHint } = classifyYtdlpError(rawError, hasCookies(getSettings(), browserCookiesFile()))
   /*
     The code, not the engine's text. `rawError` is the tail of its output, and
     that holds media addresses and file paths; with "detailed log" on, those

@@ -75,14 +75,13 @@ export type StageReporter = (stage: DetectStage) => void
  * A resolver threw.
  *
  * When the wording matches something the app knows how to explain, the code
- * travels too and the UI can say it in the user's language. When it doesn't —
- * "this translation requires Premium", say — the resolver's own sentence goes
- * through untouched: it knows more about the site than any rule matching a
- * substring of it ever will.
+ * travels too and the UI can say it in the user's language. When it doesn't,
+ * the resolver's own sentence goes through untouched: it knows more about the
+ * site than any rule matching a substring of it ever will.
  */
 function errorResult(err: unknown): DetectResult {
   const raw = err instanceof Error ? err.message : String(err)
-  const { code, message, cookieHint } = classifyYtdlpError(raw, hasCookies(getSettings()))
+  const { code, message, cookieHint } = classifyYtdlpError(raw, hasCookies(getSettings(), browserCookiesFile()))
   return { ok: false, error: code ? message : raw, errorCode: code, cookieHint }
 }
 
@@ -573,7 +572,7 @@ function spawnJson(args: string[], signal: AbortSignal | undefined, timeoutMs: n
     child.on('close', (code) => {
       if (code !== 0 || !stdout.trim()) {
         const reason = stderr.trim() || 'Could not detect any media at this URL.'
-        const { code: errorCode, message, cookieHint } = classifyYtdlpError(reason, hasCookies(settings))
+        const { code: errorCode, message, cookieHint } = classifyYtdlpError(reason, hasCookies(settings, browserCookiesFile()))
         done({ ok: false, error: message, errorCode, cookieHint, output: stderr || undefined })
         return
       }

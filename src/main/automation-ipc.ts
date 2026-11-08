@@ -28,6 +28,7 @@ import {
   inheritedSeen,
   normaliseSmbTarget,
   settleRunError,
+  settleTokenSaved,
   type AddedWatch,
   type CheckSummary,
   type EpisodeRef,
@@ -259,7 +260,18 @@ export function registerAutomationIpc(): void {
             ? SECRET.proxyPassword()
             : SECRET.telegramToken()
       // Answers once it is on disk, so a quit right after cannot lose it; false when it is not.
-      return setSecret(key, value)
+      const saved = await setSecret(key, value)
+      if (kind === 'telegram') {
+        if (saved && value) {
+          for (const watch of listWatches()) {
+            const patch = settleTokenSaved(watch)
+            if (patch) updateWatch(watch.id, patch)
+          }
+        }
+        // The Telegram step's line on the screen depends on whether a token is there.
+        broadcast()
+      }
+      return saved
     }
   )
 

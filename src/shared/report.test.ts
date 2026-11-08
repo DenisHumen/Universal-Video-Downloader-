@@ -79,9 +79,13 @@ describe('isReportable', () => {
     'signIn',
     'drm',
     'unavailable',
-    'sourceMissing'
+    'sourceMissing',
+    'siteBotCheck',
+    'noStream',
+    'premiumOnly'
   ]
   const asks: AppErrorCode[] = [
+    'playerChanged',
     'noFormats',
     'emptyPage',
     'postprocess',

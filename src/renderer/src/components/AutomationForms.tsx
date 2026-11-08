@@ -5,6 +5,7 @@ import { useStore } from '../store'
 import { useT } from '../i18n'
 import { toast } from '../lib/toast'
 import { describeError } from '../lib/errors'
+import { localizeMainText } from '../lib/mainText'
 import {
   formatSmbPath,
   normaliseSmbTarget,
@@ -52,6 +53,8 @@ export function useSecretState(): {
   smb: Record<string, boolean>
   proxy: boolean
   persists: boolean
+  /** Main has answered, so `false` above means not stored rather than not known yet. */
+  known: boolean
   refresh: () => void
 } {
   const [state, setState] = useState({
@@ -60,11 +63,15 @@ export function useSecretState(): {
     proxy: false,
     persists: true
   })
+  const [known, setKnown] = useState(false)
   const refresh = useCallback(() => {
-    void window.api.autoSecretState().then(setState)
+    void window.api.autoSecretState().then((next) => {
+      setState(next)
+      setKnown(true)
+    })
   }, [])
   useEffect(refresh, [refresh])
-  return { ...state, refresh }
+  return { ...state, known, refresh }
 }
 
 function Field({
@@ -238,7 +245,7 @@ export function ShareForm({
   const test = async (): Promise<void> => {
     setTesting(true)
     try {
-      toast(await window.api.autoTestSmb(target, password), 'success')
+      toast(localizeMainText(t, await window.api.autoTestSmb(target, password)), 'success')
     } catch (err) {
       toast(describeError(err), 'error')
     } finally {
@@ -347,7 +354,7 @@ export function TelegramForm({
   const test = async (): Promise<void> => {
     setTesting(true)
     try {
-      toast(await window.api.autoTestTelegram(token, chatId), 'success')
+      toast(localizeMainText(t, await window.api.autoTestTelegram(token, chatId)), 'success')
     } catch (err) {
       toast(describeError(err), 'error')
     } finally {

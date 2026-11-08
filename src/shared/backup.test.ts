@@ -198,6 +198,7 @@ describe('buildBackup', () => {
           lastError: 'offline',
           lastCheckedAt: 5,
           lastRunError: 'share refused',
+          lastRunErrorCode: 'diskFull',
           lastRunFailedAt: 6,
           attempts: { s1e2: 1 }
         })
@@ -208,7 +209,7 @@ describe('buildBackup', () => {
     const [kept] = backup.watches
     expect(kept.seen).toEqual([{ season: 1, episode: 1 }])
     expect(kept.failures).toBe(0)
-    for (const key of ['lastError', 'lastCheckedAt', 'lastRunError', 'lastRunFailedAt', 'attempts']) {
+    for (const key of ['lastError', 'lastCheckedAt', 'lastRunError', 'lastRunErrorCode', 'lastRunFailedAt', 'attempts']) {
       expect(kept).not.toHaveProperty(key)
     }
   })

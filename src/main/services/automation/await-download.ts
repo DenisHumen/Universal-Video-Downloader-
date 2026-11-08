@@ -1,5 +1,5 @@
 import type { EventEmitter } from 'events'
-import type { DownloadItem } from '@shared/types'
+import type { AppErrorCode, DownloadItem } from '@shared/types'
 
 /**
  * Waiting for a queue item to finish, for the automation's download step.
@@ -34,6 +34,23 @@ export class DownloadStopped extends Error {
   }
 }
 
+/**
+ * The queue gave up on the item.
+ *
+ * Carries the code the queue worked out as well as its sentence. A plain Error
+ * kept only the English, so an episode that failed for a reason the queue's own
+ * row explains in Russian was explained in English on the watch.
+ */
+export class DownloadFailed extends Error {
+  constructor(
+    message: string,
+    readonly code?: AppErrorCode
+  ) {
+    super(message)
+    this.name = 'DownloadFailed'
+  }
+}
+
 const terminal = (state: DownloadItem['state']): boolean =>
   state === 'completed' || state === 'error' || state === 'canceled'
 
@@ -63,7 +80,7 @@ export function awaitDownload(id: string, queue: QueueView, hooks: WaitHooks = {
       stop()
       if (item.state === 'completed') resolve(item)
       else if (item.state === 'canceled') reject(new DownloadStopped('cancelled'))
-      else reject(new Error(item.error || 'The download failed.'))
+      else reject(new DownloadFailed(item.error || 'The download failed.', item.errorCode))
     }
 
     const onUpdate = (item: DownloadItem): void => {

@@ -6,6 +6,7 @@
  * will produce before anything is downloaded.
  */
 
+import type { AppErrorCode } from './types'
 import { normalizeUrl } from './urls'
 
 export type StepKind = 'download' | 'rename' | 'upload' | 'notify'
@@ -153,6 +154,8 @@ export interface Watch {
    * pausing or resuming, or dismissing it.
    */
   lastRunError?: string
+  /** What the queue called that failure, when it was the download: the screen says it in the user's language. */
+  lastRunErrorCode?: AppErrorCode
   lastRunFailedAt?: number
   /**
    * Failed goes so far at each episode not yet given up on, by `episodeKey`.
@@ -169,6 +172,8 @@ export interface RunStep {
   kind: StepKind
   state: StepState
   message?: string
+  /** The queue's code for a failed download, beside its English sentence. */
+  code?: AppErrorCode
   startedAt?: number
   finishedAt?: number
 }
@@ -901,6 +906,21 @@ export function watchTrouble(watch: Watch): string | undefined {
   return watch.lastError || watch.lastRunError || undefined
 }
 
+/**
+ * What a watch says when messages cannot go because the bot's token is missing.
+ *
+ * Shared because saving a token is what fixes it, and nothing else has to wait
+ * for the next episode, which may be a week away, to take the problem down.
+ */
+export const TELEGRAM_NO_TOKEN =
+  'A Telegram chat is set but the bot token is missing, so nothing is sent. Add the token under Telegram on the Watching screen.'
+
+/** What saving a bot token writes to a watch: the missing token is no longer its trouble. */
+export function settleTokenSaved(watch: Watch): Partial<Watch> | undefined {
+  if (watch.lastRunError !== TELEGRAM_NO_TOKEN) return undefined
+  return { lastRunError: undefined, lastRunErrorCode: undefined, lastRunFailedAt: undefined }
+}
+
 /** Whether a watch counts towards the mark on the tab. A paused one is not anyone's emergency. */
 export function watchFailing(watch: Watch): boolean {
   return watch.enabled && Boolean(watchTrouble(watch))
@@ -916,5 +936,5 @@ export function watchFailing(watch: Watch): boolean {
  */
 export function settleRunError(patch: Partial<Watch>): Partial<Watch> {
   if (!('steps' in patch || 'enabled' in patch || 'lastRunError' in patch)) return patch
-  return { ...patch, lastRunError: undefined, lastRunFailedAt: undefined }
+  return { ...patch, lastRunError: undefined, lastRunErrorCode: undefined, lastRunFailedAt: undefined }
 }

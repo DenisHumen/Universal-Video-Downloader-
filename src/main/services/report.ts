@@ -21,6 +21,7 @@ import { DIRECT_SCHEME, parseDirectUrl } from '../resolvers/universal/direct'
 import { pageUrlFromSniffUrl, SNIFF_SCHEME } from '../resolvers/universal'
 import { DEFAULT_TEMPLATE, getSettings } from './settings'
 import { hasCookies } from './options'
+import { browserCookiesFile } from './browser-logins'
 import { getYtdlpStatus } from './ytdlp'
 import { ffmpegPath } from './ffmpeg'
 import { currentLanguage } from './locale'
@@ -61,7 +62,7 @@ export function recordFailure(context: Omit<FailureContext, 'at' | 'flags'>): st
     ...context,
     at: Date.now(),
     flags: {
-      cookies: hasCookies(settings),
+      cookies: hasCookies(settings, browserCookiesFile()),
       proxy: Boolean(settings.proxy.trim()),
       customTemplate: settings.filenameTemplate !== DEFAULT_TEMPLATE
     }

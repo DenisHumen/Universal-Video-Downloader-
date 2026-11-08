@@ -1,5 +1,6 @@
 import type { CheckSummary } from '@shared/automation'
 import type { TranslateFn } from '../i18n'
+import { localizeMainText } from './mainText'
 import type { ToastKind } from './toast'
 
 /**
@@ -16,7 +17,7 @@ export function describeCheck(
   date: (at: number) => string
 ): { text: string; kind: ToastKind } {
   if ('busy' in summary) return { text: t('auto.checkBusy'), kind: 'info' }
-  if ('error' in summary) return { text: summary.error, kind: 'error' }
+  if ('error' in summary) return { text: localizeMainText(t, summary.error), kind: 'error' }
   if ('notOut' in summary) {
     return {
       text: summary.releaseAt

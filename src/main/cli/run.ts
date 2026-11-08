@@ -21,9 +21,11 @@ import { classifyYtdlpError, hasCookies, refusesMidStreamInit } from '../service
 import { killTree } from '../services/process'
 import { lineReader } from '../services/engine-output'
 import { ffmpegProgressSeconds, splitOutputLines } from '../services/ffmpeg-output'
+import { browserCookiesFile, readSavedBrowserJar } from '../services/browser-logins'
 import { flushLog, initLog, log } from '../services/log'
 import {
   describeFailure,
+  downloadChoice,
   ffmpegProgressLine,
   displayName,
   parseCliArgs,
@@ -31,8 +33,8 @@ import {
   postprocessLine,
   progressLine,
   USAGE,
-  type CliOptions,
-  type CliQuality
+  type CliChoice,
+  type CliOptions
 } from './format'
 
 /**
@@ -136,6 +138,7 @@ async function run(options: CliOptions): Promise<number> {
   initLog(settings.logVerbose ? 'debug' : 'info')
   log.info('cli', 'Started', { links: options.links.length })
   await applyProxy(settings)
+  readSavedBrowserJar()
 
   if (!existsSync(ytdlpBinaryPath())) say('Setting up the download engine (first run only)…')
   try {
@@ -147,24 +150,23 @@ async function run(options: CliOptions): Promise<number> {
   }
 
   const outputDir = options.output ? resolve(options.output) : settings.downloadDir || app.getPath('downloads')
+  const choice = downloadChoice(options, settings)
   let worst = 0
   for (const link of options.links) {
     if (stopping) break
-    const code = await download(link, outputDir, options.audio, options.quality)
+    const code = await download(link, outputDir, choice)
     worst = Math.max(worst, code)
   }
   return worst
 }
 
-async function download(link: string, outputDir: string, audio: boolean, quality: CliQuality): Promise<number> {
+async function download(link: string, outputDir: string, choice: CliChoice): Promise<number> {
   const settings = getSettings()
   const item: DownloadItem = {
     id: randomUUID(),
     url: normalizeUrl(link),
     title: '',
-    mode: audio ? 'audio' : 'video',
-    // The same preset the window's quality picker hands the downloader.
-    quality: audio ? 'audio' : quality,
+    ...choice,
     state: 'downloading',
     percent: 0,
     outputDir,
@@ -199,7 +201,7 @@ async function download(link: string, outputDir: string, audio: boolean, quality
     log.info('cli', 'Download finished', { url: item.url, path })
     return 0
   }
-  const classified = classifyYtdlpError(result.stderrTail, hasCookies(settings))
+  const classified = classifyYtdlpError(result.stderrTail, hasCookies(settings, browserCookiesFile()))
   const failure = describeFailure(classified.code, classified.message, Boolean(classified.cookieHint))
   for (const line of failure.lines) say(line)
   log.warn('cli', 'Download failed', { url: item.url, code: classified.code, error: result.stderrTail.slice(-600) })
