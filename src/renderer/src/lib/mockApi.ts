@@ -516,7 +516,7 @@ export function installMockApi(): void {
     chooseDirectory: async () => null,
     chooseCookiesFile: async () => null,
     openPath: async () => '',
-    showInFolder: async () => undefined,
+    showInFolder: async () => true,
     openExternal: async (url) => {
       window.open(url, '_blank')
     },

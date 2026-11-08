@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { DownloadItem } from '@shared/types'
-import { finishedBeyond, forHistory, HISTORY_LOG_CHARS, isFinished, isHistoryEntry } from './history'
+import { clearedBy, finishedBeyond, forHistory, HISTORY_LOG_CHARS, isFinished, isHistoryEntry } from './history'
 
 const row = (id: string, overrides: Partial<DownloadItem> = {}): DownloadItem => ({
   id,
@@ -14,8 +14,22 @@ const row = (id: string, overrides: Partial<DownloadItem> = {}): DownloadItem =>
   ...overrides
 })
 
+describe('clearedBy', () => {
+  it('sends each row to the clear button of the section it is drawn in', () => {
+    expect(clearedBy('completed')).toBe('finished')
+    expect(clearedBy('error')).toBe('failed')
+    expect(clearedBy('canceled')).toBe('failed')
+  })
+
+  it('leaves anything still going alone', () => {
+    for (const state of ['queued', 'detecting', 'downloading', 'processing', 'paused'] as const) {
+      expect(clearedBy(state)).toBeNull()
+    }
+  })
+})
+
 describe('isFinished', () => {
-  // Exactly what "clear finished" clears: a failure is still owed an answer.
+  // What the limit may age out: a failure is still owed an answer.
   it('counts completed and cancelled rows, and nothing else', () => {
     expect(isFinished('completed')).toBe(true)
     expect(isFinished('canceled')).toBe(true)

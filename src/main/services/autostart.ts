@@ -87,3 +87,16 @@ export function shouldStartHidden(
   const atLogin = wasOpenedAtLogin || argv.includes(HIDDEN_FLAG)
   return atLogin && (settings.trayEnabled || settings.automationEnabled)
 }
+
+/**
+ * Whether a launch that stayed in the tray keeps the schedules going by itself.
+ *
+ * Start-with-system promises that a schedule survives a reboot. With the tray
+ * on and background watching off, the login launch stayed hidden and nothing
+ * started the watcher, so no series was checked until somebody opened the
+ * window. Somebody who has series and asked for this has asked for them to be
+ * checked; with none, there is nothing to run until a window adds one.
+ */
+export function watchesFromHiddenStart(startHidden: boolean, watchCount: number): boolean {
+  return startHidden && watchCount > 0
+}

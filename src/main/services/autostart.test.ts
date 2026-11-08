@@ -4,8 +4,20 @@ import {
   autostartNeedsApplying,
   desktopExec,
   HIDDEN_FLAG,
-  shouldStartHidden
+  shouldStartHidden,
+  watchesFromHiddenStart
 } from './autostart'
+
+describe('watchesFromHiddenStart', () => {
+  it('runs the schedules when a hidden start has series to check', () => {
+    expect(watchesFromHiddenStart(true, 2)).toBe(true)
+  })
+
+  it('has nothing to run with no series, and leaves a normal launch to the window', () => {
+    expect(watchesFromHiddenStart(true, 0)).toBe(false)
+    expect(watchesFromHiddenStart(false, 2)).toBe(false)
+  })
+})
 
 /*
   The switch used to take effect one launch late, because it was applied only

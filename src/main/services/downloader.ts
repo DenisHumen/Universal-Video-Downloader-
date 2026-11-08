@@ -20,7 +20,8 @@ import {
 import { getSettings } from './settings'
 import { log } from './log'
 import { failure, noteRefusedWrite, ReadFailure, readJsonStore, writeJsonAtomic } from './json-store'
-import { finishedBeyond, forHistory, isFinished, isHistoryEntry } from './history'
+import { clearedBy, finishedBeyond, forHistory, isFinished, isHistoryEntry } from './history'
+import { knownSiteFor } from '@shared/auto-sources'
 import { downloadFields } from './log-fields'
 import {
   accessArgs,
@@ -395,9 +396,17 @@ export function siteFolder(item: Pick<DownloadItem, 'extractor' | 'sourceUrl' | 
     the fallback for anything queued before that, for links queued without a
     detect step at all, and for the labels in NOT_A_SITE.
   */
+  const page = pageUrlOf(item.sourceUrl || item.url)
+  /*
+    A site the app knows by name goes by that name first, whatever spelled it.
+    With no detect step (Download Now, a batch, the terminal) only the host is
+    known, so one site landed in `youtube.com`, `youtu.be` and `Youtube`.
+  */
+  const known = knownSiteFor(page)
+  if (known) return safeName(known.id)
   if (item.extractor && !NOT_A_SITE.test(item.extractor)) return safeName(item.extractor)
   try {
-    return safeName(new URL(pageUrlOf(item.sourceUrl || item.url)).hostname.replace(/^www\./, ''))
+    return safeName(new URL(page).hostname.replace(/^www\./, ''))
   } catch {
     return ''
   }
@@ -503,6 +512,11 @@ export function outputTarget(
   const template = numberedName(settings.filenameTemplate || '%(title)s [%(id)s].%(ext)s', item.playlist)
   const suffix = sectionSuffix(item.range) + (item.copySuffix ?? '')
   return { path: join(dir, withNameSuffix(template, suffix)) }
+}
+
+/** An audio download into a container with no place for cover art. */
+function audioHasNoCover(item: DownloadItem, settings: AppSettings): boolean {
+  return item.mode === 'audio' && ['wav', 'aac'].includes(settings.audioFormat)
 }
 
 /**
@@ -617,7 +631,13 @@ export function buildArgs(
 
   if (settings.embedMetadata) args.push('--embed-metadata')
   args.push(...playlistTagArgs(item.playlist, settings.embedMetadata))
-  if (settings.embedThumbnail) args.push('--embed-thumbnail')
+  /*
+    The engine's thumbnail step takes mp3, mkv, mka, ogg, opus, flac, m4a, mp4, m4v
+    and mov, and raises an error on anything else - after the file is finished,
+    so a good .wav or .aac read as a failed download. Those two have nowhere to
+    put a picture, so the step is not asked for.
+  */
+  if (settings.embedThumbnail && !audioHasNoCover(item, settings)) args.push('--embed-thumbnail')
   if (settings.embedChapters && item.mode === 'video') args.push('--embed-chapters')
   const subLangs = settings.subtitleLanguages.trim() || 'all'
   if (settings.embedSubtitles && item.mode === 'video') {
@@ -1931,16 +1951,16 @@ export function removeDownload(id: string): void {
 }
 
 export function clearFinished(): void {
-  clearWhere((item) => item.state === 'completed' || item.state === 'canceled')
+  clearWhere((item) => clearedBy(item.state) === 'finished')
 }
 
 /*
   Failures are kept by "clear finished": a failed row is the one still owed an
   answer, and clearing it with the successes threw away the error text and the
-  retry along with them. They have a separate action, behind a confirmation.
+  retry along with them. They have a separate action.
 */
 export function clearFailed(): void {
-  clearWhere((item) => item.state === 'error')
+  clearWhere((item) => clearedBy(item.state) === 'failed')
 }
 
 function clearWhere(match: (item: DownloadItem) => boolean): void {

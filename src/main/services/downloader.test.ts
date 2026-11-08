@@ -71,6 +71,21 @@ function item(overrides: Partial<DownloadItem> = {}): DownloadItem {
 }
 
 describe('buildArgs', () => {
+  // The engine's thumbnail step raises an error on these two, after the file is already good.
+  it.each(['wav', 'aac'])('does not ask for a cover on %s', (audioFormat) => {
+    const args = buildArgs(item({ mode: 'audio' }), settings({ audioFormat }), '/downloads')
+    expect(args).not.toContain('--embed-thumbnail')
+  })
+
+  it.each(['mp3', 'm4a', 'opus', 'flac'])('asks for a cover on %s', (audioFormat) => {
+    const args = buildArgs(item({ mode: 'audio' }), settings({ audioFormat }), '/downloads')
+    expect(args).toContain('--embed-thumbnail')
+  })
+
+  it('asks for a cover on a video, whatever the audio format is set to', () => {
+    expect(buildArgs(item(), settings({ audioFormat: 'wav' }), '/downloads')).toContain('--embed-thumbnail')
+  })
+
   it('asks the engine for UTF-8 output', () => {
     // Left to itself yt-dlp.exe writes in the ANSI code page, and every path
     // parsed out of that - Cyrillic titles, a Cyrillic Downloads folder, even
@@ -169,7 +184,8 @@ describe('siteFolder', () => {
   it('files a sniffed page under its site, not "Universal"', () => {
     // Every universally detected site shared one folder named after the fallback.
     const sourceUrl = sniffUrlFor('https://www.ok.ru/video/1')
-    expect(siteFolder({ url: 'https://cdn.test/x.m3u8', sourceUrl, extractor: 'Universal' })).toBe('ok.ru')
+    expect(siteFolder({ url: 'https://cdn.test/x.m3u8', sourceUrl: sniffUrlFor('https://kino.example/1'), extractor: 'Universal' })).toBe('kino.example')
+    expect(siteFolder({ url: 'https://cdn.test/x.m3u8', sourceUrl, extractor: 'Universal' })).toBe('ok')
   })
 
   it('files a stream picked in the built-in browser under the page it came from', () => {
@@ -184,9 +200,20 @@ describe('siteFolder', () => {
     expect(siteFolder(generic)).toBe('videos.example.org')
   })
 
-  it('keeps a real extractor name', () => {
-    const native = { url: 'https://www.youtube.com/watch?v=abc', extractor: 'Youtube' }
-    expect(siteFolder(native)).toBe('Youtube')
+  it('keeps a real extractor name for a site it has no name of its own for', () => {
+    const native = { url: 'https://media.example/watch/1', extractor: 'ExampleTube' }
+    expect(siteFolder(native)).toBe('ExampleTube')
+  })
+
+  // Download Now, a batch and the terminal have no extractor; a detect has one.
+  it('files one site in one folder however the link was queued', () => {
+    const folders = [
+      { url: 'https://www.youtube.com/watch?v=abc', extractor: 'Youtube' },
+      { url: 'https://www.youtube.com/watch?v=abc' },
+      { url: 'https://youtu.be/abc' },
+      { url: 'https://music.youtube.com/watch?v=abc' }
+    ].map(siteFolder)
+    expect(new Set(folders)).toEqual(new Set(['youtube']))
   })
 
   it('falls back to nothing, and so to "other", for a link it cannot read', () => {

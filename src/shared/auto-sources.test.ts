@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { AUTO_SOURCES, autoSourceFor, copiedLinkAction, type CopiedLinkContext } from './auto-sources'
+import { AUTO_SOURCES, autoSourceFor, copiedLinkAction, knownSiteFor, type CopiedLinkContext } from './auto-sources'
 import { normalizeUrl } from './urls'
 
 const id = (url: string): string | null => autoSourceFor(url)?.id ?? null
@@ -58,6 +58,20 @@ describe('autoSourceFor', () => {
   it('never reuses an id', () => {
     const ids = AUTO_SOURCES.map((s) => s.id)
     expect(new Set(ids).size).toBe(ids.length)
+  })
+})
+
+describe('knownSiteFor', () => {
+  it('knows a site by any of its hosts, on any kind of page', () => {
+    expect(knownSiteFor('https://youtu.be/abc')?.id).toBe('youtube')
+    expect(knownSiteFor('https://www.youtube.com/@channel')?.id).toBe('youtube')
+    expect(knownSiteFor('https://vm.tiktok.com/abc')?.id).toBe('tiktok')
+  })
+
+  it('knows nothing of another host, or of something that is not a web address', () => {
+    expect(knownSiteFor('https://notyoutube.com/watch?v=abc')).toBeNull()
+    expect(knownSiteFor('not a url')).toBeNull()
+    expect(knownSiteFor('uvd-direct://youtube.com/abc')).toBeNull()
   })
 })
 
