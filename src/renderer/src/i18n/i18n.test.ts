@@ -33,11 +33,12 @@ describe('dictionaries', () => {
 
   /*
     Hyphens stood in for dashes and three dots for an ellipsis in a handful of
-    strings written later than the rest. The one exception is a literal file
-    name, which really is "01 - title".
+    strings written later than the rest. The exceptions are a literal file name,
+    which really is "01 - title", and a command's usage, where "..." is how "and
+    more of these" has always been written.
   */
   it('use real dashes and ellipses', () => {
-    const literal = new Set(['playlist.numberingHint'])
+    const literal = new Set(['playlist.numberingHint', 'cli.usage'])
     for (const dict of [en, ru] as Record<string, string>[]) {
       const slips = Object.entries(dict).filter(
         ([key, value]) => !literal.has(key) && (value.includes(' - ') || value.includes('...'))
