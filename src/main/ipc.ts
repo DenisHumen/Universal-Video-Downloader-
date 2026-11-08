@@ -9,7 +9,8 @@ import {
   missingFiles,
   onLibraryChanged,
   queryLibrary,
-  trashEntry
+  trashEntry,
+  trashFile
 } from './services/library'
 import type { LibraryQuery, LocateResult } from '@shared/library'
 import {
@@ -193,6 +194,10 @@ export function registerIpc({ getWindow, openSearchWindow, onSettingsChanged }: 
   ipcMain.handle(IPC.libraryTrash, (event, id: string) => {
     requireRenderer(event, IPC.libraryTrash)
     return trashEntry(String(id))
+  })
+  ipcMain.handle(IPC.libraryTrashFile, (event, filepath: string) => {
+    requireRenderer(event, IPC.libraryTrashFile)
+    return trashFile(String(filepath))
   })
   ipcMain.handle(IPC.libraryForget, (event, id: string) => {
     requireRenderer(event, IPC.libraryForget)

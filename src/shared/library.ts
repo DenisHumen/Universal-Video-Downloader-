@@ -1,4 +1,5 @@
 import type { DownloadItem } from './types'
+import { isWebLink } from './urls'
 
 /**
  * The Library (plan 5.3, [v2] SE-4): every finished file, kept in its own
@@ -17,6 +18,8 @@ export interface LibraryEntry {
   remotePath?: string
   url: string
   sourceUrl?: string
+  /** A clip or conversion: the page its source file came from. See DownloadItem. */
+  originUrl?: string
   title: string
   extractor?: string
   seriesId?: string
@@ -48,6 +51,7 @@ export function entryFromItem(item: DownloadItem): LibraryEntry | null {
     remotePath: item.remotePath,
     url: item.url,
     sourceUrl: item.sourceUrl,
+    originUrl: item.originUrl,
     title: item.title,
     extractor: item.extractor,
     duration: item.duration,
@@ -56,6 +60,12 @@ export function entryFromItem(item: DownloadItem): LibraryEntry | null {
     thumb: item.thumbnail,
     finishedAt: item.finishedAt ?? item.createdAt
   }
+}
+
+/** The page an entry or a queue row can go back to, or undefined when it has none (a local file, an internal link). */
+export function pageLinkOf(from: { originUrl?: string; sourceUrl?: string; url: string }): string | undefined {
+  const link = from.originUrl || from.sourceUrl || from.url
+  return isWebLink(link) ? link : undefined
 }
 
 /** Whether parsed JSON can be read as a library at all. */

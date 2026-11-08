@@ -223,6 +223,7 @@ export const en = {
   'library.deleteButton': 'Move to Trash',
   'library.trashed': 'Moved to the trash',
   'library.trashFailed': 'Could not move the file to the trash',
+  'queue.notInLibrary': 'This file is no longer in the Library, so nothing was deleted. Use Show in Folder to delete it yourself',
   'library.unseen': '{n} New in the Library',
   // ---- shell (D5) ----
   'shell.sidebar': 'Sidebar',

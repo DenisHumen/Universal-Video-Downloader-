@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import type { LibraryEntry, LibraryGroup } from '@shared/library'
+import { pageLinkOf, type LibraryEntry, type LibraryGroup } from '@shared/library'
 import type { DownloadItem } from '@shared/types'
 import { useStore } from '../store'
 import { useI18n, useT } from '../i18n'
@@ -45,6 +45,8 @@ function asItem(e: LibraryEntry): DownloadItem {
   return {
     id: e.id,
     url: e.url,
+    sourceUrl: e.sourceUrl,
+    originUrl: e.originUrl,
     title: e.title,
     thumbnail: e.thumb,
     state: 'completed',
@@ -179,6 +181,15 @@ export default function LibraryView(): JSX.Element {
     }
   }, [])
 
+  const copyLink = async (link: string): Promise<void> => {
+    try {
+      await navigator.clipboard.writeText(link)
+      toast(t('common.copied'), 'success')
+    } catch {
+      /* clipboard unavailable */
+    }
+  }
+
   const forgetAllMissing = async (): Promise<void> => {
     setConfirmForget(false)
     const n = await window.api.forgetMissingEntries()
@@ -260,12 +271,13 @@ export default function LibraryView(): JSX.Element {
             <PreferencesGroup key={s.title} title={s.title}>
               {s.rows.map((e) => {
                 const gone = missing.has(e.filepath)
+                const link = pageLinkOf(e)
                 return (
                   <div key={e.id} className="ui-row min-h-[56px]" data-row={e.id}>
                     <span className="h-10 w-[72px] shrink-0 overflow-hidden rounded-1 bg-fill/10">
                       <Thumbnail
                         src={e.thumb}
-                        pageUrl={e.sourceUrl}
+                        pageUrl={e.sourceUrl ?? e.originUrl}
                         className="h-full w-full object-cover"
                         fallback={<span className="flex h-full w-full items-center justify-center text-ink-2"><FileVideo size={16} /></span>}
                       />
@@ -312,15 +324,18 @@ export default function LibraryView(): JSX.Element {
                     <Menu
                       label={t('queue.more')}
                       items={[
+                        ...(link
+                          ? [
+                              { label: t('queue.copyLink'), onSelect: () => void copyLink(link) },
+                              { label: t('queue.openSource'), onSelect: () => void window.api.openExternal(link) }
+                            ]
+                          : []),
                         { label: t('library.cut'), onSelect: () => setJob({ entry: e, mode: 'trim' }), disabled: gone },
                         { label: t('library.convert'), onSelect: () => setJob({ entry: e, mode: 'convert' }), disabled: gone },
                         ...(gone && !e.remotePath
                           ? [{ label: t('library.locate'), onSelect: () => void locate(e, 'folder') }]
                           : []),
-                        // A cut or a conversion has a file on disk for its address, not a page to go back to.
-                        ...(/^https?:\/\//i.test(e.sourceUrl || e.url)
-                          ? [{ label: t('library.again'), onSelect: () => requestDetect(e.sourceUrl || e.url) }]
-                          : []),
+                        ...(link ? [{ label: t('library.again'), onSelect: () => requestDetect(link) }] : []),
                         'separator' as const,
                         { label: t('library.forget'), onSelect: () => void window.api.forgetLibraryEntry(e.id) },
                         ...(gone ? [] : [{ label: t('library.delete'), danger: true, onSelect: () => setConfirm(e) }])

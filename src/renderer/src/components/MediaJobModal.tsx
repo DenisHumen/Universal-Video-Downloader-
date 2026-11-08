@@ -8,6 +8,7 @@ import {
   type DownloadItem,
   type TrimRange
 } from '@shared/types'
+import { pageLinkOf } from '@shared/library'
 import { useT } from '../i18n'
 import { toast } from '../lib/toast'
 import { viewQueueAction } from '../lib/queue'
@@ -71,6 +72,8 @@ export default function MediaJobModal({ item, mode, onClose }: Props): JSX.Eleme
 
   const submit = async (): Promise<void> => {
     if (!item.filepath) return
+    // A clip of a clip still goes back to the page the first one came from.
+    const originUrl = pageLinkOf(item)
     setBusy(true)
     try {
       if (mode === 'trim') {
@@ -79,6 +82,7 @@ export default function MediaJobModal({ item, mode, onClose }: Props): JSX.Eleme
           sourcePath: item.filepath,
           title: item.title,
           thumbnail: item.thumbnail,
+          originUrl,
           range,
           precise
         })
@@ -93,6 +97,7 @@ export default function MediaJobModal({ item, mode, onClose }: Props): JSX.Eleme
           sourcePath: item.filepath,
           title: item.title,
           thumbnail: item.thumbnail,
+          originUrl,
           target
         })
       }

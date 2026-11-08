@@ -52,7 +52,7 @@ import { normalisePlaylist, playlistDir, playlistTagArgs } from './playlist'
 import { resolveUrl } from '../resolvers'
 import { pageUrlFromSniffUrl, SNIFF_SCHEME } from '../resolvers/universal'
 import { DIRECT_SCHEME, parseDirectUrl } from '../resolvers/universal/direct'
-import { isAbsoluteUrl, normalizeUrl } from '@shared/urls'
+import { isAbsoluteUrl, isWebLink, normalizeUrl } from '@shared/urls'
 import { infoKey, isStaleInfoError } from './info-cache'
 import { infoCache } from './info-store'
 import { numberedName } from '@shared/playlist'
@@ -1691,6 +1691,7 @@ export function startMediaJob(req: MediaJobRequest): DownloadItem {
     kind: req.kind,
     url: req.sourcePath,
     sourcePath: req.sourcePath,
+    originUrl: isWebLink(req.originUrl) ? req.originUrl : undefined,
     title: req.title,
     thumbnail: req.thumbnail,
     mode: req.target?.mode ?? 'video',

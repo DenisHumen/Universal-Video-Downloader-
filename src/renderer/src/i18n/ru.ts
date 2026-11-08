@@ -216,6 +216,7 @@ export const ru: Dictionary = {
   'library.deleteButton': 'В корзину',
   'library.trashed': 'Файл в корзине',
   'library.trashFailed': 'Не удалось отправить файл в корзину',
+  'queue.notInLibrary': 'Этого файла уже нет в библиотеке, поэтому ничего не удалено. Откройте его папку и удалите файл сами',
   'library.unseen': 'Новых в библиотеке: {n}',
   // ---- shell (D5) ----
   'shell.sidebar': 'Боковая панель',

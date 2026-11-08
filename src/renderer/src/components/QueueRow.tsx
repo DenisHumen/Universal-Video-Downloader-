@@ -17,11 +17,14 @@ import {
   X
 } from '../ui/icons'
 import type { DownloadItem } from '@shared/types'
+import { pageLinkOf } from '@shared/library'
+import { useStore } from '../store'
 import { formatBytes, formatEta, formatSpeed, splitPath } from '../lib/format'
 import { errorReport, errorText } from '../lib/errors'
 import { useT } from '../i18n'
 import { STATE_META } from '../lib/states'
 import { toast } from '../lib/toast'
+import ConfirmDialog from './ConfirmDialog'
 import MediaJobModal, { type JobMode } from './MediaJobModal'
 import Thumbnail from './Thumbnail'
 import ReportPrompt, { useReportOffer } from './ReportPrompt'
@@ -55,6 +58,7 @@ function QueueRow({ item, index, animateIn = true, heading }: Props): JSX.Elemen
   // The engine output mounts only while open, so aria-controls is set only then.
   const logId = useId()
   const [jobModal, setJobModal] = useState<JobMode | null>(null)
+  const [confirmDelete, setConfirmDelete] = useState(false)
   const meta = STATE_META[item.state]
   const landed =
     item.filepath ?? (item.remotePath ? t('queue.onShare', { path: item.remotePath }) : undefined)
@@ -136,6 +140,8 @@ function QueueRow({ item, index, animateIn = true, heading }: Props): JSX.Elemen
   */
   const sourceLink = item.sourceUrl || item.url
   const hasWebLink = item.kind !== 'trim' && item.kind !== 'convert' && /^https?:\/\//i.test(sourceLink)
+  // The same, for going back to the page: a clip or conversion has one too, through the file it was made from.
+  const pageLink = pageLinkOf(item)
 
   /*
     A failed row offers a report behind one small toggle rather than with the
@@ -153,9 +159,9 @@ function QueueRow({ item, index, animateIn = true, heading }: Props): JSX.Elemen
   const [reportOpenFor, setReportOpenFor] = useState<string | null>(null)
   const reportOpen = Boolean(failure.reportId) && reportOpenFor === failure.reportId
 
-  const copyLink = async (): Promise<void> => {
+  const copyLink = async (link: string): Promise<void> => {
     try {
-      await navigator.clipboard.writeText(sourceLink)
+      await navigator.clipboard.writeText(link)
       toast(t('common.copied'), 'success')
     } catch {
       /* clipboard unavailable */
@@ -202,13 +208,13 @@ function QueueRow({ item, index, animateIn = true, heading }: Props): JSX.Elemen
     window left the title ten characters.
   */
   const menu: MenuItem[] = [
-    ...(hasWebLink
+    ...(pageLink
       ? [
-          { label: t('queue.copyLink'), icon: <Link2 size={14} />, onSelect: () => void copyLink() },
+          { label: t('queue.copyLink'), icon: <Link2 size={14} />, onSelect: () => void copyLink(pageLink) },
           {
             label: t('queue.openSource'),
             icon: <ExternalLink size={14} />,
-            onSelect: () => void window.api.openExternal(sourceLink)
+            onSelect: () => void window.api.openExternal(pageLink)
           }
         ]
       : []),
@@ -227,7 +233,40 @@ function QueueRow({ item, index, animateIn = true, heading }: Props): JSX.Elemen
           { label: t('convert.open'), icon: <FileVideo size={14} />, onSelect: () => setJobModal('convert') }
         ]
       : []),
+    ...(item.state === 'completed' && pageLink
+      ? [
+          {
+            label: t('library.again'),
+            icon: <RotateCw size={14} />,
+            onSelect: () => useStore.getState().requestDetect(pageLink)
+          }
+        ]
+      : []),
+    ...(item.state === 'completed' && item.filepath
+      ? [
+          {
+            label: t('library.delete'),
+            icon: <Trash2 size={14} />,
+            danger: true,
+            onSelect: () => setConfirmDelete(true)
+          }
+        ]
+      : [])
   ]
+
+  const deleteFile = async (): Promise<void> => {
+    setConfirmDelete(false)
+    const outcome = await window.api.trashLibraryFile(item.filepath!)
+    if (outcome === 'noEntry') {
+      toast(t('queue.notInLibrary'), 'error')
+    } else if (outcome === 'failed') {
+      toast(t('library.trashFailed'), 'error')
+    } else {
+      toast(t('library.trashed'), 'success')
+      // The row was only about that file, and its Play would now open nothing.
+      void window.api.removeDownload(item.id)
+    }
+  }
 
   /* What the second line says, after the state: progress, speed, time left, quality. */
   const progressFact =
@@ -272,7 +311,7 @@ function QueueRow({ item, index, animateIn = true, heading }: Props): JSX.Elemen
         <div className="relative h-9 w-16 shrink-0 overflow-hidden rounded-1 bg-sink">
           <Thumbnail
             src={item.thumbnail}
-            pageUrl={item.sourceUrl}
+            pageUrl={item.sourceUrl ?? item.originUrl}
             className="h-full w-full object-cover"
             fallback={<div className="h-full w-full bg-sink" />}
           />
@@ -508,6 +547,15 @@ function QueueRow({ item, index, animateIn = true, heading }: Props): JSX.Elemen
       )}
 
       {jobModal && <MediaJobModal item={item} mode={jobModal} onClose={() => setJobModal(null)} />}
+      {confirmDelete && (
+        <ConfirmDialog
+          title={t('library.deleteConfirm')}
+          body={t('library.deleteBody', { title: item.title })}
+          confirmLabel={t('library.deleteButton')}
+          onCancel={() => setConfirmDelete(false)}
+          onConfirm={() => void deleteFile()}
+        />
+      )}
     </div>
     </m.li>
   )

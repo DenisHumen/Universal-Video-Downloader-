@@ -3,7 +3,7 @@ import { tmpdir } from 'os'
 import { join } from 'path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { DownloadItem } from '@shared/types'
-import { entryFromItem, listLibrary, normaliseLibrary, noteRemote, seedFromHistory, upsertEntry, EMPTY_LIBRARY } from '@shared/library'
+import { entryFromItem, listLibrary, normaliseLibrary, noteRemote, pageLinkOf, seedFromHistory, upsertEntry, EMPTY_LIBRARY } from '@shared/library'
 
 /*
   Plan 5.3 [v2] SE-4: the Library store lands first, with its migration and
@@ -173,6 +173,25 @@ describe('isolation (SE-4)', () => {
       const src = readFileSync(join(__dirname, file), 'utf-8')
       expect(src, file).not.toMatch(/from ['"]\.\/library['"]|shared\/library/)
     }
+  })
+})
+
+describe('deleting by file, from a queue row', () => {
+  it('moves a file the library holds to the trash, and says when it holds no such file', async () => {
+    const lib = await import('./library')
+    lib.loadLibrary()
+    lib.recordFinished(done('t', '/d/t.mp4', 1))
+    expect(await lib.trashFile('/d/stranger.mp4')).toBe('noEntry')
+    expect(h.trashed).toEqual([])
+    expect(await lib.trashFile('/d/t.mp4')).toBe('trashed')
+    expect(h.trashed).toEqual(['/d/t.mp4'])
+  })
+
+  it('goes back to the page through a clip’s origin, and has none for a local file', () => {
+    expect(pageLinkOf({ url: '/v/a.mp4', originUrl: 'https://example.com/a' })).toBe('https://example.com/a')
+    expect(pageLinkOf({ url: 'x', sourceUrl: 'https://example.com/b' })).toBe('https://example.com/b')
+    expect(pageLinkOf({ url: '/v/a.mp4' })).toBeUndefined()
+    expect(pageLinkOf({ url: 'uvd-rezka://1' })).toBeUndefined()
   })
 })
 

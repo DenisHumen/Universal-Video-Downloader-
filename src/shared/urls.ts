@@ -54,6 +54,14 @@ function trimPunctuation(input: string): string {
 }
 
 /**
+ * A real web address. The app's own `uvd-*://` links mean nothing to any other
+ * program and a local path is not a page, so link actions are only for these.
+ */
+export function isWebLink(url: string | undefined): url is string {
+  return /^https?:\/\//i.test(url ?? '')
+}
+
+/**
  * Canonicalise a link so the same video always produces the same string.
  *
  * Three separate things depend on this. The duplicate check in the queue

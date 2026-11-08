@@ -83,6 +83,8 @@ const api = {
   listLibrary: (q: LibraryQuery): Promise<LibraryPage> => ipcRenderer.invoke(IPC.libraryList, q),
   libraryMissing: (paths: string[]): Promise<string[]> => ipcRenderer.invoke(IPC.libraryMissing, paths),
   trashLibraryEntry: (id: string): Promise<boolean> => ipcRenderer.invoke(IPC.libraryTrash, id),
+  trashLibraryFile: (filepath: string): Promise<'trashed' | 'failed' | 'noEntry'> =>
+    ipcRenderer.invoke(IPC.libraryTrashFile, filepath),
   forgetLibraryEntry: (id: string): Promise<void> => ipcRenderer.invoke(IPC.libraryForget, id),
   libraryCountMissing: (): Promise<number> => ipcRenderer.invoke(IPC.libraryCountMissing),
   forgetMissingEntries: (): Promise<number> => ipcRenderer.invoke(IPC.libraryForgetMissing),

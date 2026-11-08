@@ -19,6 +19,7 @@ export const IPC = {
   libraryList: 'library:list',
   libraryMissing: 'library:missing',
   libraryTrash: 'library:trash',
+  libraryTrashFile: 'library:trash-file',
   libraryForget: 'library:forget',
   libraryCountMissing: 'library:count-missing',
   libraryForgetMissing: 'library:forget-missing',

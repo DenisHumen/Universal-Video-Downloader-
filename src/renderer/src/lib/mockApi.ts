@@ -221,6 +221,12 @@ const mockRemoved = new Set<string>()
 let mockMissing = new Set<string>()
 let mockLocateFinds: 'found' | 'noMatch' = 'found'
 const isMockLost = (e: LibraryEntry): boolean => !e.remotePath && mockMissing.has(e.filepath)
+function syncMockLibrary(): void {
+  for (const item of items) {
+    const entry = entryFromItem(item)
+    if (entry && !mockRemoved.has(entry.id)) mockLibrary = upsertEntry(mockLibrary, entry)
+  }
+}
 
 type YtdlpListener = (status: YtDlpStatus) => void
 type UpdateListener = (status: UpdateStatus) => void
@@ -385,7 +391,11 @@ export function installMockApi(): void {
     resumeDownload: async () => undefined,
     cancelDownload: async () => undefined,
     retryDownload: async () => undefined,
-    removeDownload: async () => undefined,
+    removeDownload: async (id) => {
+      const at = items.findIndex((i) => i.id === id)
+      if (at >= 0) items.splice(at, 1)
+      changedListeners.forEach((cb) => cb({ updated: [], removed: [id] }))
+    },
     clearFinished: async () => undefined,
     clearFailed: async () => undefined,
     listDownloads: async () => items,
@@ -395,6 +405,7 @@ export function installMockApi(): void {
         kind: req.kind,
         url: req.sourcePath,
         sourcePath: req.sourcePath,
+        originUrl: req.originUrl,
         title: req.title,
         thumbnail: req.thumbnail,
         mode: req.target?.mode ?? 'video',
@@ -721,10 +732,7 @@ export function installMockApi(): void {
     onNativeTheme: () => () => undefined,
     // The Library, as main builds it: every completed row with a file, kept apart from the queue.
     listLibrary: async (q) => {
-      for (const item of items) {
-        const entry = entryFromItem(item)
-        if (entry && !mockRemoved.has(entry.id)) mockLibrary = upsertEntry(mockLibrary, entry)
-      }
+      syncMockLibrary()
       return listLibrary(mockLibrary, q)
     },
     libraryMissing: async (paths) => paths.filter((p) => mockMissing.has(p)),
@@ -756,6 +764,15 @@ export function installMockApi(): void {
       mockLibrary = removeEntry(mockLibrary, id)
       libraryListeners.forEach((cb) => cb())
       return true
+    },
+    trashLibraryFile: async (filepath) => {
+      syncMockLibrary()
+      const entry = mockLibrary.entries.find((e) => e.filepath === filepath)
+      if (!entry) return 'noEntry'
+      mockRemoved.add(entry.id)
+      mockLibrary = removeEntry(mockLibrary, entry.id)
+      libraryListeners.forEach((cb) => cb())
+      return 'trashed'
     },
     forgetLibraryEntry: async (id) => {
       mockRemoved.add(id)

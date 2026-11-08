@@ -79,6 +79,78 @@ describe('a library longer than one page', () => {
   })
 })
 
+describe('the same actions in both lists', () => {
+  const openMenu = (id: string): Promise<void> =>
+    act(async () => {
+      fireEvent.click(document.querySelector(`[data-row="${id}"] [aria-haspopup="menu"]`)!)
+    })
+
+  it('offers Copy Link and Open Source Page in the Library only for real web addresses', async () => {
+    const q = window.__uvdMock!.queue
+    q({ id: 'web', title: 'From a page', state: 'completed', percent: 100, finishedAt: Date.now(), filepath: '/v/web.mp4', sourceUrl: 'https://example.com/a' })
+    q({ id: 'internal', title: 'From a resolver', state: 'completed', percent: 100, finishedAt: Date.now(), filepath: '/v/in.mp4', url: 'uvd-rezka://1', sourceUrl: 'uvd-rezka://1' })
+    await app()
+    act(() => useStore.getState().setView('library'))
+    await screen.findByText('From a page')
+    await openMenu('web')
+    expect(screen.getByRole('menuitem', { name: 'Copy the Link' })).toBeTruthy()
+    expect(screen.getByRole('menuitem', { name: 'Open the Source Page' })).toBeTruthy()
+    fireEvent.keyDown(document.activeElement!, { key: 'Escape' })
+    await openMenu('internal')
+    expect(screen.queryByRole('menuitem', { name: 'Copy the Link' })).toBeNull()
+    expect(screen.queryByRole('menuitem', { name: 'Download Again' })).toBeNull()
+  })
+
+  it('takes a clip’s Download Again back to the page its source came from', async () => {
+    window.__uvdMock!.queue({
+      id: 'clip',
+      kind: 'trim',
+      title: 'A clip',
+      state: 'completed',
+      percent: 100,
+      finishedAt: Date.now(),
+      url: '/v/source.mp4',
+      sourcePath: '/v/source.mp4',
+      originUrl: 'https://example.com/original',
+      filepath: '/v/source (clip).mp4'
+    })
+    await app()
+    act(() => useStore.getState().setView('downloads'))
+    await screen.findByText('A clip')
+    await openMenu('clip')
+    await act(async () => fireEvent.click(screen.getByRole('menuitem', { name: 'Download Again' })))
+    await waitFor(() => expect(useStore.getState().view).toBe('home'))
+  })
+
+  it('deletes a finished row’s file after asking, and the row goes with it', async () => {
+    window.__uvdMock!.queue({ id: 'del', title: 'Delete me', state: 'completed', percent: 100, finishedAt: Date.now(), filepath: '/v/del.mp4' })
+    await app()
+    act(() => useStore.getState().setView('library'))
+    await screen.findByText('Delete me')
+    act(() => useStore.getState().setView('downloads'))
+    await screen.findByText('Delete me')
+    await openMenu('del')
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Delete File…' }))
+    screen.getByRole('alertdialog', { name: 'Delete This File?' })
+    await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Move to Trash' })))
+    await waitFor(() => expect(screen.queryByText('Delete me')).toBeNull())
+  })
+
+  it('says so when the Library has no entry for the row, and keeps the row', async () => {
+    window.__uvdMock!.queue({ id: 'orphan', title: 'Not in the Library', state: 'completed', percent: 100, finishedAt: Date.now(), filepath: '/v/orphan.mp4' })
+    await window.api.listLibrary({})
+    await window.api.forgetLibraryEntry('orphan')
+    await app()
+    act(() => useStore.getState().setView('downloads'))
+    await screen.findByText('Not in the Library')
+    await openMenu('orphan')
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Delete File…' }))
+    await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Move to Trash' })))
+    await screen.findByText(/no longer in the Library/)
+    expect(screen.getByText('Not in the Library')).toBeTruthy()
+  })
+})
+
 describe('Library (5.3)', () => {
   it('lists every finished file, grouped by day', async () => {
     await app()

@@ -226,6 +226,18 @@ export async function trashEntry(id: string): Promise<boolean> {
   return true
 }
 
+/**
+ * "Delete File" from a queue row, which knows its file rather than its entry:
+ * a later run into the same path, or "Remove from Library", leaves the row with
+ * no entry of its own. The Library's rule stays whole - only a file it holds can
+ * be deleted through here - and the row can say why nothing happened.
+ */
+export async function trashFile(filepath: string): Promise<'trashed' | 'failed' | 'noEntry'> {
+  const entry = lib.entries.find((e) => e.filepath === filepath)
+  if (!entry) return 'noEntry'
+  return (await trashEntry(entry.id)) ? 'trashed' : 'failed'
+}
+
 /** Forget an entry whose file is gone (the file is not touched). */
 export function forgetEntry(id: string): void {
   const next = removeEntry(lib, id)

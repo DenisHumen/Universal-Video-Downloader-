@@ -296,6 +296,8 @@ export interface MediaJobRequest {
   sourcePath: string
   title: string
   thumbnail?: string
+  /** The page the source file came from, when it has one: what "Download Again" goes back to. */
+  originUrl?: string
   /** trim only */
   range?: TrimRange
   /** trim only — re-encode for a frame-accurate cut instead of copying. */
@@ -311,6 +313,12 @@ export interface DownloadItem {
   kind?: QueueKind
   /** For trim/convert jobs: the file being reworked. */
   sourcePath?: string
+  /**
+   * For trim/convert jobs: the page that file came from. Not `sourceUrl`, which
+   * says what this row fetched: everything that asks "is this link already
+   * handled?" reads that, and a clip of a video is not the video.
+   */
+  originUrl?: string
   /** The section this entry covers, when the user trimmed it. */
   range?: TrimRange
   /**
