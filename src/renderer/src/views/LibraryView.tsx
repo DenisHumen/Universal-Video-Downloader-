@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { LibraryEntry, LibraryGroup } from '@shared/library'
 import type { DownloadItem } from '@shared/types'
 import { useStore } from '../store'
@@ -20,6 +20,16 @@ import { FileVideo, FolderOpen, MoreHorizontal, Play, Search } from '../ui/icons
 */
 
 const DAY = 86_400_000
+
+/**
+ * Rows fetched when the view opens, and how many more as the end nears: the
+ * pattern and the reasoning are DownloadsView's, and a library only grows.
+ * Each page asks about its own files on disk, so a big library costs what the
+ * reader actually scrolled past.
+ */
+const PAGE = 100
+/** The most main hands back for one request. */
+const MOST_PER_REQUEST = 500
 
 function dayLabel(at: number, language: string, today: string, yesterday: string): string {
   const start = new Date()
@@ -54,6 +64,7 @@ export default function LibraryView(): JSX.Element {
   const language = useI18n((s) => s.language)
   const requestDetect = useStore((s) => s.requestDetect)
   const [entries, setEntries] = useState<LibraryEntry[]>([])
+  const [total, setTotal] = useState(0)
   const [loaded, setLoaded] = useState(false)
   const [query, setQuery] = useState('')
   const [group, setGroup] = useState<LibraryGroup>('date')
@@ -61,18 +72,92 @@ export default function LibraryView(): JSX.Element {
   const [confirm, setConfirm] = useState<LibraryEntry | null>(null)
   const [job, setJob] = useState<{ entry: LibraryEntry; mode: JobMode } | null>(null)
 
-  const load = useCallback(async () => {
-    const page = await window.api.listLibrary({ query, group, limit: 500 })
-    setEntries(page.entries)
-    setLoaded(true)
-    const gone = await window.api.libraryMissing(page.entries.map((e) => e.filepath))
-    setMissing(new Set(gone))
-  }, [query, group])
+  const scrollRef = useRef<HTMLDivElement>(null)
+  const sentinelRef = useRef<HTMLDivElement>(null)
+  /** Bumped by every full read, so the answer to an older one is dropped when it lands. */
+  const generation = useRef(0)
+  /** How far the reader has got: a change to the library re-reads this deep rather than throwing them back to the top. */
+  const depth = useRef(PAGE)
+  const fetchingMore = useRef(false)
+
+  const checkMissing = useCallback((rows: LibraryEntry[], gen: number) => {
+    const paths = rows.map((e) => e.filepath)
+    void window.api.libraryMissing(paths).then((gone) => {
+      if (gen !== generation.current) return
+      setMissing((prev) => {
+        const next = new Set(prev)
+        for (const p of paths) next.delete(p)
+        for (const p of gone) next.add(p)
+        return next
+      })
+    })
+  }, [])
+
+  const load = useCallback(
+    async (want: number) => {
+      const gen = ++generation.current
+      const fresh: LibraryEntry[] = []
+      let known = 0
+      do {
+        const page = await window.api.listLibrary({
+          query,
+          group,
+          offset: fresh.length,
+          limit: Math.min(MOST_PER_REQUEST, want - fresh.length)
+        })
+        if (gen !== generation.current) return
+        fresh.push(...page.entries)
+        known = page.total
+        checkMissing(page.entries, gen)
+        if (!page.entries.length) break
+      } while (fresh.length < want && fresh.length < known)
+      setEntries(fresh)
+      setTotal(known)
+      setLoaded(true)
+    },
+    [query, group, checkMissing]
+  )
+
+  // A new search or grouping starts again from the top, one page deep.
+  useEffect(() => {
+    depth.current = PAGE
+    scrollRef.current?.scrollTo?.({ top: 0 })
+    void load(PAGE)
+    return window.api.onLibraryChanged(() => void load(depth.current))
+  }, [load])
+
+  const count = entries.length
+  const hasMore = count < total
+  const loadMore = useCallback(async () => {
+    if (fetchingMore.current) return
+    fetchingMore.current = true
+    const gen = generation.current
+    try {
+      const page = await window.api.listLibrary({ query, group, offset: count, limit: PAGE })
+      if (gen !== generation.current) return
+      depth.current = count + page.entries.length
+      setEntries((prev) => [...prev, ...page.entries])
+      setTotal(page.total)
+      checkMissing(page.entries, gen)
+    } finally {
+      fetchingMore.current = false
+    }
+  }, [query, group, count, checkMissing])
 
   useEffect(() => {
-    void load()
-    return window.api.onLibraryChanged(() => void load())
-  }, [load])
+    const root = scrollRef.current
+    const sentinel = sentinelRef.current
+    if (!hasMore || !root || !sentinel) return
+    // The view's own scroller is the root, and a fresh observer per depth reports at once: see DownloadsView.
+    const observer = new IntersectionObserver(
+      (seen) => {
+        if (seen.some((e) => e.isIntersecting)) void loadMore()
+      },
+      { root, rootMargin: '800px 0px' }
+    )
+    observer.observe(sentinel)
+    return () => observer.disconnect()
+  }, [hasMore, loadMore])
 
   const sections = useMemo(() => {
     const out: { title: string; rows: LibraryEntry[] }[] = []
@@ -91,7 +176,7 @@ export default function LibraryView(): JSX.Element {
   const empty = loaded && entries.length === 0 && !query
 
   return (
-    <div className="h-full overflow-y-auto">
+    <div ref={scrollRef} className="h-full overflow-y-auto">
       {empty ? (
         <EmptyState
           icon={<Icon icon={FileVideo} size="xl" />}
@@ -202,6 +287,7 @@ export default function LibraryView(): JSX.Element {
               })}
             </PreferencesGroup>
           ))}
+          {hasMore && <div ref={sentinelRef} aria-hidden className="h-px" />}
         </div>
       )}
 

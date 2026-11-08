@@ -1,5 +1,6 @@
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
-import { beforeAll, beforeEach, describe, expect, it } from 'vitest'
+import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
+import type { LibraryEntry } from '@shared/library'
 import { installMockApi } from '../lib/mockApi'
 import { useStore } from '../store'
 import App from '../App'
@@ -33,6 +34,48 @@ describe('Activity (5.2)', () => {
     expect(screen.getByText('Still going')).toBeTruthy()
     expect(screen.getByText('Finished just now')).toBeTruthy()
     expect(screen.queryByText('Finished last week')).toBeNull()
+  })
+})
+
+describe('a library longer than one page', () => {
+  it('fetches the next page as the end nears, and asks about each page’s files', async () => {
+    const page = (offset: number, limit: number): { entries: LibraryEntry[]; total: number } => ({
+      total: 250,
+      entries: Array.from({ length: Math.min(limit, 250 - offset) }, (_, i) => ({
+        id: `e${offset + i}`,
+        filepath: `/v/${offset + i}.mp4`,
+        url: 'https://example.com/v',
+        title: `Video ${offset + i}`,
+        finishedAt: 1_000_000 - offset - i
+      }))
+    })
+    const list = vi.spyOn(window.api, 'listLibrary').mockImplementation(async (q) => page(q.offset ?? 0, q.limit ?? 100))
+    const missing = vi.spyOn(window.api, 'libraryMissing')
+    let reveal: () => void = () => undefined
+    const real = window.IntersectionObserver
+    window.IntersectionObserver = class {
+      constructor(cb: IntersectionObserverCallback) {
+        reveal = () => cb([{ isIntersecting: true } as IntersectionObserverEntry], this as unknown as IntersectionObserver)
+      }
+      observe(): void {}
+      disconnect(): void {}
+    } as unknown as typeof IntersectionObserver
+    try {
+      await app()
+      act(() => useStore.getState().setView('library'))
+      await screen.findByText('Video 99')
+      expect(screen.queryByText('Video 100')).toBeNull()
+      expect(list.mock.lastCall?.[0]).toMatchObject({ offset: 0, limit: 100 })
+      await act(async () => reveal())
+      await screen.findByText('Video 199')
+      expect(list.mock.lastCall?.[0]).toMatchObject({ offset: 100, limit: 100 })
+      expect(missing.mock.lastCall?.[0]).toContain('/v/199.mp4')
+      expect(missing.mock.lastCall?.[0]).not.toContain('/v/0.mp4')
+    } finally {
+      window.IntersectionObserver = real
+      list.mockRestore()
+      missing.mockRestore()
+    }
   })
 })
 
