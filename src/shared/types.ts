@@ -501,6 +501,10 @@ export interface AppSettings {
   notifications: boolean
   /** Watch the clipboard and offer to download links copied elsewhere. */
   clipboardWatch: boolean
+  /** Download a copied link to a video on a known site without asking. */
+  autoDownload: boolean
+  /** Sites `autoDownload` leaves alone, by `AutoSource.id`. */
+  autoDownloadOff: string[]
   /** Keep running in the tray when the window is closed. */
   trayEnabled: boolean
   /**

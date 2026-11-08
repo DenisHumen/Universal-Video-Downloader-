@@ -49,6 +49,8 @@ const settings: AppSettings = {
   language: 'auto',
   notifications: true,
   clipboardWatch: false,
+  autoDownload: false,
+  autoDownloadOff: [],
   trayEnabled: false,
   universalFallback: true,
   showAdultServices: false,
@@ -568,6 +570,7 @@ export function installMockApi(): void {
     // No network in the preview build; a YouTube link still gets its poster from the id.
     onDetectPreview: () => () => undefined,
     onClipboardLink: () => () => undefined,
+    onAutoDownload: () => () => undefined,
     onPasteLink: () => () => undefined,
     takePending: async () => ({}),
     /*

@@ -41,6 +41,8 @@ function settings(overrides: Partial<AppSettings> = {}): AppSettings {
     language: 'auto',
     notifications: true,
     clipboardWatch: false,
+    autoDownload: false,
+    autoDownloadOff: [],
     trayEnabled: false,
     universalFallback: true,
     showAdultServices: false,

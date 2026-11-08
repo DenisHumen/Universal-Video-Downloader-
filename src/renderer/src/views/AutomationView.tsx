@@ -339,12 +339,12 @@ export default function AutomationView(): JSX.Element {
               const on = w.id === selectedId
               const last = lastEpisode(w)
               return (
-                <div key={w.id} data-row={`watch-${w.id}`} className={`ui-row gap-0 p-0 ${on ? 'bg-fill/10' : ''}`}>
+                <div key={w.id} data-row={`watch-${w.id}`} className={`ui-row gap-0 p-0 ${on ? 'bg-fill/10' : 'hover:bg-fill/[0.04]'}`}>
                   <button
                     type="button"
                     aria-pressed={on}
                     onClick={() => setSelectedId(w.id)}
-                    className="no-drag flex min-w-0 flex-1 items-center gap-3 self-stretch px-3 py-2 text-left hover:bg-fill/[0.04]"
+                    className="no-drag flex min-w-0 flex-1 items-center gap-3 self-stretch px-3 py-2 text-left"
                   >
                     <Poster src={w.thumbnail} />
                     <span className="min-w-0 flex-1">

@@ -39,6 +39,8 @@ function settings(overrides: Partial<AppSettings> = {}): AppSettings {
     trayEnabled: false,
     universalFallback: true,
     showAdultServices: false,
+    autoDownload: false,
+    autoDownloadOff: [],
     preferCompatible: true,
     automationEnabled: false,
     autostart: false,

@@ -101,6 +101,8 @@ export const ru: Dictionary = {
   'prefs.group.destinations': 'Куда отправлять',
   'prefs.group.fallback': 'Резервный способ',
   'prefs.group.services': 'Сервисы',
+  'prefs.group.autoDownload': 'Автоматическая загрузка',
+  'prefs.group.autoSources': 'Сайты',
   'prefs.group.browserCookies': 'Cookies браузера',
   'prefs.group.cookiesFile': 'Файл cookies',
   'prefs.group.errorReports': 'Отчёты об ошибках',
@@ -461,6 +463,9 @@ export const ru: Dictionary = {
 
   'settings.notifications': 'Уведомления',
   'settings.notificationsHint': 'Сообщать о завершении загрузки',
+  'settings.autoDownload': 'Скачивать скопированные ссылки сами',
+  'settings.autoDownloadHint': 'Скопированная ссылка на видео с сайта из списка сразу начинает скачиваться, с качеством и папкой по умолчанию',
+  'auto.startedByItself': 'Скачивается автоматически: {title}',
   'settings.clipboardWatch': 'Следить за буфером обмена',
   'settings.clipboardWatchHint': 'Предлагать скачать ссылки, скопированные в других программах',
   'settings.tray': 'Оставаться в трее после закрытия окна',

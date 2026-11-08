@@ -10,6 +10,8 @@ import type {
   YtDlpStatus
 } from '@shared/types'
 import { engineKnowsHost, normalizeUrl } from '@shared/urls'
+import { t as translate } from './i18n'
+import { toast } from './lib/toast'
 import { watchFailing } from '@shared/automation'
 import type { ImportOutcome } from '@shared/backup'
 import type { AppInfo } from '../../preload/index'
@@ -230,6 +232,7 @@ async function runInit(set: SetState, get: GetState): Promise<void> {
     if (!current?.requestId || current.requestId !== p.requestId) return
     set({ detectPreview: p })
   })
+  window.api.onAutoDownload((title) => toast(translate('auto.startedByItself', { title })))
   window.api.onClipboardLink((url) => {
     /*
       Ignore a link that's already in the queue — nothing new to offer.

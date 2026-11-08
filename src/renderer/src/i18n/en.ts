@@ -108,6 +108,8 @@ export const en = {
   'prefs.group.destinations': 'Destinations',
   'prefs.group.fallback': 'Fallback',
   'prefs.group.services': 'Services',
+  'prefs.group.autoDownload': 'Automatic Downloads',
+  'prefs.group.autoSources': 'Sites',
   'prefs.group.browserCookies': 'Browser Cookies',
   'prefs.group.cookiesFile': 'Cookies File',
   'prefs.group.errorReports': 'Error Reports',
@@ -469,6 +471,9 @@ export const en = {
 
   'settings.notifications': 'Desktop Notifications',
   'settings.notificationsHint': 'Tell me when a download finishes',
+  'settings.autoDownload': 'Download Copied Links by Themselves',
+  'settings.autoDownloadHint': 'A copied link to a video on a site below starts downloading at once, in the default quality and folder',
+  'auto.startedByItself': 'Downloading by itself: {title}',
   'settings.clipboardWatch': 'Watch the Clipboard',
   'settings.clipboardWatchHint': 'Offer to download links you copy in other apps',
   'settings.tray': 'Keep Running in the Tray When the Window Is Closed',

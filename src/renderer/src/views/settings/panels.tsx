@@ -1,5 +1,6 @@
 import { useEffect, useState, type ReactNode } from 'react'
 import { ACCENTS, type AccentChoice } from '@shared/accent'
+import { AUTO_SOURCES } from '@shared/auto-sources'
 import {
   SUPPORTED_COOKIE_BROWSERS,
   type AppSettings,
@@ -355,6 +356,35 @@ export function DetectionPanel({ settings, set }: PanelProps): JSX.Element {
   const t = useT()
   return (
     <PreferencesPage>
+      <PreferencesGroup title={t('prefs.group.autoDownload')}>
+        <SwitchRow
+          id="autoDownload"
+          title={t('settings.autoDownload')}
+          subtitle={t('settings.autoDownloadHint')}
+          checked={settings.autoDownload}
+          onChange={(v) => set('autoDownload', v)}
+        />
+      </PreferencesGroup>
+      {settings.autoDownload && (
+        <PreferencesGroup title={t('prefs.group.autoSources')}>
+          {AUTO_SOURCES.map((source) => (
+            <SwitchRow
+              key={source.id}
+              id={`auto-${source.id}`}
+              title={source.name}
+              checked={!settings.autoDownloadOff.includes(source.id)}
+              onChange={(on) =>
+                set(
+                  'autoDownloadOff',
+                  on
+                    ? settings.autoDownloadOff.filter((id) => id !== source.id)
+                    : [...settings.autoDownloadOff, source.id]
+                )
+              }
+            />
+          ))}
+        </PreferencesGroup>
+      )}
       <PreferencesGroup title={t('prefs.group.fallback')}>
         <SwitchRow
           id="universal"

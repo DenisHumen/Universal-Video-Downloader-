@@ -16,6 +16,7 @@ import { holdQuitForSecrets, initSecretsWithin } from './services/secrets'
 import { createStartupGate, SECRETS_STARTUP_CAP_MS } from './startup-gate'
 import { flushSettings, getSettings } from './services/settings'
 import { flushLibrary, loadLibrary, recordFinished } from './services/library'
+import { handleCopiedLink } from './services/auto-download'
 import { applyProxy } from './services/proxy'
 import { answerProxyLoginsForPages } from './services/proxy-auth'
 import { ensureYtdlp, scheduleEngineRefresh } from './services/ytdlp'
@@ -633,8 +634,17 @@ function applySettings(settings: AppSettings): void {
   if (settings.trayEnabled || settings.automationEnabled) buildTray()
   else destroyTray()
 
-  if (settings.clipboardWatch) {
-    startClipboardWatch((url) => deliver(IPC.evtClipboardLink, 'link', url))
+  // Automatic downloads read the same clipboard, whether or not the strip is wanted.
+  if (settings.clipboardWatch || settings.autoDownload) {
+    startClipboardWatch((url) => {
+      void handleCopiedLink(url, {
+        offer: (link) => deliver(IPC.evtClipboardLink, 'link', link),
+        started: (title) => {
+          const wc = mainWindow?.webContents
+          if (rendererReady && wc && !wc.isDestroyed()) wc.send(IPC.evtAutoDownload, title)
+        }
+      })
+    })
   } else {
     stopClipboardWatch()
     void flushBrowserCookies()

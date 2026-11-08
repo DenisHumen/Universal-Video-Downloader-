@@ -92,6 +92,7 @@ export const IPC = {
   evtBrowserQueued: 'event:browser-queued',
   evtBrowserLoginOffer: 'event:browser-login-offer',
   evtClipboardLink: 'event:clipboard-link',
+  evtAutoDownload: 'event:auto-download',
   evtPasteLink: 'event:paste-link',
   evtNavigate: 'event:navigate',
   /** A notification was clicked: show this queue row (6.4). */

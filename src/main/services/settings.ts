@@ -80,6 +80,8 @@ function defaults(): AppSettings {
     language: 'auto',
     notifications: true,
     clipboardWatch: false,
+    autoDownload: false,
+    autoDownloadOff: [],
     trayEnabled: false,
     universalFallback: true,
     showAdultServices: false,
@@ -146,6 +148,11 @@ export function migrate(raw: Record<string, unknown>): Partial<AppSettings> {
     An entry that is not an object at all is dropped first: normalising `null`
     throws, and a throw here used to cost every other setting in the file.
   */
+  if (next.autoDownloadOff !== undefined) {
+    next.autoDownloadOff = Array.isArray(next.autoDownloadOff)
+      ? next.autoDownloadOff.filter((id): id is string => typeof id === 'string')
+      : []
+  }
   if (Array.isArray(next.smbTargets)) {
     next.smbTargets = next.smbTargets.filter(isRecord).map(normaliseSmbTarget)
   }

@@ -26,6 +26,8 @@ const settings = (over: Partial<AppSettings> = {}): AppSettings => ({
   downloadDir: '/home/demo/Videos',
   keepFinished: 0,
   showAdultServices: false,
+  autoDownload: false,
+  autoDownloadOff: [],
   concurrentDownloads: 3,
   defaultMode: 'video',
   defaultQuality: 'best',

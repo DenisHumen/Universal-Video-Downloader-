@@ -160,6 +160,8 @@ const SETTING_CHECKS: Record<keyof BackupSettings, Check> = {
   language: oneOf(['auto', 'en', 'ru']),
   notifications: isBool,
   clipboardWatch: isBool,
+  autoDownload: isBool,
+  autoDownloadOff: (v) => Array.isArray(v) && v.every(isText),
   trayEnabled: isBool,
   universalFallback: isBool,
   showAdultServices: isBool,
@@ -547,7 +549,8 @@ export function planImport(
   // A chat the file does not name leaves the one set here alone.
   if (backup.telegram.chatId) patch.telegramChatId = backup.telegram.chatId
   const settingsChanged = (Object.keys(patch) as (keyof AppSettings)[]).some(
-    (key) => patch[key] !== current.settings[key]
+    // By value: a list read from a file is never the same array as the one in use.
+    (key) => JSON.stringify(patch[key]) !== JSON.stringify(current.settings[key])
   )
 
   // Shares first, so the watches below can be pointed at whichever copy survives.

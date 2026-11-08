@@ -43,6 +43,7 @@ export const SEARCH_INDEX: IndexEntry[] = [
   { route: 'watching#background', title: 'settings.background', hint: 'settings.backgroundHint' },
   { route: 'watching/shares', title: 'settings.shares', hint: 'settings.sharesHint' },
   { route: 'watching/telegram', title: 'settings.telegram', hint: 'settings.telegramHint' },
+  { route: 'detection#autoDownload', title: 'settings.autoDownload', hint: 'settings.autoDownloadHint' },
   { route: 'detection#universal', title: 'settings.universal', hint: 'settings.universalHint' },
   { route: 'detection#adult', title: 'settings.adultServices', hint: 'settings.adultServicesHint' },
   { route: 'access#cookies', title: 'settings.cookies', hint: 'settings.cookiesHint' },
