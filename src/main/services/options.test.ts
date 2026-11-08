@@ -149,6 +149,8 @@ describe('hasCookies', () => {
     expect(hasCookies(settings())).toBe(false)
     expect(hasCookies(settings({ cookiesFile: '/c.txt' }))).toBe(true)
     expect(hasCookies(settings({ cookiesFromBrowser: 'edge' }))).toBe(true)
+    expect(hasCookies(settings(), '/data/browser-cookies.txt')).toBe(true)
+    expect(hasCookies(settings(), undefined)).toBe(false)
   })
 })
 

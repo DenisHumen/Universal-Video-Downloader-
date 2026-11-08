@@ -82,8 +82,13 @@ export function headerArgs(headers?: Record<string, string>): string[] {
   return args
 }
 
-export function hasCookies(settings: AppSettings): boolean {
-  return Boolean(settings.cookiesFile || settings.cookiesFromBrowser)
+/**
+ * Whether the engine is being given cookies, by the same three roads as
+ * `accessArgs`. A sign-in in the built-in browser is one of them: somebody who
+ * had just signed in there was told to switch cookies on.
+ */
+export function hasCookies(settings: AppSettings, browserJar?: string): boolean {
+  return Boolean(settings.cookiesFile || settings.cookiesFromBrowser || browserJar)
 }
 
 /**

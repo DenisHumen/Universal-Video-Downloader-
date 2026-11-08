@@ -88,7 +88,8 @@ export function toNetscape(cookies: JarCookie[]): string {
 
 /** How many cookies `toNetscape` wrote: none means there is no point passing the file. */
 export function netscapeCount(text: string): number {
-  return text.split('\n').filter((l) => l && (!l.startsWith('#') || l.startsWith('#HttpOnly_'))).length
+  // The engine rewrites the file on its way out, in Windows line endings on Windows.
+  return text.split(/\r?\n/).filter((l) => l && (!l.startsWith('#') || l.startsWith('#HttpOnly_'))).length
 }
 
 export interface SavedLogin {

@@ -42,6 +42,8 @@ const JAR = (): string => join(app.getPath('userData'), 'browser-cookies.txt')
 let jarCount = 0
 let jarTimer: NodeJS.Timeout | null = null
 let started = false
+/** Reading the jar the app left, for the terminal. */
+let reading = false
 
 function writeJar(cookies: Cookie[]): void {
   const text = toNetscape(cookies)
@@ -87,8 +89,26 @@ export function initBrowserLogins(): void {
 
 /** The jar for the engine's `--cookies`, when there is one worth passing. */
 export function browserCookiesFile(): string | undefined {
-  if (!started || !getSettings().browserStaySignedIn || jarCount === 0) return undefined
+  if ((!started && !reading) || !getSettings().browserStaySignedIn || jarCount === 0) return undefined
   return JAR()
+}
+
+/**
+ * Use the jar the app wrote, without starting anything that writes one.
+ *
+ * For `uvd`, which claims the app's cookies. It has a Chromium profile of its
+ * own with no sign-ins in it, so `initBrowserLogins` there would replace the
+ * app's jar with an empty one, and without either the terminal went out as a
+ * stranger on a site the person had signed in to.
+ */
+export function readSavedBrowserJar(): void {
+  reading = true
+  try {
+    jarCount = netscapeCount(readFileSync(JAR(), 'utf8'))
+  } catch {
+    // The app has never written one: nothing to pass.
+    jarCount = 0
+  }
 }
 
 /** Put the cookie store on disk now: before quitting, and when the browser closes. */

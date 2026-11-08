@@ -3,6 +3,7 @@ import {
   cliArgvFrom,
   describeFailure,
   displayName,
+  downloadChoice,
   EXIT_NOT_DETECTED,
   formatBytes,
   formatEta,
@@ -28,13 +29,54 @@ describe('cliArgvFrom', () => {
   })
 })
 
+/*
+  The terminal took the best video whatever the app's settings said, so somebody
+  who had set 1080p or sound only got something else from `uvd` than from the
+  window. The help now says what happens, and this keeps the two agreeing.
+*/
+describe('downloadChoice', () => {
+  const app = { defaultMode: 'video', defaultQuality: '1080' } as const
+
+  it("follows the app's default mode and quality with no flags", () => {
+    expect(downloadChoice({ audio: false }, app)).toEqual({ mode: 'video', quality: '1080' })
+    expect(downloadChoice({ audio: false }, { defaultMode: 'video', defaultQuality: 'best' })).toEqual({
+      mode: 'video',
+      quality: 'best'
+    })
+    expect(downloadChoice({ audio: false }, { defaultMode: 'audio', defaultQuality: '1080' })).toEqual({
+      mode: 'audio',
+      quality: 'audio'
+    })
+  })
+
+  it('reads a default quality of audio, with the mode on video, as the best video', () => {
+    expect(downloadChoice({ audio: false }, { defaultMode: 'video', defaultQuality: 'audio' })).toEqual({
+      mode: 'video',
+      quality: 'best'
+    })
+  })
+
+  it('lets either flag overrule the settings', () => {
+    expect(downloadChoice({ audio: false, quality: '720' }, app)).toEqual({ mode: 'video', quality: '720' })
+    expect(downloadChoice({ audio: true }, app)).toEqual({ mode: 'audio', quality: 'audio' })
+    expect(downloadChoice({ audio: false, quality: 'best' }, { defaultMode: 'audio', defaultQuality: 'audio' })).toEqual({
+      mode: 'video',
+      quality: 'best'
+    })
+  })
+
+  it('is what the help says', () => {
+    expect(USAGE).toMatch(/default mode and quality from the app's settings/)
+    expect(USAGE).toMatch(/override the settings/)
+  })
+})
+
 describe('parseCliArgs', () => {
   it('reads links and options', () => {
     expect(parseCliArgs(['https://a.example/v', '-o', '/tmp/x', '--audio', 'https://b.example/w'])).toEqual({
       links: ['https://a.example/v', 'https://b.example/w'],
       output: '/tmp/x',
       audio: true,
-      quality: 'best',
       help: false,
       version: false
     })
@@ -42,7 +84,7 @@ describe('parseCliArgs', () => {
   })
 
   it('takes a quality in any of the ways it is written', () => {
-    expect(parseCliArgs(['https://a.example/v']).quality).toBe('best')
+    expect(parseCliArgs(['https://a.example/v']).quality).toBeUndefined()
     expect(parseCliArgs(['-q', '720', 'https://a.example/v']).quality).toBe('720')
     expect(parseCliArgs(['https://a.example/v', '--quality', '1080p']).quality).toBe('1080')
     expect(parseCliArgs(['--quality=4K', 'https://a.example/v']).quality).toBe('2160')
