@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { librarySite, listLibrary, type LibraryEntry } from './library'
+import { librarySite, listLibrary, siteNameOf, type LibraryEntry } from './library'
 
 const entry = (id: string, overrides: Partial<LibraryEntry>): LibraryEntry => ({
   id,
@@ -12,6 +12,15 @@ const entry = (id: string, overrides: Partial<LibraryEntry>): LibraryEntry => ({
 
 afterEach(() => {
   vi.unstubAllGlobals()
+})
+
+describe('siteNameOf', () => {
+  it('names a site, and not the words for having no extractor', () => {
+    expect(siteNameOf('Youtube')).toBe('Youtube')
+    for (const word of ['Generic', 'generic', 'Universal', 'Browser', 'HTML5MediaEmbed', undefined]) {
+      expect(siteNameOf(word)).toBeUndefined()
+    }
+  })
 })
 
 describe('listLibrary: grouping by site', () => {

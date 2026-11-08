@@ -2,6 +2,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { Check, Loader2 } from '../ui/icons'
 import type { DetectResult, DownloadMode, MediaInfo, PlaylistEntry, QualityPreset } from '@shared/types'
 import { deeperListing } from '@shared/playlist'
+import { siteNameOf } from '@shared/library'
 import Choice from './Choice'
 import ConfirmDialog from './ConfirmDialog'
 import SaveLocation from './SaveLocation'
@@ -195,7 +196,7 @@ export default function PlaylistCard({ info: detected, onDone, saveDir, onSaveDi
           {info.title}
         </h2>
         <p className="mono mt-1 text-meta text-ink-2">
-          {tp('playlist.videos', entries.length)} · {info.extractor}
+          {[tp('playlist.videos', entries.length), siteNameOf(info.extractor)].filter(Boolean).join(' · ')}
         </p>
       </div>
 
