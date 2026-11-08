@@ -626,9 +626,14 @@ function QueueRow({ item, index, animateIn = true, heading }: Props): JSX.Elemen
       {confirmCancel && (running || item.state === 'paused') && (
         <ConfirmDialog
           title={t('queue.cancelConfirm')}
-          body={t('queue.cancelBody', {
-            amount: item.percent > 0 ? `${Math.round(item.percent)}%` : formatBytes(item.downloadedBytes)
-          })}
+          body={
+            // The row can start over under an open dialog, and then there is no figure to name.
+            Math.round(item.percent) > 0 || item.downloadedBytes
+              ? t('queue.cancelBody', {
+                  amount: Math.round(item.percent) > 0 ? `${Math.round(item.percent)}%` : formatBytes(item.downloadedBytes)
+                })
+              : t('queue.cancelBodyNoFigure')
+          }
           confirmLabel={t('queue.cancelButton')}
           onConfirm={() => {
             setConfirmCancel(false)

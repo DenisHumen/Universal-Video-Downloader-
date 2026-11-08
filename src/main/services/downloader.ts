@@ -353,7 +353,18 @@ function emitProgress(progress: DownloadProgress): void {
 
 function forgetProgress(id: string): void {
   progressMarks.delete(id)
+  resumedFigure.delete(id)
 }
+
+/**
+ * Rows showing the figure their last run reached, until this run says its own.
+ *
+ * A resume starts the engine again, so that figure must not act as a floor: a
+ * row paused during a merge would sit at 90% through all of a fresh download.
+ * Zeroing it was worse to look at, though. A row at 72% before a restart read 0%
+ * until the first progress line, which is seconds on a site that has to be asked.
+ */
+const resumedFigure = new Set<string>()
 
 /**
  * The ways to get one audio language at a height, for the front of a selector.
@@ -961,6 +972,13 @@ function handleProgressLine(line: string, item: DownloadItem): void {
 
   const payload = line.slice(PROGRESS_PREFIX.length)
   const [status, downloaded, total, totalEst, speed, eta, fragIndex, fragCount] = payload.split('\t')
+  /*
+    The engine reports a file it found on disk as one it just fetched. Believed,
+    that started the phase, so the step that files it away put "Processing 90%"
+    on a row about to start over as a copy, for long enough to press Cancel at.
+    Anything really fetched after this still counts: it is only the first word.
+  */
+  if (status === 'finished' && !item.phase && alreadyOnDisk.has(item.id)) return
   const totalBytes = num(total) ?? num(totalEst)
   const downloadedBytes = num(downloaded)
   const fragmentIndex = num(fragIndex)
@@ -1077,6 +1095,7 @@ function handleFfmpegProgress(seconds: number, item: DownloadItem, line: string)
 
 /** The bar is full and no phase is running. */
 function finishProgress(item: DownloadItem): void {
+  resumedFigure.delete(item.id)
   item.percent = 100
   item.phase = undefined
   item.postprocess = undefined
@@ -1110,7 +1129,9 @@ function applyProgress(
   item: DownloadItem,
   input: { phase: 'download' | 'postprocess'; phasePercent?: number }
 ): void {
-  const view = overallProgress({ ...input, previous: item.percent })
+  // The new run's first real figure replaces the last run's: see `resumedFigure`.
+  const replaces = input.phasePercent != null && resumedFigure.delete(item.id)
+  const view = overallProgress({ ...input, previous: replaces ? 0 : item.percent })
   item.phase = input.phase
   item.percent = view.percent
   item.indeterminate = view.indeterminate
@@ -2231,13 +2252,10 @@ export function resumeDownload(id: string): void {
   item.interrupted = false
   // A fresh run decides its own output path; see retryDownload.
   finalPaths.delete(id)
-  /*
-    A resume re-runs the engine from the beginning, so the bar has to go with
-    it. Without this the never-backwards rule pinned it at the figure the
-    previous attempt reached — an item paused during a merge would sit at 90%
-    for the whole of its fresh download.
-  */
+  const figure = item.percent
   resetProgress(item)
+  item.percent = figure
+  if (figure > 0) resumedFigure.add(id)
   emitUpdated(item)
   processQueue()
 }
