@@ -1,5 +1,6 @@
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import type { DownloadItem } from '@shared/types'
 import { installMockApi } from '../lib/mockApi'
 import { useStore } from '../store'
 import App from '../App'
@@ -66,12 +67,7 @@ describe('the clear buttons', () => {
 })
 
 describe('Clear Failed with a recording that can still be saved', () => {
-  const recording = {
-    state: 'error',
-    live: true,
-    partialPaths: ['/d/a.mp4'],
-    errorCode: 'network'
-  } as const
+  const recording: Partial<DownloadItem> = { state: 'error', live: true, partialPaths: ['/d/a.mp4'], errorCode: 'network' }
 
   it('asks first, says it can be saved, and clears only on yes', async () => {
     window.__uvdMock!.queue({ id: 'rec', title: 'A broadcast', ...recording })

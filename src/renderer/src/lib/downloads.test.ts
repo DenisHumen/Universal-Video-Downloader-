@@ -99,7 +99,7 @@ describe('applyDownloadsChanged', () => {
 })
 
 describe('failedRecordingCanBeSaved', () => {
-  const failed = { state: 'error', live: true, partialPaths: ['/d/a.mp4'] } as const
+  const failed: Partial<DownloadItem> = { state: 'error', live: true, partialPaths: ['/d/a.mp4'] }
 
   it('is a failed recording with something to save', () => {
     expect(failedRecordingCanBeSaved(item('a', 1, failed))).toBe(true)

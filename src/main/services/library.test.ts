@@ -37,7 +37,11 @@ beforeEach(() => {
   h.trashed = []
   vi.resetModules()
 })
-afterEach(() => rmSync(h.dir, { recursive: true, force: true }))
+afterEach(async () => {
+  // A save still on its timer would land in the next test's folder, as that test's library.
+  ;(await import('./library')).flushLibrary()
+  rmSync(h.dir, { recursive: true, force: true })
+})
 
 describe('the library rules (shared)', () => {
   it('takes only finished rows that made a file', () => {
