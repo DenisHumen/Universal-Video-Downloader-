@@ -8,7 +8,8 @@ import { toast } from '../lib/toast'
 import ConfirmDialog from '../components/ConfirmDialog'
 import MediaJobModal, { type JobMode } from '../components/MediaJobModal'
 import Thumbnail from '../components/Thumbnail'
-import { EmptyState, Icon, IconButton, Menu, PreferencesGroup, SegmentedControl } from '../ui'
+import HeaderSlot from '../shell/HeaderSlot'
+import { Dialog, EmptyState, Icon, IconButton, Menu, PreferencesGroup, SegmentedControl } from '../ui'
 import { FileVideo, FolderOpen, MoreHorizontal, Play, Search } from '../ui/icons'
 
 /*
@@ -71,6 +72,9 @@ export default function LibraryView(): JSX.Element {
   const [missing, setMissing] = useState<Set<string>>(new Set())
   const [confirm, setConfirm] = useState<LibraryEntry | null>(null)
   const [job, setJob] = useState<{ entry: LibraryEntry; mode: JobMode } | null>(null)
+  const [lost, setLost] = useState(0)
+  const [confirmForget, setConfirmForget] = useState(false)
+  const [noMatch, setNoMatch] = useState<{ entry: LibraryEntry; name: string } | null>(null)
 
   const scrollRef = useRef<HTMLDivElement>(null)
   const sentinelRef = useRef<HTMLDivElement>(null)
@@ -159,6 +163,37 @@ export default function LibraryView(): JSX.Element {
     return () => observer.disconnect()
   }, [hasMore, loadMore])
 
+  // Of the whole library, not the rows loaded so far: the header action is about all of it.
+  useEffect(() => {
+    let live = true
+    const ask = (): void => {
+      void window.api.libraryCountMissing().then((n) => {
+        if (live) setLost(n)
+      })
+    }
+    ask()
+    const off = window.api.onLibraryChanged(ask)
+    return () => {
+      live = false
+      off()
+    }
+  }, [])
+
+  const forgetAllMissing = async (): Promise<void> => {
+    setConfirmForget(false)
+    const n = await window.api.forgetMissingEntries()
+    toast(t('library.forgotMissing', { n }), 'success')
+  }
+
+  /** The renderer names the entry; main shows the dialog and validates what comes back. */
+  const locate = async (entry: LibraryEntry, how: 'folder' | 'file'): Promise<void> => {
+    const result = await window.api.locateLibraryEntry(entry.id, how)
+    if (result.status === 'found') toast(t('library.located'), 'success')
+    else if (result.status === 'noMatch') setNoMatch({ entry, name: result.name })
+    else if (result.status === 'taken') toast(t('library.locateTaken'), 'error')
+    else if (result.status === 'failed') toast(t('library.locateFailed'), 'error')
+  }
+
   const sections = useMemo(() => {
     const out: { title: string; rows: LibraryEntry[] }[] = []
     for (const e of entries) {
@@ -177,6 +212,13 @@ export default function LibraryView(): JSX.Element {
 
   return (
     <div ref={scrollRef} className="h-full overflow-y-auto">
+      {lost > 0 && (
+        <HeaderSlot>
+          <button className="btn-quiet" onClick={() => setConfirmForget(true)}>
+            {t('library.forgetMissing')}
+          </button>
+        </HeaderSlot>
+      )}
       {empty ? (
         <EmptyState
           icon={<Icon icon={FileVideo} size="xl" />}
@@ -272,6 +314,9 @@ export default function LibraryView(): JSX.Element {
                       items={[
                         { label: t('library.cut'), onSelect: () => setJob({ entry: e, mode: 'trim' }), disabled: gone },
                         { label: t('library.convert'), onSelect: () => setJob({ entry: e, mode: 'convert' }), disabled: gone },
+                        ...(gone && !e.remotePath
+                          ? [{ label: t('library.locate'), onSelect: () => void locate(e, 'folder') }]
+                          : []),
                         // A cut or a conversion has a file on disk for its address, not a page to go back to.
                         ...(/^https?:\/\//i.test(e.sourceUrl || e.url)
                           ? [{ label: t('library.again'), onSelect: () => requestDetect(e.sourceUrl || e.url) }]
@@ -303,6 +348,40 @@ export default function LibraryView(): JSX.Element {
             const ok = await window.api.trashLibraryEntry(entry.id)
             toast(ok ? t('library.trashed') : t('library.trashFailed'), ok ? 'success' : 'error')
           }}
+        />
+      )}
+      {confirmForget && (
+        <ConfirmDialog
+          title={t('library.forgetMissingConfirm')}
+          body={t('library.forgetMissingBody', { n: lost })}
+          confirmLabel={t('library.forgetMissingButton')}
+          onCancel={() => setConfirmForget(false)}
+          onConfirm={() => void forgetAllMissing()}
+        />
+      )}
+      {noMatch && (
+        <Dialog
+          role="alertdialog"
+          title={t('library.locateNoMatch')}
+          description={t('library.locateNoMatchBody', { name: noMatch.name })}
+          onClose={() => setNoMatch(null)}
+          actions={
+            <>
+              <button className="btn-quiet" onClick={() => setNoMatch(null)}>
+                {t('common.cancel')}
+              </button>
+              <button
+                className="btn-solid"
+                onClick={() => {
+                  const { entry } = noMatch
+                  setNoMatch(null)
+                  void locate(entry, 'file')
+                }}
+              >
+                {t('library.locateChoose')}
+              </button>
+            </>
+          }
         />
       )}
       {job && <MediaJobModal item={asItem(job.entry)} mode={job.mode} onClose={() => setJob(null)} />}

@@ -146,6 +146,31 @@ export function relocateEntry(
   return { version: LIBRARY_VERSION, entries }
 }
 
+/**
+ * The file turned up somewhere else ("Locate…"): the entry moves to that path.
+ * One entry per file, so a path another entry holds is refused (the same object back).
+ */
+export function rekeyEntry(lib: LibraryFile, id: string, filepath: string, sizeBytes?: number): LibraryFile {
+  const at = lib.entries.findIndex((e) => e.id === id)
+  if (at < 0 || lib.entries.some((e, i) => i !== at && e.filepath === filepath)) return lib
+  const entries = lib.entries.slice()
+  entries[at] = {
+    ...entries[at],
+    filepath,
+    container: extOf(filepath),
+    sizeBytes: sizeBytes ?? entries[at].sizeBytes
+  }
+  return { version: LIBRARY_VERSION, entries }
+}
+
+/** How "Locate…" went. `noMatch` names the file looked for, so the view can offer to pick it by hand. */
+export type LocateResult =
+  | { status: 'found'; path: string }
+  | { status: 'canceled' }
+  | { status: 'noMatch'; name: string }
+  | { status: 'taken' }
+  | { status: 'failed' }
+
 export function removeEntry(lib: LibraryFile, id: string): LibraryFile {
   return { version: LIBRARY_VERSION, entries: lib.entries.filter((e) => e.id !== id) }
 }

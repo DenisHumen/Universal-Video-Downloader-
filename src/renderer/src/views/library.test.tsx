@@ -101,6 +101,48 @@ describe('Library (5.3)', () => {
     await waitFor(() => expect(screen.queryByText('Finished last week')).toBeNull())
   })
 
+  it('offers Locate… on a missing file, and choosing the file by hand when the folder has no match', async () => {
+    const mock = window.__uvdMock!
+    mock.queue({ id: 'lost', title: 'Lost film', state: 'completed', percent: 100, finishedAt: Date.now(), filepath: '/v/lost.mp4' })
+    await app()
+    act(() => useStore.getState().setView('library'))
+    await screen.findByText('Lost film')
+    act(() => mock.missing(['/v/lost.mp4']))
+    await screen.findByText('File Missing')
+    const locate = vi.spyOn(window.api, 'locateLibraryEntry')
+    mock.locate('noMatch')
+    await act(async () => fireEvent.click(document.querySelector('[data-row="lost"] [aria-haspopup="menu"]')!))
+    await act(async () => fireEvent.click(screen.getByRole('menuitem', { name: 'Locate…' })))
+    screen.getByRole('alertdialog', { name: 'No File with That Name' })
+    mock.locate('found')
+    await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Choose the File…' })))
+    expect(locate.mock.calls).toEqual([
+      ['lost', 'folder'],
+      ['lost', 'file']
+    ])
+    await waitFor(() => expect(screen.queryByText('File Missing')).toBeNull())
+    locate.mockRestore()
+    await act(async () => mock.missing([]))
+  })
+
+  it('forgets all missing files only after saying no file is touched', async () => {
+    const mock = window.__uvdMock!
+    mock.queue({ id: 'bye', title: 'Gone for good', state: 'completed', percent: 100, finishedAt: Date.now(), filepath: '/v/bye.mp4' })
+    mock.queue({ id: 'away', title: 'On a share', state: 'completed', percent: 100, finishedAt: Date.now(), filepath: '/v/away.mp4', remotePath: 'share/away.mp4' })
+    await app()
+    act(() => useStore.getState().setView('library'))
+    await screen.findByText('Gone for good')
+    act(() => mock.missing(['/v/bye.mp4', '/v/away.mp4']))
+    fireEvent.click(await screen.findByRole('button', { name: 'Forget All Missing' }))
+    const dialog = screen.getByRole('alertdialog', { name: 'Forget All Missing Files?' })
+    expect(dialog.textContent).toMatch(/no file on disk is touched/)
+    expect(dialog.textContent).toMatch(/missing files: 1\b/)
+    await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Forget Them' })))
+    await waitFor(() => expect(screen.queryByText('Gone for good')).toBeNull())
+    expect(screen.getByText('On a share')).toBeTruthy()
+    await act(async () => mock.missing([]))
+  })
+
   it('badges files finished elsewhere until the Library is opened', async () => {
     await app()
     act(() => useStore.setState({ libraryUnseen: 0, view: 'home' }))

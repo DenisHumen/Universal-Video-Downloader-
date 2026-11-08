@@ -1,4 +1,4 @@
-import { mkdtempSync, readFileSync, rmSync, writeFileSync, existsSync } from 'fs'
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync, existsSync } from 'fs'
 import { tmpdir } from 'os'
 import { join } from 'path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -173,6 +173,65 @@ describe('isolation (SE-4)', () => {
       const src = readFileSync(join(__dirname, file), 'utf-8')
       expect(src, file).not.toMatch(/from ['"]\.\/library['"]|shared\/library/)
     }
+  })
+})
+
+describe('entries whose file is gone', () => {
+  it('forgets every missing entry in the library, keeps what went to a share, and touches no file', async () => {
+    const lib = await import('./library')
+    lib.loadLibrary()
+    writeFileSync(join(h.dir, 'here.mp4'), 'x')
+    lib.recordFinished(done('here', join(h.dir, 'here.mp4'), 1))
+    lib.recordFinished(done('gone1', join(h.dir, 'gone1.mp4'), 2))
+    lib.recordFinished(done('gone2', join(h.dir, 'gone2.mp4'), 3))
+    lib.recordFinished(done('shared', join(h.dir, 'shared.mp4'), 4, { remotePath: 'anime/ep.mp4' }))
+    expect(await lib.countMissing()).toBe(2)
+    expect(await lib.forgetMissing()).toBe(2)
+    expect(lib.queryLibrary({}).entries.map((e) => e.id).sort()).toEqual(['here', 'shared'])
+    expect(existsSync(join(h.dir, 'here.mp4'))).toBe(true)
+    expect(h.trashed).toEqual([])
+    expect(await lib.forgetMissing()).toBe(0)
+  })
+
+  it('locates a file by name in a folder, nested too, and re-keys the entry with the file’s facts', async () => {
+    const lib = await import('./library')
+    lib.loadLibrary()
+    lib.recordFinished(done('a', join(h.dir, 'old', 'Film.MP4'), 1, { totalBytes: 1 }))
+    const moved = join(h.dir, 'moved', 'deep')
+    mkdirSync(moved, { recursive: true })
+    writeFileSync(join(moved, 'Film.MP4'), 'four')
+    expect(await lib.locateInFolder('a', join(h.dir, 'moved'))).toEqual({ status: 'found', path: join(moved, 'Film.MP4') })
+    expect(lib.queryLibrary({}).entries[0]).toMatchObject({ filepath: join(moved, 'Film.MP4'), sizeBytes: 4, container: 'mp4' })
+  })
+
+  it('reports no match by name, so the view can offer to pick the file by hand', async () => {
+    const lib = await import('./library')
+    lib.loadLibrary()
+    lib.recordFinished(done('a', join(h.dir, 'old', 'Film.mp4'), 1))
+    expect(await lib.locateInFolder('a', h.dir)).toEqual({ status: 'noMatch', name: 'Film.mp4' })
+    writeFileSync(join(h.dir, 'renamed.mp4'), 'x')
+    expect(await lib.locateFile('a', join(h.dir, 'renamed.mp4'))).toMatchObject({ status: 'found' })
+  })
+
+  it('refuses a file another entry holds, a path that is no file, and an entry it does not know', async () => {
+    const lib = await import('./library')
+    lib.loadLibrary()
+    writeFileSync(join(h.dir, 'b.mp4'), 'x')
+    lib.recordFinished(done('a', join(h.dir, 'a.mp4'), 1))
+    lib.recordFinished(done('b', join(h.dir, 'b.mp4'), 2))
+    expect(await lib.locateFile('a', join(h.dir, 'b.mp4'))).toEqual({ status: 'taken' })
+    expect(await lib.locateFile('a', h.dir)).toEqual({ status: 'failed' })
+    expect(await lib.locateFile('a', join(h.dir, 'nowhere.mp4'))).toEqual({ status: 'failed' })
+    expect(await lib.locateFile('stranger', join(h.dir, 'b.mp4'))).toEqual({ status: 'failed' })
+    expect(lib.libraryEntry('a')?.filepath).toBe(join(h.dir, 'a.mp4'))
+  })
+
+  // The trust boundary: the channel takes an entry id and a way of looking, never a path.
+  it('never takes a path from the renderer when locating', () => {
+    const preload = readFileSync(join(__dirname, '..', '..', 'preload', 'index.ts'), 'utf-8')
+    expect(preload).toMatch(/locateLibraryEntry: \(id: string, how: 'folder' \| 'file'\)/)
+    const ipc = readFileSync(join(__dirname, '..', 'ipc.ts'), 'utf-8')
+    expect(ipc).toMatch(/const path = picked\.filePaths\[0\]/)
   })
 })
 

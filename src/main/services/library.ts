@@ -1,6 +1,6 @@
 import { app, shell } from 'electron'
 import { existsSync, readFileSync } from 'fs'
-import { access } from 'fs/promises'
+import { access, readdir, stat } from 'fs/promises'
 import { join } from 'path'
 import {
   EMPTY_LIBRARY,
@@ -10,13 +10,16 @@ import {
   listLibrary,
   normaliseLibrary,
   noteRemote,
+  rekeyEntry,
   relocateEntry,
   removeEntry,
   seedFromHistory,
   upsertEntry,
+  type LibraryEntry,
   type LibraryFile,
   type LibraryPage,
-  type LibraryQuery
+  type LibraryQuery,
+  type LocateResult
 } from '@shared/library'
 import type { DownloadItem } from '@shared/types'
 import { normalizeUrl } from '@shared/urls'
@@ -229,6 +232,107 @@ export function forgetEntry(id: string): void {
   if (next.entries.length === lib.entries.length) return
   lib = next
   changed()
+}
+
+/** The most files checked at once: a whole big library must not fill the thread pool ahead of everything else. */
+const SCAN_WIDTH = 16
+
+/**
+ * Entries whose file is gone from here, across the whole library and not just
+ * the rows on screen. One sent to a share is not among them: it is elsewhere,
+ * not lost.
+ */
+async function lostPaths(): Promise<Set<string>> {
+  const queue = lib.entries.filter((e) => !e.remotePath).map((e) => e.filepath)
+  const lost = new Set<string>()
+  let next = 0
+  await Promise.all(
+    Array.from({ length: SCAN_WIDTH }, async () => {
+      while (next < queue.length) {
+        const path = queue[next++]
+        await access(path).catch(() => lost.add(path))
+      }
+    })
+  )
+  return lost
+}
+
+let counting: Promise<number> | null = null
+
+/** How many entries "Forget All Missing" would remove. Calls that overlap share one scan. */
+export function countMissing(): Promise<number> {
+  counting ??= lostPaths()
+    .then((lost) => lost.size)
+    .finally(() => {
+      counting = null
+    })
+  return counting
+}
+
+/** "Forget All Missing": looks again now, whatever the view last counted. No file is touched. Returns how many went. */
+export async function forgetMissing(): Promise<number> {
+  const lost = await lostPaths()
+  // By path and against the library as it is now: an entry located during the scan has a new path and stays.
+  const entries = lib.entries.filter((e) => e.remotePath || !lost.has(e.filepath))
+  const removed = lib.entries.length - entries.length
+  if (removed === 0) return 0
+  lib = { ...lib, entries }
+  changed()
+  return removed
+}
+
+export function libraryEntry(id: string): LibraryEntry | undefined {
+  return lib.entries.find((e) => e.id === id)
+}
+
+/** Windows and macOS take a file name in any case; Linux does not. */
+const sameName = (a: string, b: string): boolean =>
+  process.platform === 'linux' ? a === b : a.toLowerCase() === b.toLowerCase()
+
+/** The first file of this name in a folder, nearest first: people move a whole folder, sometimes into another. */
+async function findByName(folder: string, name: string): Promise<string | null> {
+  let level = [folder]
+  let looked = 0
+  for (let depth = 0; depth < 4 && level.length; depth++) {
+    const below: string[] = []
+    for (const dir of level) {
+      // Bounded: picking the root of a drive must not walk all of it.
+      if (looked > 20_000) return null
+      const found = await readdir(dir, { withFileTypes: true }).catch(() => [])
+      looked += found.length
+      const hit = found.find((f) => f.isFile() && sameName(f.name, name))
+      if (hit) return join(dir, hit.name)
+      for (const f of found) if (f.isDirectory()) below.push(join(dir, f.name))
+    }
+    level = below
+  }
+  return null
+}
+
+/**
+ * Point an entry at a file the person picked in main's own dialog (ipc.ts): the
+ * renderer only ever names the entry, never the path. Still checked here, since
+ * a dialog can return a path that is gone a moment later.
+ */
+export async function locateFile(id: string, path: string): Promise<LocateResult> {
+  if (!libraryEntry(id)) return { status: 'failed' }
+  const info = await stat(path).catch(() => null)
+  if (!info?.isFile()) return { status: 'failed' }
+  if (lib.entries.some((e) => e.id !== id && sameName(e.filepath, path))) return { status: 'taken' }
+  const next = rekeyEntry(lib, id, path, info.size)
+  if (next === lib) return { status: 'taken' }
+  lib = next
+  changed()
+  return { status: 'found', path }
+}
+
+/** Find an entry's file by its name in a folder the person picked. */
+export async function locateInFolder(id: string, folder: string): Promise<LocateResult> {
+  const entry = libraryEntry(id)
+  if (!entry) return { status: 'failed' }
+  const name = entry.filepath.split(/[\\/]/).pop() ?? ''
+  const found = await findByName(folder, name)
+  return found ? locateFile(id, found) : { status: 'noMatch', name }
 }
 
 export function onLibraryChanged(cb: () => void): () => void {

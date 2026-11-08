@@ -20,6 +20,10 @@ export const IPC = {
   libraryMissing: 'library:missing',
   libraryTrash: 'library:trash',
   libraryForget: 'library:forget',
+  libraryCountMissing: 'library:count-missing',
+  libraryForgetMissing: 'library:forget-missing',
+  /** Find a missing entry's file: main asks the person where, the renderer only names the entry. */
+  libraryLocate: 'library:locate',
   evtLibraryChanged: 'library:changed',
   mediaJobStart: 'media:job-start',
   mediaProbe: 'media:probe',

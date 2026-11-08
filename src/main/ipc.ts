@@ -1,6 +1,17 @@
 import { buttonLayout, systemAccent } from './services/desktop'
-import { forgetEntry, missingFiles, onLibraryChanged, queryLibrary, trashEntry } from './services/library'
-import type { LibraryQuery } from '@shared/library'
+import {
+  countMissing,
+  forgetEntry,
+  forgetMissing,
+  libraryEntry,
+  locateFile,
+  locateInFolder,
+  missingFiles,
+  onLibraryChanged,
+  queryLibrary,
+  trashEntry
+} from './services/library'
+import type { LibraryQuery, LocateResult } from '@shared/library'
 import {
   app,
   BrowserWindow,
@@ -39,7 +50,9 @@ import {
   clearFinished,
   clearFailed,
   downloadEvents,
+  getDownload,
   listDownloads,
+  relocateItem,
   pauseAll,
   pauseDownload,
   removeDownload,
@@ -184,6 +197,40 @@ export function registerIpc({ getWindow, openSearchWindow, onSettingsChanged }: 
   ipcMain.handle(IPC.libraryForget, (event, id: string) => {
     requireRenderer(event, IPC.libraryForget)
     return forgetEntry(String(id))
+  })
+  ipcMain.handle(IPC.libraryCountMissing, (event) => {
+    requireRenderer(event, IPC.libraryCountMissing)
+    return countMissing()
+  })
+  ipcMain.handle(IPC.libraryForgetMissing, (event) => {
+    requireRenderer(event, IPC.libraryForgetMissing)
+    return forgetMissing()
+  })
+  /*
+    "Locate…". The renderer names the entry and nothing else: the path only ever
+    comes out of this dialog, so a page in the window cannot point an entry - and
+    with it Play and Delete File - at a file the person did not pick.
+  */
+  let lastLocateFolder: string | undefined
+  ipcMain.handle(IPC.libraryLocate, async (event, id: unknown, how: unknown): Promise<LocateResult> => {
+    requireRenderer(event, IPC.libraryLocate)
+    const entry = libraryEntry(String(id))
+    if (!entry) return { status: 'failed' }
+    const byFile = how === 'file'
+    const win = BrowserWindow.fromWebContents(event.sender) ?? getWindow() ?? undefined
+    const picked = await dialog.showOpenDialog(win!, {
+      defaultPath: lastLocateFolder ?? (getSettings().downloadDir || undefined),
+      properties: byFile ? ['openFile'] : ['openDirectory']
+    })
+    if (picked.canceled || !picked.filePaths.length) return { status: 'canceled' }
+    const path = picked.filePaths[0]
+    lastLocateFolder = byFile ? dirname(path) : path
+    const result = byFile ? await locateFile(entry.id, path) : await locateInFolder(entry.id, path)
+    // A row still on the queue for this file follows it, or its Play goes on opening the old path.
+    if (result.status === 'found' && getDownload(entry.id)?.filepath === entry.filepath) {
+      relocateItem(entry.id, { filepath: result.path })
+    }
+    return result
   })
   ipcMain.handle(IPC.mediaJobStart, (_e, req: MediaJobRequest) => startMediaJob(req))
   ipcMain.handle(IPC.mediaProbe, (_e, path: string) => probeMedia(path))

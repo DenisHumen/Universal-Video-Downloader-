@@ -1,4 +1,13 @@
-import { EMPTY_LIBRARY, entryFromItem, listLibrary, removeEntry, upsertEntry, type LibraryFile } from '@shared/library'
+import {
+  EMPTY_LIBRARY,
+  entryFromItem,
+  listLibrary,
+  rekeyEntry,
+  removeEntry,
+  upsertEntry,
+  type LibraryEntry,
+  type LibraryFile
+} from '@shared/library'
 import type { ButtonLayout } from '@shared/desktop'
 import type { UvdApi, AppInfo } from '../../../preload/index'
 import type {
@@ -208,6 +217,10 @@ const items: DownloadItem[] = []
 let mockLibrary: LibraryFile = EMPTY_LIBRARY
 const libraryListeners = new Set<() => void>()
 const mockRemoved = new Set<string>()
+/** Files the preview pretends are gone from disk: `__uvdMock.missing(['/v/old.mp4'])`. */
+let mockMissing = new Set<string>()
+let mockLocateFinds: 'found' | 'noMatch' = 'found'
+const isMockLost = (e: LibraryEntry): boolean => !e.remotePath && mockMissing.has(e.filepath)
 
 type YtdlpListener = (status: YtDlpStatus) => void
 type UpdateListener = (status: UpdateStatus) => void
@@ -249,6 +262,10 @@ declare global {
       maximize: (next: boolean) => void
       /** The terminal command's state, read when Settings next opens. */
       cli: (patch: Partial<CliStatus>) => void
+      /** Which library files are gone from disk. */
+      missing: (paths: string[]) => void
+      /** What the next "Locate…" in a folder comes back with. */
+      locate: (finds: 'found' | 'noMatch') => void
     }
   }
 }
@@ -316,6 +333,13 @@ export function installMockApi(): void {
     },
     cli: (patch) => {
       Object.assign(cliState, patch)
+    },
+    missing: (paths) => {
+      mockMissing = new Set(paths)
+      libraryListeners.forEach((cb) => cb())
+    },
+    locate: (finds) => {
+      mockLocateFinds = finds
     }
   }
   const api: UvdApi = {
@@ -703,7 +727,30 @@ export function installMockApi(): void {
       }
       return listLibrary(mockLibrary, q)
     },
-    libraryMissing: async () => [],
+    libraryMissing: async (paths) => paths.filter((p) => mockMissing.has(p)),
+    libraryCountMissing: async () => mockLibrary.entries.filter(isMockLost).length,
+    forgetMissingEntries: async () => {
+      const lost = mockLibrary.entries.filter(isMockLost)
+      for (const e of lost) {
+        mockRemoved.add(e.id)
+        mockLibrary = removeEntry(mockLibrary, e.id)
+      }
+      libraryListeners.forEach((cb) => cb())
+      return lost.length
+    },
+    // The dialog's part is pretended: `__uvdMock.locate('noMatch')` makes the folder come up empty.
+    locateLibraryEntry: async (id, how) => {
+      const entry = mockLibrary.entries.find((e) => e.id === id)
+      if (!entry) return { status: 'failed' }
+      const name = entry.filepath.split(/[\\/]/).pop() ?? ''
+      if (how === 'folder' && mockLocateFinds === 'noMatch') return { status: 'noMatch', name }
+      const path = `/found/${name}`
+      mockLibrary = rekeyEntry(mockLibrary, id, path)
+      // Its queue row must not put the old path back on the next read.
+      mockRemoved.add(id)
+      libraryListeners.forEach((cb) => cb())
+      return { status: 'found', path }
+    },
     trashLibraryEntry: async (id) => {
       mockRemoved.add(id)
       mockLibrary = removeEntry(mockLibrary, id)
