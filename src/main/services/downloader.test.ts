@@ -56,6 +56,14 @@ function settings(overrides: Partial<AppSettings> = {}): AppSettings {
   }
 }
 
+describe('buildArgs: waiting for a video', () => {
+  it('asks the engine to wait, only when told to', () => {
+    const args = buildArgs(item({ waitForVideo: true }), settings(), '/tmp')
+    expect(args[args.indexOf('--wait-for-video') + 1]).toMatch(/^\d+-\d+$/)
+    expect(buildArgs(item(), settings(), '/tmp')).not.toContain('--wait-for-video')
+  })
+})
+
 describe('buildArgs: audio language', () => {
   const format = (args: string[]): string => args[args.indexOf('-f') + 1]
 

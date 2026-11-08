@@ -79,7 +79,7 @@ export function applyDownloadProgress(list: DownloadItem[], batch: DownloadProgr
   return next ?? list
 }
 
-const LIVE: ReadonlySet<DownloadItem['state']> = new Set(['detecting', 'downloading', 'processing', 'queued'])
+const LIVE: ReadonlySet<DownloadItem['state']> = new Set(['detecting', 'downloading', 'processing', 'queued', 'waiting'])
 
 /**
  * What Home shows under its field once there is a history: the jobs moving

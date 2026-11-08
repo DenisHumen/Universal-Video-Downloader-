@@ -6,7 +6,7 @@ import { SidebarShow } from '../ui/icons'
 import { overallPercent } from '../lib/downloads'
 import { useShellLayout } from './layout'
 
-const ACTIVE = ['downloading', 'processing', 'queued', 'paused', 'detecting']
+const ACTIVE = ['downloading', 'processing', 'queued', 'paused', 'detecting', 'waiting']
 
 /**
  * The window's caption controls for a header bar's `side`, per OS: GNOME's

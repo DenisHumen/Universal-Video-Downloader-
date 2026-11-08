@@ -362,6 +362,10 @@ export function installMockApi(): void {
         return { ok: true, info: fakeChannel(url, options?.playlistEnd ?? settings.playlistLimit) }
       }
       if (url.startsWith('uvd-yummy-item://')) return { ok: true, info: fakeAnimeInfo(url) }
+      // A link with "mock-premiere" in it has not started yet.
+      if (/mock-premiere/.test(url)) {
+        return { ok: false, error: 'Premieres in 3 days', errorCode: 'upcoming' }
+      }
       // A link with "unsupported" in it fails the way an unknown site does, report offer and all.
       if (/unsupported/i.test(url)) {
         return { ok: false, error: `Unsupported URL: ${url}`, reportId: 'mock-detect' }
@@ -391,7 +395,8 @@ export function installMockApi(): void {
         playlist: req.playlist,
         subtitles: req.subtitles,
         audioLanguage: req.audioLanguage,
-        state: 'queued',
+        waitForVideo: req.waitForVideo,
+        state: req.waitForVideo ? 'waiting' : 'queued',
         percent: 0,
         outputDir: req.outputDir || settings.downloadDir,
         createdAt: Date.now()

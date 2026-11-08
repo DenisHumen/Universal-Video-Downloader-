@@ -87,6 +87,18 @@ describe('Download: the result card (5.4, A1)', () => {
     expect(start.mock.calls[0][0].audioLanguage).toBe('de')
   })
 
+  it('offers to wait for a premiere, and queues it to', async () => {
+    const input = await app()
+    fireEvent.change(input, { target: { value: 'https://www.youtube.com/watch?v=mock-premiere' } })
+    fireEvent.keyDown(input, { key: 'Enter' })
+    const wait = await screen.findByRole('button', { name: 'Wait and Download' }, { timeout: 4000 })
+    const start = vi.spyOn(window.api, 'startDownload')
+    start.mockClear()
+    await act(async () => fireEvent.click(wait))
+    await waitFor(() => expect(start).toHaveBeenCalled())
+    expect(start.mock.calls[0][0]).toMatchObject({ waitForVideo: true, url: expect.stringContaining('mock-premiere') })
+  })
+
   it('has no audio language row for one track', async () => {
     const input = await app()
     fireEvent.change(input, { target: { value: 'https://www.youtube.com/watch?v=one-track' } })

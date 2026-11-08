@@ -181,6 +181,8 @@ export type AppErrorCode =
 export type DownloadState =
   | 'queued'
   | 'detecting'
+  /** The engine is holding on for a premiere or a stream to start; nothing is being fetched yet. */
+  | 'waiting'
   | 'downloading'
   | 'processing'
   | 'completed'
@@ -297,6 +299,8 @@ export interface DownloadRequest {
   subtitles?: string[]
   /** The audio track to fetch, by the language code the formats carry. Absent is the site's default. */
   audioLanguage?: string
+  /** It has not started yet: wait for it, however long that takes, then download. */
+  waitForVideo?: boolean
 }
 
 /** What ffmpeg found inside a local file. */
@@ -383,6 +387,7 @@ export interface DownloadItem {
   /** Kept with the row, so a pause, a retry or a restart fetches what was picked. */
   subtitles?: string[]
   audioLanguage?: string
+  waitForVideo?: boolean
   state: DownloadState
   percent: number
   speed?: number

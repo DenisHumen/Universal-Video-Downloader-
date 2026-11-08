@@ -200,7 +200,7 @@ export function shouldTakeOwnName(
 }
 
 /** States in which an entry has an engine running, or a resolve about to start one. */
-const RUNNING: readonly DownloadItem['state'][] = ['detecting', 'downloading', 'processing']
+const RUNNING: readonly DownloadItem['state'][] = ['detecting', 'waiting', 'downloading', 'processing']
 
 const isDownload = (item: DownloadItem): boolean => !item.kind || item.kind === 'download'
 

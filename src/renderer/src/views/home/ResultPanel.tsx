@@ -29,6 +29,8 @@ interface Props {
   onRetry: () => void
   /** The "Audio Only" fix: queue the link as audio without the format list. */
   onAudioOnly: () => void
+  /** The "Wait and Download" fix: queue a premiere to wait for it, with no format list to show yet. */
+  onWaitForVideo: () => void
   /** A series or playlist card queued what it was asked to. */
   onDone: () => void
   starting: boolean
@@ -53,6 +55,7 @@ export default function ResultPanel({
   onDownload,
   onRetry,
   onAudioOnly,
+  onWaitForVideo,
   onDone,
   starting
 }: Props): JSX.Element | null {
@@ -65,6 +68,7 @@ export default function ResultPanel({
         url={url}
         onRetry={onRetry}
         onAudioOnly={onAudioOnly}
+        onWaitForVideo={onWaitForVideo}
         onChangeFolder={(dir) => {
           onSaveDir(dir)
           onRetry()
@@ -109,12 +113,14 @@ function ErrorCard({
   url,
   onRetry,
   onAudioOnly,
+  onWaitForVideo,
   onChangeFolder
 }: {
   failure: DetectFailure
   url: string
   onRetry: () => void
   onAudioOnly: () => void
+  onWaitForVideo: () => void
   onChangeFolder: (dir: string) => void
 }): JSX.Element {
   const t = useT()
@@ -153,6 +159,7 @@ function ErrorCard({
           copyText={errorReport(t, { error, errorCode, cookieHint })}
           onRetry={onRetry}
           onAudioOnly={onAudioOnly}
+          onWaitForVideo={onWaitForVideo}
           onChangeFolder={onChangeFolder}
         />
         <p className="hint mt-3">{t('browser.openHint')}</p>

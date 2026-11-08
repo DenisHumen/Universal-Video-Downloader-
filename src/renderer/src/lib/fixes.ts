@@ -12,9 +12,10 @@ import type { TranslationKey } from '../i18n'
     disk full / permission / path    → Change Folder
     region / network / timeout       → Proxy Settings
     rateLimited / serverError        → Retry in 5 Min
+    upcoming                         → Wait and Download
 */
 
-export type FixKind = 'cookies' | 'cookiesFile' | 'browser' | 'audioOnly' | 'changeFolder' | 'retryLater' | 'proxy'
+export type FixKind = 'cookies' | 'cookiesFile' | 'browser' | 'audioOnly' | 'changeFolder' | 'retryLater' | 'proxy' | 'waitForVideo'
 
 const BY_CODE: Partial<Record<AppErrorCode, FixKind>> = {
   signIn: 'cookies',
@@ -42,7 +43,8 @@ const BY_CODE: Partial<Record<AppErrorCode, FixKind>> = {
   network: 'proxy',
   timeout: 'proxy',
   rateLimited: 'retryLater',
-  serverError: 'retryLater'
+  serverError: 'retryLater',
+  upcoming: 'waitForVideo'
 }
 
 /** The fix for a failure, or none: then Retry, Report and Copy Error are what is offered. */
@@ -61,7 +63,8 @@ export const FIX_LABEL: Record<FixKind, TranslationKey> = {
   browser: 'fix.browser',
   audioOnly: 'fix.audioOnly',
   changeFolder: 'fix.changeFolder',
-  retryLater: 'fix.retryLater'
+  retryLater: 'fix.retryLater',
+  waitForVideo: 'fix.waitForVideo'
 }
 
 /** "Retry in 5 Min". */

@@ -74,6 +74,12 @@ export const downloadEvents = new EventEmitter()
 export const PROGRESS_PREFIX = '@@UVD@@'
 /** Post-processing progress, on its own channel so the parser can tell them apart. */
 export const POSTPROCESS_PREFIX = '@@UVDPP@@'
+/*
+  Seconds between looks at a video that has not started: at the time the site
+  gives if that is sooner, at least a minute apart, and at most half an hour,
+  because a premiere's time moves and a stream can start early.
+*/
+const WAIT_FOR_VIDEO_RANGE = '60-1800'
 /** Automatic retries for transient network failures before we bother the user. */
 const AUTO_RETRIES = 2
 const LOG_TAIL_CHARS = 4000
@@ -575,6 +581,7 @@ export function buildArgs(
   if (item.referer) args.push('--referer', item.referer)
   if (settings.restrictFilenames) args.push('--restrict-filenames')
   if (settings.speedLimit.trim()) args.push('--limit-rate', settings.speedLimit.trim())
+  if (item.waitForVideo) args.push('--wait-for-video', WAIT_FOR_VIDEO_RANGE)
 
   /*
     Output template. For custom-resolved streams we bake in the title we
@@ -783,7 +790,15 @@ function appendLog(item: DownloadItem, text: string): void {
   item.log = ((item.log || '') + text).slice(-LOG_TAIL_CHARS)
 }
 
+/** The wait is over: something came down. The row has been saying it was waiting until now. */
+function endWait(item: DownloadItem): void {
+  if (items.get(item.id)?.state !== 'waiting') return
+  item.state = 'downloading'
+  emitUpdated(item)
+}
+
 function handleProgressLine(line: string, item: DownloadItem): void {
+  endWait(item)
   /*
     Is this job still running?
 
@@ -887,6 +902,7 @@ function expectedSeconds(item: DownloadItem): number | undefined {
  * line will ever arrive and this is the only thing that can move the bar.
  */
 function handleFfmpegProgress(seconds: number, item: DownloadItem, line: string): void {
+  endWait(item)
   if (item.state !== 'downloading') return
   /*
     Only the fetching half. The engine captures its post-processors' output
@@ -997,6 +1013,12 @@ function handlePostprocessLine(line: string, item: DownloadItem): void {
   })
 }
 
+/**
+ * What is using a slot. Not a row waiting for a premiere: that can be days of an
+ * idle process, and "three at once" should not become two for all of them. When
+ * it starts it runs at once, over the limit if need be, because a stream that
+ * has begun will not wait for a slot.
+ */
 function activeCount(): number {
   let n = 0
   for (const item of items.values()) {
@@ -1303,7 +1325,7 @@ async function runDownload(item: DownloadItem): Promise<void> {
     return
   }
 
-  item.state = 'downloading'
+  item.state = item.waitForVideo ? 'waiting' : 'downloading'
   emitUpdated(item)
   const retried = item.attempts || 0
   log.info('download', 'Started', { ...downloadFields(item), attempt: retried ? retried + 1 : undefined })
@@ -1339,7 +1361,8 @@ async function runDownload(item: DownloadItem): Promise<void> {
     const source = item.sourceUrl || item.url
     const skip = skipInfo.delete(item.id)
     infoFile =
-      !skip && item.url === source && !item.headers && !item.referer
+      // Not for a wait: what the detect knew is that there is nothing to fetch yet.
+      !skip && !item.waitForVideo && item.url === source && !item.headers && !item.referer
         ? infoCache.take(infoKey(source, settings))
         : null
     const args = buildArgs(item, settings, dir, ffmpegLocation(), infoFile ?? undefined)
@@ -1656,6 +1679,7 @@ export async function startDownload(request: DownloadRequest): Promise<DownloadI
     playlist: normalisePlaylist(req.playlist),
     subtitles: cleanLanguages(req.subtitles),
     audioLanguage: cleanLanguage(req.audioLanguage),
+    waitForVideo: req.waitForVideo === true ? true : undefined,
     state: 'queued',
     percent: 0,
     attempts: 0,
@@ -1697,7 +1721,8 @@ export async function startDownload(request: DownloadRequest): Promise<DownloadI
  * from — on Windows it cannot even be overwritten while it is loaded.
  */
 export function isEngineBusy(): boolean {
-  return activeCount() > 0
+  // A row that is waiting has the binary loaded as surely as one that is downloading.
+  return activeCount() > 0 || [...items.values()].some((item) => item.state === 'waiting')
 }
 
 export function kickQueue(): void {
@@ -2022,7 +2047,7 @@ export function pauseAll(): void {
   const all = [...items.values()]
   for (const item of all) if (item.state === 'queued') pauseDownload(item.id)
   for (const item of all) {
-    if (['downloading', 'processing', 'detecting'].includes(item.state)) pauseDownload(item.id)
+    if (['downloading', 'processing', 'detecting', 'waiting'].includes(item.state)) pauseDownload(item.id)
   }
 }
 

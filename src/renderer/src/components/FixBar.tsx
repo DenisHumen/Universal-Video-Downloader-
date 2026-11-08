@@ -18,6 +18,8 @@ export interface FixBarProps {
   onAudioOnly: () => void
   /** Try again into another folder. */
   onChangeFolder: (dir: string) => void
+  /** It has not started: queue it to wait for that. */
+  onWaitForVideo: () => void
   /** Keys the five-minute wait, so a second click does not stack. */
   retryKey: string
   /** What Copy Error puts on the clipboard. */
@@ -40,6 +42,7 @@ export default function FixBar({
   onRetry,
   onAudioOnly,
   onChangeFolder,
+  onWaitForVideo,
   retryKey,
   copyText,
   report
@@ -126,6 +129,12 @@ export default function FixBar({
         return (
           <button type="button" className="btn-quiet" data-fix="changeFolder" onClick={() => void changeFolder()}>
             <Folder size={14} /> {t(FIX_LABEL.changeFolder)}
+          </button>
+        )
+      case 'waitForVideo':
+        return (
+          <button type="button" className="btn-quiet" data-fix="waitForVideo" onClick={onWaitForVideo}>
+            <Clock size={14} /> {t(FIX_LABEL.waitForVideo)}
           </button>
         )
       case 'retryLater':

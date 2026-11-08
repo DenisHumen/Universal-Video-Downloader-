@@ -78,3 +78,17 @@ describe('isSameDownload', () => {
     expect(isSameDownload(item(), request({ url: 'https://site/other' }))).toBe(false)
   })
 })
+
+describe('isSameDownload, an audio language or a wait', () => {
+  const req = { url: 'https://site/video', mode: 'video', quality: 'best' } as DownloadRequest
+
+  it('takes another audio language for another file', () => {
+    const german = item({ quality: 'best', state: 'downloading', audioLanguage: 'de' })
+    expect(isSameDownload(german, req)).toBe(false)
+    expect(isSameDownload(german, { ...req, audioLanguage: 'de' })).toBe(true)
+  })
+
+  it('counts a row waiting for its premiere as in the queue', () => {
+    expect(isSameDownload(item({ quality: 'best', state: 'waiting' }), req)).toBe(true)
+  })
+})

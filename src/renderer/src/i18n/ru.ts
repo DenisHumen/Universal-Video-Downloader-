@@ -302,12 +302,14 @@ export const ru: Dictionary = {
   'queue.next': 'Следующий',
   'queue.log': 'Технические подробности',
   'queue.retryingIn': 'Повторяю автоматически…',
+  'queue.waitingHint': 'Скачается само, как только начнётся, пока приложение открыто',
   'queue.onShare': 'В сетевой папке: {path}',
   'queue.openFailed': 'Не удалось открыть файл — возможно, его переместили или удалили',
 
   // ---- download states ----
   'state.queued': 'В очереди',
   'state.detecting': 'Подготовка',
+  'state.waiting': 'Ждёт начала',
   'state.downloading': 'Скачивается',
   'state.processing': 'Обработка',
   'phase.trim': 'Обрезка',
@@ -576,6 +578,7 @@ export const ru: Dictionary = {
   'fix.changeFolder': 'Сменить папку',
   'fix.retryLater': 'Повторить через 5 мин',
   'fix.retryingAt': 'Повтор в {time}',
+  'fix.waitForVideo': 'Подождать и скачать',
   'fix.report': 'Сообщить',
   'fix.copyError': 'Скопировать ошибку',
   'fix.reportConsent': 'Сначала будет показано, что уйдёт. Без вашего нажатия ничего не отправляется.',

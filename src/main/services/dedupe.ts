@@ -9,6 +9,7 @@ import type { DownloadItem, DownloadRequest } from '@shared/types'
 export const IN_FLIGHT_STATES: DownloadItem['state'][] = [
   'queued',
   'detecting',
+  'waiting',
   'downloading',
   'processing',
   'paused'

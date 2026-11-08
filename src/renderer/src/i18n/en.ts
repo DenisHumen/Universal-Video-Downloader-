@@ -308,12 +308,14 @@ export const en = {
   'queue.next': 'Next up',
   'queue.log': 'Technical Details',
   'queue.retryingIn': 'Retrying automatically…',
+  'queue.waitingHint': 'Downloads by itself once it starts, while the app is open',
   'queue.onShare': 'On the share: {path}',
   'queue.openFailed': 'Could not open that file — it may have been moved or deleted',
 
   // ---- download states ----
   'state.queued': 'Queued',
   'state.detecting': 'Preparing',
+  'state.waiting': 'Waiting to Start',
   'state.downloading': 'Downloading',
   'state.processing': 'Processing',
   'phase.trim': 'Trimming',
@@ -584,6 +586,7 @@ export const en = {
   'fix.changeFolder': 'Change Folder',
   'fix.retryLater': 'Retry in 5 Min',
   'fix.retryingAt': 'Retrying at {time}',
+  'fix.waitForVideo': 'Wait and Download',
   'fix.report': 'Report',
   'fix.copyError': 'Copy Error',
   'fix.reportConsent': 'Report shows what would be sent. Nothing is sent without your click.',
