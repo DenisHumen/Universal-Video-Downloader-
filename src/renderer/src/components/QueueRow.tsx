@@ -35,7 +35,6 @@ import ReportPrompt, { useReportOffer } from './ReportPrompt'
 import FixBar from './FixBar'
 import EngineOutput from './EngineOutput'
 import SendToShareDialog from './SendToShareDialog'
-import { useStore } from '../store'
 import { queueDownload } from '../lib/queue'
 import { IconButton, Menu, type MenuItem } from '../ui'
 
