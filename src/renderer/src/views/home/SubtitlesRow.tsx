@@ -1,7 +1,7 @@
 import { useMemo } from 'react'
 import type { AppSettings, MediaInfo } from '@shared/types'
 import { MAX_SUBTITLE_LANGUAGES } from '@shared/languages'
-import { languageName, subtitleChoices } from '../../lib/languages'
+import { languageInSentence, subtitleChoices } from '../../lib/languages'
 import { resolveLanguage, useT } from '../../i18n'
 import { useStore } from '../../store'
 import { ExpanderRow, cx } from '../../ui'
@@ -34,7 +34,7 @@ export default function SubtitlesRow({ info, settings, value, onChange }: Props)
     onChange(next.length ? next : undefined)
   }
   const summary = picked.length
-    ? picked.map((code) => languageName(code, locale, t)).join(', ')
+    ? picked.map((code) => languageInSentence(code, locale, t)).join(', ')
     : settings.embedSubtitles || settings.writeSubtitles
       ? t('format.subtitlesSettings', { languages: settings.subtitleLanguages })
       : t('format.subtitlesNone')

@@ -7,7 +7,7 @@ const DESCRIBED = /-desc$/i
 
 const namers = new Map<string, Intl.DisplayNames>()
 
-function plainName(code: string, locale: string): string {
+function plainName(code: string, locale: string, standalone = true): string {
   try {
     let namer = namers.get(locale)
     if (!namer) {
@@ -15,8 +15,8 @@ function plainName(code: string, locale: string): string {
       namers.set(locale, namer)
     }
     const name = namer.of(code.replace('_', '-')) ?? code
-    // Russian names start in lower case, and these stand alone.
-    return name.charAt(0).toLocaleUpperCase(locale) + name.slice(1)
+    // Russian names start in lower case, which is right inside a sentence and not on their own.
+    return standalone ? name.charAt(0).toLocaleUpperCase(locale) + name.slice(1) : name
   } catch {
     // Not a code the system can read at all. It is still the site's name for the track.
     return code
@@ -28,6 +28,13 @@ export function languageName(code: string, locale: string, t: TranslateFn): stri
   if (ORIGINAL.test(code)) return t('lang.original', { language: plainName(code.replace(ORIGINAL, ''), locale) })
   if (DESCRIBED.test(code)) return t('lang.described', { language: plainName(code.replace(DESCRIBED, ''), locale) })
   return plainName(code, locale)
+}
+
+/** The same, for the middle of a sentence: "субтитры скачать не удалось: английский". */
+export function languageInSentence(code: string, locale: string, t: TranslateFn): string {
+  if (ORIGINAL.test(code)) return t('lang.original', { language: plainName(code.replace(ORIGINAL, ''), locale, false) })
+  if (DESCRIBED.test(code)) return t('lang.described', { language: plainName(code.replace(DESCRIBED, ''), locale, false) })
+  return plainName(code, locale, false)
 }
 
 /** Codes that say the site does not know, or that there are no words. */
