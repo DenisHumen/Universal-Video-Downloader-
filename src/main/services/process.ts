@@ -15,6 +15,65 @@ export function groupSpawnOptions(): { detached?: boolean } {
   return process.platform === 'win32' ? {} : { detached: true }
 }
 
+/*
+  Windows has no signal to send a console program, only a console event, and a
+  process can only send that to the console it is attached to. So a short-lived
+  PowerShell leaves its own console, joins the child's, ignores the event itself
+  and fires it at everyone there, which is the engine and its ffmpeg - exactly
+  what pressing Ctrl-C in that window would do. `taskkill` without /F cannot do
+  this: it posts a close message, and these have no window to receive one.
+*/
+export function ctrlCScript(pid: number): string {
+  return [
+    `Add-Type -Namespace Uvd -Name Con -MemberDefinition '` +
+      `[DllImport("kernel32.dll")] public static extern bool FreeConsole();` +
+      `[DllImport("kernel32.dll")] public static extern bool AttachConsole(uint id);` +
+      `[DllImport("kernel32.dll")] public static extern bool SetConsoleCtrlHandler(IntPtr h, bool add);` +
+      `[DllImport("kernel32.dll")] public static extern bool GenerateConsoleCtrlEvent(uint ev, uint group);'`,
+    '[Uvd.Con]::FreeConsole() | Out-Null',
+    `if (-not [Uvd.Con]::AttachConsole(${Math.trunc(pid)})) { exit 2 }`,
+    '[Uvd.Con]::SetConsoleCtrlHandler([IntPtr]::Zero, $true) | Out-Null',
+    'if (-not [Uvd.Con]::GenerateConsoleCtrlEvent(0, 0)) { exit 3 }',
+    'exit 0'
+  ].join('; ')
+}
+
+/**
+ * Ask a child and everything it started to finish up, as Ctrl-C does.
+ *
+ * ffmpeg writes out what it has and closes its file, and the engine treats the
+ * end of a live capture as a normal end: it fixes the container and exits 0.
+ * `onFailed` is for when the request could not even be delivered. A delivered
+ * one can still be ignored, so the caller keeps its own deadline as well.
+ */
+export function interruptTree(child: ChildProcess, onFailed: () => void): void {
+  if (child.pid == null) {
+    onFailed()
+    return
+  }
+  if (process.platform === 'win32') {
+    execFile(
+      'powershell.exe',
+      ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-Command', ctrlCScript(child.pid)],
+      { windowsHide: true, timeout: 10_000 },
+      (err) => {
+        if (err) onFailed()
+      }
+    )
+    return
+  }
+  try {
+    // ffmpeg gets it directly as well, as it would from a terminal - see groupSpawnOptions.
+    process.kill(-child.pid, 'SIGINT')
+  } catch {
+    try {
+      child.kill('SIGINT')
+    } catch {
+      onFailed()
+    }
+  }
+}
+
 /**
  * Terminate a child and everything it started.
  *

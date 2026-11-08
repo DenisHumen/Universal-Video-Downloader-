@@ -11,9 +11,11 @@ import {
   FolderOpen,
   Pause,
   Play,
+  ProcessStop,
   RotateCw,
   Scissors,
   Trash2,
+  Upload,
   X
 } from '../ui/icons'
 import type { DownloadItem } from '@shared/types'
@@ -26,6 +28,9 @@ import MediaJobModal, { type JobMode } from './MediaJobModal'
 import Thumbnail from './Thumbnail'
 import ReportPrompt, { useReportOffer } from './ReportPrompt'
 import FixBar from './FixBar'
+import EngineOutput from './EngineOutput'
+import SendToShareDialog from './SendToShareDialog'
+import { useStore } from '../store'
 import { queueDownload } from '../lib/queue'
 import { IconButton, Menu, type MenuItem } from '../ui'
 
@@ -55,6 +60,8 @@ function QueueRow({ item, index, animateIn = true, heading }: Props): JSX.Elemen
   // The engine output mounts only while open, so aria-controls is set only then.
   const logId = useId()
   const [jobModal, setJobModal] = useState<JobMode | null>(null)
+  const [sending, setSending] = useState(false)
+  const hasShare = useStore((s) => (s.settings?.smbTargets?.length ?? 0) > 0)
   const meta = STATE_META[item.state]
   const landed =
     item.filepath ?? (item.remotePath ? t('queue.onShare', { path: item.remotePath }) : undefined)
@@ -87,7 +94,9 @@ function QueueRow({ item, index, animateIn = true, heading }: Props): JSX.Elemen
    */
   const phaseLabel = !active
     ? null
-    : item.postprocess === 'trim'
+    : item.savingLive
+      ? t('phase.saveLive')
+      : item.postprocess === 'trim'
       ? t('phase.trim')
       : item.postprocess === 'merge'
         ? t('phase.merge')
@@ -112,7 +121,22 @@ function QueueRow({ item, index, animateIn = true, heading }: Props): JSX.Elemen
           ? `${item.quality}p`
           : null
 
+  /*
+    A broadcast has no end for the row to wait for and cannot be picked up where
+    it left off, so its way out is the labelled button rather than pause. A
+    paused row got there through "pause all" or a restart, and still has its
+    partial to save, and so has a recording that failed partway, unless the
+    failure was saving it.
+  */
+  const canStopSave =
+    item.live &&
+    !item.savingLive &&
+    (item.state === 'downloading' ||
+      item.state === 'paused' ||
+      (item.state === 'error' && Boolean(item.partialPaths?.length) && !item.keptPartial && item.errorCode !== 'liveEmpty'))
+
   const facts = [
+    item.live && item.state === 'downloading' ? t('queue.recording') : null,
     phaseLabel,
     jobKindLabel,
     item.jobLabel,
@@ -183,6 +207,7 @@ function QueueRow({ item, index, animateIn = true, heading }: Props): JSX.Elemen
       targetHeight: change.mode === 'audio' ? undefined : item.targetHeight,
       duration: item.duration,
       extractor: item.extractor,
+      live: item.live,
       section: item.range,
       preciseSection: item.precise,
       outputDir: change.outputDir ?? item.outputDir
@@ -224,9 +249,15 @@ function QueueRow({ item, index, animateIn = true, heading }: Props): JSX.Elemen
     ...(item.state === 'completed' && item.filepath
       ? [
           { label: t('trim.openEditor'), icon: <Scissors size={14} />, onSelect: () => setJobModal('trim') },
-          { label: t('convert.open'), icon: <FileVideo size={14} />, onSelect: () => setJobModal('convert') }
+          { label: t('convert.open'), icon: <FileVideo size={14} />, onSelect: () => setJobModal('convert') },
+          ...(hasShare
+            ? [{ label: t('queue.sendShare'), icon: <Upload size={14} />, onSelect: () => setSending(true) }]
+            : [])
         ]
       : []),
+    ...(active || item.state === 'paused'
+      ? [{ label: t('queue.log'), icon: <FileVideo size={14} />, onSelect: () => setLogOpen((v) => !v) }]
+      : [])
   ]
 
   /* What the second line says, after the state: progress, speed, time left, quality. */
@@ -328,7 +359,19 @@ function QueueRow({ item, index, animateIn = true, heading }: Props): JSX.Elemen
               </button>
             </>
           )}
-          {running && (
+          {canStopSave && (
+            <button
+              type="button"
+              className="btn-quiet mr-1"
+              data-action="stop-save"
+              title={t('queue.stopSaveHint')}
+              onClick={() => void window.api.stopLiveRecording(item.id)}
+            >
+              <ProcessStop size={14} />
+              {t('queue.stopSave')}
+            </button>
+          )}
+          {running && !item.live && (
             <button
               className="btn-icon-bare"
               title={t('common.pause')}
@@ -428,6 +471,12 @@ function QueueRow({ item, index, animateIn = true, heading }: Props): JSX.Elemen
         </div>
       )}
 
+      {logOpen && (active || item.state === 'paused') && (
+        <div className="pb-3 pl-[116px] pr-1">
+          <EngineOutput id={item.id} running={active} />
+        </div>
+      )}
+
       {/*
         Outcome: the path it landed at, or why it didn't. An automated episode
         whose local copy was deleted once it was on the share has only the
@@ -446,6 +495,16 @@ function QueueRow({ item, index, animateIn = true, heading }: Props): JSX.Elemen
               title={errorText(t, item)}
             >
               {errorText(t, item)}
+              {item.keptPartial && (
+                <button
+                  type="button"
+                  className="selectable mono mt-1 block max-w-full truncate text-left text-ink-2 underline"
+                  title={t('common.showInFolder')}
+                  onClick={() => window.api.showInFolder(item.keptPartial!)}
+                >
+                  {item.keptPartial}
+                </button>
+              )}
             </p>
           ) : (
             item.filepath ? (
@@ -458,6 +517,11 @@ function QueueRow({ item, index, animateIn = true, heading }: Props): JSX.Elemen
                 {landed}
               </p>
             )
+          )}
+          {item.filepath && item.remotePath && (
+            <p className="selectable mono mt-1 truncate text-meta text-ink-3" title={item.remotePath}>
+              {t('queue.onShare', { path: item.remotePath })}
+            </p>
           )}
           {item.log && (
             <>
@@ -508,6 +572,7 @@ function QueueRow({ item, index, animateIn = true, heading }: Props): JSX.Elemen
       )}
 
       {jobModal && <MediaJobModal item={item} mode={jobModal} onClose={() => setJobModal(null)} />}
+      {sending && <SendToShareDialog id={item.id} title={item.title} onClose={() => setSending(false)} />}
     </div>
     </m.li>
   )

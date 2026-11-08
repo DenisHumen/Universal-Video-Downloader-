@@ -7,6 +7,7 @@ import { formatBytes } from '../lib/format'
 import { toast } from '../lib/toast'
 import ConfirmDialog from '../components/ConfirmDialog'
 import MediaJobModal, { type JobMode } from '../components/MediaJobModal'
+import SendToShareDialog from '../components/SendToShareDialog'
 import Thumbnail from '../components/Thumbnail'
 import { EmptyState, Icon, IconButton, Menu, PreferencesGroup, SegmentedControl } from '../ui'
 import { FileVideo, FolderOpen, MoreHorizontal, Play, Search } from '../ui/icons'
@@ -60,6 +61,8 @@ export default function LibraryView(): JSX.Element {
   const [missing, setMissing] = useState<Set<string>>(new Set())
   const [confirm, setConfirm] = useState<LibraryEntry | null>(null)
   const [job, setJob] = useState<{ entry: LibraryEntry; mode: JobMode } | null>(null)
+  const [sending, setSending] = useState<LibraryEntry | null>(null)
+  const hasShare = useStore((s) => (s.settings?.smbTargets?.length ?? 0) > 0)
 
   const load = useCallback(async () => {
     const page = await window.api.listLibrary({ query, group, limit: 500 })
@@ -158,8 +161,8 @@ export default function LibraryView(): JSX.Element {
                           .join(' · ')}
                       </p>
                     </div>
-                    {/* Sent to a share by a watch and deleted here: not lost, just elsewhere. */}
-                    {gone && e.remotePath ? (
+                    {/* Sent to a share, by a watch or by hand. If it was deleted here it is not lost, just elsewhere. */}
+                    {e.remotePath ? (
                       <span className="tag shrink-0" title={e.remotePath}>
                         {t('library.onShare')}
                       </span>
@@ -187,6 +190,7 @@ export default function LibraryView(): JSX.Element {
                       items={[
                         { label: t('library.cut'), onSelect: () => setJob({ entry: e, mode: 'trim' }), disabled: gone },
                         { label: t('library.convert'), onSelect: () => setJob({ entry: e, mode: 'convert' }), disabled: gone },
+                        ...(hasShare && !gone ? [{ label: t('queue.sendShare'), onSelect: () => setSending(e) }] : []),
                         // A cut or a conversion has a file on disk for its address, not a page to go back to.
                         ...(/^https?:\/\//i.test(e.sourceUrl || e.url)
                           ? [{ label: t('library.again'), onSelect: () => requestDetect(e.sourceUrl || e.url) }]
@@ -220,6 +224,7 @@ export default function LibraryView(): JSX.Element {
         />
       )}
       {job && <MediaJobModal item={asItem(job.entry)} mode={job.mode} onClose={() => setJob(null)} />}
+      {sending && <SendToShareDialog id={sending.id} title={sending.title} onClose={() => setSending(null)} />}
     </div>
   )
 }

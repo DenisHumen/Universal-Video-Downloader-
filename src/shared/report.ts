@@ -97,6 +97,10 @@ const REPORTABLE: Record<AppErrorCode, boolean> = {
   adultHidden: false,
   // The link was queued without its picker; Home is the fix, not a report.
   needsPicker: false,
+  // Stopped before the first piece of the broadcast arrived; nothing went wrong.
+  liveEmpty: false,
+  // The stream or the app's handling of it is broken, and the file is still there to look at.
+  liveNotSaved: true,
   // The engine could not be installed - nearly always the network, not a site.
   engineMissing: false,
   // A premiere that has not started, or a title the site does not carry.

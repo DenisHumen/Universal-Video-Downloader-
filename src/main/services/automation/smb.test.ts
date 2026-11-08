@@ -185,6 +185,30 @@ describe('uploadFile', () => {
     await uploadFile(target, 'example', local, 'Series', 'ep.mkv')
     expect(h.files.get(final)).toBe('video')
   })
+
+  // Somebody sending a file by hand has said nothing about what is on the share.
+  it('with replace off, refuses a name already taken and touches nothing', async () => {
+    h.files.set(final, 'the old copy')
+    await expect(
+      uploadFile(target, 'example', local, 'Series', 'ep.mkv', undefined, false)
+    ).rejects.toMatchObject({ kind: 'exists' })
+    expect(h.created).toEqual([])
+    expect([...h.files.entries()]).toEqual([[final, 'the old copy']])
+  })
+
+  it('with replace off, still refuses when the name was taken while the file was on its way', async () => {
+    const racing = (): void => void h.files.set(final, 'somebody else')
+    await expect(
+      uploadFile(target, 'example', local, 'Series', 'ep.mkv', racing, false)
+    ).rejects.toMatchObject({ kind: 'exists' })
+    expect(h.files.get(final)).toBe('somebody else')
+    expect([...h.files.keys()]).toEqual([final])
+  })
+
+  it('with replace off, sends a file whose name is free', async () => {
+    await uploadFile(target, 'example', local, 'Series', 'ep.mkv', undefined, false)
+    expect(h.files.get(final)).toBe('video')
+  })
 })
 
 /*

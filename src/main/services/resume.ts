@@ -31,6 +31,8 @@ export function markInterrupted(item: DownloadItem): boolean {
   if (!WAS_RUNNING.includes(item.state)) return false
   item.state = 'paused'
   item.interrupted = true
+  // Whatever was saving a recording died with the app; what it was saving is still there.
+  item.savingLive = undefined
   return true
 }
 

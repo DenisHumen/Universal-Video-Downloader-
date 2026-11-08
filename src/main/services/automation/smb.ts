@@ -34,7 +34,7 @@ const NAME_COLLISION = 0xc0000035
 /** The name is taken by a file somebody has deleted but the server still holds open. */
 const DELETE_PENDING = 0xc0000056
 
-export type SmbErrorKind = 'auth' | 'network' | 'path' | 'full' | 'busy' | 'unknown'
+export type SmbErrorKind = 'auth' | 'network' | 'path' | 'full' | 'busy' | 'exists' | 'unknown'
 
 /**
  * SMB status codes worth telling a person apart from one another.
@@ -155,6 +155,13 @@ export interface UploadResult {
  * runs unattended. Uploaded under a temporary name and renamed on success, so
  * the share never briefly holds a half-written episode under the name something
  * else might pick up.
+ *
+ * `replace` is for a watch re-running an episode it already sent, which is its
+ * own file. Somebody sending a file by hand has not said anything about what is
+ * on the share, so with `replace` off a name that is taken stops the upload with
+ * kind 'exists' and nothing on the share is touched: looked at before a byte is
+ * sent, and again before the rename, because a big file takes long enough for
+ * somebody else to put one there.
  */
 export async function uploadFile(
   input: SmbTarget,
@@ -162,7 +169,8 @@ export async function uploadFile(
   localPath: string,
   remoteDir: string,
   remoteName: string,
-  onProgress?: (bytes: number, total: number) => void
+  onProgress?: (bytes: number, total: number) => void,
+  replace = true
 ): Promise<UploadResult> {
   const target = normaliseSmbTarget(input)
   const total = statSync(localPath).size
@@ -176,9 +184,15 @@ export async function uploadFile(
     .join(SEP)
   const finalPath = dir ? dir + SEP + remoteName : remoteName
   let tempPath = `${finalPath}.uvd-part`
+  const refuseIfTaken = async (): Promise<void> => {
+    if (!replace && (await tree.exists(finalPath))) {
+      throw new SmbError('A file with that name already exists on the share.', 'exists')
+    }
+  }
 
   try {
     if (dir) await ensureDirs(tree, dir)
+    await refuseIfTaken()
 
     /*
       An upload cut short - the connection dropped, the app quit mid-file -
@@ -223,6 +237,7 @@ export async function uploadFile(
       await pipeline(createReadStream(localPath), stream)
     }
 
+    await refuseIfTaken()
     // Replace anything already there, rather than failing on a re-run.
     try {
       if (await tree.exists(finalPath)) await tree.removeFile(finalPath)
@@ -247,7 +262,7 @@ export async function uploadFile(
     } catch {
       /* it may not exist */
     }
-    throw toSmbError(err, target.host)
+    throw err instanceof SmbError ? err : toSmbError(err, target.host)
   } finally {
     try {
       await client.close()
