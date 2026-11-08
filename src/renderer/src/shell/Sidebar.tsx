@@ -2,7 +2,7 @@ import { useStore } from '../store'
 import { useT } from '../i18n'
 import { overallPercent } from '../lib/downloads'
 import { Badge, HeaderBar, IconButton, Menu, Tooltip, cx } from '../ui'
-import { OpenMenu } from '../ui/icons'
+import { OpenMenu, Help } from '../ui/icons'
 import { NAV_BOTTOM, NAV_MAIN, type NavSection } from './nav'
 import { WindowControls } from './WindowControls'
 
@@ -67,6 +67,8 @@ export default function Sidebar({ platform, overlay }: Props): JSX.Element {
           <NavItem key={s.id} section={s} />
         ))}
         <div className="mx-2 my-1.5 h-px shrink-0 bg-fill/15" role="separator" />
+        {/* In plain sight: someone who is lost will not think to look behind the menu button. */}
+        <NavItem section={{ id: 'guide', label: 'help.title', icon: Help, key: '' }} />
         {NAV_BOTTOM.map((s) => (
           <NavItem key={s.id} section={s} />
         ))}

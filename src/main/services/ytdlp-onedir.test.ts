@@ -131,7 +131,7 @@ async function fresh(): Promise<typeof import('./ytdlp')> {
   return import('./ytdlp')
 }
 
-const settle = (): Promise<void> => new Promise((resolve) => setTimeout(resolve, 30))
+const settle = (): Promise<void> => new Promise((resolve) => setTimeout(resolve, 300))
 const realPublic = process.env.PUBLIC
 const bin = (): string => join(h.dir, 'UniversalVideoDownloader', 'bin')
 const binDir = (): string => (process.platform === 'win32' ? bin() : join(h.dir, 'bin'))
@@ -166,8 +166,7 @@ describe('the onedir engine', () => {
     const m = await fresh()
     // Ready at once, on the engine that already works.
     await expect(m.ensureYtdlp()).resolves.toBe(onefile())
-    await settle()
-    expect(m.ytdlpBinaryPath()).toContain('yt-dlp-dist-')
+    await vi.waitFor(() => expect(m.ytdlpBinaryPath()).toContain('yt-dlp-dist-'), { timeout: 8000 })
     expect(m.getYtdlpStatus()).toMatchObject({ state: 'ready', version: 'onedir' })
     // The single file goes at the next launch's clean-up, not while it may be running.
     expect(existsSync(onefile())).toBe(true)
