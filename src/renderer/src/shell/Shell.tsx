@@ -71,6 +71,15 @@ export default function Shell({ platform, notices, children }: Props): JSX.Eleme
     return () => window.removeEventListener('keydown', onKey, true)
   }, [pinned, overlayOpen, setOverlayOpen])
 
+  /* Closed without choosing anything, the focused row is gone: back to the toggle that opened it. */
+  const wasOpen = useRef(false)
+  useEffect(() => {
+    if (wasOpen.current && !overlayOpen && document.activeElement === document.body) {
+      document.querySelector<HTMLElement>('[data-uvd="sidebar-toggle"]')?.focus({ preventScroll: true })
+    }
+    wasOpen.current = overlayOpen
+  }, [overlayOpen])
+
   const section = NAV_ALL.find((s) => s.id === view)
   const ownHeader = OWN_HEADER.includes(view)
 

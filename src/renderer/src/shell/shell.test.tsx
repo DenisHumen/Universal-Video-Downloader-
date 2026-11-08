@@ -1,5 +1,7 @@
 import { act, fireEvent, render, screen, within } from '@testing-library/react'
 import { afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest'
+import { readFileSync } from 'fs'
+import { resolve } from 'path'
 import type { ButtonLayout } from '@shared/desktop'
 import { axeViolations } from '../../../../test/axe'
 import { installMockApi } from '../lib/mockApi'
@@ -116,6 +118,24 @@ describe('sidebar', () => {
     expect(screen.getByRole('navigation')).toBeTruthy()
     fireEvent.keyDown(window, { key: 'Escape' })
     expect(screen.queryByRole('navigation')).toBeNull()
+  })
+
+  it('draws the overlay above its scrim, so a pointer can reach it, and takes the keyboard there and back', async () => {
+    const root = await shell('linux', SIDEBAR_PINNED_FROM - 1)
+    const toggle = screen.getByRole('button', { name: 'Sidebar' })
+    toggle.focus()
+    fireEvent.click(toggle)
+    const sidebar = root.querySelector<HTMLElement>('#uvd-sidebar')!
+    const scrim = root.querySelector<HTMLElement>('.scrim')!
+    const css = readFileSync(resolve(process.cwd(), 'src/renderer/src/index.css'), 'utf8')
+    const depth = (el: HTMLElement): number => {
+      const token = /var\((--z-[a-z]+)\)/.exec(el.style.zIndex)![1]
+      return Number(new RegExp(`${token}: (\\d+)`).exec(css)![1])
+    }
+    expect(depth(sidebar)).toBeGreaterThan(depth(scrim))
+    expect(sidebar.contains(document.activeElement)).toBe(true)
+    fireEvent.keyDown(window, { key: 'Escape' })
+    expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Sidebar' }))
   })
 
   it('switches views, marks the current one, and closes the overlay', async () => {

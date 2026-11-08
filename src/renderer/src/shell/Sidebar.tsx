@@ -1,3 +1,4 @@
+import { useEffect, useRef } from 'react'
 import { useStore } from '../store'
 import { useT } from '../i18n'
 import { overallPercent } from '../lib/downloads'
@@ -32,12 +33,23 @@ export default function Sidebar({ platform, overlay }: Props): JSX.Element {
   const isMac = platform === 'darwin'
   const openShortcuts = useStore((s) => s.setShortcutsOpen)
   const openSettings = useStore((s) => s.openSettings)
+  const navRef = useRef<HTMLElement>(null)
+
+  // The toggle stays behind the scrim, and after it in the tab order: Tab would have gone on through the dimmed page.
+  useEffect(() => {
+    if (overlay) navRef.current?.querySelector('button')?.focus({ preventScroll: true })
+  }, [overlay])
 
   return (
     <div
       id="uvd-sidebar"
       className={cx('ui-app-sidebar flex w-[240px] shrink-0 flex-col', overlay && 'ui-app-sidebar-overlay')}
-      style={{ zIndex: 'var(--z-nav)' }}
+      /*
+        Above its scrim (--z-chrome) as an overlay. It was under it, so in a window
+        narrower than 860 px every click on the only navigation there is landed on
+        the scrim and just closed the sidebar. Only a real pointer can tell.
+      */
+      style={{ zIndex: overlay ? 'var(--z-banner)' : 'var(--z-nav)' }}
       data-overlay={overlay || undefined}
     >
       <HeaderBar
@@ -61,7 +73,7 @@ export default function Sidebar({ platform, overlay }: Props): JSX.Element {
         }
       />
 
-      <nav aria-label={t('nav.label')} className="flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto px-2 pb-2">
+      <nav ref={navRef} aria-label={t('nav.label')} className="flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto px-2 pb-2">
         {NAV_MAIN.map((s) => (
           <NavItem key={s.id} section={s} />
         ))}
