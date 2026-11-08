@@ -68,6 +68,17 @@ interface RawInfo {
   entries?: RawInfo[]
   playlist_count?: number
   subtitles?: Record<string, unknown>
+  automatic_captions?: Record<string, unknown>
+}
+
+/** What the engine lists among subtitles that nobody could read as subtitles: a stream's chat, say. */
+const NOT_SUBTITLES = /^(live_chat|rechat|danmaku|comments?)$/i
+
+/** The language codes in the engine's subtitle map. Bounded, because the map is the site's data. */
+export function subtitleCodes(map: Record<string, unknown> | undefined): string[] {
+  return Object.keys(map || {})
+    .filter((code) => !NOT_SUBTITLES.test(code))
+    .slice(0, 200)
 }
 
 export type StageReporter = (stage: DetectStage) => void
@@ -758,7 +769,8 @@ async function probeWithEngine(
     isLive: Boolean(primary.is_live),
     viewCount: primary.view_count,
     formats,
-    subtitleLanguages: Object.keys(primary.subtitles || {}).slice(0, 24),
+    subtitleLanguages: subtitleCodes(primary.subtitles),
+    autoCaptionLanguages: subtitleCodes(primary.automatic_captions),
     isPlaylist,
     playlistCount: isPlaylist ? raw.playlist_count || raw.entries?.length : undefined
   }

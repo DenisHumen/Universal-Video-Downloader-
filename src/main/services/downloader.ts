@@ -56,6 +56,7 @@ import { isAbsoluteUrl, normalizeUrl } from '@shared/urls'
 import { infoKey, isStaleInfoError } from './info-cache'
 import { infoCache } from './info-store'
 import { numberedName } from '@shared/playlist'
+import { cleanLanguages } from '@shared/languages'
 import { browserCookiesFile } from './browser-logins'
 import { hasTrim } from '@shared/types'
 import type {
@@ -619,12 +620,26 @@ export function buildArgs(
   args.push(...playlistTagArgs(item.playlist, settings.embedMetadata))
   if (settings.embedThumbnail) args.push('--embed-thumbnail')
   if (settings.embedChapters && item.mode === 'video') args.push('--embed-chapters')
-  const subLangs = settings.subtitleLanguages.trim() || 'all'
-  if (settings.embedSubtitles && item.mode === 'video') {
-    args.push('--embed-subs', '--sub-langs', subLangs)
+  /*
+    Languages picked on the card outrank the Settings list, and work with those
+    settings off, which is what they are for: nothing was fetched by default,
+    however many tracks the card said there were. They go inside the file, unless
+    Settings asks for files beside the video.
+  */
+  const picked = item.mode === 'video' && item.subtitles?.length ? item.subtitles : undefined
+  const subLangs = picked?.join(',') ?? (settings.subtitleLanguages.trim() || 'all')
+  /*
+    Machine-made captions count as subtitles to a person: a video with nothing
+    else came down with none, embedded, while the Settings row promised them.
+    Never for "all", though. On YouTube that is every language it can translate
+    to, which is a hundred and fifty requests, and it answers those with a 429.
+  */
+  const autoSubs = /(^|,)\s*all\s*(,|$)/i.test(subLangs) ? [] : ['--write-auto-subs']
+  if (item.mode === 'video' && (settings.embedSubtitles || (picked && !settings.writeSubtitles))) {
+    args.push('--embed-subs', ...autoSubs, '--sub-langs', subLangs)
   }
   if (settings.writeSubtitles) {
-    args.push('--write-subs', '--write-auto-subs', '--sub-langs', subLangs, '--convert-subs', 'srt')
+    args.push('--write-subs', ...autoSubs, '--sub-langs', subLangs, '--convert-subs', 'srt')
   }
   if (settings.sponsorBlock && item.mode === 'video') {
     args.push('--sponsorblock-remove', 'sponsor,selfpromo,interaction')
@@ -1621,6 +1636,7 @@ export async function startDownload(request: DownloadRequest): Promise<DownloadI
     duration: req.duration,
     extractor: req.extractor,
     playlist: normalisePlaylist(req.playlist),
+    subtitles: cleanLanguages(req.subtitles),
     state: 'queued',
     percent: 0,
     attempts: 0,

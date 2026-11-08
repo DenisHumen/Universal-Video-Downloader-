@@ -1,7 +1,7 @@
 import { EventEmitter } from 'events'
 import { PassThrough } from 'stream'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { detect, flattenEntries, playlistEntries, universalCanHelp } from './detector'
+import { detect, flattenEntries, playlistEntries, subtitleCodes, universalCanHelp } from './detector'
 import { describeNetError } from '../resolvers/neterror'
 
 /*
@@ -295,6 +295,13 @@ describe('detect, listing a collection', () => {
     const result = await detect(link, undefined, undefined, { playlistEnd: 1000 })
     expect(result.ok).toBe(false)
     expect(spawn).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe('subtitleCodes', () => {
+  it('lists languages, not a stream chat', () => {
+    expect(subtitleCodes({ en: [], live_chat: [], 'zh-Hans': [] })).toEqual(['en', 'zh-Hans'])
+    expect(subtitleCodes(undefined)).toEqual([])
   })
 })
 

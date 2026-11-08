@@ -123,6 +123,7 @@ function fakeInfo(url: string): MediaInfo {
     isLive: false,
     viewCount: 1234567,
     subtitleLanguages: ['en', 'ru', 'de'],
+    autoCaptionLanguages: ['en-orig', 'en', 'ru', 'fr', 'ja', 'es-419'],
     formats: [
       { id: '137', ext: 'mp4', kind: 'video', resolution: '1080p', height: 1080, vcodec: 'avc1' },
       {
@@ -376,6 +377,7 @@ export function installMockApi(): void {
         mode: req.mode,
         quality: req.quality,
         playlist: req.playlist,
+        subtitles: req.subtitles,
         state: 'queued',
         percent: 0,
         outputDir: req.outputDir || settings.downloadDir,

@@ -18,6 +18,7 @@ import { useT, useTp } from '../../i18n'
 import { ActionRow, ComboRow, ExpanderRow, PreferencesGroup, SegmentedControl, cx } from '../../ui'
 import Thumbnail from '../../components/Thumbnail'
 import TrimEditor from '../../components/TrimEditor'
+import SubtitlesRow from './SubtitlesRow'
 
 export interface Selection {
   mode: DownloadMode
@@ -38,6 +39,8 @@ export interface ResultChoice {
   section: TrimRange
   /** Re-encode for an exact cut, or copy the stream and land on a keyframe. */
   precise: boolean
+  /** Languages picked on the card; absent leaves it to Settings. */
+  subtitles?: string[]
 }
 
 export const AUDIO_FORMATS = ['mp3', 'm4a', 'opus', 'flac', 'wav', 'aac']
@@ -264,6 +267,14 @@ export default function VideoResult({
               })}
             </div>
           </ExpanderRow>
+        )}
+        {mode === 'video' && (
+          <SubtitlesRow
+            info={info}
+            settings={settings}
+            value={choice.subtitles}
+            onChange={(subtitles) => onChoice({ ...choice, subtitles })}
+          />
         )}
         {/*
           A live stream has no end, so it has no section to cut out of it. The

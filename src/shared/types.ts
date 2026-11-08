@@ -66,8 +66,10 @@ export interface MediaInfo {
   downloadUrl?: string
   /** The stream was found by the universal resolver rather than the engine. */
   viaUniversal?: boolean
-  /** Subtitle languages the engine reported for this video. */
+  /** Subtitle languages the engine reported for this video: the ones people wrote. */
   subtitleLanguages?: string[]
+  /** Machine-made captions on offer. On YouTube this is every language it can translate to. */
+  autoCaptionLanguages?: string[]
 }
 
 export interface PlaylistEntry {
@@ -287,6 +289,8 @@ export interface DownloadRequest {
   targetHeight?: number
   /** Picked from a playlist or channel: its number, its folder, its track tag. */
   playlist?: PlaylistPlace
+  /** Subtitles picked for this video, by language code, over what Settings says. */
+  subtitles?: string[]
 }
 
 /** What ffmpeg found inside a local file. */
@@ -370,6 +374,8 @@ export interface DownloadItem {
   /** The height this download resolves to, when it was known at queue time. */
   targetHeight?: number
   playlist?: PlaylistPlace
+  /** Kept with the row, so a pause, a retry or a restart fetches what was picked. */
+  subtitles?: string[]
   state: DownloadState
   percent: number
   speed?: number

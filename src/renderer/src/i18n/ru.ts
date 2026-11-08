@@ -362,6 +362,13 @@ export const ru: Dictionary = {
   'format.exactStreamTitle': 'Другие варианты файла',
   'format.streams': '{count} вариант|{count} варианта|{count} вариантов',
   'format.plusAudio': '+ звук',
+  'format.subtitlesTitle': 'Субтитры',
+  'format.subtitlesNone': 'Нет. Выберите язык, чтобы добавить их в видео',
+  'format.subtitlesSettings': 'Как в настройках: {languages}',
+  'format.subtitlesFromSite': 'С сайта',
+  'format.subtitlesAutomatic': 'Автоматические',
+  'lang.original': '{language} (оригинал)',
+  'lang.described': '{language} (с описанием происходящего)',
   'format.upTo': 'До {height}p',
   'format.youGet': 'Получится',
   'format.subtitles':

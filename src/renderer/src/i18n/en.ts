@@ -373,6 +373,13 @@ export const en = {
   'format.plusAudio': '+ Audio',
   'format.upTo': 'Up to {height}p',
   'format.subtitles': '{count} subtitle track|{count} subtitle tracks',
+  'format.subtitlesTitle': 'Subtitles',
+  'format.subtitlesNone': 'None. Pick a language to add them to the video',
+  'format.subtitlesSettings': 'As in Settings: {languages}',
+  'format.subtitlesFromSite': 'From the Site',
+  'format.subtitlesAutomatic': 'Automatic Captions',
+  'lang.original': '{language} (original)',
+  'lang.described': '{language} (audio description)',
   'format.youGet': 'You get',
 
   // ---- search ----

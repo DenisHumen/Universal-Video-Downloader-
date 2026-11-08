@@ -200,7 +200,8 @@ export default function HomeView(): JSX.Element {
         outputDir: saveDir || undefined,
         // Only when a video is fetched: a cut left set in audio mode is not applied.
         section: cutting ? choice.section : undefined,
-        preciseSection: choice.precise
+        preciseSection: choice.precise,
+        subtitles: selection.mode === 'video' ? choice.subtitles : undefined
       })
     } finally {
       setStarting(false)

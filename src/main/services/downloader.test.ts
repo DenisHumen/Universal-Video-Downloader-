@@ -56,6 +56,56 @@ function settings(overrides: Partial<AppSettings> = {}): AppSettings {
   }
 }
 
+describe('buildArgs: subtitles', () => {
+  const langs = (args: string[]): string[] =>
+    args.flatMap((a, i) => (a === '--sub-langs' ? [args[i + 1]] : []))
+
+  it('asks for nothing by default', () => {
+    const args = buildArgs(item(), settings(), '/tmp')
+    expect(args).not.toContain('--embed-subs')
+    expect(args).not.toContain('--write-subs')
+  })
+
+  it('embeds languages picked on the card, machine-made ones included, with the settings off', () => {
+    const args = buildArgs(item({ subtitles: ['ru', 'en-orig'] }), settings(), '/tmp')
+    expect(args).toContain('--embed-subs')
+    expect(args).toContain('--write-auto-subs')
+    expect(langs(args)).toEqual(['ru,en-orig'])
+    expect(args).not.toContain('--write-subs')
+  })
+
+  it('picked languages outrank the Settings list', () => {
+    const args = buildArgs(item({ subtitles: ['de'] }), settings({ embedSubtitles: true, subtitleLanguages: 'en' }), '/tmp')
+    expect(langs(args)).toEqual(['de'])
+  })
+
+  it('leaves them beside the video when Settings asks for that, and only then', () => {
+    const args = buildArgs(item({ subtitles: ['de'] }), settings({ writeSubtitles: true }), '/tmp')
+    expect(args).toContain('--write-subs')
+    expect(args).not.toContain('--embed-subs')
+    expect(langs(args)).toEqual(['de'])
+  })
+
+  it('does not embed in an audio download', () => {
+    const args = buildArgs(item({ mode: 'audio', subtitles: ['de'] }), settings(), '/tmp')
+    expect(args).not.toContain('--embed-subs')
+    expect(args).not.toContain('--sub-langs')
+  })
+
+  it('embedding from Settings takes machine-made captions too', () => {
+    const args = buildArgs(item(), settings({ embedSubtitles: true, subtitleLanguages: 'en,ru' }), '/tmp')
+    expect(args).toContain('--write-auto-subs')
+  })
+
+  // Every language YouTube can translate to, in one go, is a 429.
+  it('never asks for machine-made captions in every language', () => {
+    for (const subtitleLanguages of ['', 'all', 'en,all']) {
+      const args = buildArgs(item(), settings({ embedSubtitles: true, writeSubtitles: true, subtitleLanguages }), '/tmp')
+      expect(args).not.toContain('--write-auto-subs')
+    }
+  })
+})
+
 function item(overrides: Partial<DownloadItem> = {}): DownloadItem {
   return {
     id: 'id-1',
