@@ -13,6 +13,7 @@ import { useT } from '../i18n'
 import { toast } from '../lib/toast'
 import { viewQueueAction } from '../lib/queue'
 import { describeError } from '../lib/errors'
+import { clipTitle, convertedTitle } from '../lib/jobTitle'
 import TrimEditor from './TrimEditor'
 import Choice from './Choice'
 import Dialog from '../ui/Dialog'
@@ -87,6 +88,7 @@ export default function MediaJobModal({ item, mode, onClose }: Props): JSX.Eleme
       if (mode === 'trim') {
         await window.api.startMediaJob({
           ...source,
+          title: clipTitle(t, item.title, range),
           kind: 'trim',
           range,
           precise
@@ -99,6 +101,7 @@ export default function MediaJobModal({ item, mode, onClose }: Props): JSX.Eleme
         }
         await window.api.startMediaJob({
           ...source,
+          title: convertedTitle(item.title, target),
           kind: 'convert',
           target
         })

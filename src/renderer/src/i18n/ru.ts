@@ -789,6 +789,8 @@ export const ru: Dictionary = {
   // ---- queue job kinds ----
   'job.trim': 'Обрезка',
   'job.convert': 'Конвертация',
+  'job.clipTitle': '{title} (отрезок {range})',
+  'job.clipTitleOpen': '{title} (отрезок с {start})',
 
   // ---- built-in browser ----
   'browser.open': 'Открыть встроенный браузер',

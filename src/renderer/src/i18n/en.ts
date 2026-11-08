@@ -797,6 +797,8 @@ export const en = {
   // ---- queue job kinds ----
   'job.trim': 'Trimming',
   'job.convert': 'Converting',
+  'job.clipTitle': '{title} (clip {range})',
+  'job.clipTitleOpen': '{title} (clip from {start})',
 
   // ---- built-in browser ----
   'browser.open': 'Open the Built-in Browser',

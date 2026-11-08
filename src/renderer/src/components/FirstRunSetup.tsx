@@ -83,7 +83,8 @@ function Steps({ settings, onClose }: { settings: AppSettings; onClose: () => vo
               {t('setup.skipAll')}
             </button>
           )}
-          <button type="button" className="btn-solid" onClick={next} data-uvd="setup-next">
+          {/* Focus starts here: left to the dialog it landed on Change…, and Enter opened a folder picker. */}
+          <button type="button" className="btn-solid" onClick={next} data-uvd="setup-next" data-autofocus>
             {last ? t('setup.done') : t('setup.next')}
           </button>
         </>
