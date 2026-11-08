@@ -56,6 +56,104 @@ function settings(overrides: Partial<AppSettings> = {}): AppSettings {
   }
 }
 
+describe('buildArgs: waiting for a video', () => {
+  it('asks the engine to wait, only when told to', () => {
+    const args = buildArgs(item({ waitForVideo: true }), settings(), '/tmp')
+    expect(args[args.indexOf('--wait-for-video') + 1]).toMatch(/^\d+-\d+$/)
+    expect(buildArgs(item(), settings(), '/tmp')).not.toContain('--wait-for-video')
+  })
+})
+
+describe('buildArgs: audio language', () => {
+  const format = (args: string[]): string => args[args.indexOf('-f') + 1]
+
+  // These are the selectors run through the real engine with --simulate.
+  it('asks for the language first, and falls back to the plain choice', () => {
+    expect(format(buildArgs(item({ quality: '720', audioLanguage: 'de' }), settings(), '/tmp'))).toBe(
+      'bv[height<=?720]+ba[language=de]/b[height<=?720][language=de]/bv+ba[language=de]/' +
+        'bv*[height<=?720]+ba/b[height<=?720]/bv*+ba/b'
+    )
+    expect(format(buildArgs(item({ quality: 'best', audioLanguage: 'es-419' }), settings(), '/tmp'))).toBe(
+      'bv+ba[language=es-419]/b[language=es-419]/bv*+ba/b'
+    )
+  })
+
+  it('never lets a format with sound of its own take the place of the language', () => {
+    const selector = format(buildArgs(item({ quality: '360', audioLanguage: 'de' }), settings(), '/tmp'))
+    const beforeFallback = selector.split('/bv*')[0]
+    expect(beforeFallback).not.toContain('bv*')
+  })
+
+  it('works on an exact format and on an audio download', () => {
+    expect(format(buildArgs(item({ formatId: '137', audioLanguage: 'de' }), settings(), '/tmp'))).toBe(
+      '137+ba[language=de]/137+bestaudio/137/best'
+    )
+    expect(format(buildArgs(item({ mode: 'audio', audioLanguage: 'de' }), settings(), '/tmp'))).toBe(
+      'ba[language=de]/bestaudio/best'
+    )
+  })
+
+  it('leaves every selector as it was without one', () => {
+    expect(format(buildArgs(item({ quality: 'best' }), settings(), '/tmp'))).toBe('bv*+ba/b')
+    expect(format(buildArgs(item({ mode: 'audio' }), settings(), '/tmp'))).toBe('bestaudio/best')
+  })
+
+  it('names the file after the track, so two languages are two files', () => {
+    const args = buildArgs(item({ audioLanguage: 'de' }), settings(), '/tmp')
+    expect(args[args.indexOf('-o') + 1]).toContain(' [de].%(ext)s')
+  })
+})
+
+describe('buildArgs: subtitles', () => {
+  const langs = (args: string[]): string[] =>
+    args.flatMap((a, i) => (a === '--sub-langs' ? [args[i + 1]] : []))
+
+  it('asks for nothing by default', () => {
+    const args = buildArgs(item(), settings(), '/tmp')
+    expect(args).not.toContain('--embed-subs')
+    expect(args).not.toContain('--write-subs')
+  })
+
+  it('embeds languages picked on the card, machine-made ones included, with the settings off', () => {
+    const args = buildArgs(item({ subtitles: ['ru', 'en-orig'] }), settings(), '/tmp')
+    expect(args).toContain('--embed-subs')
+    expect(args).toContain('--write-auto-subs')
+    expect(langs(args)).toEqual(['ru,en-orig'])
+    expect(args).not.toContain('--write-subs')
+  })
+
+  it('picked languages outrank the Settings list', () => {
+    const args = buildArgs(item({ subtitles: ['de'] }), settings({ embedSubtitles: true, subtitleLanguages: 'en' }), '/tmp')
+    expect(langs(args)).toEqual(['de'])
+  })
+
+  it('leaves them beside the video when Settings asks for that, and only then', () => {
+    const args = buildArgs(item({ subtitles: ['de'] }), settings({ writeSubtitles: true }), '/tmp')
+    expect(args).toContain('--write-subs')
+    expect(args).not.toContain('--embed-subs')
+    expect(langs(args)).toEqual(['de'])
+  })
+
+  it('does not embed in an audio download', () => {
+    const args = buildArgs(item({ mode: 'audio', subtitles: ['de'] }), settings(), '/tmp')
+    expect(args).not.toContain('--embed-subs')
+    expect(args).not.toContain('--sub-langs')
+  })
+
+  it('embedding from Settings takes machine-made captions too', () => {
+    const args = buildArgs(item(), settings({ embedSubtitles: true, subtitleLanguages: 'en,ru' }), '/tmp')
+    expect(args).toContain('--write-auto-subs')
+  })
+
+  // Every language YouTube can translate to, in one go, is a 429.
+  it('never asks for machine-made captions in every language', () => {
+    for (const subtitleLanguages of ['', 'all', 'en,all']) {
+      const args = buildArgs(item(), settings({ embedSubtitles: true, writeSubtitles: true, subtitleLanguages }), '/tmp')
+      expect(args).not.toContain('--write-auto-subs')
+    }
+  })
+})
+
 function item(overrides: Partial<DownloadItem> = {}): DownloadItem {
   return {
     id: 'id-1',

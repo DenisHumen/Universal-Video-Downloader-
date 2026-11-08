@@ -1,14 +1,18 @@
-import { useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { Check, Loader2 } from '../ui/icons'
-import type { DownloadMode, MediaInfo, PlaylistEntry, QualityPreset } from '@shared/types'
+import type { DetectResult, DownloadMode, MediaInfo, PlaylistEntry, QualityPreset } from '@shared/types'
+import { deeperListing } from '@shared/playlist'
 import Choice from './Choice'
+import ConfirmDialog from './ConfirmDialog'
 import SaveLocation from './SaveLocation'
 import { useLibraryHits } from '../lib/libraryHits'
 import { placeEntries } from '../lib/playlist'
 import { initialMode, initialQuality } from '../lib/quality'
 import { queueDownloads } from '../lib/queue'
+import { describeError } from '../lib/errors'
+import { toast } from '../lib/toast'
 import { useT, useTp } from '../i18n'
-import { useStore } from '../store'
+import { detectCache, useStore } from '../store'
 
 interface Props {
   info: MediaInfo
@@ -25,8 +29,11 @@ const VIEWPORT_HEIGHT = 224
 /** Rows built past each edge, so a flick doesn't reveal blank space. */
 const OVERSCAN = 6
 
+/** Above this many, "Download All" asks first: one click is otherwise a whole channel in the queue. */
+export const CONFIRM_ALL_ABOVE = 50
+
 /** A channel or playlist: pick a format once, then choose what to take. */
-export default function PlaylistCard({ info, onDone, saveDir, onSaveDirChange }: Props): JSX.Element {
+export default function PlaylistCard({ info: detected, onDone, saveDir, onSaveDirChange }: Props): JSX.Element {
   const t = useT()
   const tp = useTp()
   const settings = useStore((s) => s.settings)
@@ -45,9 +52,59 @@ export default function PlaylistCard({ info, onDone, saveDir, onSaveDirChange }:
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [rangeFrom, setRangeFrom] = useState('1')
   const [rangeTo, setRangeTo] = useState('')
+  const [confirmAll, setConfirmAll] = useState(false)
+
+  /*
+    What "Load More" found, for as long as the card is on the list it was asked
+    about. The selection is by URL, so it needs nothing doing: every link still
+    in the longer list stays ticked.
+  */
+  const [deeper, setDeeper] = useState<{ from: MediaInfo; info: MediaInfo } | null>(null)
+  const info = deeper?.from === detected ? deeper.info : detected
+  const moreRequest = useRef<string | null>(null)
+  const [loadingMore, setLoadingMore] = useState(false)
 
   const entries = useMemo(() => info.entries || [], [info.entries])
   const kept = useLibraryHits(useMemo(() => entries.map((e) => e.url), [entries]))
+  const nextDepth = info.listingCut ? deeperListing(info.listingCut) : null
+
+  const stopLoadingMore = (): void => {
+    if (moreRequest.current) void window.api.cancelDetect(moreRequest.current)
+    moreRequest.current = null
+    setLoadingMore(false)
+  }
+  // Leaving the card leaves no engine listing a channel behind it.
+  useEffect(
+    () => () => {
+      if (moreRequest.current) void window.api.cancelDetect(moreRequest.current)
+      moreRequest.current = null
+    },
+    []
+  )
+
+  const loadMore = async (): Promise<void> => {
+    if (!nextDepth) return
+    const requestId = `more-${Date.now()}-${Math.random().toString(36).slice(2)}`
+    moreRequest.current = requestId
+    setLoadingMore(true)
+    // Straight to main: the cache holds the shorter list this is asking past.
+    const res: DetectResult = await window.api
+      .detect(info.originalUrl, requestId, { playlistEnd: nextDepth })
+      .catch((err: unknown) => ({ ok: false, error: describeError(err) }))
+    if (moreRequest.current !== requestId) return
+    moreRequest.current = null
+    setLoadingMore(false)
+    const found = res.ok ? res.info : undefined
+    // Never a shorter list than the one on screen: that is the site having a bad moment.
+    if (!found?.entries || found.entries.length < entries.length) {
+      toast(t('playlist.loadMoreFailed'), 'error')
+      return
+    }
+    if (found.entries.length === entries.length) toast(t('playlist.wholeList'), 'info')
+    setDeeper({ from: detected, info: found })
+    // Coming back to this link within the cache's few minutes finds the longer list.
+    detectCache.set(info.originalUrl, res)
+  }
 
   /*
     Only the rows on screen are built.
@@ -275,6 +332,25 @@ export default function PlaylistCard({ info, onDone, saveDir, onSaveDirChange }:
               </ul>
             </div>
           </div>
+
+          {/* Before the buttons that act on the list: "Download All" means what is listed here. */}
+          {info.listingCut && (
+            <div className="mt-2 flex flex-wrap items-center justify-between gap-2" role="status">
+              <p className="hint min-w-0 flex-1">
+                {t(nextDepth ? 'playlist.cut' : 'playlist.cutDeepest', { count: entries.length })}
+              </p>
+              {nextDepth &&
+                (loadingMore ? (
+                  <button className="btn-quiet px-3 py-1.5" onClick={stopLoadingMore}>
+                    <Loader2 size={14} className="animate-spin" /> {t('common.cancel')}
+                  </button>
+                ) : (
+                  <button className="btn-quiet px-3 py-1.5" onClick={() => void loadMore()}>
+                    {t('playlist.loadMore')}
+                  </button>
+                ))}
+            </div>
+          )}
         </div>
 
         <div className="space-y-1 border-t border-edge pt-4">
@@ -307,7 +383,7 @@ export default function PlaylistCard({ info, onDone, saveDir, onSaveDirChange }:
           )}
           <button
             className={`${chosen.length ? 'btn-quiet' : 'btn-solid'} flex-1 py-3`}
-            onClick={() => run(entries)}
+            onClick={() => (entries.length > CONFIRM_ALL_ABOVE ? setConfirmAll(true) : void run(entries))}
             disabled={busy}
           >
             {busy && !chosen.length ? <Loader2 size={15} className="animate-spin" /> : null}
@@ -315,12 +391,24 @@ export default function PlaylistCard({ info, onDone, saveDir, onSaveDirChange }:
           </button>
         </div>
       </div>
+      {confirmAll && (
+        <ConfirmDialog
+          title={t('playlist.confirmAll', { count: entries.length })}
+          body={t('playlist.confirmAllBody', { count: entries.length })}
+          confirmLabel={t('playlist.downloadAll', { count: entries.length })}
+          onConfirm={() => {
+            setConfirmAll(false)
+            void run(entries)
+          }}
+          onCancel={() => setConfirmAll(false)}
+        />
+      )}
     </div>
   )
 }
 
 /** A yes/no about how the files land, drawn like the entries' own check boxes above it. */
-function LayoutOption({
+export function LayoutOption({
   on,
   onChange,
   label,

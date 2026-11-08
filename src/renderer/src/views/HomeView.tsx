@@ -201,7 +201,9 @@ export default function HomeView(): JSX.Element {
         outputDir: saveDir || undefined,
         // Only when a video is fetched: a cut left set in audio mode is not applied.
         section: cutting ? choice.section : undefined,
-        preciseSection: choice.precise
+        preciseSection: choice.precise,
+        subtitles: selection.mode === 'video' ? choice.subtitles : undefined,
+        audioLanguage: choice.audioLanguage
       })
     } finally {
       setStarting(false)
@@ -265,6 +267,35 @@ export default function HomeView(): JSX.Element {
     const target = det.detectedUrl || url.trim()
     if (!target) return
     const ok = await queueDownload({ url: target, title: target, mode: 'audio', quality: 'audio', outputDir: saveDir || undefined })
+    if (ok) reset()
+  }
+
+  /*
+    The title and poster the site gave ahead of the detect. The detect failing
+    clears them from the store, and they are all a row waiting for a premiere
+    will have to go by, since the engine has told nobody anything yet.
+  */
+  const lastPreview = useRef(detectPreview)
+  useEffect(() => {
+    if (detectPreview) lastPreview.current = detectPreview
+  }, [detectPreview])
+
+  /** The "Wait and Download" fix: it has not started, so there is no format list to choose from. */
+  const waitForVideo = async (): Promise<void> => {
+    const target = det.detectedUrl || url.trim()
+    if (!target || !settings) return
+    const preview = lastPreview.current?.url === target ? lastPreview.current : null
+    const ytId = youtubeIdOf(target)
+    const mode = initialMode(settings)
+    const ok = await queueDownload({
+      url: target,
+      title: preview?.title || target,
+      thumbnail: preview?.thumbnail ?? (ytId ? `https://i.ytimg.com/vi/${ytId}/mqdefault.jpg` : undefined),
+      mode,
+      quality: mode === 'audio' ? 'audio' : initialQuality(settings),
+      outputDir: saveDir || undefined,
+      waitForVideo: true
+    })
     if (ok) reset()
   }
 
@@ -383,6 +414,7 @@ export default function HomeView(): JSX.Element {
             onDownload={() => void start()}
             onRetry={() => submit()}
             onAudioOnly={() => void downloadAudioOnly()}
+            onWaitForVideo={() => void waitForVideo()}
             onDone={det.dropInfo}
             starting={starting}
           />

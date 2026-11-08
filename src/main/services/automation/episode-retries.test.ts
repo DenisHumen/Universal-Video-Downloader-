@@ -129,7 +129,7 @@ vi.mock('../downloader', async () => {
         mode: req.mode,
         state: 'queued',
         percent: 0,
-        outputDir: h.dir,
+        outputDir: req.outputDir ?? h.dir,
         createdAt: 0
       }
       h.items.set(id, item)
@@ -425,6 +425,12 @@ describe('an episode that fails', () => {
   })
 
   // The row in Downloads kept the name the file was downloaded under, so Play did nothing.
+  it("saves into the watch's own folder, when it has one", async () => {
+    m.store.updateWatch('w1', { outputDir: join(h.dir, 'series') })
+    await check()
+    expect((h.items.get('d1') as DownloadItem).outputDir).toBe(join(h.dir, 'series'))
+  })
+
   it('points the queue row at the renamed file', async () => {
     m.store.updateWatch('w1', {
       steps: [

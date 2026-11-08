@@ -4,6 +4,7 @@ import {
   Check,
   Download,
   ExternalLink,
+  Folder,
   FolderUp,
   Loader2,
   Pencil,
@@ -36,9 +37,11 @@ import { RUN_LABEL, STEP_LABEL } from '../lib/automationLabels'
 import {
   attemptsAt,
   byStepOrder,
+  duplicateAfterEdit,
   MAX_ATTEMPTS,
   STEP_ORDER,
   upcomingDelayMinutes,
+  WATCH_QUALITIES,
   watchFailing,
   type PipelineStep,
   type Run,
@@ -240,6 +243,23 @@ export default function AutomationView(): JSX.Element {
     await refresh()
   }
 
+  const qualityLabel = (q: string): string => (q === 'best' ? t('common.best') : q)
+
+  /* Refused with a reason: two watches of one series, dub and quality fetch every episode twice. */
+  const changeQuality = async (quality: string): Promise<void> => {
+    if (!selected) return
+    if (duplicateAfterEdit(watches, selected.id, { quality })) {
+      toast(t('auto.qualityTaken', { quality: qualityLabel(quality) }), 'error')
+      return
+    }
+    await patch({ quality })
+  }
+
+  const chooseFolder = async (): Promise<void> => {
+    const dir = await window.api.chooseDirectory()
+    if (dir) await patch({ outputDir: dir })
+  }
+
   const checkNow = async (): Promise<void> => {
     if (!selected) return
     const id = selected.id
@@ -421,6 +441,31 @@ export default function AutomationView(): JSX.Element {
                   value={String(selected.intervalMinutes)}
                   onChange={(v) => void patch({ intervalMinutes: Number(v) })}
                   options={[15, 30, 60, 180, 360, 720, 1440].map((n) => ({ value: String(n), label: every(n, t) }))}
+                />
+                <ComboRow
+                  title={t('common.quality')}
+                  subtitle={t('auto.nextEpisodes')}
+                  value={selected.quality}
+                  onChange={(v) => void changeQuality(v)}
+                  // A quality the site listed when the watch was made stays on offer until it is changed.
+                  options={[...new Set([...WATCH_QUALITIES, selected.quality])].map((q) => ({ value: q, label: qualityLabel(q) }))}
+                />
+                <ActionRow
+                  title={t('home.saveTo')}
+                  subtitle={<span title={selected.outputDir || settings?.downloadDir}>{selected.outputDir || settings?.downloadDir}</span>}
+                  monoSubtitle
+                  suffix={
+                    <>
+                      {selected.outputDir && (
+                        <button type="button" className="btn-quiet" onClick={() => void patch({ outputDir: undefined })}>
+                          {t('home.saveDefault')}
+                        </button>
+                      )}
+                      <button type="button" className="btn-quiet" onClick={() => void chooseFolder()}>
+                        <Folder size={14} /> {t('common.change')}
+                      </button>
+                    </>
+                  }
                 />
                 {selected.lastError && (
                   <ActionRow

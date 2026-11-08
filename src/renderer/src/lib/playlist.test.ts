@@ -1,6 +1,23 @@
 import { describe, expect, it } from 'vitest'
 import type { PlaylistEntry } from '@shared/types'
-import { latestEpisode, placeEntries } from './playlist'
+import { latestEpisode, placeEntries, placeEpisode } from './playlist'
+
+describe('placeEpisode', () => {
+  it('files an episode under the series, by its own number, never numbering the name', () => {
+    expect(placeEpisode('Show', 5, [1, 2, 3, 12], true)).toEqual({
+      title: 'Show',
+      index: 5,
+      count: 12,
+      folder: true,
+      numbered: false
+    })
+  })
+
+  it('keeps a special or a half episode in the folder, as place zero', () => {
+    expect(placeEpisode('Show', 0, [0, 1, 2], true)).toMatchObject({ index: 0, count: 2, folder: true })
+    expect(placeEpisode('Show', 12.5, [12, 12.5], true)).toMatchObject({ index: 0, count: 12, folder: true })
+  })
+})
 
 const entries: PlaylistEntry[] = Array.from({ length: 12 }, (_, i) => ({
   url: `https://site/v${i + 1}`,

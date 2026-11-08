@@ -1,7 +1,7 @@
 import { EventEmitter } from 'events'
 import { PassThrough } from 'stream'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { detect, flattenEntries, playlistEntries, universalCanHelp } from './detector'
+import { detect, flattenEntries, playlistEntries, subtitleCodes, universalCanHelp } from './detector'
 import { describeNetError } from '../resolvers/neterror'
 
 /*
@@ -243,6 +243,65 @@ describe('detect, keeping the answer for the download', () => {
     )
     await detect('https://www.youtube.com/watch?v=listlistlis')
     expect(putInfo).not.toHaveBeenCalled()
+  })
+})
+
+describe('detect, listing a collection', () => {
+  // What the settings mock at the top of this file says.
+  const settingsLimit = 500
+  function listing(count: number): EventEmitter {
+    const child = Object.assign(new EventEmitter(), { stdout: new PassThrough(), stderr: new PassThrough() })
+    child.stdout.write(
+      JSON.stringify({
+        _type: 'playlist',
+        id: 'PL',
+        title: 'List',
+        // The count is no help: as here, it often only says what was listed.
+        playlist_count: count,
+        entries: Array.from({ length: count }, (_, i) => ({ url: `https://www.youtube.com/watch?v=${i}`, title: `V${i}` }))
+      })
+    )
+    setImmediate(() => child.emit('close', 0))
+    return child
+  }
+  const link = 'https://www.youtube.com/playlist?list=PLabc'
+  const endOf = (args: string[]): string => args[args.indexOf('--playlist-end') + 1]
+
+  it('says when the list reached the depth from the settings', async () => {
+    spawn.mockImplementationOnce(() => listing(settingsLimit))
+    const result = await detect(link)
+    expect(endOf(spawn.mock.calls[0][1])).toBe(String(settingsLimit))
+    expect(result.info?.listingCut).toBe(settingsLimit)
+  })
+
+  it('says nothing about a list that ended before it', async () => {
+    spawn.mockImplementationOnce(() => listing(settingsLimit - 1))
+    const result = await detect(link)
+    expect(result.info?.listingCut).toBeUndefined()
+  })
+
+  it('lists deeper when asked to, and refuses a depth that is not a number', async () => {
+    spawn.mockImplementationOnce(() => listing(5))
+    await detect(link, undefined, undefined, { playlistEnd: 1000 })
+    expect(endOf(spawn.mock.calls[0][1])).toBe('1000')
+    spawn.mockClear()
+    spawn.mockImplementationOnce(() => listing(5))
+    await detect(link, undefined, undefined, { playlistEnd: '--exec' as unknown as number })
+    expect(endOf(spawn.mock.calls[0][1])).toBe(String(settingsLimit))
+  })
+
+  it('fails a deeper listing outright, rather than probing the link as one video', async () => {
+    spawn.mockImplementationOnce(() => engine('ERROR: boom\n'))
+    const result = await detect(link, undefined, undefined, { playlistEnd: 1000 })
+    expect(result.ok).toBe(false)
+    expect(spawn).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe('subtitleCodes', () => {
+  it('lists languages, not a stream chat', () => {
+    expect(subtitleCodes({ en: [], live_chat: [], 'zh-Hans': [] })).toEqual(['en', 'zh-Hans'])
+    expect(subtitleCodes(undefined)).toEqual([])
   })
 })
 

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+  duplicateAfterEdit,
   exactDuplicate,
   inheritedSeen,
   newEpisodes,
@@ -100,6 +101,33 @@ describe('exactDuplicate', () => {
   it('never counts a waiting watch as a copy', () => {
     const waiting = watch({ pending: true, translatorId: '' })
     expect(exactDuplicate([waiting], watch({ pending: true, translatorId: '' }))).toBeUndefined()
+  })
+})
+
+describe('duplicateAfterEdit', () => {
+  const a = watch({ id: 'a', quality: '720p' })
+  const b = watch({ id: 'b', quality: '1080p' })
+
+  it('refuses a change of quality that lands on another watch', () => {
+    expect(duplicateAfterEdit([a, b], 'a', { quality: '1080p' })?.id).toBe('b')
+  })
+
+  it('takes a spelling of the same height for the same quality', () => {
+    expect(duplicateAfterEdit([a, b], 'a', { quality: '1080' })?.id).toBe('b')
+  })
+
+  it('lets a free quality through, and a watch is no copy of itself', () => {
+    expect(duplicateAfterEdit([a, b], 'a', { quality: '480p' })).toBeUndefined()
+    expect(duplicateAfterEdit([a, b], 'a', { quality: '720p' })).toBeUndefined()
+  })
+
+  it('leaves another dub, a waiting watch and any other change alone', () => {
+    const other = watch({ id: 'c', quality: '480p', translatorId: 'other' })
+    expect(duplicateAfterEdit([a, other], 'a', { quality: '480p' })).toBeUndefined()
+    const waiting = watch({ id: 'd', quality: '360p', pending: true })
+    expect(duplicateAfterEdit([waiting, b], 'd', { quality: '1080p' })).toBeUndefined()
+    const twin = watch({ id: 'e', quality: '720p' })
+    expect(duplicateAfterEdit([a, twin], 'a', { enabled: false })).toBeUndefined()
   })
 })
 

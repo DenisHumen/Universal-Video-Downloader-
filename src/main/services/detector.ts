@@ -7,6 +7,7 @@ import { resolveUniversal, resolveUrl, scrapeStatic, type ResolvedUrl, type Stat
 import { withSignal } from '../resolvers/http'
 import { unreachableCode } from '../resolvers/neterror'
 import { engineKnowsHost, isAbsoluteUrl, looksLikeCollection, normalizeUrl } from '@shared/urls'
+import { cleanListingDepth } from '@shared/playlist'
 import { reportDetectFailure, type DetectVerdict } from './report'
 import { infoKey, infoReusable } from './info-cache'
 import { infoCache } from './info-store'
@@ -41,6 +42,8 @@ export interface RawFormat {
   resolution?: string
   dynamic_range?: string
   protocol?: string
+  language?: string | null
+  language_preference?: number | null
 }
 
 interface RawInfo {
@@ -67,6 +70,17 @@ interface RawInfo {
   entries?: RawInfo[]
   playlist_count?: number
   subtitles?: Record<string, unknown>
+  automatic_captions?: Record<string, unknown>
+}
+
+/** What the engine lists among subtitles that nobody could read as subtitles: a stream's chat, say. */
+const NOT_SUBTITLES = /^(live_chat|rechat|danmaku|comments?)$/i
+
+/** The language codes in the engine's subtitle map. Bounded, because the map is the site's data. */
+export function subtitleCodes(map: Record<string, unknown> | undefined): string[] {
+  return Object.keys(map || {})
+    .filter((code) => !NOT_SUBTITLES.test(code))
+    .slice(0, 200)
 }
 
 export type StageReporter = (stage: DetectStage) => void
@@ -152,7 +166,9 @@ export function mapFormats(formats: RawFormat[] = []): VideoFormat[] {
       filesize: f.filesize,
       filesizeApprox: f.filesize_approx,
       formatNote: f.format_note,
-      dynamicRange: f.dynamic_range
+      dynamicRange: f.dynamic_range,
+      language: f.language || undefined,
+      languagePreference: f.language_preference ?? undefined
     }))
     .sort((a, b) => {
       const kindRank = (k: FormatKind): number => (k === 'video+audio' ? 2 : k === 'video' ? 1 : 0)
@@ -278,10 +294,13 @@ export async function detect(
   // Collections (playlists, channels, sets) expand into a pickable list.
   if (!wasRewritten && looksLikeCollection(url)) {
     onStage('engine')
-    const collection = await probeCollection(url, signal)
+    const depth = cleanListingDepth(options.playlistEnd)
+    const collection = await probeCollection(url, signal, depth)
     if (collection) return { ok: true, info: collection }
     // A canceled listing also comes back as null; don't carry on to the next stage.
     if (signal?.aborted) return canceled()
+    // "Load More" asked for this list. The card is still showing it; a single-video probe answers nothing.
+    if (depth) return { ok: false, error: 'Could not list more of this playlist.' }
   }
 
   onStage(wasRewritten ? 'probing' : 'engine')
@@ -641,8 +660,9 @@ export function flattenEntries(raw: RawInfo[], depth = 0): RawInfo[] {
 const PROBE_SOCKET_TIMEOUT = ['--socket-timeout', '10']
 
 /** Expand a playlist/channel URL into its entries without extracting each one. */
-async function probeCollection(url: string, signal?: AbortSignal): Promise<MediaInfo | null> {
+async function probeCollection(url: string, signal?: AbortSignal, depth?: number): Promise<MediaInfo | null> {
   const settings = getSettings()
+  const limit = depth ?? settings.playlistLimit
   const args = [
     '-J',
     '--flat-playlist',
@@ -653,13 +673,13 @@ async function probeCollection(url: string, signal?: AbortSignal): Promise<Media
     'utf-8',
     ...PROBE_SOCKET_TIMEOUT,
     '--playlist-end',
-    String(settings.playlistLimit),
+    String(limit),
     ...accessArgs(settings, browserCookiesFile()),
     '--',
     url
   ]
-  // Listing a big channel is cheap but not instant — give it room.
-  const result = await spawnJson(args, signal, 120_000)
+  // Listing a big channel is cheap but not instant — give it room, and more the deeper it is asked to go.
+  const result = await spawnJson(args, signal, Math.min(600_000, Math.max(120_000, limit * 120)))
   if (!result.ok) return null
   const raw = result.raw
   // The count is checked after flattening: a channel with one tab is one entry deep.
@@ -667,6 +687,8 @@ async function probeCollection(url: string, signal?: AbortSignal): Promise<Media
 
   const entries = playlistEntries(raw.entries)
   if (entries.length < 2) return null
+  // Before the filtering: an entry with no usable address still counted towards the depth.
+  const cut = flattenEntries(raw.entries).length >= limit
 
   return {
     id: raw.id || 'playlist',
@@ -679,7 +701,8 @@ async function probeCollection(url: string, signal?: AbortSignal): Promise<Media
     formats: [],
     isPlaylist: true,
     playlistCount: raw.playlist_count || entries.length,
-    entries
+    entries,
+    ...(cut ? { listingCut: limit } : {})
   }
 }
 
@@ -749,7 +772,8 @@ async function probeWithEngine(
     isLive: Boolean(primary.is_live),
     viewCount: primary.view_count,
     formats,
-    subtitleLanguages: Object.keys(primary.subtitles || {}).slice(0, 24),
+    subtitleLanguages: subtitleCodes(primary.subtitles),
+    autoCaptionLanguages: subtitleCodes(primary.automatic_captions),
     isPlaylist,
     playlistCount: isPlaylist ? raw.playlist_count || raw.entries?.length : undefined
   }

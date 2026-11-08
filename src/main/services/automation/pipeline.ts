@@ -261,7 +261,8 @@ export async function runEpisode(
       series: seriesTitle,
       thumbnail: watch.thumbnail,
       mode: 'video',
-      quality: watch.quality as never
+      quality: watch.quality as never,
+      outputDir: watch.outputDir
     })
     updateRun(run.id, { downloadId: item.id })
     queueId = item.id

@@ -9,6 +9,21 @@ import type { PlaylistPlace } from './types'
   main will actually write - not a second guess at it that could drift.
 */
 
+/** How deep "Load More" can take a listing. Past the setting's 5000, for the channels that are longer. */
+export const MAX_LISTING_DEPTH = 20_000
+
+/** The next depth to list, or null when the list is already as deep as it goes. */
+export function deeperListing(depth: number): number | null {
+  return depth >= MAX_LISTING_DEPTH ? null : Math.min(MAX_LISTING_DEPTH, depth * 2)
+}
+
+/** A depth from over the bridge, as the engine's command line will trust it; undefined for anything else. */
+export function cleanListingDepth(raw: unknown): number | undefined {
+  return typeof raw === 'number' && Number.isSafeInteger(raw) && raw >= 1
+    ? Math.min(raw, MAX_LISTING_DEPTH)
+    : undefined
+}
+
 /** `07 - `, padded to as many digits as the list is long, so a file manager sorts it in order. */
 export function playlistNumber(index: number, count: number): string {
   return `${String(index).padStart(String(Math.max(count, index)).length, '0')} - `

@@ -26,6 +26,7 @@ describe('fix buttons (6.2): the error code decides the fix', () => {
     ['rateLimited', 'retryLater'],
     ['network', 'proxy'],
     ['timeout', 'proxy'],
+    ['upcoming', 'waitForVideo'],
     ['drm', null]
   ]
   it.each(cases)('%s → %s', (code, fix) => {

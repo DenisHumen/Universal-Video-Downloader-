@@ -6,7 +6,7 @@ import { OpenMenu } from '../ui/icons'
 import { NAV_BOTTOM, NAV_MAIN, type NavSection } from './nav'
 import { WindowControls } from './WindowControls'
 
-const ACTIVE_STATES = ['downloading', 'processing', 'queued', 'paused', 'detecting']
+const ACTIVE_STATES = ['downloading', 'processing', 'queued', 'paused', 'detecting', 'waiting']
 
 interface Props {
   /** The platform, from the preload (appInfo), never `process.platform`: tests render it as each OS. */

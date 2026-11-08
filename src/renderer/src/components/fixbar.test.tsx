@@ -15,6 +15,8 @@ beforeAll(() => {
   q({ id: 'gate', title: 'Members only clip', state: 'error', errorCode: 'signIn', error: 'Sign in to confirm', url: 'https://www.youtube.com/watch?v=gate' })
   q({ id: 'disk', title: 'Too big for the disk', state: 'error', errorCode: 'diskFull', error: 'No space left', url: 'https://www.youtube.com/watch?v=disk' })
   q({ id: 'limit', title: 'Rate limited one', state: 'error', errorCode: 'rateLimited', error: 'HTTP 429', url: 'https://www.youtube.com/watch?v=limit' })
+  q({ id: 'soon', title: 'A premiere', state: 'error', errorCode: 'upcoming', error: 'Premieres in 3 days', url: 'https://www.youtube.com/watch?v=soon' })
+  q({ id: 'held', title: 'Waiting premiere', state: 'waiting', waitForVideo: true, url: 'https://www.youtube.com/watch?v=held' })
   q({ id: 'nofmt', title: 'Podcast with no video', state: 'error', errorCode: 'noSuchFormat', error: 'Requested format is not available', url: 'https://www.youtube.com/watch?v=nofmt' })
 })
 beforeEach(() => useStore.setState({ view: 'downloads' }))
@@ -37,6 +39,27 @@ describe('fix buttons on failed rows (6.2)', () => {
     // And the way to the full settings.
     await act(async () => fireEvent.click(within(r).getByRole('button', { name: 'Sign In or Use Cookies…' })))
     expect(screen.getByRole('menuitem', { name: 'Settings › Access & Cookies…' })).toBeTruthy()
+  })
+
+  it('upcoming: "Wait and Download" re-queues it to wait, and the old row goes', async () => {
+    const r = await row('A premiere')
+    const remove = vi.spyOn(window.api, 'removeDownload')
+    const start = vi.spyOn(window.api, 'startDownload')
+    start.mockClear()
+    await act(async () => fireEvent.click(within(r).getByRole('button', { name: 'Wait and Download' })))
+    await waitFor(() => expect(start).toHaveBeenCalled())
+    expect(remove).toHaveBeenCalledWith('soon')
+    expect(start.mock.calls[0][0]).toMatchObject({ waitForVideo: true })
+  })
+
+  it('a row waiting says so plainly, and can be stopped', async () => {
+    const r = await row('Waiting premiere')
+    expect(within(r).getByText('Waiting to Start')).toBeTruthy()
+    expect(within(r).getByText(/once it starts/)).toBeTruthy()
+    expect(within(r).queryByRole('progressbar')).toBeNull()
+    const cancel = vi.spyOn(window.api, 'cancelDownload')
+    await act(async () => fireEvent.click(within(r).getByRole('button', { name: 'Cancel' })))
+    expect(cancel).toHaveBeenCalledWith('held')
   })
 
   it('diskFull: "Change Folder" re-queues into the folder picked', async () => {

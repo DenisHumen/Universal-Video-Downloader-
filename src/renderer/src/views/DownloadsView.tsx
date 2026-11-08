@@ -41,6 +41,7 @@ const GROUP_LABEL: Record<QueueGroup, TranslationKey> = {
 const ACTIVE_STATES: DownloadItem['state'][] = [
   'queued',
   'detecting',
+  'waiting',
   'downloading',
   'processing',
   'paused'
@@ -185,7 +186,7 @@ export default function DownloadsView(): JSX.Element {
   // Failures are not "finished": they keep their error and their retry until cleared on purpose.
   const hasFinished = downloads.some((d) => d.state === 'completed')
   const hasRunning = downloads.some((d) =>
-    ['downloading', 'processing', 'detecting', 'queued'].includes(d.state)
+    ['downloading', 'processing', 'detecting', 'queued', 'waiting'].includes(d.state)
   )
   const hasPaused = downloads.some((d) => d.state === 'paused')
   const hasErrors = downloads.some((d) => d.state === 'error')

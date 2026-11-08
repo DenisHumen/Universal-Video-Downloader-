@@ -13,6 +13,25 @@ export function latestEpisode(seasons: StreamSeason[]): { season: number; episod
 }
 
 /**
+ * A series episode's place, for its folder: named after the series and, unlike
+ * a playlist entry, never numbered, because the file name already says S01E05.
+ *
+ * The episode's own number, since that is the track a player should show. One
+ * that is not a whole number from zero up (some sites have an episode 12.5) goes
+ * as 0, which main accepts and tags with nothing: refused, it would lose the
+ * folder as well.
+ */
+export function placeEpisode(title: string, episode: number, episodes: number[], folder: boolean): PlaylistPlace {
+  return {
+    title,
+    index: Number.isSafeInteger(episode) && episode >= 0 ? episode : 0,
+    count: Math.max(0, ...episodes.filter((e) => Number.isSafeInteger(e))),
+    folder,
+    numbered: false
+  }
+}
+
+/**
  * Each chosen entry with its place in the playlist it came from.
  *
  * Numbered by position in the whole list, not in the selection: taking items

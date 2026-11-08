@@ -4,9 +4,10 @@ import type { MediaInfo, QualityPreset } from '@shared/types'
 import { watchingAlready, type Watch } from '@shared/automation'
 import { PROVIDER_NAMES, streamUrl } from '@shared/streaming'
 import Choice, { type ChoiceOption } from './Choice'
+import { LayoutOption } from './PlaylistCard'
 import SaveLocation from './SaveLocation'
 import Thumbnail from './Thumbnail'
-import { latestEpisode } from '../lib/playlist'
+import { latestEpisode, placeEpisode } from '../lib/playlist'
 import { heightLabel, initialQuality } from '../lib/quality'
 import { toast } from '../lib/toast'
 import { queueDownload, queueDownloads } from '../lib/queue'
@@ -36,7 +37,10 @@ export default function StreamingCard({
   const t = useT()
   const requestWatch = useStore((s) => s.requestWatch)
   const settings = useStore((s) => s.settings)
+  const saveSettings = useStore((s) => s.saveSettings)
   const s = info.streaming!
+  // The same remembered choice as a playlist's: a season should not land loose in the download root either.
+  const folder = settings?.playlistFolder ?? true
 
   /*
     Only the qualities this provider actually serves, plus automatic "best".
@@ -158,7 +162,13 @@ export default function StreamingCard({
             mode: 'video' as const,
             quality,
             targetHeight: targetHeight(quality),
-            outputDir: saveDir || undefined
+            outputDir: saveDir || undefined,
+            playlist: placeEpisode(
+              s.title,
+              ep,
+              seasonsForT.find((x) => x.season === Number(seasonStr))?.episodes ?? eps,
+              folder
+            )
           }))
         )
       )
@@ -315,6 +325,15 @@ export default function StreamingCard({
                 value={quality}
                 onChange={(v) => setQuality(v as QualityPreset)}
                 options={qualityOptions}
+              />
+            </div>
+
+            <div className="border-t border-edge pt-4">
+              <LayoutOption
+                on={folder}
+                onChange={(v) => void saveSettings({ playlistFolder: v })}
+                label={t('playlist.folder')}
+                hint={t('playlist.folderHint', { name: s.title })}
               />
             </div>
 

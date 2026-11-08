@@ -22,6 +22,7 @@ import { initialMode, initialQuality, maxHeightOf } from '../lib/quality'
 import { toast } from '../lib/toast'
 import { queueDownload } from '../lib/queue'
 import { describeError, errorText } from '../lib/errors'
+import { capLimit, firstLimit, mergeByUrl, mightHaveMore } from '../lib/search'
 import { useT, type TranslateFn } from '../i18n'
 import { serviceLabel } from '../lib/services'
 import { useStore } from '../store'
@@ -101,8 +102,20 @@ export default function SearchView({ settings, embedded = false }: Props): JSX.E
     working.
   */
   const probeRequests = useRef(new Set<string>())
+  /*
+    What is left to probe, and who is working on it. One queue rather than a
+    pair of workers per call, so "Show More" joins the probes still running
+    instead of doubling how many engines are started at once.
+  */
+  const probeQueue = useRef<{ item: SearchResult; gen: number }[]>([])
+  const probeWorkers = useRef(0)
+  /** What the results on screen answer: "Show More" repeats this, whatever the field says by now. */
+  const shown = useRef<{ q: string; s: SearchScope } | null>(null)
+  const [canShowMore, setCanShowMore] = useState(false)
+  const [showingMore, setShowingMore] = useState(false)
 
   const cancelProbes = (): void => {
+    probeQueue.current = []
     for (const id of probeRequests.current) void window.api.cancelDetect(id)
     probeRequests.current.clear()
   }
@@ -120,6 +133,9 @@ export default function SearchView({ settings, embedded = false }: Props): JSX.E
     setProbes({})
     setAdded(new Set())
     setPicker(null)
+    setCanShowMore(false)
+    setShowingMore(false)
+    const limit = firstLimit(s)
     /*
       `searchVideos` waits on the engine, and that used to rethrow when it
       couldn't be installed — offline on first run, say. A rejected invoke
@@ -129,12 +145,14 @@ export default function SearchView({ settings, embedded = false }: Props): JSX.E
       whatever else might still reject.
     */
     const res: SearchResponse = await window.api
-      .searchVideos(q, s, s === 'all' ? 6 : 12)
+      .searchVideos(q, s, limit)
       .catch((err: unknown) => ({ ok: false, error: describeError(err) }))
     if (res.ok && res.results) {
+      shown.current = { q, s }
       setResults(res.results)
+      setCanShowMore(mightHaveMore(res.results, limit))
       setStatus('idle')
-      void probeQualities(res.results, generation.current)
+      probeQualities(res.results, generation.current)
     } else {
       setError(res.error || t('search.failed'))
       setErrorCode(res.errorCode)
@@ -142,21 +160,54 @@ export default function SearchView({ settings, embedded = false }: Props): JSX.E
     }
   }
 
+  /*
+    The search can only go as far as the cap main allows, so this is one step:
+    ask for all of it, and keep the rows already on screen where they are, with
+    what is known about them. Only the new ones are probed.
+  */
+  const showMore = async (): Promise<void> => {
+    const last = shown.current
+    if (!last || showingMore) return
+    const gen = generation.current
+    setShowingMore(true)
+    const res: SearchResponse = await window.api
+      .searchVideos(last.q, last.s, capLimit(last.s))
+      .catch((err: unknown) => ({ ok: false, error: describeError(err) }))
+    if (gen !== generation.current) return
+    setShowingMore(false)
+    if (!res.ok || !res.results) {
+      // The results on screen are still good, so this is no reason to take them away.
+      toast(errorText(t, { error: res.error || t('search.failed'), errorCode: res.errorCode }), 'error')
+      return
+    }
+    const { merged, fresh } = mergeByUrl(results ?? [], res.results)
+    setResults(merged)
+    setCanShowMore(false)
+    probeQualities(fresh, gen)
+  }
+
   // Lazily discover each result's best quality + thumbnail (2 probes at a time)
   // so tiles fill in as answers arrive. Only for services that carry both.
-  const probeQualities = async (list: SearchResult[], gen: number): Promise<void> => {
-    const queue = list.filter((r) => PROBE_SERVICES.includes(r.service))
+  const probeQualities = (list: SearchResult[], gen: number): void => {
+    for (const item of list) {
+      if (PROBE_SERVICES.includes(item.service)) probeQueue.current.push({ item, gen })
+    }
+    /*
+      A worker outlives the search it started for: one still waiting on a
+      cancelled probe when the next search arrives takes that search's rows next,
+      so it must not stop just because the row it was on has gone stale.
+    */
     const worker = async (): Promise<void> => {
-      while (queue.length) {
-        const item = queue.shift()!
-        if (gen !== generation.current) return
+      while (probeQueue.current.length) {
+        const { item, gen: rowGen } = probeQueue.current.shift()!
+        if (rowGen !== generation.current) continue
         setProbes((p) => ({ ...p, [item.url]: { status: 'loading', maxHeight: 0 } }))
-        const requestId = `probe-${gen}-${item.url}`
+        const requestId = `probe-${rowGen}-${item.url}`
         probeRequests.current.add(requestId)
         try {
           const res = await window.api.detect(item.url, requestId)
           probeRequests.current.delete(requestId)
-          if (gen !== generation.current) return
+          if (rowGen !== generation.current) continue
           const info = res.ok ? res.info : undefined
           setProbes((p) => ({
             ...p,
@@ -168,12 +219,16 @@ export default function SearchView({ settings, embedded = false }: Props): JSX.E
           }))
         } catch {
           probeRequests.current.delete(requestId)
-          if (gen !== generation.current) return
+          if (rowGen !== generation.current) continue
           setProbes((p) => ({ ...p, [item.url]: { status: 'failed', maxHeight: 0 } }))
         }
       }
+      probeWorkers.current--
     }
-    await Promise.all([worker(), worker()])
+    while (probeWorkers.current < 2 && probeQueue.current.length) {
+      probeWorkers.current++
+      void worker()
+    }
   }
 
   // Auto-run the query this view was opened with, plus follow-up queries sent
@@ -394,6 +449,15 @@ export default function SearchView({ settings, embedded = false }: Props): JSX.E
                 />
               ))}
             </m.div>
+          )}
+
+          {status === 'idle' && results && results.length > 0 && canShowMore && (
+            <div className="mt-5 flex justify-center">
+              <button type="button" className="btn-quiet rounded-pill px-6" onClick={() => void showMore()} disabled={showingMore}>
+                {showingMore ? <Loader2 size={14} className="animate-spin" /> : null}
+                {t('search.showMore')}
+              </button>
+            </div>
           )}
 
           {status === 'idle' && !results && (

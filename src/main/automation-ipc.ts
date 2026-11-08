@@ -23,6 +23,7 @@ import { logFilePath } from './services/log'
 import { getSettings } from './services/settings'
 import { coalesce } from './services/coalesce'
 import {
+  duplicateAfterEdit,
   exactDuplicate,
   formatSmbPath,
   inheritedSeen,
@@ -129,6 +130,8 @@ export function registerAutomationIpc(): void {
   })
 
   ipcMain.handle(IPC.autoUpdate, (_e, id: string, patch: Partial<Watch>): Watch | undefined => {
+    // The screen says why before it gets here; this is the half that holds. Answered with the watch as it stands.
+    if (duplicateAfterEdit(listWatches(), id, patch)) return getWatch(id)
     // A tighter interval takes effect now, rather than after the check it was meant to bring forward.
     const current = getWatch(id)
     const sooner =

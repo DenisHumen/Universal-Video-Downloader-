@@ -137,7 +137,8 @@ function QueueRow({ item, index, animateIn = true, heading }: Props): JSX.Elemen
     active && item.eta ? t('queue.eta', { time: formatEta(item.eta) }) : null,
     active && item.speed ? formatSpeed(item.speed) : null,
     item.state === 'completed' && item.totalBytes ? formatBytes(item.totalBytes) : null,
-    item.state === 'queued' && (item.attempts || 0) > 0 ? t('queue.retryingIn') : null
+    item.state === 'queued' && (item.attempts || 0) > 0 ? t('queue.retryingIn') : null,
+    item.state === 'waiting' ? t('queue.waitingHint') : null
   ].filter(Boolean)
 
   /*
@@ -183,7 +184,7 @@ function QueueRow({ item, index, animateIn = true, heading }: Props): JSX.Elemen
     it afresh in place of this row; the row goes first, so the new one is not
     taken for a duplicate of it.
   */
-  const requeue = async (change: { mode?: 'audio'; outputDir?: string }): Promise<void> => {
+  const requeue = async (change: { mode?: 'audio'; outputDir?: string; waitForVideo?: boolean }): Promise<void> => {
     await window.api.removeDownload(item.id)
     await queueDownload({
       // The page, not the stream a resolver found on it: that address expires and carries no referer.
@@ -201,6 +202,9 @@ function QueueRow({ item, index, animateIn = true, heading }: Props): JSX.Elemen
       series: item.series,
       section: item.range,
       preciseSection: item.precise,
+      subtitles: change.mode === 'audio' ? undefined : item.subtitles,
+      audioLanguage: item.audioLanguage,
+      waitForVideo: change.waitForVideo ?? item.waitForVideo,
       outputDir: change.outputDir ?? item.outputDir
     })
   }
@@ -209,7 +213,8 @@ function QueueRow({ item, index, animateIn = true, heading }: Props): JSX.Elemen
     item.state === 'downloading' ||
     item.state === 'queued' ||
     item.state === 'processing' ||
-    item.state === 'detecting'
+    item.state === 'detecting' ||
+    item.state === 'waiting'
 
   /*
     Everything but the row's one primary action and its remove, behind "⋯".
@@ -514,6 +519,7 @@ function QueueRow({ item, index, animateIn = true, heading }: Props): JSX.Elemen
               onRetry={() => void window.api.retryDownload(item.id)}
               onAudioOnly={() => void requeue({ mode: 'audio' })}
               onChangeFolder={(dir) => void requeue({ outputDir: dir })}
+              onWaitForVideo={() => void requeue({ waitForVideo: true })}
               report={
                 canReport
                   ? { open: reportOpen, onToggle: () => setReportOpenFor(reportOpen ? null : (failure.reportId ?? null)) }

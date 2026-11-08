@@ -121,7 +121,19 @@ function poster(seed: number, label: string): string {
 }
 
 
+/** A link with "mock-dubbed" in it has its sound in several languages. */
+const DUBBED: MediaInfo['formats'] = [
+  { id: '140-en', ext: 'm4a', kind: 'audio', resolution: 'audio', language: 'en', languagePreference: 10000 },
+  { id: '140-de', ext: 'm4a', kind: 'audio', resolution: 'audio', language: 'de', languagePreference: -1 },
+  { id: '140-es', ext: 'm4a', kind: 'audio', resolution: 'audio', language: 'es-419', languagePreference: -1 }
+]
+
 function fakeInfo(url: string): MediaInfo {
+  const info = fakeVideo(url)
+  return /mock-dubbed/.test(url) ? { ...info, formats: [...info.formats, ...DUBBED] } : info
+}
+
+function fakeVideo(url: string): MediaInfo {
   return {
     id: 'mock',
     title: 'Big Buck Bunny — official 4K remaster',
@@ -134,6 +146,7 @@ function fakeInfo(url: string): MediaInfo {
     isLive: false,
     viewCount: 1234567,
     subtitleLanguages: ['en', 'ru', 'de'],
+    autoCaptionLanguages: ['en-orig', 'en', 'ru', 'fr', 'ja', 'es-419'],
     formats: [
       { id: '137', ext: 'mp4', kind: 'video', resolution: '1080p', height: 1080, vcodec: 'avc1' },
       {
@@ -159,13 +172,36 @@ function fakeInfo(url: string): MediaInfo {
   }
 }
 
-function fakeResults(query: string, scope: string): SearchResult[] {
+/** A link with "mock-channel" in it: a channel longer than the listing depth, for "Load More". */
+function fakeChannel(url: string, depth: number): MediaInfo {
+  const count = Math.min(depth, 730)
+  return {
+    id: 'mock-channel',
+    title: 'A very long channel',
+    webpageUrl: url,
+    originalUrl: url,
+    extractor: 'YoutubeTab',
+    isLive: false,
+    formats: [],
+    isPlaylist: true,
+    playlistCount: count,
+    entries: Array.from({ length: count }, (_, i) => ({
+      url: `https://example.com/watch?v=c${i}`,
+      title: `Episode ${i + 1} of the channel`,
+      extractor: 'Youtube'
+    })),
+    ...(count >= depth ? { listingCut: depth } : {})
+  }
+}
+
+function fakeResults(query: string, scope: string, limit: number): SearchResult[] {
   // The same choice main makes, so the preview never shows what the setting hides.
   const services =
     scope === 'all'
       ? allowedSearchServices(SEARCH_ALL_SERVICES, settings.showAdultServices)
       : ([scope] as unknown as readonly SearchResult['service'][])
-  return Array.from({ length: scope === 'all' ? 12 : 9 }, (_, i) => {
+  // `limit` is per service when everything is searched, as it is in main.
+  return Array.from({ length: scope === 'all' ? limit * services.length : limit }, (_, i) => {
     const service = services[i % services.length]
     const isAnime = service === 'yummyani'
     return {
@@ -279,6 +315,7 @@ declare global {
 }
 
 import {
+  duplicateAfterEdit,
   exactDuplicate,
   inheritedSeen,
   settleRunError,
@@ -351,9 +388,16 @@ export function installMockApi(): void {
     }
   }
   const api: UvdApi = {
-    detect: async (url) => {
+    detect: async (url, _requestId, options) => {
       await delay(700)
+      if (/mock-channel/.test(url)) {
+        return { ok: true, info: fakeChannel(url, options?.playlistEnd ?? settings.playlistLimit) }
+      }
       if (url.startsWith('uvd-yummy-item://')) return { ok: true, info: fakeAnimeInfo(url) }
+      // A link with "mock-premiere" in it has not started yet.
+      if (/mock-premiere/.test(url)) {
+        return { ok: false, error: 'Premieres in 3 days', errorCode: 'upcoming' }
+      }
       // A link with "unsupported" in it fails the way an unknown site does, report offer and all.
       if (/unsupported/i.test(url)) {
         return { ok: false, error: `Unsupported URL: ${url}`, reportId: 'mock-detect' }
@@ -361,9 +405,9 @@ export function installMockApi(): void {
       return { ok: true, info: fakeInfo(url) }
     },
     cancelDetect: async () => undefined,
-    searchVideos: async (query, scope) => {
+    searchVideos: async (query, scope, limit = 12) => {
       await delay(800)
-      return { ok: true, results: fakeResults(query, scope) }
+      return { ok: true, results: fakeResults(query, scope, limit) }
     },
     openSearchWindow: async (query) => {
       window.location.hash = `/search?q=${encodeURIComponent(query)}`
@@ -383,7 +427,10 @@ export function installMockApi(): void {
         playlist: req.playlist,
         uploader: req.uploader,
         series: req.series,
-        state: 'queued',
+        subtitles: req.subtitles,
+        audioLanguage: req.audioLanguage,
+        waitForVideo: req.waitForVideo,
+        state: req.waitForVideo ? 'waiting' : 'queued',
         percent: 0,
         outputDir: req.outputDir || settings.downloadDir,
         createdAt: Date.now()
@@ -689,6 +736,7 @@ export function installMockApi(): void {
     },
     autoUpdate: async (id, changes) => {
       const i = mockWatches.findIndex((x) => x.id === id)
+      if (duplicateAfterEdit(mockWatches, id, changes)) return mockWatches[i]
       // The same rule main applies, so dismissing or pausing behaves here as it does there.
       if (i >= 0) mockWatches[i] = { ...mockWatches[i], ...settleRunError(changes) }
       return mockWatches[i]

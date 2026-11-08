@@ -30,6 +30,10 @@ export interface VideoFormat {
   filesizeApprox?: number
   formatNote?: string
   dynamicRange?: string
+  /** The language of the audio in this format, as the site names it. */
+  language?: string
+  /** How much the site favours that language; its own original track ranks far above the rest. */
+  languagePreference?: number
 }
 
 export interface MediaInfo {
@@ -51,6 +55,12 @@ export interface MediaInfo {
   playlistCount?: number
   isPlaylist?: boolean
   entries?: PlaylistEntry[]
+  /**
+   * The listing depth this list ran into, when it did: there may be more past
+   * it. Reaching the depth is the signal, because `playlist_count` often only
+   * counts what was listed.
+   */
+  listingCut?: number
   // For streaming sites needing translator/episode/quality selection
   streaming?: StreamingInfo
   /**
@@ -60,8 +70,10 @@ export interface MediaInfo {
   downloadUrl?: string
   /** The stream was found by the universal resolver rather than the engine. */
   viaUniversal?: boolean
-  /** Subtitle languages the engine reported for this video. */
+  /** Subtitle languages the engine reported for this video: the ones people wrote. */
   subtitleLanguages?: string[]
+  /** Machine-made captions on offer. On YouTube this is every language it can translate to. */
+  autoCaptionLanguages?: string[]
 }
 
 export interface PlaylistEntry {
@@ -177,6 +189,8 @@ export type AppErrorCode =
 export type DownloadState =
   | 'queued'
   | 'detecting'
+  /** The engine is holding on for a premiere or a stream to start; nothing is being fetched yet. */
+  | 'waiting'
   | 'downloading'
   | 'processing'
   | 'completed'
@@ -293,6 +307,12 @@ export interface DownloadRequest {
   uploader?: string
   /** The show an episode belongs to (a watch, a streaming site), for the Library's grouping. */
   series?: string
+  /** Subtitles picked for this video, by language code, over what Settings says. */
+  subtitles?: string[]
+  /** The audio track to fetch, by the language code the formats carry. Absent is the site's default. */
+  audioLanguage?: string
+  /** It has not started yet: wait for it, however long that takes, then download. */
+  waitForVideo?: boolean
 }
 
 /** What ffmpeg found inside a local file. */
@@ -391,6 +411,10 @@ export interface DownloadItem {
   /** Who published it, and the show it belongs to: see DownloadRequest. */
   uploader?: string
   series?: string
+  /** Kept with the row, so a pause, a retry or a restart fetches what was picked. */
+  subtitles?: string[]
+  audioLanguage?: string
+  waitForVideo?: boolean
   state: DownloadState
   percent: number
   speed?: number
@@ -755,6 +779,8 @@ export interface DetectOptions {
    * clipboard never opens a window or fetches a page behind the user's back.
    */
   prefetch?: boolean
+  /** List a channel or playlist this deep instead of the setting's depth: "Load More". */
+  playlistEnd?: number
 }
 
 export type DetectStage =
@@ -842,6 +868,11 @@ export const ADULT_SEARCH_SERVICES: readonly SearchService[] = ['pornhub'] as co
 export function allowedSearchServices<T extends SearchScope>(list: readonly T[], showAdult: boolean): T[] {
   return showAdult ? [...list] : list.filter((s) => !ADULT_SEARCH_SERVICES.includes(s as SearchService))
 }
+
+/** The most results one service is asked for: what the site APIs and the engine's own searches take. */
+export const SEARCH_CAP = 30
+/** The same when every service is searched at once, per service, so the wait stays bearable. */
+export const SEARCH_CAP_PER_SERVICE = 12
 
 /** What the user searches: one service, or all of them in parallel. */
 export type SearchScope = SearchService | 'all'

@@ -8,6 +8,7 @@ import type { DownloadItem } from '@shared/types'
 export const WAS_RUNNING: DownloadItem['state'][] = [
   'queued',
   'detecting',
+  'waiting',
   'downloading',
   'processing'
 ]

@@ -101,12 +101,20 @@ describe('playlistTagArgs', () => {
 
 describe('normalisePlaylist', () => {
   // It comes over IPC and ends up in a file name and on ffmpeg's command line.
-  it('refuses a position that is not a positive whole number', () => {
-    for (const index of [0, -1, 1.5, Number.NaN, 'x', undefined]) {
+  it('refuses a position that is not a whole number from zero up', () => {
+    for (const index of [-1, 1.5, Number.NaN, 'x', undefined]) {
       expect(normalisePlaylist({ title: 'P', index, count: 3 })).toBeUndefined()
     }
     expect(normalisePlaylist(undefined)).toBeUndefined()
     expect(normalisePlaylist('playlist')).toBeUndefined()
+  })
+
+  // A series' "episode 0" special keeps its folder like any other episode.
+  it('keeps position zero, and tags it with no track number', () => {
+    const place = normalisePlaylist({ title: 'S', index: 0, count: 12, folder: true })
+    expect(place).toMatchObject({ index: 0, count: 12, folder: true })
+    expect(playlistTagArgs(place, true)).toEqual([])
+    expect(playlistDir('/d', place)).toBe(join('/d', 'S'))
   })
 
   it('keeps a well-formed place, and only a literal true switches anything on', () => {

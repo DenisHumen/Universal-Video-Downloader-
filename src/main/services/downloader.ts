@@ -36,8 +36,8 @@ import {
   freeCopySuffix,
   pickOutputStem,
   samePath,
-  sectionSuffix,
   shouldTakeOwnName,
+  variantSuffix,
   waitsForNamesake,
   withNameSuffix
 } from './naming'
@@ -57,6 +57,7 @@ import { isAbsoluteUrl, isWebLink, normalizeUrl } from '@shared/urls'
 import { infoKey, isStaleInfoError } from './info-cache'
 import { infoCache } from './info-store'
 import { numberedName } from '@shared/playlist'
+import { cleanLanguage, cleanLanguages } from '@shared/languages'
 import { browserCookiesFile } from './browser-logins'
 import { hasTrim } from '@shared/types'
 import type {
@@ -74,6 +75,12 @@ export const downloadEvents = new EventEmitter()
 export const PROGRESS_PREFIX = '@@UVD@@'
 /** Post-processing progress, on its own channel so the parser can tell them apart. */
 export const POSTPROCESS_PREFIX = '@@UVDPP@@'
+/*
+  Seconds between looks at a video that has not started: at the time the site
+  gives if that is sooner, at least a minute apart, and at most half an hour,
+  because a premiere's time moves and a stream can start early.
+*/
+const WAIT_FOR_VIDEO_RANGE = '60-1800'
 /** Automatic retries for transient network failures before we bother the user. */
 const AUTO_RETRIES = 2
 const LOG_TAIL_CHARS = 4000
@@ -334,15 +341,32 @@ function forgetProgress(id: string): void {
   progressMarks.delete(id)
 }
 
-function qualityFormat(quality: QualityPreset | undefined): string {
-  if (quality === 'audio') return 'bestaudio/best'
+/**
+ * The ways to get one audio language at a height, for the front of a selector.
+ *
+ * `bv`, not the `bv*` of the plain selector. `bv*` can choose a format that has
+ * sound of its own, and the engine, keeping one audio track, then drops the one
+ * asked for: checked against the real engine, `bv*[height<=?360]+ba[language=de]`
+ * on a video with a combined 360p comes back as that format alone, in English.
+ * Past these the selector goes on to the plain choices, so a language the site
+ * has stopped offering by the time this runs still gets the video.
+ */
+function languageChoices(language: string, height?: number): string {
+  const lang = `[language=${language}]`
+  if (!height) return `bv+ba${lang}/b${lang}/`
+  // The language was asked for by name, so it outranks a height with no silent video.
+  return `bv[height<=?${height}]+ba${lang}/b[height<=?${height}]${lang}/bv+ba${lang}/`
+}
+
+function qualityFormat(quality: QualityPreset | undefined, language?: string): string {
+  if (quality === 'audio') return language ? `ba[language=${language}]/bestaudio/best` : 'bestaudio/best'
   const height = Number(quality)
   // 'best' (and anything non-numeric) → let the engine pick the best available.
-  if (!Number.isFinite(height) || height <= 0) return 'bv*+ba/b'
+  if (!Number.isFinite(height) || height <= 0) return `${language ? languageChoices(language) : ''}bv*+ba/b`
   // `<=?` keeps formats with unknown height in play (common for HLS streams),
   // and the trailing `bv*+ba/b` means a request above what the site offers
   // falls back to the best available instead of erroring out.
-  return `bv*[height<=?${height}]+ba/b[height<=?${height}]/bv*+ba/b`
+  return `${language ? languageChoices(language, height) : ''}bv*[height<=?${height}]+ba/b[height<=?${height}]/bv*+ba/b`
 }
 
 /**
@@ -479,7 +503,7 @@ function settleOutputStem(item: DownloadItem, dir: string, settings: AppSettings
   const ranBefore = !item.outputStem && item.log != null
   const legacy = ranBefore && partialsFor(names, base).length ? base : undefined
   const stem = pickOutputStem({
-    wanted: base + sectionSuffix(item.range),
+    wanted: base + variantSuffix(item),
     current: item.outputStem,
     legacy,
     held,
@@ -506,11 +530,11 @@ export function outputTarget(
 ): { path: string; stem?: string } {
   const base = chosenStem(item)
   if (base) {
-    const stem = item.outputStem ?? base + sectionSuffix(item.range)
+    const stem = item.outputStem ?? base + variantSuffix(item)
     return { path: join(dir, `${stem}.%(ext)s`), stem }
   }
   const template = numberedName(settings.filenameTemplate || '%(title)s [%(id)s].%(ext)s', item.playlist)
-  const suffix = sectionSuffix(item.range) + (item.copySuffix ?? '')
+  const suffix = variantSuffix(item) + (item.copySuffix ?? '')
   return { path: join(dir, withNameSuffix(template, suffix)) }
 }
 
@@ -571,6 +595,7 @@ export function buildArgs(
   if (item.referer) args.push('--referer', item.referer)
   if (settings.restrictFilenames) args.push('--restrict-filenames')
   if (settings.speedLimit.trim()) args.push('--limit-rate', settings.speedLimit.trim())
+  if (item.waitForVideo) args.push('--wait-for-video', WAIT_FOR_VIDEO_RANGE)
 
   /*
     Output template. For custom-resolved streams we bake in the title we
@@ -601,12 +626,13 @@ export function buildArgs(
   )
 
   if (item.mode === 'audio') {
-    args.push('-f', 'bestaudio/best', '-x', '--audio-format', settings.audioFormat, '--audio-quality', '0')
+    args.push('-f', qualityFormat('audio', item.audioLanguage), '-x', '--audio-format', settings.audioFormat, '--audio-quality', '0')
   } else {
     if (item.formatId && item.formatId !== 'auto') {
-      args.push('-f', `${item.formatId}+bestaudio/${item.formatId}/best`)
+      const inLanguage = item.audioLanguage ? `${item.formatId}+ba[language=${item.audioLanguage}]/` : ''
+      args.push('-f', `${inLanguage}${item.formatId}+bestaudio/${item.formatId}/best`)
     } else {
-      args.push('-f', qualityFormat(item.quality))
+      args.push('-f', qualityFormat(item.quality, item.audioLanguage))
     }
     args.push('--merge-output-format', 'mp4')
     /*
@@ -639,12 +665,26 @@ export function buildArgs(
   */
   if (settings.embedThumbnail && !audioHasNoCover(item, settings)) args.push('--embed-thumbnail')
   if (settings.embedChapters && item.mode === 'video') args.push('--embed-chapters')
-  const subLangs = settings.subtitleLanguages.trim() || 'all'
-  if (settings.embedSubtitles && item.mode === 'video') {
-    args.push('--embed-subs', '--sub-langs', subLangs)
+  /*
+    Languages picked on the card outrank the Settings list, and work with those
+    settings off, which is what they are for: nothing was fetched by default,
+    however many tracks the card said there were. They go inside the file, unless
+    Settings asks for files beside the video.
+  */
+  const picked = item.mode === 'video' && item.subtitles?.length ? item.subtitles : undefined
+  const subLangs = picked?.join(',') ?? (settings.subtitleLanguages.trim() || 'all')
+  /*
+    Machine-made captions count as subtitles to a person: a video with nothing
+    else came down with none, embedded, while the Settings row promised them.
+    Never for "all", though. On YouTube that is every language it can translate
+    to, which is a hundred and fifty requests, and it answers those with a 429.
+  */
+  const autoSubs = /(^|,)\s*all\s*(,|$)/i.test(subLangs) ? [] : ['--write-auto-subs']
+  if (item.mode === 'video' && (settings.embedSubtitles || (picked && !settings.writeSubtitles))) {
+    args.push('--embed-subs', ...autoSubs, '--sub-langs', subLangs)
   }
   if (settings.writeSubtitles) {
-    args.push('--write-subs', '--write-auto-subs', '--sub-langs', subLangs, '--convert-subs', 'srt')
+    args.push('--write-subs', ...autoSubs, '--sub-langs', subLangs, '--convert-subs', 'srt')
   }
   if (settings.sponsorBlock && item.mode === 'video') {
     args.push('--sponsorblock-remove', 'sponsor,selfpromo,interaction')
@@ -770,7 +810,15 @@ function appendLog(item: DownloadItem, text: string): void {
   item.log = ((item.log || '') + text).slice(-LOG_TAIL_CHARS)
 }
 
+/** The wait is over: something came down. The row has been saying it was waiting until now. */
+function endWait(item: DownloadItem): void {
+  if (items.get(item.id)?.state !== 'waiting') return
+  item.state = 'downloading'
+  emitUpdated(item)
+}
+
 function handleProgressLine(line: string, item: DownloadItem): void {
+  endWait(item)
   /*
     Is this job still running?
 
@@ -874,6 +922,7 @@ function expectedSeconds(item: DownloadItem): number | undefined {
  * line will ever arrive and this is the only thing that can move the bar.
  */
 function handleFfmpegProgress(seconds: number, item: DownloadItem, line: string): void {
+  endWait(item)
   if (item.state !== 'downloading') return
   /*
     Only the fetching half. The engine captures its post-processors' output
@@ -984,6 +1033,12 @@ function handlePostprocessLine(line: string, item: DownloadItem): void {
   })
 }
 
+/**
+ * What is using a slot. Not a row waiting for a premiere: that can be days of an
+ * idle process, and "three at once" should not become two for all of them. When
+ * it starts it runs at once, over the limit if need be, because a stream that
+ * has begun will not wait for a slot.
+ */
 function activeCount(): number {
   let n = 0
   for (const item of items.values()) {
@@ -1297,7 +1352,7 @@ async function runDownload(item: DownloadItem): Promise<void> {
     return
   }
 
-  item.state = 'downloading'
+  item.state = item.waitForVideo ? 'waiting' : 'downloading'
   emitUpdated(item)
   const retried = item.attempts || 0
   log.info('download', 'Started', { ...downloadFields(item), attempt: retried ? retried + 1 : undefined })
@@ -1333,7 +1388,8 @@ async function runDownload(item: DownloadItem): Promise<void> {
     const source = item.sourceUrl || item.url
     const skip = skipInfo.delete(item.id)
     infoFile =
-      !skip && item.url === source && !item.headers && !item.referer
+      // Not for a wait: what the detect knew is that there is nothing to fetch yet.
+      !skip && !item.waitForVideo && item.url === source && !item.headers && !item.referer
         ? infoCache.take(infoKey(source, settings))
         : null
     const args = buildArgs(item, settings, dir, ffmpegLocation(), infoFile ?? undefined)
@@ -1650,6 +1706,9 @@ export async function startDownload(request: DownloadRequest): Promise<DownloadI
     playlist: normalisePlaylist(req.playlist),
     uploader: req.uploader,
     series: req.series,
+    subtitles: cleanLanguages(req.subtitles),
+    audioLanguage: cleanLanguage(req.audioLanguage),
+    waitForVideo: req.waitForVideo === true ? true : undefined,
     state: 'queued',
     percent: 0,
     attempts: 0,
@@ -1691,7 +1750,8 @@ export async function startDownload(request: DownloadRequest): Promise<DownloadI
  * from — on Windows it cannot even be overwritten while it is loaded.
  */
 export function isEngineBusy(): boolean {
-  return activeCount() > 0
+  // A row that is waiting has the binary loaded as surely as one that is downloading.
+  return activeCount() > 0 || [...items.values()].some((item) => item.state === 'waiting')
 }
 
 export function kickQueue(): void {
@@ -2020,7 +2080,7 @@ export function pauseAll(): void {
   const all = [...items.values()]
   for (const item of all) if (item.state === 'queued') pauseDownload(item.id)
   for (const item of all) {
-    if (['downloading', 'processing', 'detecting'].includes(item.state)) pauseDownload(item.id)
+    if (['downloading', 'processing', 'detecting', 'waiting'].includes(item.state)) pauseDownload(item.id)
   }
 }
 
