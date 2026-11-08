@@ -16,6 +16,7 @@ import { useStore } from '../../store'
 import { useT, useTp, type TranslationKey } from '../../i18n'
 import { toast } from '../../lib/toast'
 import { describeCliCommand } from '../../lib/cliCommand'
+import { updateErrorText } from '../../lib/updateError'
 import AutomationSettings from '../../components/AutomationSettings'
 import ConfirmDialog from '../../components/ConfirmDialog'
 import Logo from '../../components/Logo'
@@ -795,7 +796,7 @@ export function UpdatesPage({ settings, set }: PanelProps): JSX.Element {
     update.state === 'available'
       ? t('settings.updateAvailable', { version: update.version ?? '' })
       : update.state === 'error'
-        ? update.message || t('update.failed')
+        ? updateErrorText(t, update.message)
         : update.state === 'not-available'
           ? t('settings.upToDate')
           : `${appInfo?.version ?? '—'}`

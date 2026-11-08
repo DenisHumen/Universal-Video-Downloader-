@@ -586,6 +586,7 @@ export const ru: Dictionary = {
   'update.readyHint': 'Приложение перезапустится, чтобы применить его',
   'update.action': 'Обновить',
   'update.failed': 'Обновление не удалось установить',
+  'update.notAnswering': 'Сервер обновлений не отвечает. Попробуйте позже',
   'update.restart': 'Перезапустить',
   'update.getIt': 'Скачать',
 

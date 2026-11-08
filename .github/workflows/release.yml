@@ -143,8 +143,8 @@ jobs:
           sudo apt-get install -y rpm fakeroot desktop-file-utils apparmor
 
       # Without ffmpeg-static's install script: it downloads a 6.1.1 binary that
-      # the next step replaces, and when GitHub stopped serving that release
-      # (504) every job of v4.1.0 failed here, before running a single test.
+      # is replaced by the pinned one or never used, and during a GitHub outage
+      # (504s, v4.1.0) it failed every job here, before running a single test.
       - name: Install dependencies
         run: npm ci --ignore-scripts && npm rebuild esbuild sharp
 

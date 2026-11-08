@@ -594,6 +594,7 @@ export const en = {
   'update.readyHint': 'The app will restart to apply it',
   'update.action': 'Update',
   'update.failed': 'The update could not be installed',
+  'update.notAnswering': 'The update server is not answering. Try again later',
   'update.restart': 'Restart',
   'update.getIt': 'Get It',
 
