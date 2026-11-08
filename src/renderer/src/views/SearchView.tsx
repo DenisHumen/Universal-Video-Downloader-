@@ -2,7 +2,7 @@ import { useEffect, useId, useRef, useState } from 'react'
 import { AnimatePresence, m } from 'framer-motion'
 import { staggerChild, staggerParent } from '../lib/motion'
 import { AlertTriangle, ArrowRight, Check, Download, Loader2, RotateCw, Search, SearchX } from '../ui/icons'
-import { Dropdown, EmptyState, Icon, Spinner, ToggleGroup } from '../ui'
+import { Dropdown, EmptyState, Icon, IconButton, Spinner, ToggleGroup } from '../ui'
 import HeaderSlot from '../shell/HeaderSlot'
 import type {
   AppErrorCode,
@@ -290,23 +290,21 @@ export default function SearchView({ settings, embedded = false }: Props): JSX.E
         onKeyDown={(e) => e.key === 'Enter' && search()}
         placeholder={t('search.placeholder')}
         aria-label={t('search.label')}
-        className="no-drag min-w-0 flex-1 bg-transparent px-1 text-body text-ink outline-none placeholder:text-ink-2"
+        className="no-drag min-w-0 flex-1 bg-transparent px-1 text-body text-ink outline-none placeholder:text-ink/80"
         spellCheck={false}
         autoComplete="off"
       />
       {status === 'searching' ? (
         <span className="mr-1.5 flex"><Spinner size={16} label={t('search.searching')} /></span>
       ) : (
-        <button
-          type="button"
-          className="ui-icon-btn ui-icon-btn-sm"
+        <IconButton
+          size="sm"
           data-uvd="search"
+          label={t('common.search')}
+          icon={<ArrowRight size={16} />}
           onClick={() => search()}
           disabled={!query.trim()}
-          aria-label={t('common.search')}
-        >
-          <ArrowRight size={16} />
-        </button>
+        />
       )}
     </div>
   )
@@ -316,7 +314,9 @@ export default function SearchView({ settings, embedded = false }: Props): JSX.E
       {/* The entry sits in the header bar (A1 §3); the standalone window has none, so it stays on the page. */}
       {embedded ? <HeaderSlot where="center">{entry}</HeaderSlot> : <div className="mx-auto w-full max-w-[1000px] shrink-0 px-6 pt-4">{entry}</div>}
 
-      <div className="mx-auto min-h-0 w-full max-w-[1000px] flex-1 overflow-y-auto px-6 pb-8 pt-4">
+      {/* The scroller is the whole pane, the column inside it: the bar belongs at the window's edge and the wheel works beside the column too. */}
+      <div className="min-h-0 flex-1 overflow-y-auto">
+      <div className="mx-auto flex min-h-full w-full max-w-[1000px] flex-col px-6 pb-8 pt-4">
         <div className="mb-5 flex items-center gap-3">
           <ServiceFilter
             label={t('search.services')}
@@ -399,6 +399,7 @@ export default function SearchView({ settings, embedded = false }: Props): JSX.E
             <EmptyState icon={<Icon icon={Search} size="xl" />} title={t('search.idle', { service: activeLabel })} hint={t('search.idleHint')} />
           )}
         </>
+      </div>
       </div>
 
       {/* Anime episode/translator/quality picker (the standalone window) */}
@@ -535,7 +536,7 @@ function ResultCard({
     <m.div variants={staggerChild} className="panel flex flex-col overflow-hidden">
       <button
         type="button"
-        className="relative block aspect-video w-full cursor-pointer overflow-hidden bg-sink text-left"
+        className="ui-poster"
         aria-label={`${openLabel}: ${result.title}`}
         onClick={() => (onOpen ? onOpen() : window.api.openExternal(result.url))}
       >

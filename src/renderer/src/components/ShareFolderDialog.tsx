@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import Dialog from '../ui/Dialog'
+import IconButton from '../ui/IconButton'
 import { ActionRow } from '../ui/Rows'
 import { Spinner } from '../ui/Status'
 import { ArrowUp, ChevronRight, Folder, Loader2, Plus } from '../ui/icons'
@@ -115,16 +116,12 @@ export default function ShareFolderDialog({
       }
     >
       <div className="mb-3 flex items-center gap-1.5">
-        <button
-          type="button"
-          className="ui-icon-btn ui-icon-btn-md shrink-0"
-          aria-label={t('auto.shareFolderUp')}
-          title={t('auto.shareFolderUp')}
+        <IconButton
+          label={t('auto.shareFolderUp')}
+          icon={<ArrowUp size={16} />}
           disabled={!parts.length}
           onClick={() => go(parts.slice(0, -1))}
-        >
-          <ArrowUp size={16} />
-        </button>
+        />
         <nav aria-label={t('auto.shareFolderPath')} className="min-w-0 flex-1 overflow-x-auto">
           <ol className="flex items-center gap-0.5 whitespace-nowrap text-body">
             {crumbs.map((crumb, i) => {
@@ -145,17 +142,13 @@ export default function ShareFolderDialog({
             })}
           </ol>
         </nav>
-        <button
-          type="button"
-          className="ui-icon-btn ui-icon-btn-md shrink-0"
-          aria-label={t('auto.shareFolderNew')}
-          title={t('auto.shareFolderNew')}
+        <IconButton
+          label={t('auto.shareFolderNew')}
+          icon={<Plus size={16} />}
           aria-pressed={creating}
           disabled={folders === null && !error}
           onClick={() => setCreating((c) => !c)}
-        >
-          <Plus size={16} />
-        </button>
+        />
       </div>
 
       {creating && (

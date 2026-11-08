@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Loader2, Plus, Trash2 } from '../ui/icons'
+import IconButton from '../ui/IconButton'
 import { useT } from '../i18n'
 import { useStore } from '../store'
 import { toast } from '../lib/toast'
@@ -127,7 +128,7 @@ export default function AutomationSettings({
                   onClick={() => (editing === target.id ? setEditing(null) : startEdit(target))}
                 >
                   <span className="block text-control text-ink">{target.name}</span>
-                  <span className="mono block text-caption text-ink-2">
+                  <span className="mono block text-caption text-ink">
                     {pathOf(target)}
                     {/* Said in words and in the warning colour; it used to read "· password?". */}
                     {!secrets.smb[target.id] && (
@@ -135,14 +136,7 @@ export default function AutomationSettings({
                     )}
                   </span>
                 </button>
-                <button
-                  className="btn-icon"
-                  aria-label={t('common.remove')}
-                  title={t('common.remove')}
-                  onClick={() => setConfirmShare(target)}
-                >
-                  <Trash2 size={14} />
-                </button>
+                <IconButton label={t('common.remove')} icon={<Trash2 size={16} />} onClick={() => setConfirmShare(target)} />
               </div>
 
               {editing === target.id && (

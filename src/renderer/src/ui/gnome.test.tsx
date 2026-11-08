@@ -91,6 +91,29 @@ describe('preferences rows', () => {
     fireEvent.click(screen.getByRole('switch', { name: 'SponsorBlock' }))
     expect(screen.getByText('Categories').closest('[aria-disabled]')?.getAttribute('aria-disabled')).toBe('false')
   })
+
+  it('expands from anywhere on its row, except the controls that answer for themselves', () => {
+    const toggle = vi.fn()
+    render(
+      <ExpanderRow title="SponsorBlock" subtitle="Skips the sponsor" enabled={false} onEnabledChange={toggle} expandLabel="Show options">
+        <ActionRow title="Categories" />
+      </ExpanderRow>
+    )
+    const chevron = screen.getByRole('button', { name: 'Show options' })
+    fireEvent.click(screen.getByText('Skips the sponsor'))
+    expect(chevron.getAttribute('aria-expanded')).toBe('true')
+    expect(screen.getByText('Categories')).toBeTruthy()
+    // The switch is its own question; it must not fold the row as well.
+    fireEvent.click(screen.getByRole('switch', { name: 'SponsorBlock' }))
+    expect(toggle).toHaveBeenCalledWith(true)
+    expect(chevron.getAttribute('aria-expanded')).toBe('true')
+    fireEvent.click(chevron)
+    expect(chevron.getAttribute('aria-expanded')).toBe('false')
+    // Nothing inside what it revealed folds it either.
+    fireEvent.click(chevron)
+    fireEvent.click(screen.getByText('Categories'))
+    expect(chevron.getAttribute('aria-expanded')).toBe('true')
+  })
 })
 
 describe('NavigationStack', () => {

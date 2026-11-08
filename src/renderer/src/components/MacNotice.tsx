@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { Check, Copy, X } from '../ui/icons'
+import IconButton from '../ui/IconButton'
 import { useStore } from '../store'
 import { useT } from '../i18n'
 
@@ -60,9 +61,7 @@ export default function MacNotice(): JSX.Element | null {
         {copied ? <Check size={14} className="text-good" /> : <Copy size={14} />}
         {copied ? t('common.copied') : t('common.copy')}
       </button>
-      <button className="btn-icon" onClick={dismiss} aria-label={t('common.close')}>
-        <X size={15} />
-      </button>
+      <IconButton label={t('common.close')} icon={<X size={16} />} onClick={dismiss} />
     </div>
   )
 }

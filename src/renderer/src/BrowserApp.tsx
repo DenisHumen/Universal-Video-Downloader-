@@ -14,6 +14,7 @@ import {
 } from './ui/icons'
 import type { BrowserLoginOffer, BrowserMedia, BrowserState } from '@shared/types'
 import { Banner, ToastViewport as Toasts } from './ui'
+import IconButton from './ui/IconButton'
 import Logo from './components/Logo'
 import CaptionButtons from './components/CaptionButtons'
 import { enter } from './lib/motion'
@@ -160,29 +161,23 @@ export default function BrowserApp(): JSX.Element {
         </div>
 
         <div className="ml-1 flex shrink-0 items-center gap-0.5">
-          <button
-            className="btn-icon"
-            title={t('browser.back')} aria-label={t('browser.back')}
+          <IconButton
+            label={t('browser.back')}
+            icon={<ArrowLeft size={16} />}
             disabled={!state.canGoBack}
             onClick={() => window.api.browserBack()}
-          >
-            <ArrowLeft size={15} />
-          </button>
-          <button
-            className="btn-icon"
-            title={t('browser.forward')} aria-label={t('browser.forward')}
+          />
+          <IconButton
+            label={t('browser.forward')}
+            icon={<ArrowRight size={16} />}
             disabled={!state.canGoForward}
             onClick={() => window.api.browserForward()}
-          >
-            <ArrowRight size={15} />
-          </button>
-          <button
-            className="btn-icon"
-            title={state.loading ? t('browser.stop') : t('browser.reload')} aria-label={state.loading ? t('browser.stop') : t('browser.reload')}
+          />
+          <IconButton
+            label={state.loading ? t('browser.stop') : t('browser.reload')}
+            icon={state.loading ? <X size={16} /> : <RotateCw size={16} />}
             onClick={() => (state.loading ? window.api.browserStop() : window.api.browserReload())}
-          >
-            {state.loading ? <X size={15} /> : <RotateCw size={15} />}
-          </button>
+          />
         </div>
 
         <label className="field flex min-w-0 flex-1 cursor-text items-center gap-2 px-3 py-1.5">
@@ -197,7 +192,7 @@ export default function BrowserApp(): JSX.Element {
             onKeyDown={(e) => e.key === 'Enter' && go()}
             placeholder={t('browser.urlPlaceholder')}
             spellCheck={false}
-            className="no-drag mono min-w-0 flex-1 self-stretch bg-transparent text-control text-ink outline-none placeholder:text-ink-3"
+            className="no-drag mono min-w-0 flex-1 self-stretch bg-transparent text-control text-ink outline-none placeholder:text-ink/80"
           />
         </label>
 
@@ -209,13 +204,11 @@ export default function BrowserApp(): JSX.Element {
           <Crosshair size={14} />
           {state.picking ? t('browser.pickActive') : t('browser.pick')}
         </button>
-        <button
-          className="btn-icon"
-          title={t('browser.openExternal')} aria-label={t('browser.openExternal')}
+        <IconButton
+          label={t('browser.openExternal')}
+          icon={<ExternalLink size={16} />}
           onClick={() => state.url && window.api.openExternal(state.url)}
-        >
-          <ExternalLink size={14} />
-        </button>
+        />
 
         {!isMac && <CaptionButtons />}
       </header>
@@ -262,9 +255,7 @@ export default function BrowserApp(): JSX.Element {
           <div className="flex items-center justify-between border-b border-edge px-4 py-3">
             <p className="label">{t('browser.found')}</p>
             {media.length > 0 && (
-              <button className="btn-icon" title={t('browser.clear')} aria-label={t('browser.clear')} onClick={() => window.api.browserClearMedia()}>
-                <Trash2 size={13} />
-              </button>
+              <IconButton label={t('browser.clear')} icon={<Trash2 size={16} />} onClick={() => window.api.browserClearMedia()} />
             )}
           </div>
 

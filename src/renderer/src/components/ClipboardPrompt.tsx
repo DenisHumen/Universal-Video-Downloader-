@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react'
 import { AnimatePresence, m } from 'framer-motion'
 import { collapse } from '../lib/motion'
 import { X } from '../ui/icons'
+import IconButton from '../ui/IconButton'
 import { useStore } from '../store'
 import { useT } from '../i18n'
 
@@ -63,9 +64,7 @@ export default function ClipboardPrompt(): JSX.Element {
             <button className="btn-quiet shrink-0 px-3 py-2" onClick={accept}>
               {t('home.clipboardUse')}
             </button>
-            <button className="btn-icon" onClick={dismiss} aria-label={t('common.close')}>
-              <X size={15} />
-            </button>
+            <IconButton label={t('common.close')} icon={<X size={16} />} onClick={dismiss} />
           </div>
         </m.div>
       )}
