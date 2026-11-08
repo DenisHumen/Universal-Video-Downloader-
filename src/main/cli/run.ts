@@ -23,22 +23,18 @@ import { lineReader } from '../services/engine-output'
 import { ffmpegProgressSeconds, splitOutputLines } from '../services/ffmpeg-output'
 import { browserCookiesFile, dropSavedBrowserJar, readSavedBrowserJar } from '../services/browser-logins'
 import { flushLog, initLog, log } from '../services/log'
-import { currentLanguage, type MainLanguage } from '../services/locale'
-import { wordsIn } from '../services/words'
 import {
   describeFailure,
   downloadChoice,
-  engineSetupFailure,
-  failureText,
   ffmpegProgressLine,
   displayName,
-  outputLanguage,
   parseCliArgs,
   parseProgress,
   postprocessLine,
   progressLine,
-  usage,
-  type CliChoice
+  USAGE,
+  type CliChoice,
+  type CliOptions
 } from './format'
 
 /**
@@ -64,9 +60,6 @@ let live: ReturnType<typeof spawn> | null = null
 let stopping = false
 /** The progress line is redrawn in place; anything else printed first has to clear it. */
 let lineOpen = false
-/** English until the settings can be read, which is the same moment there is something to say. */
-let language: MainLanguage = 'en'
-const t = ((key, params) => wordsIn(language).t(key, params)) as ReturnType<typeof wordsIn>['t']
 
 function status(text: string): void {
   if (!tty) return
@@ -93,6 +86,8 @@ function finish(code: number): void {
 
 /** Before `ready`: everything that has to be decided before Chromium starts. */
 export function startCli(argv: string[]): void {
+  const options = parseCliArgs(argv)
+
   // Nothing here draws, and a terminal does not want Chromium's GPU chatter.
   app.disableHardwareAcceleration()
   app.commandLine.appendSwitch('log-level', '3')
@@ -108,7 +103,7 @@ export function startCli(argv: string[]): void {
     if (stopping) return
     stopping = true
     if (live) killTree(live)
-    say(t('cli.stopped'))
+    say('Stopped. Run the same command again to pick up where it left off.')
     finish(130)
   }
   process.on('SIGINT', stop)
@@ -116,49 +111,43 @@ export function startCli(argv: string[]): void {
 
   app
     .whenReady()
-    .then(() => run(argv))
+    .then(() => run(options))
     .then(
       (code) => finish(code),
       (error) => {
-        say(`✗ ${failureText(language, error instanceof Error ? error.message : String(error))}`)
+        say(`✗ ${error instanceof Error ? error.message : String(error)}`)
         finish(1)
       }
     )
 }
 
-async function run(argv: string[]): Promise<number> {
-  const asked = parseCliArgs(argv)
-  if (asked.version && !asked.help) {
+async function run(options: CliOptions): Promise<number> {
+  if (options.help) {
+    out(USAGE)
+    return 0
+  }
+  if (options.version) {
     out(`uvd ${app.getVersion()} (Universal Video Downloader)`)
     return 0
   }
-
-  // Before the first read of the settings, which may hand a proxy password to the store.
-  await initSecrets()
-  const settings = getSettings()
-  // Only ready now: the system's locale, for a setting of "auto", is not known before Chromium is up.
-  language = outputLanguage(currentLanguage(), tty, asked.help)
-  // Read again for the words: nothing above could have told what language an error should be in.
-  const options = parseCliArgs(argv, language)
-  if (options.help) {
-    out(usage(language))
-    return 0
-  }
   if (options.error) {
-    err(`uvd: ${options.error}\n\n${usage(language)}`)
+    err(`uvd: ${options.error}\n\n${USAGE}`)
     return 64
   }
 
+  await initSecrets()
+  const settings = getSettings()
   initLog(settings.logVerbose ? 'debug' : 'info')
   log.info('cli', 'Started', { links: options.links.length })
   await applyProxy(settings)
   readSavedBrowserJar()
 
-  if (!existsSync(ytdlpBinaryPath())) say(t('cli.settingUp'))
+  if (!existsSync(ytdlpBinaryPath())) say('Setting up the download engine (first run only)…')
   try {
     await ensureYtdlp()
   } catch (error) {
-    for (const line of engineSetupFailure(error instanceof Error ? error.message : String(error), language)) say(line)
+    say(`✗ Could not set up the download engine: ${error instanceof Error ? error.message : String(error)}`)
+    say('  Check the connection, or open Universal Video Downloader once and let it finish setting up.')
     return 1
   }
 
@@ -197,7 +186,7 @@ async function download(link: string, outputDir: string, choice: CliChoice): Pro
     which the engine's own HLS downloader refuses, is fetched again by ffmpeg.
   */
   if (result.code !== 0 && !stopping && !item.hlsViaFfmpeg && refusesMidStreamInit(result.stderrTail)) {
-    say(`  ${t('cli.restarts')}`)
+    say('  the stream restarts partway through; fetching it with ffmpeg instead')
     log.info('cli', 'Fetching the HLS stream with ffmpeg', { url: item.url })
     item.hlsViaFfmpeg = true
     result = await runEngine(item, settings, dir)
@@ -205,17 +194,17 @@ async function download(link: string, outputDir: string, choice: CliChoice): Pro
 
   if (stopping) return 130
   if (result.startError) {
-    say(`✗ ${t('cli.startFailed', { why: result.startError })}`)
+    say(`✗ Could not start the download engine: ${result.startError}`)
     return 1
   }
   if (result.code === 0) {
     const path = result.finalPath
-    say(path && existsSync(path) ? `✓ ${t('cli.saved', { path })}` : `✓ ${t('cli.savedIn', { dir })}`)
+    say(path && existsSync(path) ? `✓ Saved to ${path}` : `✓ Done. Saved in ${dir}`)
     log.info('cli', 'Download finished', { url: item.url, path })
     return 0
   }
   const classified = classifyYtdlpError(result.stderrTail, hasCookies(settings, browserCookiesFile()))
-  const failure = describeFailure(classified.code, classified.message, Boolean(classified.cookieHint), language)
+  const failure = describeFailure(classified.code, classified.message, Boolean(classified.cookieHint))
   for (const line of failure.lines) say(line)
   log.warn('cli', 'Download failed', { url: item.url, code: classified.code, error: result.stderrTail.slice(-600) })
   return failure.exitCode
@@ -246,12 +235,12 @@ function runEngine(item: DownloadItem, settings: AppSettings, dir: string): Prom
       (line) => {
         if (line.startsWith(PROGRESS_PREFIX)) {
           fetched = true
-          status(progressLine(parseProgress(line.slice(PROGRESS_PREFIX.length)), undefined, language))
+          status(progressLine(parseProgress(line.slice(PROGRESS_PREFIX.length))))
           return
         }
         if (line.startsWith(POSTPROCESS_PREFIX)) {
           const [state, postprocessor] = line.slice(POSTPROCESS_PREFIX.length).split('\t')
-          if (state === 'started') status(postprocessLine(postprocessor, language))
+          if (state === 'started') status(postprocessLine(postprocessor))
           if (fetched) postprocessing = true
           return
         }
@@ -259,14 +248,14 @@ function runEngine(item: DownloadItem, settings: AppSettings, dir: string): Prom
         if (found && (!finalPath || found.priority >= finalPath.priority)) finalPath = found
         if (found && !announced) {
           announced = true
-          say(`  ${t('cli.savingAs', { name: displayName(found.path) })}`)
+          say(`  saving as ${displayName(found.path)}`)
         }
       }
     )
     const stderr = lineReader(splitOutputLines, (line) => {
       // ffmpeg fetching an HLS stream says how far it has got here, and nowhere else.
       const seconds = ffmpegProgressSeconds(line)
-      if (seconds != null) return status(ffmpegProgressLine(seconds, language))
+      if (seconds != null) return status(ffmpegProgressLine(seconds))
       stderrTail = (stderrTail + line + '\n').slice(-4000)
     })
     child.stdout?.on('data', (chunk: Buffer) => stdout.push(chunk))

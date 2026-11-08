@@ -1,27 +1,12 @@
 import type { AppErrorCode, AppSettings, DownloadMode, QualityPreset } from '@shared/types'
-import type { MainLanguage } from '../services/locale'
-import { decimalIn, reasonIn, wordsIn } from '../services/words'
 
 /**
  * The command line's words: what it accepts, what it prints while it works,
  * and what it says when a link does not work.
  *
- * Pure. Everything that prints takes the language, and left out it is English,
- * which is also what a script gets: see `outputLanguage`.
+ * Pure, and in English only - a terminal is the one place the app does not
+ * follow the interface language, because scripts grep what it prints.
  */
-
-/**
- * The language to print in.
- *
- * The app's language on a terminal, where somebody is reading. Into a pipe or a
- * file it stays English, as it always has: scripts grep this output, and one
- * that looks for "Saved to" must not break because the machine it runs on is set
- * to Russian. Exit codes, the two streams and the marks at the start of a line
- * are the same either way. Help is read by a person even through `less`.
- */
-export function outputLanguage(preferred: MainLanguage, terminal: boolean, help: boolean): MainLanguage {
-  return terminal || help ? preferred : 'en'
-}
 
 /** The switch that turns a launch of the app into a terminal run. */
 export const CLI_FLAG = '--cli'
@@ -47,6 +32,8 @@ export const CLI_QUALITIES = ['best', '2160', '1440', '1080', '720', '480', '360
 
 /** One of the ladder's rungs; each is a `QualityPreset` the downloader already reads. */
 export type CliQuality = (typeof CLI_QUALITIES)[number] & QualityPreset
+
+const QUALITY_LIST = 'best, 2160, 1440, 1080, 720, 480 or 360'
 
 /**
  * A quality as somebody types it, or null when it is not one of the ladder's.
@@ -76,14 +63,12 @@ export interface CliOptions {
   error?: string
 }
 
-export function parseCliArgs(args: string[], language: MainLanguage = 'en'): CliOptions {
-  const { t } = wordsIn(language)
-  const list = t('cli.err.qualityList')
+export function parseCliArgs(args: string[]): CliOptions {
   const options: CliOptions = { links: [], audio: false, help: false, version: false }
   const takeQuality = (flag: string, value: string | undefined): string | undefined => {
-    if (!value) return t('cli.err.needsQuality', { flag, list })
+    if (!value) return `${flag} needs a quality after it: ${QUALITY_LIST}.`
     const quality = parseQuality(value)
-    if (!quality) return t('cli.err.badQuality', { flag, list, value })
+    if (!quality) return `${flag} takes ${QUALITY_LIST}, not "${value}".`
     options.quality = quality
     return undefined
   }
@@ -94,7 +79,7 @@ export function parseCliArgs(args: string[], language: MainLanguage = 'en'): Cli
     else if (arg === '-a' || arg === '--audio') options.audio = true
     else if (arg === '-o' || arg === '--output') {
       const value = args[++i]
-      if (!value) return { ...options, error: t('cli.err.needsFolder', { flag: arg }) }
+      if (!value) return { ...options, error: `${arg} needs a folder after it.` }
       options.output = value
     } else if (arg.startsWith('--output=')) options.output = arg.slice('--output='.length)
     else if (arg === '-q' || arg === '--quality') {
@@ -107,7 +92,7 @@ export function parseCliArgs(args: string[], language: MainLanguage = 'en'): Cli
       // Everything after `--` is a link, even one that starts with a dash.
       options.links.push(...args.slice(i + 1).map((a) => a.trim()).filter(Boolean))
       break
-    } else if (arg.startsWith('-')) return { ...options, error: t('cli.err.unknownOption', { flag: arg }) }
+    } else if (arg.startsWith('-')) return { ...options, error: `Unknown option: ${arg}` }
     else if (arg.trim()) options.links.push(arg.trim())
   }
   /*
@@ -116,10 +101,10 @@ export function parseCliArgs(args: string[], language: MainLanguage = 'en'): Cli
     Better to ask than to guess which one was meant.
   */
   if (options.quality && options.audio && !options.error) {
-    options.error = t('cli.err.qualityWithAudio')
+    options.error = '--quality picks a video size, so it does nothing with --audio. Leave one of them out.'
   }
   if (!options.help && !options.version && !options.error && options.links.length === 0) {
-    options.error = t('cli.err.noLink')
+    options.error = 'Give it a link to download.'
   }
   return options
 }
@@ -149,12 +134,24 @@ export function downloadChoice(
   return { mode: 'video', quality: !quality || quality === 'audio' ? 'best' : quality }
 }
 
-// The ladder as a flag's argument. Outside the dictionary, where a "|" means plural forms.
-const QUALITY_ARGUMENT = `<${CLI_QUALITIES.join('|')}>`
+export const USAGE = `Usage: uvd <link> [<link> ...] [options]
 
-export function usage(language: MainLanguage = 'en'): string {
-  return wordsIn(language).t('cli.usage', { qualities: QUALITY_ARGUMENT })
-}
+Downloads each link with the default mode and quality from the app's settings
+(the best quality, until you change them), into your Downloads folder or the
+folder chosen there. The flags below override the settings for this run.
+
+Options:
+  -q, --quality <best|2160|1440|1080|720|480|360>
+                         take a video of at most this height (1080p and 4K
+                         work too); a site without it gives the best it has
+  -o, --output <folder>  save into this folder instead
+  -a, --audio            save the audio only
+  -V, --version          print the version
+  -h, --help             print this help
+
+If a link does not work here, open Universal Video Downloader and try it
+there: the app can also read the page itself and catch the stream in its
+built-in browser.`
 
 // ---------------------------------------------------------------------------
 // Progress
@@ -189,16 +186,15 @@ export function parseProgress(fields: string): CliProgress {
   }
 }
 
-export function formatBytes(bytes: number, language: MainLanguage = 'en'): string {
-  const { t } = wordsIn(language)
-  const units = [t('bytes.B'), t('bytes.KB'), t('bytes.MB'), t('bytes.GB'), t('bytes.TB')]
+export function formatBytes(bytes: number): string {
+  const units = ['B', 'KB', 'MB', 'GB', 'TB']
   let value = bytes
   let unit = 0
   while (value >= 1000 && unit < units.length - 1) {
     value /= 1000
     unit++
   }
-  return `${value >= 100 || unit === 0 ? Math.round(value) : decimalIn(language, value, 1)} ${units[unit]}`
+  return `${value >= 100 || unit === 0 ? Math.round(value) : value.toFixed(1)} ${units[unit]}`
 }
 
 export function formatEta(seconds: number): string {
@@ -210,17 +206,15 @@ export function formatEta(seconds: number): string {
 }
 
 /** `  42% ━━━━━━━━━━──────────────  120 MB of 286 MB · 8.1 MB/s · 0:21 left` */
-export function progressLine(p: CliProgress, width = 24, language: MainLanguage = 'en'): string {
-  const { t } = wordsIn(language)
-  const bytes = (n: number): string => formatBytes(n, language)
+export function progressLine(p: CliProgress, width = 24): string {
   const share = p.total && p.downloaded != null ? Math.min(1, p.downloaded / p.total) : undefined
   const parts: string[] = []
   if (p.downloaded != null) {
-    parts.push(p.total ? t('cli.sizeOf', { done: bytes(p.downloaded), total: bytes(p.total) }) : bytes(p.downloaded))
+    parts.push(p.total ? `${formatBytes(p.downloaded)} of ${formatBytes(p.total)}` : formatBytes(p.downloaded))
   }
-  if (p.speed) parts.push(`${bytes(p.speed)}${t('speed.perSecond')}`)
-  if (p.eta != null && share !== 1) parts.push(t('cli.left', { time: formatEta(p.eta) }))
-  if (share == null) return `  ${t('cli.downloading')}  ${parts.join(' · ')}`.trimEnd()
+  if (p.speed) parts.push(`${formatBytes(p.speed)}/s`)
+  if (p.eta != null && share !== 1) parts.push(`${formatEta(p.eta)} left`)
+  if (share == null) return `  downloading  ${parts.join(' · ')}`.trimEnd()
   const filled = Math.round(share * width)
   const percent = `${Math.floor(share * 100)}%`.padStart(4)
   return `  ${percent} ${'━'.repeat(filled)}${'─'.repeat(width - filled)}  ${parts.join(' · ')}`.trimEnd()
@@ -241,21 +235,20 @@ export function displayName(path: string): string {
  * it has, never bytes or a total, and the terminal knows no duration to set
  * that against - so it says the position, which still shows it is moving.
  */
-export function ffmpegProgressLine(seconds: number, language: MainLanguage = 'en'): string {
-  return `  ${wordsIn(language).t('cli.ffmpegProgress', { time: formatEta(seconds) })}`
+export function ffmpegProgressLine(seconds: number): string {
+  return `  downloading with ffmpeg  ${formatEta(seconds)} of the video so far`
 }
 
 /** What a post-processing step is doing, as a person would say it. */
-export function postprocessLine(postprocessor: string | undefined, language: MainLanguage = 'en'): string {
-  const { t } = wordsIn(language)
+export function postprocessLine(postprocessor: string | undefined): string {
   const name = (postprocessor ?? '').toLowerCase()
-  if (name.includes('merger')) return `  ${t('cli.step.merge')}`
-  if (name.includes('extractaudio')) return `  ${t('cli.step.audio')}`
-  if (name.includes('thumbnail')) return `  ${t('cli.step.thumbnail')}`
-  if (name.includes('metadata')) return `  ${t('cli.step.metadata')}`
-  if (name.includes('subtitle') || name.includes('subs')) return `  ${t('cli.step.subtitles')}`
-  if (name.includes('sponsorblock')) return `  ${t('cli.step.sponsors')}`
-  return `  ${t('cli.step.finish')}`
+  if (name.includes('merger')) return '  merging video and audio…'
+  if (name.includes('extractaudio')) return '  converting the audio…'
+  if (name.includes('thumbnail')) return '  adding the thumbnail…'
+  if (name.includes('metadata')) return '  writing the metadata…'
+  if (name.includes('subtitle') || name.includes('subs')) return '  adding subtitles…'
+  if (name.includes('sponsorblock')) return '  cutting sponsor segments…'
+  return '  finishing up…'
 }
 
 // ---------------------------------------------------------------------------
@@ -287,44 +280,21 @@ export interface CliFailure {
   lines: string[]
 }
 
-/**
- * A failure's reason as it prints. English keeps the sentence the engine's output
- * was classified into, which is what this command has always said; another
- * language has the interface's sentence for the code, so the terminal and the
- * window say the same.
- */
-export function failureText(language: MainLanguage, message: string, code?: AppErrorCode): string {
-  return language === 'en' ? message : reasonIn(language, message, code)
-}
-
-export function describeFailure(
-  code: AppErrorCode | undefined,
-  message: string,
-  cookieHint: boolean,
-  language: MainLanguage = 'en'
-): CliFailure {
-  const { t } = wordsIn(language)
+export function describeFailure(code: AppErrorCode | undefined, message: string, cookieHint: boolean): CliFailure {
   if (APP_MIGHT_MANAGE.has(code)) {
     return {
       exitCode: EXIT_NOT_DETECTED,
       lines: [
         // With no code the sentence is the only reason there is; a 503 or a locked file was hidden behind this line.
-        code ? `✗ ${t('cli.noVideo')}` : `✗ ${failureText(language, message)}`,
-        ...t('cli.tryApp').split('\n').map((line) => `  ${line}`)
+        code ? "✗ Couldn't find a video to download at this link." : `✗ ${message}`,
+        '  Open Universal Video Downloader and try it there: the app can also read',
+        '  the page itself and catch the stream in its built-in browser.'
       ]
     }
   }
-  const lines = [`✗ ${failureText(language, message, code)}`]
-  if (cookieHint) lines.push(`  ${t('cli.cookieHint')}`)
+  const lines = [`✗ ${message}`]
+  if (cookieHint) {
+    lines.push('  Switch on browser cookies in the app (Settings → Access) and run this again.')
+  }
   return { exitCode: 1, lines }
-}
-
-/**
- * The engine could not be got ready. One that is there and will not start is
- * antivirus, where the connection this used to mention could not help.
- */
-export function engineSetupFailure(message: string, language: MainLanguage = 'en'): string[] {
-  const { t } = wordsIn(language)
-  if (/failed to start/i.test(message)) return [`✗ ${t('engine.startFailed')}`]
-  return [`✗ ${t('cli.setupFailed', { why: message })}`, `  ${t('cli.setupAdvice')}`]
 }

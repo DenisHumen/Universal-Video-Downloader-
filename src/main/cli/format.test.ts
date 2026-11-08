@@ -4,18 +4,16 @@ import {
   describeFailure,
   displayName,
   downloadChoice,
-  engineSetupFailure,
   EXIT_NOT_DETECTED,
   formatBytes,
   formatEta,
-  outputLanguage,
   parseCliArgs,
   parseProgress,
   parseQuality,
   ffmpegProgressLine,
   postprocessLine,
   progressLine,
-  usage
+  USAGE
 } from './format'
 
 describe('cliArgvFrom', () => {
@@ -68,8 +66,8 @@ describe('downloadChoice', () => {
   })
 
   it('is what the help says', () => {
-    expect(usage()).toMatch(/default mode and quality from the app's settings/)
-    expect(usage()).toMatch(/override the settings/)
+    expect(USAGE).toMatch(/default mode and quality from the app's settings/)
+    expect(USAGE).toMatch(/override the settings/)
   })
 })
 
@@ -136,7 +134,7 @@ describe('parseQuality', () => {
   })
 
   it('is listed in the help', () => {
-    expect(usage()).toMatch(/-q, --quality <best\|2160\|1440\|1080\|720\|480\|360>/)
+    expect(USAGE).toMatch(/-q, --quality <best\|2160\|1440\|1080\|720\|480\|360>/)
   })
 })
 
@@ -203,109 +201,5 @@ describe('describeFailure', () => {
   it('points at cookies for an access gate', () => {
     const failure = describeFailure('signIn', 'This video requires you to be signed in.', true)
     expect(failure.lines[1]).toMatch(/browser cookies/)
-  })
-})
-
-/*
-  Scripts grep what this prints, so English has to stay word for word what it
-  was, and a script on a machine set to Russian has to get that English too.
-*/
-describe('the language it prints in', () => {
-  it('is the app’s on a terminal, English into a pipe, and the app’s for help anywhere', () => {
-    expect(outputLanguage('ru', true, false)).toBe('ru')
-    expect(outputLanguage('ru', false, false)).toBe('en')
-    expect(outputLanguage('ru', false, true)).toBe('ru')
-    expect(outputLanguage('en', true, false)).toBe('en')
-  })
-
-  it('leaves the English help as it was', () => {
-    expect(usage()).toBe(
-      [
-        'Usage: uvd <link> [<link> ...] [options]',
-        '',
-        "Downloads each link with the default mode and quality from the app's settings",
-        '(the best quality, until you change them), into your Downloads folder or the',
-        'folder chosen there. The flags below override the settings for this run.',
-        '',
-        'Options:',
-        '  -q, --quality <best|2160|1440|1080|720|480|360>',
-        '                         take a video of at most this height (1080p and 4K',
-        '                         work too); a site without it gives the best it has',
-        '  -o, --output <folder>  save into this folder instead',
-        '  -a, --audio            save the audio only',
-        '  -V, --version          print the version',
-        '  -h, --help             print this help',
-        '',
-        'If a link does not work here, open Universal Video Downloader and try it',
-        'there: the app can also read the page itself and catch the stream in its',
-        'built-in browser.'
-      ].join('\n')
-    )
-  })
-
-  it('leaves the English hint to try the app as it was', () => {
-    expect(describeFailure('noFormats', 'x', false).lines).toEqual([
-      "✗ Couldn't find a video to download at this link.",
-      '  Open Universal Video Downloader and try it there: the app can also read',
-      '  the page itself and catch the stream in its built-in browser.'
-    ])
-  })
-
-  it('says the help in Russian, with the flags as they are typed', () => {
-    const text = usage('ru')
-    expect(text).toMatch(/uvd <ссылка>/)
-    expect(text).toContain('-q, --quality <best|2160|1440|1080|720|480|360>')
-    expect(text).not.toMatch(/\{\w+\}/)
-    expect(text).not.toMatch(/движ|поток/i)
-  })
-
-  it('refuses a command line in Russian', () => {
-    expect(parseCliArgs(['-q', '72', 'https://a.example/v'], 'ru').error).toBe(
-      '-q принимает best, 2160, 1440, 1080, 720, 480 или 360, а не «72».'
-    )
-    expect(parseCliArgs([], 'ru').error).toMatch(/ссылку/)
-    expect(parseCliArgs(['--best', 'x'], 'ru').error).toBe('Неизвестный параметр: --best')
-  })
-
-  it('draws progress in Russian, with a comma and Russian units', () => {
-    const line = progressLine({ status: 'downloading', downloaded: 5_300_000, total: 8_100_000, speed: 1_000_000, eta: 21 }, 10, 'ru')
-    expect(line).toContain('5,3 МБ из 8,1 МБ')
-    expect(line).toContain('1,0 МБ/с')
-    expect(line).toContain('осталось 0:21')
-    expect(ffmpegProgressLine(754, 'ru')).toContain('12:34')
-    expect(postprocessLine('Merger', 'ru')).toMatch(/соединяю/)
-  })
-
-  it('keeps the exit codes whatever the language', () => {
-    for (const code of ['noFormats', 'geo', undefined] as const) {
-      expect(describeFailure(code, 'Something.', false, 'ru').exitCode).toBe(describeFailure(code, 'Something.', false).exitCode)
-    }
-  })
-
-  it('gives the interface’s sentence for a code in Russian, and the engine’s in English', () => {
-    expect(describeFailure('geo', 'This video is not available in your region.', false, 'ru').lines[0]).toMatch(/^✗ [^A-Za-z]+/)
-    expect(describeFailure(undefined, 'HTTP 503', false, 'ru').lines[0]).toMatch(/сервер/i)
-    expect(describeFailure(undefined, 'HTTP 503', false, 'ru').lines[1]).toMatch(/Откройте Universal Video Downloader/)
-    expect(describeFailure(undefined, 'HTTP 503', false).lines[0]).toBe('✗ HTTP 503')
-    expect(describeFailure('signIn', 'x', true, 'ru').lines[1]).toMatch(/Настройки → Доступ/)
-  })
-})
-
-describe('engineSetupFailure', () => {
-  it('sends an engine that will not start to antivirus, not to the connection', () => {
-    const said = 'The download engine was installed but failed to start on this system.'
-    for (const language of ['en', 'ru'] as const) {
-      const lines = engineSetupFailure(said, language)
-      expect(lines).toHaveLength(1)
-      expect(lines[0]).toMatch(/antivirus|антивирус/)
-    }
-  })
-
-  it('keeps the connection advice, and the reason, for anything else', () => {
-    expect(engineSetupFailure('HTTP 503')).toEqual([
-      '✗ Could not set up the download engine: HTTP 503',
-      '  Check the connection, or open Universal Video Downloader once and let it finish setting up.'
-    ])
-    expect(engineSetupFailure('HTTP 503', 'ru')[1]).toMatch(/Проверьте интернет/)
   })
 })

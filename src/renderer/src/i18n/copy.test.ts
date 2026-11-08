@@ -82,8 +82,8 @@ describe('copy (D7)', () => {
   starts in lower case is shown in lower case.
 */
 describe('copy pass (5.8)', () => {
-  // Fragments composed into a sentence, units, placeholders that show what to type, and lines in a terminal.
-  const FRAGMENT = /^(cli\.|time\.|settings\.proxyPlaceholder$|auto\.(in|ago)$|shortcuts\.or$|format\.plusAudio$|main\.netReason\.)/
+  // Fragments composed into a sentence, units, and placeholders that show what to type.
+  const FRAGMENT = /^(time\.|settings\.proxyPlaceholder$|auto\.(in|ago)$|shortcuts\.or$|format\.plusAudio$|main\.netReason\.)/
 
   it.each([
     ['en', en],
