@@ -6,6 +6,7 @@ import { AccentSwatches, ActionRow, Dialog, PreferencesGroup, StyleTiles, Switch
 import { useT } from '../i18n'
 import { useStore } from '../store'
 import { ACCENT_LABEL } from '../views/settings/panels'
+import HelpText from './HelpText'
 
 /**
  * The steps (6.3). There was a third, "which browser's cookies": asked of someone
@@ -139,6 +140,9 @@ function Steps({ settings, onClose }: { settings: AppSettings; onClose: () => vo
               />
             </div>
           </PreferencesGroup>
+          <p className="text-center text-meta text-ink-2">
+            <HelpText text={t('setup.helpWhere')} />
+          </p>
         </div>
       )}
     </Dialog>

@@ -5,6 +5,7 @@ import type { AppSettings, MediaInfo } from '@shared/types'
 import { errorReport, errorText } from '../../lib/errors'
 import { fixFor } from '../../lib/fixes'
 import FixBar from '../../components/FixBar'
+import HelpLink from '../../components/HelpLink'
 import { errorCardLead } from '../../lib/emphasis'
 import { toast } from '../../lib/toast'
 import { Menu, type MenuItem } from '../../ui'
@@ -193,6 +194,7 @@ function ErrorCard({
               </button>
             )}
           />
+          <HelpLink errorCode={errorCode} cookieHint={cookieHint} />
         </div>
         {(lead === 'browser' || fix === 'browser') && <p className="hint mt-3">{t('browser.openHint')}</p>}
         {/* Keyed by the failure, so a retry that fails again asks afresh. */}

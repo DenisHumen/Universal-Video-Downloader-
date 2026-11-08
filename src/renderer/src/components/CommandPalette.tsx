@@ -7,6 +7,7 @@ import { linkIn } from '../lib/shortcuts'
 import { recentFinished } from '../lib/downloads'
 import Modal from './Modal'
 import { NAV_ALL } from '../shell/nav'
+import { HELP_TOPICS, helpPlain, helpSearchText } from '../lib/help'
 import { PANELS } from '../views/settings/router'
 import { searchSettings } from '../views/settings/searchIndex'
 import { cx } from '../ui'
@@ -19,13 +20,17 @@ import { GoNext, Search } from '../ui/icons'
   ↑/↓ move, Enter runs, Esc closes; focus never leaves the field.
 */
 
-type Group = 'navigate' | 'actions' | 'recent' | 'settings'
+type Group = 'navigate' | 'actions' | 'recent' | 'help' | 'settings'
 
 interface Command {
   id: string
   group: Group
   label: string
   hint?: string
+  /** Also matched, never shown: what a Help topic says. */
+  search?: string
+  /** Only once something is typed: eight questions would crowd the idle menu. */
+  whenTyping?: boolean
   run: () => void | Promise<void>
 }
 
@@ -33,6 +38,7 @@ const GROUP_LABEL: Record<Group, TranslationKey> = {
   navigate: 'palette.navigate',
   actions: 'palette.actions',
   recent: 'palette.recent',
+  help: 'help.title',
   settings: 'palette.settings'
 }
 
@@ -93,6 +99,15 @@ function Palette(): JSX.Element {
         label: d.title,
         hint: t('palette.showInFolder'),
         run: () => void (d.filepath && showFile(d.filepath))
+      })),
+      { id: 'help', group: 'help', label: t('help.title'), run: () => s.openHelp() },
+      ...HELP_TOPICS.map((topic) => ({
+        id: `help-${topic.id}`,
+        group: 'help' as const,
+        label: helpPlain(t(topic.title), t),
+        search: helpSearchText(topic, t),
+        whenTyping: true,
+        run: () => s.openHelp(topic.id)
       }))
     ]
     return list
@@ -102,9 +117,9 @@ function Palette(): JSX.Element {
     const q = query.trim()
     if (!q) {
       const counts: Partial<Record<Group, number>> = {}
-      return commands.filter((c) => (counts[c.group] = (counts[c.group] ?? 0) + 1) <= IDLE_PER_GROUP)
+      return commands.filter((c) => !c.whenTyping && (counts[c.group] = (counts[c.group] ?? 0) + 1) <= IDLE_PER_GROUP)
     }
-    const hits = commands.filter((c) => matchesQuery(q, c.label, c.hint))
+    const hits = commands.filter((c) => matchesQuery(q, c.label, c.hint, c.search))
     const settingHits: Command[] = searchSettings(q, t)
       .slice(0, 8)
       .map((h) => ({

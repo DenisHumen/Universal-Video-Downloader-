@@ -5,6 +5,7 @@ import { Menu } from '../ui'
 import { useT } from '../i18n'
 import { useStore } from '../store'
 import { toast } from '../lib/toast'
+import HelpLink from './HelpLink'
 import { FIX_LABEL, fixFor, retryAt, scheduleRetry, subscribeRetries } from '../lib/fixes'
 
 export interface FixBarProps {
@@ -177,6 +178,7 @@ export default function FixBar({
         <button type="button" className="btn-quiet" onClick={() => void copy()}>
           <Copy size={14} /> {t('fix.copyError')}
         </button>
+        <HelpLink errorCode={errorCode} cookieHint={cookieHint} />
       </div>
       {report && !report.open && <p className="mt-1.5 text-meta text-ink-2">{t('fix.reportConsent')}</p>}
     </div>

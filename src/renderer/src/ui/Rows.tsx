@@ -293,6 +293,8 @@ export function PasswordEntryRow({ showLabel, hideLabel, ...props }: EntryRowPro
 
 interface ExpanderRowProps {
   title: ReactNode
+  /** Leading widget: a 16 px symbolic icon. */
+  prefix?: ReactNode
   subtitle?: ReactNode
   /** An enable switch on the row (AdwExpanderRow show-enable-switch). */
   enabled?: boolean
@@ -306,6 +308,7 @@ interface ExpanderRowProps {
 /** AdwExpanderRow: a row that reveals child rows, from anywhere on it; with an enable switch, the children follow it. */
 export function ExpanderRow({
   title,
+  prefix,
   subtitle,
   enabled,
   onEnabledChange,
@@ -320,6 +323,11 @@ export function ExpanderRow({
   return (
     <div id={id} data-row={id} className="border-b border-edge-soft last:border-b-0">
       <div className="ui-row ui-row-activatable border-b-0" onClick={onRowSurface(() => setOpen((v) => !v))}>
+        {prefix && (
+          <span className="flex shrink-0 items-center text-ink" aria-hidden="true">
+            {prefix}
+          </span>
+        )}
         <span className="min-w-0 flex-1">
           <span id={titleId} className="ui-row-title block">
             {title}

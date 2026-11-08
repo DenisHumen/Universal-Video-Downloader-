@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import type { HelpTopicId } from './lib/help'
 import type {
   AppSettings,
   DetectPreview,
@@ -41,7 +42,8 @@ function rememberPreview(p: DetectPreview): void {
   while (previews.size > 8) previews.delete(previews.keys().next().value as string)
 }
 
-export type ViewId = 'home' | 'search' | 'downloads' | 'library' | 'automation' | 'settings'
+/** `guide` is Help: `help` already names the shortcut list's action (lib/shortcuts.ts). */
+export type ViewId = 'home' | 'search' | 'downloads' | 'library' | 'automation' | 'settings' | 'guide'
 
 export interface WatchIntent {
   url: string
@@ -95,6 +97,10 @@ interface AppState {
   /** The site's own title and poster for the link being detected, when it has one. */
   detectPreview: DetectPreview | null
   shortcutsOpen: boolean
+  /** The Help topic asked for, open and in view when Help appears. */
+  helpTopic: HelpTopicId | null
+  /** Counts the requests: asking again for a topic since folded opens it again. */
+  helpRequest: number
   /** The Ctrl/⌘+K command palette (plan 4.5). */
   paletteOpen: boolean
   /** The first-run setup (6.3), shown once and again from the primary menu. */
@@ -132,6 +138,7 @@ interface AppState {
   setSidebarFolded: (folded: boolean) => void
   /** Open Settings, at `route` or where it was last (Ctrl+, , About, Fix buttons, deep links). */
   openSettings: (route?: string) => void
+  openHelp: (topic?: HelpTopicId) => void
   setSettingsRoute: (route: string) => void
   /** Home started detecting this link: its stage starts over, from resolving. */
   beginDetect: (url: string, requestId: string) => void
@@ -311,6 +318,8 @@ export const useStore = create<AppState>((set, get) => ({
   detect: null,
   detectPreview: null,
   shortcutsOpen: false,
+  helpTopic: null,
+  helpRequest: 0,
   paletteOpen: false,
   setupOpen: false,
   focusedRow: null,
@@ -378,6 +387,8 @@ export const useStore = create<AppState>((set, get) => ({
       sidebarOverlayOpen: false
     })),
   setSettingsRoute: (route) => set({ settingsRoute: route }),
+  openHelp: (topic) =>
+    set((s) => ({ view: 'guide', helpTopic: topic ?? null, helpRequest: s.helpRequest + 1, sidebarOverlayOpen: false })),
   beginDetect: (url, requestId) =>
     set({ detect: { stage: 'resolving', url, requestId }, detectPreview: previews.get(requestId) ?? null }),
   endDetect: () => {
