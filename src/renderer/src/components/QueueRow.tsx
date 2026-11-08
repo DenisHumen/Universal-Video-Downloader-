@@ -242,6 +242,9 @@ function QueueRow({ item, index, animateIn = true, heading }: Props): JSX.Elemen
     item.state === 'detecting' ||
     item.state === 'waiting'
 
+  // A wait is the one place someone may well ask what the engine is up to; `active` also drives the bar.
+  const showsOutput = active || item.state === 'paused' || item.state === 'waiting'
+
   // Until it has started there is nothing being recorded for Stop and Save to keep.
   const canPause =
     running &&
@@ -302,7 +305,7 @@ function QueueRow({ item, index, animateIn = true, heading }: Props): JSX.Elemen
           }
         ]
       : []),
-    ...(active || item.state === 'paused'
+    ...(showsOutput
       ? [{ label: t('queue.log'), icon: <FileVideo size={14} />, onSelect: () => setLogOpen((v) => !v) }]
       : [])
   ]
@@ -502,9 +505,9 @@ function QueueRow({ item, index, animateIn = true, heading }: Props): JSX.Elemen
         </div>
       )}
 
-      {logOpen && (active || item.state === 'paused') && (
+      {logOpen && showsOutput && (
         <div className="pb-3 pl-[116px] pr-1">
-          <EngineOutput id={item.id} running={active} />
+          <EngineOutput id={item.id} running={active || item.state === 'waiting'} />
         </div>
       )}
 

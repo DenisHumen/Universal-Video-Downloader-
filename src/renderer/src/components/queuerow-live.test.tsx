@@ -51,6 +51,16 @@ const show = (item: DownloadItem): void =>
 describe('a row waiting for a video to start', () => {
   const waiting = { live: true, waitForVideo: true }
 
+  it('can show what the engine is saying, without a progress bar', async () => {
+    const read = vi.spyOn(window.api, 'downloadLog').mockResolvedValue('[info] waiting for the video')
+    show(row({ ...waiting, state: 'waiting' }))
+    expect(screen.queryByRole('progressbar')).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: 'More Actions' }))
+    fireEvent.click(await screen.findByRole('menuitem', { name: 'Technical Details' }))
+    await waitFor(() => expect(read).toHaveBeenCalledWith('row'))
+    expect(await screen.findByText(/waiting for the video/)).toBeTruthy()
+  })
+
   it('can be paused while it waits, with nothing yet to save', () => {
     const pause = vi.spyOn(window.api, 'pauseDownload')
     show(row({ ...waiting, state: 'waiting' }))
