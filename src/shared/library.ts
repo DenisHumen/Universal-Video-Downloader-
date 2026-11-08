@@ -60,8 +60,9 @@ export function siteNameOf(extractor: string | undefined): string | undefined {
  * Download Now, a batch and the terminal record no extractor, so their files
  * went under "Other", apart from the same site's files that were detected first.
  */
-export function librarySite(entry: Pick<LibraryEntry, 'url' | 'sourceUrl' | 'extractor'>): string | undefined {
-  const page = pageUrlOf(entry.sourceUrl || entry.url)
+export function librarySite(entry: Pick<LibraryEntry, 'url' | 'sourceUrl' | 'originUrl' | 'extractor'>): string | undefined {
+  // A clip's own `url` is the file it was cut from; the page it came from is `originUrl`.
+  const page = pageUrlOf(entry.originUrl || entry.sourceUrl || entry.url)
   const known = knownSiteFor(page)
   if (known) return known.name
   const named = siteNameOf(entry.extractor)

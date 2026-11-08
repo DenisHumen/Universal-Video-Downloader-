@@ -14,6 +14,12 @@ afterEach(() => {
   vi.unstubAllGlobals()
 })
 
+describe('librarySite', () => {
+  it('files a clip under the site of the video it was cut from', () => {
+    expect(librarySite({ url: 'C:\\v\\a.mp4', originUrl: 'https://media.example/1' })).toBe('media.example')
+  })
+})
+
 describe('siteNameOf', () => {
   it('names a site, and not the words for having no extractor', () => {
     expect(siteNameOf('Youtube')).toBe('Youtube')

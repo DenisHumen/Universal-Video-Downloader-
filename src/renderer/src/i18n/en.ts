@@ -729,11 +729,11 @@ export const en = {
   'trim.downloadHint': 'Only the selected part is downloaded',
   'trim.invalid': 'The end must come after the start',
   'trim.apply': 'Trim',
-  'trim.openEditor': 'Trim',
+  'trim.openEditor': 'Trim…',
 
   // ---- convert ----
   'convert.title': 'Convert',
-  'convert.open': 'Convert',
+  'convert.open': 'Convert…',
   'convert.keep': 'What to Keep',
   'convert.format': 'Format',
   'convert.resolution': 'Resolution',
