@@ -186,6 +186,7 @@ function QueueRow({ item, index, animateIn = true, heading }: Props): JSX.Elemen
       section: item.range,
       preciseSection: item.precise,
       subtitles: change.mode === 'audio' ? undefined : item.subtitles,
+      audioLanguage: item.audioLanguage,
       outputDir: change.outputDir ?? item.outputDir
     })
   }

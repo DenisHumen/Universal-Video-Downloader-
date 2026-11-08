@@ -110,7 +110,19 @@ function poster(seed: number, label: string): string {
 }
 
 
+/** A link with "mock-dubbed" in it has its sound in several languages. */
+const DUBBED: MediaInfo['formats'] = [
+  { id: '140-en', ext: 'm4a', kind: 'audio', resolution: 'audio', language: 'en', languagePreference: 10000 },
+  { id: '140-de', ext: 'm4a', kind: 'audio', resolution: 'audio', language: 'de', languagePreference: -1 },
+  { id: '140-es', ext: 'm4a', kind: 'audio', resolution: 'audio', language: 'es-419', languagePreference: -1 }
+]
+
 function fakeInfo(url: string): MediaInfo {
+  const info = fakeVideo(url)
+  return /mock-dubbed/.test(url) ? { ...info, formats: [...info.formats, ...DUBBED] } : info
+}
+
+function fakeVideo(url: string): MediaInfo {
   return {
     id: 'mock',
     title: 'Big Buck Bunny — official 4K remaster',
@@ -378,6 +390,7 @@ export function installMockApi(): void {
         quality: req.quality,
         playlist: req.playlist,
         subtitles: req.subtitles,
+        audioLanguage: req.audioLanguage,
         state: 'queued',
         percent: 0,
         outputDir: req.outputDir || settings.downloadDir,

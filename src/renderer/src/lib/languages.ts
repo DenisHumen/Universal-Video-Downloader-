@@ -1,4 +1,4 @@
-import type { MediaInfo } from '@shared/types'
+import type { MediaInfo, VideoFormat } from '@shared/types'
 import type { TranslateFn } from '../i18n'
 
 /** What the engine adds to a code; neither is a part of a language name the system could look up. */
@@ -28,6 +28,30 @@ export function languageName(code: string, locale: string, t: TranslateFn): stri
   if (ORIGINAL.test(code)) return t('lang.original', { language: plainName(code.replace(ORIGINAL, ''), locale) })
   if (DESCRIBED.test(code)) return t('lang.described', { language: plainName(code.replace(DESCRIBED, ''), locale) })
   return plainName(code, locale)
+}
+
+/** Codes that say the site does not know, or that there are no words. */
+const NOT_A_LANGUAGE = /^(und|zxx|mis|mul|unknown|none)$/i
+
+/**
+ * The audio languages worth asking about: none unless there are at least two.
+ *
+ * A format carrying only a language tag and no sound (a silent video stream is
+ * tagged on some sites) offers nothing to choose. The site's original track, the
+ * one it ranks above the rest or calls so in its note, comes first.
+ */
+export function audioLanguages(formats: VideoFormat[]): { code: string; original: boolean }[] {
+  const found = new Map<string, boolean>()
+  for (const f of formats) {
+    if (f.kind !== 'audio' && f.kind !== 'video+audio') continue
+    if (!f.language || NOT_A_LANGUAGE.test(f.language)) continue
+    const original = (f.languagePreference ?? 0) >= 1000 || /\boriginal\b/i.test(f.formatNote ?? '')
+    found.set(f.language, (found.get(f.language) ?? false) || original)
+  }
+  if (found.size < 2) return []
+  return [...found]
+    .map(([code, original]) => ({ code, original }))
+    .sort((a, b) => Number(b.original) - Number(a.original))
 }
 
 /**

@@ -71,6 +71,30 @@ describe('Download: the result card (5.4, A1)', () => {
     expect(screen.getByRole('button', { name: 'Cut a Section' })).toBeTruthy()
   })
 
+  it('offers audio languages only where there are several, and sends the one picked', async () => {
+    const input = await app()
+    fireEvent.change(input, { target: { value: 'https://www.youtube.com/watch?v=mock-dubbed' } })
+    fireEvent.keyDown(input, { key: 'Enter' })
+    const pill = await screen.findByRole('button', { name: /^Download · / }, { timeout: 4000 })
+    const row = screen.getByRole('combobox', { name: 'Audio Language' })
+    expect(row.textContent).toContain('Original · English')
+    await act(async () => fireEvent.click(row))
+    await act(async () => fireEvent.click(screen.getByRole('option', { name: 'German' })))
+    const start = vi.spyOn(window.api, 'startDownload')
+    start.mockClear()
+    await act(async () => fireEvent.click(pill))
+    await waitFor(() => expect(start).toHaveBeenCalled())
+    expect(start.mock.calls[0][0].audioLanguage).toBe('de')
+  })
+
+  it('has no audio language row for one track', async () => {
+    const input = await app()
+    fireEvent.change(input, { target: { value: 'https://www.youtube.com/watch?v=one-track' } })
+    fireEvent.keyDown(input, { key: 'Enter' })
+    await screen.findByRole('button', { name: /^Download · / }, { timeout: 4000 })
+    expect(screen.queryByRole('combobox', { name: 'Audio Language' })).toBeNull()
+  })
+
   it('sends the subtitles picked on the card, written or automatic, and never offers "all"', async () => {
     const input = await app()
     fireEvent.change(input, { target: { value: 'https://www.youtube.com/watch?v=subs' } })

@@ -38,6 +38,8 @@ export function isSameDownload(item: DownloadItem, req: DownloadRequest): boolea
   if (item.mode !== req.mode) return false
   if (item.quality !== req.quality) return false
   if (item.formatId !== req.formatId) return false
+  // Another language is another file: `variantSuffix` gives it its own name.
+  if (item.audioLanguage !== req.audioLanguage) return false
   // A different section of the same video is a different file.
   if ((item.range?.start ?? 0) !== (req.section?.start ?? 0)) return false
   return item.range?.end === req.section?.end

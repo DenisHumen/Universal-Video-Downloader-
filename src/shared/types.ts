@@ -30,6 +30,10 @@ export interface VideoFormat {
   filesizeApprox?: number
   formatNote?: string
   dynamicRange?: string
+  /** The language of the audio in this format, as the site names it. */
+  language?: string
+  /** How much the site favours that language; its own original track ranks far above the rest. */
+  languagePreference?: number
 }
 
 export interface MediaInfo {
@@ -291,6 +295,8 @@ export interface DownloadRequest {
   playlist?: PlaylistPlace
   /** Subtitles picked for this video, by language code, over what Settings says. */
   subtitles?: string[]
+  /** The audio track to fetch, by the language code the formats carry. Absent is the site's default. */
+  audioLanguage?: string
 }
 
 /** What ffmpeg found inside a local file. */
@@ -376,6 +382,7 @@ export interface DownloadItem {
   playlist?: PlaylistPlace
   /** Kept with the row, so a pause, a retry or a restart fetches what was picked. */
   subtitles?: string[]
+  audioLanguage?: string
   state: DownloadState
   percent: number
   speed?: number

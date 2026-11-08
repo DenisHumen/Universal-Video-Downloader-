@@ -14,7 +14,9 @@ import {
   resolveSelection
 } from '../../lib/quality'
 import { toClock } from '../../lib/time'
-import { useT, useTp } from '../../i18n'
+import { audioLanguages, languageName } from '../../lib/languages'
+import { resolveLanguage, useT, useTp } from '../../i18n'
+import { useStore } from '../../store'
 import { ActionRow, ComboRow, ExpanderRow, PreferencesGroup, SegmentedControl, cx } from '../../ui'
 import Thumbnail from '../../components/Thumbnail'
 import TrimEditor from '../../components/TrimEditor'
@@ -41,6 +43,8 @@ export interface ResultChoice {
   precise: boolean
   /** Languages picked on the card; absent leaves it to Settings. */
   subtitles?: string[]
+  /** The audio track picked on the card; absent is the site's default. */
+  audioLanguage?: string
 }
 
 export const AUDIO_FORMATS = ['mp3', 'm4a', 'opus', 'flac', 'wav', 'aac']
@@ -81,8 +85,11 @@ export default function VideoResult({
 }: Props): JSX.Element {
   const t = useT()
   const tp = useTp()
+  const locale = useStore((s) => resolveLanguage(s.settings?.language ?? 'auto', s.appInfo?.locale ?? 'en'))
   const { selection } = choice
   const mode = selection.mode
+  const languages = useMemo(() => audioLanguages(info.formats), [info.formats])
+  const originalLanguage = languages.find((l) => l.original)
   const videoFormats = info.formats.filter((f) => f.kind !== 'audio')
 
   /**
@@ -267,6 +274,26 @@ export default function VideoResult({
               })}
             </div>
           </ExpanderRow>
+        )}
+        {languages.length > 0 && (
+          <ComboRow
+            id="result-audio-language"
+            title={t('format.audioLanguage')}
+            value={choice.audioLanguage ?? ''}
+            onChange={(v) => onChoice({ ...choice, audioLanguage: v || undefined })}
+            options={[
+              // What the site would have served anyway, named when the site says which that is.
+              {
+                value: '',
+                label: originalLanguage
+                  ? t('format.audioOriginal', { language: languageName(originalLanguage.code, locale, t) })
+                  : t('format.audioDefault')
+              },
+              ...languages
+                .filter((l) => !l.original)
+                .map((l) => ({ value: l.code, label: languageName(l.code, locale, t) }))
+            ]}
+          />
         )}
         {mode === 'video' && (
           <SubtitlesRow

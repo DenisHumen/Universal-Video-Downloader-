@@ -56,6 +56,46 @@ function settings(overrides: Partial<AppSettings> = {}): AppSettings {
   }
 }
 
+describe('buildArgs: audio language', () => {
+  const format = (args: string[]): string => args[args.indexOf('-f') + 1]
+
+  // These are the selectors run through the real engine with --simulate.
+  it('asks for the language first, and falls back to the plain choice', () => {
+    expect(format(buildArgs(item({ quality: '720', audioLanguage: 'de' }), settings(), '/tmp'))).toBe(
+      'bv[height<=?720]+ba[language=de]/b[height<=?720][language=de]/bv+ba[language=de]/' +
+        'bv*[height<=?720]+ba/b[height<=?720]/bv*+ba/b'
+    )
+    expect(format(buildArgs(item({ quality: 'best', audioLanguage: 'es-419' }), settings(), '/tmp'))).toBe(
+      'bv+ba[language=es-419]/b[language=es-419]/bv*+ba/b'
+    )
+  })
+
+  it('never lets a format with sound of its own take the place of the language', () => {
+    const selector = format(buildArgs(item({ quality: '360', audioLanguage: 'de' }), settings(), '/tmp'))
+    const beforeFallback = selector.split('/bv*')[0]
+    expect(beforeFallback).not.toContain('bv*')
+  })
+
+  it('works on an exact format and on an audio download', () => {
+    expect(format(buildArgs(item({ formatId: '137', audioLanguage: 'de' }), settings(), '/tmp'))).toBe(
+      '137+ba[language=de]/137+bestaudio/137/best'
+    )
+    expect(format(buildArgs(item({ mode: 'audio', audioLanguage: 'de' }), settings(), '/tmp'))).toBe(
+      'ba[language=de]/bestaudio/best'
+    )
+  })
+
+  it('leaves every selector as it was without one', () => {
+    expect(format(buildArgs(item({ quality: 'best' }), settings(), '/tmp'))).toBe('bv*+ba/b')
+    expect(format(buildArgs(item({ mode: 'audio' }), settings(), '/tmp'))).toBe('bestaudio/best')
+  })
+
+  it('names the file after the track, so two languages are two files', () => {
+    const args = buildArgs(item({ audioLanguage: 'de' }), settings(), '/tmp')
+    expect(args[args.indexOf('-o') + 1]).toContain(' [de].%(ext)s')
+  })
+})
+
 describe('buildArgs: subtitles', () => {
   const langs = (args: string[]): string[] =>
     args.flatMap((a, i) => (a === '--sub-langs' ? [args[i + 1]] : []))

@@ -35,8 +35,8 @@ import {
   freeCopySuffix,
   pickOutputStem,
   samePath,
-  sectionSuffix,
   shouldTakeOwnName,
+  variantSuffix,
   waitsForNamesake,
   withNameSuffix
 } from './naming'
@@ -56,7 +56,7 @@ import { isAbsoluteUrl, normalizeUrl } from '@shared/urls'
 import { infoKey, isStaleInfoError } from './info-cache'
 import { infoCache } from './info-store'
 import { numberedName } from '@shared/playlist'
-import { cleanLanguages } from '@shared/languages'
+import { cleanLanguage, cleanLanguages } from '@shared/languages'
 import { browserCookiesFile } from './browser-logins'
 import { hasTrim } from '@shared/types'
 import type {
@@ -334,15 +334,32 @@ function forgetProgress(id: string): void {
   progressMarks.delete(id)
 }
 
-function qualityFormat(quality: QualityPreset | undefined): string {
-  if (quality === 'audio') return 'bestaudio/best'
+/**
+ * The ways to get one audio language at a height, for the front of a selector.
+ *
+ * `bv`, not the `bv*` of the plain selector. `bv*` can choose a format that has
+ * sound of its own, and the engine, keeping one audio track, then drops the one
+ * asked for: checked against the real engine, `bv*[height<=?360]+ba[language=de]`
+ * on a video with a combined 360p comes back as that format alone, in English.
+ * Past these the selector goes on to the plain choices, so a language the site
+ * has stopped offering by the time this runs still gets the video.
+ */
+function languageChoices(language: string, height?: number): string {
+  const lang = `[language=${language}]`
+  if (!height) return `bv+ba${lang}/b${lang}/`
+  // The language was asked for by name, so it outranks a height with no silent video.
+  return `bv[height<=?${height}]+ba${lang}/b[height<=?${height}]${lang}/bv+ba${lang}/`
+}
+
+function qualityFormat(quality: QualityPreset | undefined, language?: string): string {
+  if (quality === 'audio') return language ? `ba[language=${language}]/bestaudio/best` : 'bestaudio/best'
   const height = Number(quality)
   // 'best' (and anything non-numeric) → let the engine pick the best available.
-  if (!Number.isFinite(height) || height <= 0) return 'bv*+ba/b'
+  if (!Number.isFinite(height) || height <= 0) return `${language ? languageChoices(language) : ''}bv*+ba/b`
   // `<=?` keeps formats with unknown height in play (common for HLS streams),
   // and the trailing `bv*+ba/b` means a request above what the site offers
   // falls back to the best available instead of erroring out.
-  return `bv*[height<=?${height}]+ba/b[height<=?${height}]/bv*+ba/b`
+  return `${language ? languageChoices(language, height) : ''}bv*[height<=?${height}]+ba/b[height<=?${height}]/bv*+ba/b`
 }
 
 /**
@@ -471,7 +488,7 @@ function settleOutputStem(item: DownloadItem, dir: string, settings: AppSettings
   const ranBefore = !item.outputStem && item.log != null
   const legacy = ranBefore && partialsFor(names, base).length ? base : undefined
   const stem = pickOutputStem({
-    wanted: base + sectionSuffix(item.range),
+    wanted: base + variantSuffix(item),
     current: item.outputStem,
     legacy,
     held,
@@ -498,11 +515,11 @@ export function outputTarget(
 ): { path: string; stem?: string } {
   const base = chosenStem(item)
   if (base) {
-    const stem = item.outputStem ?? base + sectionSuffix(item.range)
+    const stem = item.outputStem ?? base + variantSuffix(item)
     return { path: join(dir, `${stem}.%(ext)s`), stem }
   }
   const template = numberedName(settings.filenameTemplate || '%(title)s [%(id)s].%(ext)s', item.playlist)
-  const suffix = sectionSuffix(item.range) + (item.copySuffix ?? '')
+  const suffix = variantSuffix(item) + (item.copySuffix ?? '')
   return { path: join(dir, withNameSuffix(template, suffix)) }
 }
 
@@ -588,12 +605,13 @@ export function buildArgs(
   )
 
   if (item.mode === 'audio') {
-    args.push('-f', 'bestaudio/best', '-x', '--audio-format', settings.audioFormat, '--audio-quality', '0')
+    args.push('-f', qualityFormat('audio', item.audioLanguage), '-x', '--audio-format', settings.audioFormat, '--audio-quality', '0')
   } else {
     if (item.formatId && item.formatId !== 'auto') {
-      args.push('-f', `${item.formatId}+bestaudio/${item.formatId}/best`)
+      const inLanguage = item.audioLanguage ? `${item.formatId}+ba[language=${item.audioLanguage}]/` : ''
+      args.push('-f', `${inLanguage}${item.formatId}+bestaudio/${item.formatId}/best`)
     } else {
-      args.push('-f', qualityFormat(item.quality))
+      args.push('-f', qualityFormat(item.quality, item.audioLanguage))
     }
     args.push('--merge-output-format', 'mp4')
     /*
@@ -1637,6 +1655,7 @@ export async function startDownload(request: DownloadRequest): Promise<DownloadI
     extractor: req.extractor,
     playlist: normalisePlaylist(req.playlist),
     subtitles: cleanLanguages(req.subtitles),
+    audioLanguage: cleanLanguage(req.audioLanguage),
     state: 'queued',
     percent: 0,
     attempts: 0,

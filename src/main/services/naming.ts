@@ -47,6 +47,16 @@ export function sectionSuffix(range?: TrimRange): string {
   return ` [${sectionTime(range.start ?? 0)}-${end}]`
 }
 
+/**
+ * What sets this entry's file apart from the same video's other files, in its
+ * name: the section it covers and the audio track it carries. The engine's name
+ * for a video knows neither, and "already downloaded" would then hand a German
+ * track's request the English file.
+ */
+export function variantSuffix(item: Pick<DownloadItem, 'range' | 'audioLanguage'>): string {
+  return sectionSuffix(item.range) + (item.audioLanguage ? ` [${item.audioLanguage}]` : '')
+}
+
 const EXT_FIELD = /\.%\(ext\)s$/
 
 /**
@@ -151,6 +161,7 @@ function sameRequest(a: DownloadItem, b: DownloadItem): boolean {
     a.mode === b.mode &&
     a.quality === b.quality &&
     a.formatId === b.formatId &&
+    a.audioLanguage === b.audioLanguage &&
     (a.range?.start ?? 0) === (b.range?.start ?? 0) &&
     a.range?.end === b.range?.end
   )
@@ -213,13 +224,13 @@ const isDownload = (item: DownloadItem): boolean => !item.kind || item.kind === 
 export function waitsForNamesake(item: DownloadItem, all: readonly DownloadItem[]): boolean {
   if (!isDownload(item)) return false
   const link = item.sourceUrl || item.url
-  const tail = sectionSuffix(item.range) + (item.copySuffix ?? '')
+  const tail = variantSuffix(item) + (item.copySuffix ?? '')
   return all.some(
     (other) =>
       other.id !== item.id &&
       isDownload(other) &&
       RUNNING.includes(other.state) &&
       (other.sourceUrl || other.url) === link &&
-      sectionSuffix(other.range) + (other.copySuffix ?? '') === tail
+      variantSuffix(other) + (other.copySuffix ?? '') === tail
   )
 }

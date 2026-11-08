@@ -42,6 +42,8 @@ export interface RawFormat {
   resolution?: string
   dynamic_range?: string
   protocol?: string
+  language?: string | null
+  language_preference?: number | null
 }
 
 interface RawInfo {
@@ -165,7 +167,9 @@ export function mapFormats(formats: RawFormat[] = []): VideoFormat[] {
       filesize: f.filesize,
       filesizeApprox: f.filesize_approx,
       formatNote: f.format_note,
-      dynamicRange: f.dynamic_range
+      dynamicRange: f.dynamic_range,
+      language: f.language || undefined,
+      languagePreference: f.language_preference ?? undefined
     }))
     .sort((a, b) => {
       const kindRank = (k: FormatKind): number => (k === 'video+audio' ? 2 : k === 'video' ? 1 : 0)
