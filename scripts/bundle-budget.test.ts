@@ -25,9 +25,9 @@ const BUDGET = {
    * spent on features rather than a dependency (Yaru rows, sign-ins, the share
    * browser), so it is given back: +15 kB again from here. 4.3: ~213 kB, for
    * every main-process sentence in Russian and the Library's new actions, with
-   * no new dependency.
+   * no new dependency. 4.5: ~225 kB, for Help, again words rather than a dependency.
    */
-  entryJs: 225_000,
+  entryJs: 235_000,
   /** All CSS, gzip. 3.26.1: ~11 kB. */
   css: 16_000
 }
