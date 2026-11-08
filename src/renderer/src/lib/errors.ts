@@ -1,5 +1,6 @@
 import type { AppErrorCode } from '@shared/types'
 import { t as tNow, type TranslateFn, type TranslationKey } from '../i18n'
+import { fixFor } from './fixes'
 
 /**
  * Say what went wrong in the user's language.
@@ -71,7 +72,8 @@ export function errorText(t: TranslateFn, failure: FailureLike): string {
   const key = failure.errorCode ? KEYS[failure.errorCode] : undefined
   const base = key ? t(key) : failure.error?.trim()
   if (!base) return t('error.title')
-  return failure.cookieHint ? `${base} ${t('err.cookieHint')}` : base
+  // It names a button, so only where the hint is what puts that button there; a code with a fix of its own has said its piece.
+  return failure.cookieHint && !fixFor(failure.errorCode) ? `${base} ${t('err.cookieHint')}` : base
 }
 
 /**

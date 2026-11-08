@@ -17,7 +17,7 @@ import { useT, useTp, type TranslationKey } from '../i18n'
 import QueueRow from '../components/QueueRow'
 import { groupQueue, queueGroupOf, type QueueGroup } from '../lib/downloads'
 import { EmptyState, Icon } from '../ui'
-import ConfirmDialog from '../components/ConfirmDialog'
+import { toast } from '../lib/toast'
 import HeaderSlot from '../shell/HeaderSlot'
 import { SegmentedControl } from '../ui'
 
@@ -85,7 +85,6 @@ export default function DownloadsView(): JSX.Element {
 
   const [filter, setFilter] = useState<Filter>('all')
   const [query, setQuery] = useState('')
-  const [confirmClearFailed, setConfirmClearFailed] = useState(false)
   const [limit, setLimit] = useState(PAGE)
   const scrollRef = useRef<HTMLDivElement>(null)
   const sentinelRef = useRef<HTMLLIElement>(null)
@@ -173,12 +172,14 @@ export default function DownloadsView(): JSX.Element {
   }, [hasMore, limit])
 
   // Failures are not "finished": they keep their error and their retry until cleared on purpose.
-  const hasFinished = downloads.some((d) => d.state === 'completed' || d.state === 'canceled')
+  const hasFinished = downloads.some((d) => d.state === 'completed')
   const hasRunning = downloads.some((d) =>
     ['downloading', 'processing', 'detecting', 'queued'].includes(d.state)
   )
   const hasPaused = downloads.some((d) => d.state === 'paused')
   const hasErrors = downloads.some((d) => d.state === 'error')
+  // A cancelled row is drawn under Failed, so it is cleared from there; it is not retried with them.
+  const hasFailedRows = hasErrors || downloads.some((d) => d.state === 'canceled')
 
   const running = downloads.filter((d) => d.state === 'downloading')
   const totalSpeed = running.reduce((n, d) => n + (d.speed || 0), 0)
@@ -232,7 +233,11 @@ export default function DownloadsView(): JSX.Element {
             <button
               className="btn-icon"
               title={t('queue.openFolder')} aria-label={t('queue.openFolder')}
-              onClick={() => window.api.openPath(settings.downloadDir)}
+              onClick={() =>
+                void window.api.openPath(settings.downloadDir).then((why) => {
+                  if (why) toast(t('queue.folderFailed'), 'error')
+                })
+              }
             >
               <FolderOpen size={16} />
             </button>
@@ -260,13 +265,14 @@ export default function DownloadsView(): JSX.Element {
               <Trash2 size={14} /> <span className="hidden sm:inline">{t('queue.clearFinished')}</span>
             </button>
           )}
-          {hasErrors && (
+          {/* No question first: it takes the rows' errors and nothing on disk. */}
+          {hasFailedRows && (
             <button
               className="btn-icon"
               title={t('queue.clearFailed')}
               aria-label={t('queue.clearFailed')}
               data-uvd="clear-failed"
-              onClick={() => setConfirmClearFailed(true)}
+              onClick={() => void window.api.clearFailed()}
             >
               <CircleX size={16} />
             </button>
@@ -368,18 +374,6 @@ export default function DownloadsView(): JSX.Element {
           </ul>
         )}
       </div>
-      {confirmClearFailed && (
-        <ConfirmDialog
-          title={t('queue.clearFailedConfirm')}
-          body={t('queue.clearFailedBody')}
-          confirmLabel={t('queue.clearFailed')}
-          onConfirm={() => {
-            setConfirmClearFailed(false)
-            void window.api.clearFailed()
-          }}
-          onCancel={() => setConfirmClearFailed(false)}
-        />
-      )}
     </div>
   )
 }

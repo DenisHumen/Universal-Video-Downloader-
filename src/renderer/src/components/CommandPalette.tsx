@@ -1,3 +1,4 @@
+import { showFile } from '../lib/showFile'
 import { useId, useMemo, useRef, useState, type KeyboardEvent } from 'react'
 import { useStore } from '../store'
 import { useT, type TranslationKey } from '../i18n'
@@ -91,7 +92,7 @@ function Palette(): JSX.Element {
         group: 'recent' as const,
         label: d.title,
         hint: t('palette.showInFolder'),
-        run: () => void (d.filepath && window.api.showInFolder(d.filepath))
+        run: () => void (d.filepath && showFile(d.filepath))
       }))
     ]
     return list

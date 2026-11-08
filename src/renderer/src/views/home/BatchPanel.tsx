@@ -86,7 +86,7 @@ export default function BatchPanel({ id, text, onText, settings, saveDir, onSave
         </PreferencesGroup>
         <PreferencesGroup>
           <ComboRow
-            title={t('common.format')}
+            title={t('common.whatToDownload')}
             value={mode}
             onChange={(v) => setMode(v as DownloadMode)}
             options={[

@@ -104,6 +104,7 @@ export function TemplateRow({
             )}
           </dl>
         )}
+        {example && <p className="text-meta text-ink-2">{t('settings.templateResolvedHint')}</p>}
       </div>
     </>
   )

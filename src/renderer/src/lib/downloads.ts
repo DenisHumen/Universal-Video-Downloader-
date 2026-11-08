@@ -121,6 +121,26 @@ export function overallPercent(list: DownloadItem[]): number | null {
   return Math.round(sum / running.length)
 }
 
+/** Below this a cancel costs next to nothing, and asking would only be in the way. */
+const CANCEL_ASKS_ABOVE_PERCENT = 10
+
+/**
+ * Whether cancelling this row throws away something worth keeping, and so has
+ * to ask first. A paused row is one somebody meant to come back to; a recording
+ * has no percentage, only what it has fetched so far. A trim or a convert works
+ * on a file that stays where it is, and can simply be run again.
+ */
+export function cancelLosesWork(
+  item: Pick<DownloadItem, 'state' | 'percent' | 'downloadedBytes' | 'indeterminate' | 'kind'>
+): boolean {
+  if (item.kind === 'trim' || item.kind === 'convert') return false
+  const percent = item.percent || 0
+  const bytes = item.downloadedBytes || 0
+  if (percent > CANCEL_ASKS_ABOVE_PERCENT) return true
+  if (item.state === 'paused') return percent > 0 || bytes > 0
+  return Boolean(item.indeterminate) && bytes > 0
+}
+
 /** The sections the queue is drawn in when nothing is filtered out. */
 export type QueueGroup = 'active' | 'failed' | 'done'
 

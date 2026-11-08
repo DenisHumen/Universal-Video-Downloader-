@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { DownloadItem, DownloadProgress } from '@shared/types'
-import { applyDownloadProgress, applyDownloadsChanged, groupQueue, liveDownloads, overallPercent, recentFinished } from './downloads'
+import { applyDownloadProgress, applyDownloadsChanged, cancelLosesWork, groupQueue, liveDownloads, overallPercent, recentFinished } from './downloads'
 
 function item(id: string, createdAt: number, overrides: Partial<DownloadItem> = {}): DownloadItem {
   return {
@@ -148,5 +148,39 @@ describe('groupQueue', () => {
       item('canceled', 6, { state: 'canceled' })
     ]
     expect(ids(groupQueue(list))).toEqual(['run1', 'paused', 'err1', 'canceled', 'done1', 'done2'])
+  })
+})
+
+describe('cancelLosesWork', () => {
+  const row = (over: Partial<DownloadItem>): Pick<DownloadItem, 'state' | 'percent' | 'downloadedBytes' | 'indeterminate' | 'kind'> => ({
+    state: 'downloading',
+    percent: 0,
+    ...over
+  })
+
+  it('lets a download that has barely started go without a question', () => {
+    expect(cancelLosesWork(row({ percent: 5 }))).toBe(false)
+    expect(cancelLosesWork(row({ state: 'queued' }))).toBe(false)
+  })
+
+  it('asks once a real part of it is down', () => {
+    expect(cancelLosesWork(row({ percent: 62 }))).toBe(true)
+  })
+
+  it('asks about anything paused that holds something, however little', () => {
+    expect(cancelLosesWork(row({ state: 'paused', percent: 95 }))).toBe(true)
+    expect(cancelLosesWork(row({ state: 'paused', percent: 3 }))).toBe(true)
+    expect(cancelLosesWork(row({ state: 'paused', downloadedBytes: 1000 }))).toBe(true)
+    expect(cancelLosesWork(row({ state: 'paused' }))).toBe(false)
+  })
+
+  it('asks about a recording, which has bytes but no percentage', () => {
+    expect(cancelLosesWork(row({ indeterminate: true, downloadedBytes: 1000 }))).toBe(true)
+    expect(cancelLosesWork(row({ indeterminate: true }))).toBe(false)
+  })
+
+  it('does not ask about a trim or a convert: the source stays where it is', () => {
+    expect(cancelLosesWork(row({ percent: 80, kind: 'trim' }))).toBe(false)
+    expect(cancelLosesWork(row({ percent: 80, kind: 'convert' }))).toBe(false)
   })
 })

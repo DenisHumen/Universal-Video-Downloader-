@@ -4,6 +4,7 @@ import { axeViolations } from '../../../../../test/axe'
 import { installMockApi } from '../../lib/mockApi'
 import { useStore } from '../../store'
 import App from '../../App'
+import { en } from '../../i18n/en'
 import { SEARCH_INDEX } from './searchIndex'
 import { PANELS, SUBPAGES, formatRoute, parseRoute } from './router'
 
@@ -91,6 +92,20 @@ describe('layout', () => {
     expect(screen.getByRole('heading', { name: 'Network' })).toBeTruthy()
     fireEvent.click(screen.getByRole('button', { name: 'Back' }))
     expect(document.querySelector('[data-uvd="settings-list"]')).not.toBeNull()
+  })
+})
+
+describe('the tray switch', () => {
+  it('reads on and cannot be turned off while background checks keep the icon', async () => {
+    render(<App />)
+    await waitFor(() => expect(useStore.getState().ready).toBe(true))
+    await act(async () => useStore.getState().saveSettings({ trayEnabled: false, automationEnabled: true }))
+    act(() => useStore.getState().openSettings('system/startup'))
+    const row = await screen.findByRole('switch', { name: en['settings.tray'] })
+    expect(row.getAttribute('aria-checked')).toBe('true')
+    expect((row as HTMLButtonElement).disabled).toBe(true)
+    expect(screen.getByText(en['settings.trayImplied'])).toBeTruthy()
+    await act(async () => useStore.getState().saveSettings({ automationEnabled: false }))
   })
 })
 

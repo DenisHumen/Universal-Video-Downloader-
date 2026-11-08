@@ -329,7 +329,7 @@ export default function HomeView(): JSX.Element {
           </HeaderSlot>
           <div className="mt-3 flex flex-wrap items-center gap-2">
             <button className="btn-quiet" onClick={() => window.api.openBrowser()}>
-              <Globe size={15} /> {t('browser.open')}
+              <Globe size={15} /> {t('home.openSiteHere')}
             </button>
           </div>
         </m.div>
