@@ -185,6 +185,10 @@ export type AppErrorCode =
   | 'adultHidden'
   /** A queued page that needs its stream picked on Home: a series player or a listing. */
   | 'needsPicker'
+  /** Stop and Save found nothing recorded yet. */
+  | 'liveEmpty'
+  /** Stop and Save found a recording it could not turn into a playable file. */
+  | 'liveNotSaved'
 
 export type DownloadState =
   | 'queued'
@@ -313,6 +317,35 @@ export interface DownloadRequest {
   audioLanguage?: string
   /** It has not started yet: wait for it, however long that takes, then download. */
   waitForVideo?: boolean
+  /** A live broadcast: it runs until somebody stops it, and stopping it keeps what was recorded. */
+  live?: boolean
+}
+
+/** Send a finished file to a configured share. The file is looked up from `id`, never taken from the window. */
+export interface ShareSendRequest {
+  /** The queue row or Library entry. */
+  id: string
+  targetId: string
+  /** Share-relative and '/'-joined; '' for the share itself. */
+  folder: string
+  /** The person has answered "replace" for a name already taken. */
+  replace?: boolean
+}
+
+export type ShareSendResult =
+  | { status: 'sent'; remotePath: string }
+  /** The name is taken and nothing was changed: ask, and send again with `replace`. */
+  | { status: 'exists'; name: string }
+  | {
+      status: 'failed'
+      kind: 'auth' | 'network' | 'path' | 'full' | 'busy' | 'unknown' | 'noTarget' | 'noPassword' | 'noFile'
+      message: string
+    }
+
+export interface ShareSendProgress {
+  id: string
+  bytes: number
+  total: number
 }
 
 /** What ffmpeg found inside a local file. */
@@ -438,6 +471,17 @@ export interface DownloadItem {
    * kept, so a pause, a retry or a restart does not run into the same refusal.
    */
   hlsViaFfmpeg?: boolean
+  /** A live broadcast being recorded; see DownloadRequest. */
+  live?: boolean
+  /**
+   * The files the engine announced for this recording. Kept across a restart:
+   * they are how Stop and Save finds what an interrupted run left behind.
+   */
+  partialPaths?: string[]
+  /** Stop and Save is under way: the engine is finishing, or the pieces are being joined. */
+  savingLive?: boolean
+  /** A recording that could not be made playable: the file it is still in. */
+  keptPartial?: string
   /**
    * Where an automated episode was uploaded, as `share/folder/name`. With no
    * `filepath`, the local copy was deleted afterwards and this is the only copy.

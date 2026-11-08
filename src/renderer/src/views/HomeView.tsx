@@ -195,6 +195,7 @@ export default function HomeView(): JSX.Element {
         // What `best` came out as, and the length that turns a cut's progress into a percentage.
         targetHeight: selection.targetHeight,
         duration: info.duration,
+        live: info.isLive || undefined,
         // Names the per-site subfolder.
         extractor: info.extractor,
         uploader: info.uploader,

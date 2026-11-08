@@ -22,6 +22,10 @@ import { getSecretWhenReady, hasSecret, SECRET, secretsPersist, setSecret } from
 import { logFilePath } from './services/log'
 import { getSettings } from './services/settings'
 import { coalesce } from './services/coalesce'
+import { getDownload, relocateItem } from './services/downloader'
+import { entryFile, followEntry } from './services/library'
+import { sendToShare } from './services/share-send'
+import type { ShareSendRequest, ShareSendResult } from '@shared/types'
 import {
   duplicateAfterEdit,
   exactDuplicate,
@@ -199,6 +203,32 @@ export function registerAutomationIpc(): void {
       return listSmbFolders(target, secret, String(folder ?? ''))
     }
   )
+
+  /*
+    "Send to Share…". The window names a row and is never believed about which
+    file that is, or this would be a way to send any file on the machine to any
+    share it knows. Asking about progress several times a second is plenty: the
+    upload reports per chunk, and a big file has tens of thousands of those.
+  */
+  ipcMain.handle(IPC.shareSend, async (event, request: ShareSendRequest): Promise<ShareSendResult> => {
+    const file = getDownload(request.id)?.filepath ?? entryFile(request.id)
+    if (!file || !existsSync(file)) {
+      return { status: 'failed', kind: 'noFile', message: 'The file is no longer on this computer.' }
+    }
+    let lastSent = 0
+    const result = await sendToShare(request, file, getSettings().smbTargets, (bytes, total) => {
+      const now = Date.now()
+      if (bytes < total && now - lastSent < 250) return
+      lastSent = now
+      if (!event.sender.isDestroyed()) event.sender.send(IPC.evtShareSendProgress, { id: request.id, bytes, total })
+    })
+    if (result.status === 'sent') {
+      // The row if it is still in the queue, the entry whichever: either may be all that is left.
+      relocateItem(request.id, { remotePath: result.remotePath })
+      followEntry(request.id, { remotePath: result.remotePath })
+    }
+    return result
+  })
 
   ipcMain.handle(
     IPC.autoCreateShareFolder,

@@ -28,6 +28,9 @@ import type {
   PendingDelivery,
   SearchResponse,
   SearchScope,
+  ShareSendProgress,
+  ShareSendRequest,
+  ShareSendResult,
   UpdateStatus,
   YtDlpStatus,
   SavedSiteLogins,
@@ -72,6 +75,11 @@ const api = {
   startDownload: (req: DownloadRequest): Promise<DownloadItem> =>
     ipcRenderer.invoke(IPC.downloadStart, req),
   pauseDownload: (id: string): Promise<void> => ipcRenderer.invoke(IPC.downloadPause, id),
+  stopLiveRecording: (id: string): Promise<void> => ipcRenderer.invoke(IPC.downloadStopLive, id),
+  downloadLog: (id: string): Promise<string> => ipcRenderer.invoke(IPC.downloadLog, id),
+  shareSend: (request: ShareSendRequest): Promise<ShareSendResult> => ipcRenderer.invoke(IPC.shareSend, request),
+  onShareSendProgress: (cb: (progress: ShareSendProgress) => void) =>
+    on<ShareSendProgress>(IPC.evtShareSendProgress, cb),
   resumeDownload: (id: string): Promise<void> => ipcRenderer.invoke(IPC.downloadResume, id),
   cancelDownload: (id: string): Promise<void> => ipcRenderer.invoke(IPC.downloadCancel, id),
   retryDownload: (id: string): Promise<void> => ipcRenderer.invoke(IPC.downloadRetry, id),

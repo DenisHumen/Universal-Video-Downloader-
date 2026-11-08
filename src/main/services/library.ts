@@ -282,6 +282,11 @@ export async function trashFile(filepath: string): Promise<'trashed' | 'failed' 
   return (await trashEntry(entry.id)) ? 'trashed' : 'failed'
 }
 
+/** The file an entry stands for, when there is such an entry. */
+export function entryFile(id: string): string | undefined {
+  return lib.entries.find((e) => e.id === id)?.filepath
+}
+
 /** Forget an entry whose file is gone (the file is not touched). */
 export function forgetEntry(id: string): void {
   const next = removeEntry(lib, id)

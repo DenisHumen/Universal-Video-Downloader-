@@ -439,6 +439,10 @@ export function installMockApi(): void {
       return item
     },
     pauseDownload: async () => undefined,
+    stopLiveRecording: async () => undefined,
+    downloadLog: async (id) => items.find((item) => item.id === id)?.log ?? '',
+    shareSend: async (request) => ({ status: 'sent', remotePath: `shared/${request.folder}/file.mp4` }),
+    onShareSendProgress: () => () => undefined,
     resumeDownload: async () => undefined,
     cancelDownload: async () => undefined,
     retryDownload: async () => undefined,

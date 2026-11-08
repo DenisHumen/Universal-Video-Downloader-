@@ -8,6 +8,7 @@ import { formatBytes, formatDuration } from '../lib/format'
 import { toast } from '../lib/toast'
 import ConfirmDialog from '../components/ConfirmDialog'
 import MediaJobModal, { type JobMode } from '../components/MediaJobModal'
+import SendToShareDialog from '../components/SendToShareDialog'
 import Thumbnail from '../components/Thumbnail'
 import HeaderSlot from '../shell/HeaderSlot'
 import { Dialog, EmptyState, Icon, IconButton, Menu, PreferencesGroup, SegmentedControl } from '../ui'
@@ -88,6 +89,8 @@ export default function LibraryView(): JSX.Element {
   /** How far the reader has got: a change to the library re-reads this deep rather than throwing them back to the top. */
   const depth = useRef(PAGE)
   const fetchingMore = useRef(false)
+  const [sending, setSending] = useState<LibraryEntry | null>(null)
+  const hasShare = useStore((s) => (s.settings?.smbTargets?.length ?? 0) > 0)
 
   const checkMissing = useCallback((rows: LibraryEntry[], gen: number) => {
     const paths = rows.map((e) => e.filepath)
@@ -316,8 +319,8 @@ export default function LibraryView(): JSX.Element {
                           .join(' · ')}
                       </p>
                     </div>
-                    {/* Sent to a share by a watch and deleted here: not lost, just elsewhere. */}
-                    {gone && e.remotePath ? (
+                    {/* Sent to a share, by a watch or by hand. If it was deleted here it is not lost, just elsewhere. */}
+                    {e.remotePath ? (
                       <span className="tag shrink-0" title={e.remotePath}>
                         {t('library.onShare')}
                       </span>
@@ -352,6 +355,7 @@ export default function LibraryView(): JSX.Element {
                             : []),
                           { label: t('library.cut'), onSelect: () => setJob({ entry: e, mode: 'trim' }), disabled: gone },
                           { label: t('library.convert'), onSelect: () => setJob({ entry: e, mode: 'convert' }), disabled: gone },
+                          ...(hasShare && !gone ? [{ label: t('queue.sendShare'), onSelect: () => setSending(e) }] : []),
                           ...(gone && !e.remotePath
                             ? [{ label: t('library.locate'), onSelect: () => void locate(e, 'folder') }]
                             : []),
@@ -421,6 +425,7 @@ export default function LibraryView(): JSX.Element {
         />
       )}
       {job && <MediaJobModal item={asItem(job.entry)} mode={job.mode} onClose={() => setJob(null)} />}
+      {sending && <SendToShareDialog id={sending.id} title={sending.title} onClose={() => setSending(null)} />}
     </div>
   )
 }

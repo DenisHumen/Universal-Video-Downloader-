@@ -58,6 +58,7 @@ import {
   relocateItem,
   pauseAll,
   pauseDownload,
+  stopLiveRecording,
   removeDownload,
   resumeAll,
   resumeDownload,
@@ -179,6 +180,8 @@ export function registerIpc({ getWindow, openSearchWindow, onSettingsChanged }: 
   // ---- Downloads ----
   ipcMain.handle(IPC.downloadStart, (_e, req: DownloadRequest) => startDownload(req))
   ipcMain.handle(IPC.downloadPause, (_e, id: string) => pauseDownload(id))
+  ipcMain.handle(IPC.downloadStopLive, (_e, id: string) => stopLiveRecording(id))
+  ipcMain.handle(IPC.downloadLog, (_e, id: string) => getDownload(id)?.log ?? '')
   ipcMain.handle(IPC.downloadResume, (_e, id: string) => resumeDownload(id))
   ipcMain.handle(IPC.downloadCancel, (_e, id: string) => cancelDownload(id))
   ipcMain.handle(IPC.downloadRetry, (_e, id: string) => retryDownload(id))

@@ -1,7 +1,7 @@
 import { app } from 'electron'
 import { EventEmitter } from 'events'
 import { spawn, ChildProcess, type ChildProcessWithoutNullStreams } from 'child_process'
-import { existsSync, mkdirSync, readdirSync, rmSync, statSync } from 'fs'
+import { existsSync, mkdirSync, readdirSync, renameSync, rmSync, statSync } from 'fs'
 import { basename, dirname, join } from 'path'
 import { randomUUID } from 'crypto'
 import { ytdlpBinaryPath, ensureYtdlp, ytdlpSpawnOptions } from './ytdlp'
@@ -41,7 +41,8 @@ import {
   waitsForNamesake,
   withNameSuffix
 } from './naming'
-import { killTree } from './process'
+import { interruptTree, killTree } from './process'
+import { joinFragments, keptFile, piecesOnDisk, remuxArgs, removePieces, savedPath } from './live-recording'
 import { markInterrupted, shouldResume } from './resume'
 import { pendingOrder } from './schedule'
 import { acceptsPostprocess, overallProgress, postprocessorLabel } from './progress'
@@ -110,6 +111,15 @@ const resolveAborts = new Map<string, AbortController>()
   everything from the toolbar did it to every running item at once.
 */
 const deliberateStops = new Set<string>()
+
+/*
+  Recordings told to finish, with the deadline for hearing back. See
+  `stopLiveRecording`. Long enough for a slow disk to take ffmpeg's last write,
+  and off once the engine says it heard: fixing the container of a long
+  recording then takes as long as it takes.
+*/
+const liveStops = new Map<string, NodeJS.Timeout>()
+const LIVE_STOP_GRACE = 20_000
 
 /** Items whose next run must extract afresh: the detect's JSON just failed them once. */
 const skipInfo = new Set<string>()
@@ -590,6 +600,14 @@ export function buildArgs(
     fetches five fragments at a time and reports bytes, and ffmpeg does neither.
   */
   if (item.hlsViaFfmpeg) args.push('--downloader', 'm3u8:ffmpeg')
+  /*
+    A recording ends by being stopped, so its partial has to be worth having at
+    any moment. An mp4 being written by ffmpeg has no index until it closes, and
+    a forced kill left 48 bytes that nothing could read; a transport stream is
+    readable wherever it is cut. The engine only does this for streams it knows
+    are live, and the two do not always agree.
+  */
+  if (item.live) args.push('--hls-use-mpegts')
   args.push(...accessArgs(settings, browserCookiesFile()))
   args.push(...headerArgs(item.headers))
   if (item.referer) args.push('--referer', item.referer)
@@ -724,6 +742,7 @@ export function buildArgs(
 }
 
 const ALREADY_DOWNLOADED = /\[download\]\s*(.+?) has already been downloaded/
+const DESTINATION_PRIORITY = 2
 
 const FINAL_PATH_RULES: { re: RegExp; priority: number }[] = [
   { re: /\[Merger\] Merging formats into "(.+?)"/, priority: 6 },
@@ -731,7 +750,7 @@ const FINAL_PATH_RULES: { re: RegExp; priority: number }[] = [
   { re: /\[SponsorBlock\].*?to "(.+?)"/, priority: 5 },
   { re: ALREADY_DOWNLOADED, priority: 4 },
   { re: /\[Metadata\] .*?to "(.+?)"/, priority: 3 },
-  { re: /\[download\] Destination:\s*(.+?)\s*$/, priority: 2 }
+  { re: /\[download\] Destination:\s*(.+?)\s*$/, priority: DESTINATION_PRIORITY }
 ]
 
 /**
@@ -757,10 +776,22 @@ function parseFinalPath(line: string, item: DownloadItem): void {
     finalPaths.set(item.id, { path: found.path, priority: found.priority })
   }
   if (found.alreadyDownloaded) alreadyOnDisk.set(item.id, found.path)
+  if (item.live && found.priority === DESTINATION_PRIORITY && isMediaName(found.path)) {
+    // Subtitles announce a destination too, and are nothing to save a recording from.
+    const known = item.partialPaths ?? []
+    if (!known.includes(found.path)) {
+      item.partialPaths = [...known, found.path]
+      scheduleSave()
+    }
+  }
 }
 
 /** What the engine can name a finished download, after the stem we gave it. */
 const MEDIA_EXTENSION = /^(mp4|mkv|webm|m4a|mp3|opus|flac|wav|ogg|aac|mov|m4v|flv|ts)$/i
+
+function isMediaName(path: string): boolean {
+  return MEDIA_EXTENSION.test(path.split('.').pop() ?? '')
+}
 
 /**
  * Which of a folder's files is the download we named `stem`.
@@ -1374,6 +1405,7 @@ async function runDownload(item: DownloadItem): Promise<void> {
   try {
     const settings = getSettings()
     const dir = outputDirFor(item, settings)
+    if (item.live) setAsideRecording(item)
     const stem = settleOutputStem(item, dir, settings)
     expectedNames.delete(item.id)
     alreadyOnDisk.delete(item.id)
@@ -1412,6 +1444,7 @@ async function runDownload(item: DownloadItem): Promise<void> {
     recognise; the debug level keeps the rest out of an ordinary run.
   */
   const onOutputLine = (line: string): void => {
+    if (line.startsWith(POSTPROCESS_PREFIX) || /\] Interrupted by user/.test(line)) heardLiveStop(item.id)
     if (line.startsWith(PROGRESS_PREFIX)) {
       handleProgressLine(line, item)
     } else if (line.startsWith(POSTPROCESS_PREFIX)) {
@@ -1494,7 +1527,19 @@ async function runDownload(item: DownloadItem): Promise<void> {
       processQueue()
       return
     }
-    if (code === 0 && existing && shouldTakeOwnName(item, existing, [...items.values()])) {
+    // Whatever the exit code says: stopping is how a recording ends, and a forced one exits 1.
+    if (liveStops.has(item.id)) {
+      heardLiveStop(item.id)
+      liveStops.delete(item.id)
+      void saveRecording(item, code === 0)
+      return
+    }
+    /*
+      A recording is never the file already there, even one from this same link:
+      the engine puts the minute in a live title, so stopping and recording again
+      within it found the first file and "finished" on that without recording.
+    */
+    if (code === 0 && existing && (item.live || shouldTakeOwnName(item, existing, [...items.values()]))) {
       retryUnderOwnName(item, existing)
       return
     }
@@ -1709,6 +1754,7 @@ export async function startDownload(request: DownloadRequest): Promise<DownloadI
     subtitles: cleanLanguages(req.subtitles),
     audioLanguage: cleanLanguage(req.audioLanguage),
     waitForVideo: req.waitForVideo === true ? true : undefined,
+    live: req.live || undefined,
     state: 'queued',
     percent: 0,
     attempts: 0,
@@ -1756,6 +1802,209 @@ export function isEngineBusy(): boolean {
 
 export function kickQueue(): void {
   processQueue()
+}
+
+/** The engine said it is finishing, or has gone: nothing more to wait for it to say. */
+function heardLiveStop(id: string): void {
+  const deadline = liveStops.get(id)
+  if (deadline) clearTimeout(deadline)
+}
+
+/** Stop and Save is off: somebody paused, cancelled or removed the row meanwhile. */
+function abandonLiveStop(item: DownloadItem): void {
+  heardLiveStop(item.id)
+  liveStops.delete(item.id)
+  item.savingLive = undefined
+}
+
+/**
+ * End a live recording and keep what it has.
+ *
+ * Pause and cancel both force-kill, and cancel then deletes the partials, so a
+ * recording that promised to run "until you stop it" had no way to be stopped
+ * and kept. This asks the engine to finish; when the process has gone, by that
+ * road or the deadline's, `saveRecording` makes a file of whatever is there. A
+ * paused row has no process and only needs the second half: its partial may be
+ * from a run that the app's own quit cut short.
+ */
+export function stopLiveRecording(id: string): void {
+  const item = items.get(id)
+  if (!item?.live || item.savingLive) return
+  const proc = procs.get(id)
+  // Paused, or failed: a broadcast that dropped hours in still has those hours on disk.
+  if ((item.state === 'paused' || item.state === 'error') && !proc) {
+    clearRetry(id)
+    markSaving(item)
+    emitUpdated(item)
+    void saveRecording(item, false)
+    return
+  }
+  if (item.state !== 'downloading' || !proc) return
+  markSaving(item)
+  // Which of these gets there first, `close` hears nothing different: only the partial does.
+  const force = (): void => killTree(proc)
+  liveStops.set(id, setTimeout(force, LIVE_STOP_GRACE))
+  interruptTree(proc, force)
+  emitUpdated(item)
+}
+
+function markSaving(item: DownloadItem): void {
+  clearPhase(item)
+  item.state = 'processing'
+  item.savingLive = true
+  item.interrupted = false
+  item.indeterminate = true
+  item.error = undefined
+  item.errorCode = undefined
+  item.cookieHint = undefined
+  item.reportId = undefined
+  item.keptPartial = undefined
+}
+
+/**
+ * A new run of a recording writes from scratch: ffmpeg is given `-y`, and
+ * `--continue` means nothing to it. A pause and resume, an automatic retry or
+ * the pick-up after a restart would each have emptied the partial of everything
+ * recorded so far, so that goes to a row of its own, saved like any other, and
+ * this one moves to a new name.
+ */
+function setAsideRecording(item: DownloadItem): void {
+  item.keptPartial = undefined
+  const destinations = item.partialPaths ?? []
+  const pieces = piecesOnDisk(destinations).filter((piece) => !piece.whole)
+  item.partialPaths = undefined
+  if (!pieces.length) return
+  const saved: DownloadItem = {
+    ...item,
+    id: randomUUID(),
+    partialPaths: destinations,
+    createdAt: Date.now(),
+    reportId: undefined
+  }
+  markSaving(saved)
+  items.set(saved.id, saved)
+
+  const { dir, base } = savedPath(destinations, item.mode)
+  let names: string[] = []
+  try {
+    names = readdirSync(dir)
+  } catch {
+    /* gone already: any number is free */
+  }
+  const bare = item.copySuffix && base.endsWith(item.copySuffix) ? base.slice(0, -item.copySuffix.length) : base
+  const suffix = freeCopySuffix(bare, names)
+  if (item.outputStem) item.outputStem = bare + suffix
+  else item.copySuffix = suffix
+  finalPaths.delete(item.id)
+  emitUpdated(saved)
+  void saveRecording(saved, false)
+}
+
+/**
+ * The row ends with the real file, or says why it does not.
+ *
+ * `clean` is the engine's exit 0, after which its file is finished and needs
+ * nothing done to it. In every other case the pieces are joined by copying, with
+ * no encoding: the length of the recording costs only disk reads. A piece that
+ * will not become a playable file is left exactly as it was and named on the row.
+ */
+async function saveRecording(item: DownloadItem, clean: boolean): Promise<void> {
+  const stillSaving = (): boolean => items.get(item.id) === item && item.savingLive === true
+  const known = finalPaths.get(item.id)?.path
+  const named = [...(known && isMediaName(known) ? [known] : []), ...(item.partialPaths ?? [])]
+  try {
+    const finished = clean ? piecesOnDisk(named).find((piece) => piece.whole) : undefined
+    if (finished) {
+      const probe = await probeMedia(finished.file)
+      if (!stillSaving()) return settleAbandoned(item)
+      if (probe.duration && (probe.hasVideo || probe.hasAudio)) {
+        finishRecording(item, finished.file, probe.duration)
+        return
+      }
+    }
+
+    const destinations = item.partialPaths ?? []
+    const pieces = piecesOnDisk(destinations)
+    if (!pieces.length) {
+      saveFailed(item, 'liveEmpty', 'Nothing had been recorded yet when it stopped.')
+      return
+    }
+    for (const piece of pieces) await joinFragments(piece)
+    if (!stillSaving()) return settleAbandoned(item)
+
+    const { dir, base, ext } = savedPath(destinations, item.mode)
+    const inputs = pieces.map((piece) => piece.file)
+    // The stream's own codecs may not fit the first choice; Matroska takes nearly anything.
+    for (const container of [ext, item.mode === 'audio' ? 'mka' : 'mkv']) {
+      const working = join(dir, `${base}.saving.${container}`)
+      rmSync(working, { force: true })
+      const run = runFfmpeg(remuxArgs(inputs, working, item.mode))
+      procs.set(item.id, run.child)
+      const { code, stderr } = await run.done
+      procs.delete(item.id)
+      deliberateStops.delete(item.id)
+      if (!stillSaving()) {
+        rmSync(working, { force: true })
+        return settleAbandoned(item)
+      }
+      if (stderr) appendLog(item, stderr.slice(-1000) + '\n')
+      const probe = code === 0 ? await probeMedia(working) : undefined
+      if (!stillSaving()) {
+        rmSync(working, { force: true })
+        return settleAbandoned(item)
+      }
+      if (probe?.duration && (probe.hasVideo || probe.hasAudio)) {
+        const output = uniqueOutputPath(join(dir, `${base}.${container}`), '', container)
+        renameSync(working, output)
+        removePieces(pieces)
+        finishRecording(item, output, probe.duration)
+        return
+      }
+      rmSync(working, { force: true })
+    }
+    item.keptPartial = keptFile(pieces)
+    saveFailed(item, 'liveNotSaved', 'The recording could not be turned into a file that plays.')
+  } catch (err) {
+    item.keptPartial = keptFile(piecesOnDisk(item.partialPaths ?? []))
+    const code = item.keptPartial ? 'liveNotSaved' : 'liveEmpty'
+    saveFailed(item, code, err instanceof Error ? err.message : String(err))
+  }
+}
+
+/** Paused, cancelled or removed while saving: that action's state stands, and its slot is free. */
+function settleAbandoned(item: DownloadItem): void {
+  if (items.has(item.id)) emitUpdated(item)
+  processQueue()
+}
+
+function finishRecording(item: DownloadItem, file: string, duration: number): void {
+  item.state = 'completed'
+  item.savingLive = undefined
+  item.partialPaths = undefined
+  item.keptPartial = undefined
+  finishProgress(item)
+  item.speed = undefined
+  item.eta = undefined
+  item.attempts = 0
+  item.finishedAt = Date.now()
+  item.filepath = file
+  item.duration = duration
+  try {
+    item.downloadedBytes = item.totalBytes = statSync(file).size
+  } catch {
+    // Moved already; the row still knows where it was put.
+  }
+  finalPaths.delete(item.id)
+  expectedNames.delete(item.id)
+  log.info('download', 'Finished', downloadFields(item))
+  emitUpdated(item)
+  processQueue()
+}
+
+function saveFailed(item: DownloadItem, code: AppErrorCode, message: string): void {
+  item.savingLive = undefined
+  finalPaths.delete(item.id)
+  failWith(item, code, message)
 }
 
 /** Queue a trim or convert job for a file that's already on disk. */
@@ -1818,6 +2067,7 @@ export function pauseDownload(id: string): void {
   if (item.state === 'completed') return
   clearRetry(id)
   abortResolve(id)
+  abandonLiveStop(item)
   const proc = procs.get(id)
   item.state = 'paused'
   // A deliberate pause outranks anything the previous shutdown recorded.
@@ -1917,6 +2167,8 @@ function cleanupPartials(item: DownloadItem): void {
   */
   const known = item.filepath || finalPaths.get(item.id)?.path
   if (known) cleanupPartialsAt(known)
+  // A recording's other stream, or the partial of a run from before a restart.
+  for (const path of item.partialPaths ?? []) if (path !== known) cleanupPartialsAt(path)
 }
 
 function cleanupPartialsAt(known: string): void {
@@ -1936,6 +2188,7 @@ export function cancelDownload(id: string): void {
   if (!item) return
   clearRetry(id)
   abortResolve(id)
+  abandonLiveStop(item)
   const proc = procs.get(id)
   item.state = 'canceled'
   // When it stopped, not when it was queued: the keep-finished limit drops the
@@ -2000,6 +2253,7 @@ export function removeDownload(id: string): void {
     or convert never owns its source, and a finished file is the user's.
   */
   const item = items.get(id)
+  if (item) abandonLiveStop(item)
   const unfinished =
     item !== undefined &&
     IN_FLIGHT_STATES.includes(item.state) &&
@@ -2136,6 +2390,8 @@ export function retryFailed(): void {
 export function shutdownDownloads(): void {
   for (const timer of retryTimers.values()) clearTimeout(timer)
   retryTimers.clear()
+  for (const timer of liveStops.values()) clearTimeout(timer)
+  liveStops.clear()
   for (const [id, proc] of procs) {
     const item = items.get(id)
     if (item) markInterrupted(item)
