@@ -429,11 +429,13 @@ function QueueRow({ item, index, animateIn = true, heading }: Props): JSX.Elemen
               {t('queue.stopSave')}
             </button>
           )}
-          {canPause && (
-            <IconButton label={t('common.pause')} icon={<Pause size={16} />} onClick={() => window.api.pauseDownload(item.id)} />
-          )}
-          {item.state === 'paused' && (
-            <IconButton label={t('common.resume')} icon={<Play size={16} />} onClick={() => window.api.resumeDownload(item.id)} />
+          {/* One button that changes its mind: as two, pressing Enter on Pause destroyed the focused element, and the next Enter did nothing. */}
+          {(canPause || item.state === 'paused') && (
+            <IconButton
+              label={item.state === 'paused' ? t('common.resume') : t('common.pause')}
+              icon={item.state === 'paused' ? <Play size={16} /> : <Pause size={16} />}
+              onClick={() => (item.state === 'paused' ? window.api.resumeDownload(item.id) : window.api.pauseDownload(item.id))}
+            />
           )}
           {(item.state === 'error' || item.state === 'canceled') && (
             <IconButton label={t('common.retry')} icon={<RotateCw size={16} />} onClick={() => window.api.retryDownload(item.id)} />
@@ -443,10 +445,12 @@ function QueueRow({ item, index, animateIn = true, heading }: Props): JSX.Elemen
             cancelled - `processing` too: a merge on a long video takes
             minutes, and it was once the one running state with no way out -
             and a bin beside cancel read as a second way to say the same thing.
-            A row that has stopped is removed.
+            A row that has stopped is removed. Keyed apart, or React reuses the
+            element: a double click or a second Enter on Cancel removed the row.
           */}
           {running || item.state === 'paused' ? (
             <IconButton
+              key="cancel"
               className="hover:text-bad"
               data-uvd="cancel-download"
               label={t('common.cancel')}
@@ -455,6 +459,7 @@ function QueueRow({ item, index, animateIn = true, heading }: Props): JSX.Elemen
             />
           ) : (
             <IconButton
+              key="remove"
               className="hover:text-bad"
               label={t('queue.removeRow')}
               icon={<Trash2 size={16} />}

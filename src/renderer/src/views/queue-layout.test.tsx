@@ -3,6 +3,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vites
 import { installMockApi } from '../lib/mockApi'
 import { useStore } from '../store'
 import { useI18n } from '../i18n'
+import { en } from '../i18n/en'
 import { TOOLTIP_DELAY } from '../ui'
 import DownloadsView from './DownloadsView'
 import QueueRow from '../components/QueueRow'
@@ -49,6 +50,34 @@ const queue = async (at: number): Promise<HTMLElement> => {
   )
   return container
 }
+
+describe('the keyboard in the queue', () => {
+  const row = (state: DownloadItem['state']): DownloadItem =>
+    ({ id: 'k1', url: 'https://x.test/v', title: 'Keys', state, percent: 40, mode: 'video', createdAt: 1 }) as DownloadItem
+
+  it('stays on the button when Pause becomes Resume, so Enter can undo it', () => {
+    const { rerender } = render(<QueueRow item={row('downloading')} index={0} />)
+    const button = screen.getByRole('button', { name: en['common.pause'] })
+    button.focus()
+    rerender(<QueueRow item={row('paused')} index={0} />)
+    expect(document.activeElement).toBe(button)
+    expect(button.getAttribute('aria-label')).toBe(en['common.resume'])
+  })
+
+  it('stays with a row that moved to another section when it was cancelled', async () => {
+    setWidth(1200)
+    useStore.setState({ downloads: [row('downloading')] })
+    render(
+      <>
+        <span id="uvd-header-end" />
+        <DownloadsView />
+      </>
+    )
+    screen.getByRole('button', { name: en['common.cancel'] }).focus()
+    act(() => useStore.setState({ downloads: [row('canceled')] }))
+    await waitFor(() => expect(document.activeElement).toBe(screen.getByRole('button', { name: en['common.retry'] })))
+  })
+})
 
 describe('the queue screen', () => {
   it('scrolls as a whole, so the toolbar and the rows share one column', async () => {

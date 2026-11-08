@@ -162,6 +162,24 @@ export default function DownloadsView(): JSX.Element {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [focusedRow])
 
+  /*
+    A row changes section or leaves when it is cancelled, retried or removed, and
+    the focused button goes with it. The keyboard then started again from the top
+    of the window, past the sidebar, every time. Only for a button that is really
+    gone: a click on empty space must not be taken back by the next progress line.
+  */
+  const lastFocused = useRef<HTMLElement | null>(null)
+  const lastRow = useRef<string | null>(null)
+  useEffect(() => {
+    const gone = lastFocused.current
+    if (!gone || gone.isConnected || document.activeElement !== document.body) return
+    lastFocused.current = null
+    const id = lastRow.current
+    const row = id ? scrollRef.current?.querySelector(`[data-row="${id.replace(/["\\]/g, '\\$&')}"]`) : null
+    const target = row?.querySelector('button') ?? scrollRef.current
+    target?.focus({ preventScroll: true })
+  }, [downloads])
+
   const hasMore = visible.length > limit
   useEffect(() => {
     const root = scrollRef.current
@@ -228,7 +246,17 @@ export default function DownloadsView(): JSX.Element {
       nothing beside the column, and the rows were a scrollbar narrower than the
       toolbar above them.
     */
-    <div ref={scrollRef} className="h-full overflow-y-auto">
+    <div
+      ref={scrollRef}
+      tabIndex={-1}
+      className="h-full overflow-y-auto outline-none"
+      onFocusCapture={(e) => {
+        const target = e.target as HTMLElement
+        if (target === scrollRef.current) return
+        lastFocused.current = target
+        lastRow.current = target.closest<HTMLElement>('[data-row]')?.dataset.row ?? null
+      }}
+    >
       {/* GNOME keeps the view's main bulk action in its header bar (A1.1 §3). */}
       <HeaderSlot>
         {hasRunning &&
