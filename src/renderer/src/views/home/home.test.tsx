@@ -87,6 +87,23 @@ describe('Download: the result card (5.4, A1)', () => {
     expect(start.mock.calls[0][0].audioLanguage).toBe('de')
   })
 
+  it('sends the height, not a format with its own sound, when another language is picked', async () => {
+    const input = await app()
+    fireEvent.change(input, { target: { value: 'https://www.youtube.com/watch?v=mock-dubbed' } })
+    fireEvent.keyDown(input, { key: 'Enter' })
+    await screen.findByRole('button', { name: /^Download · / }, { timeout: 4000 })
+    await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Other File Options' })))
+    await act(async () => fireEvent.click(screen.getByRole('radio', { name: /^720p/ })))
+    await act(async () => fireEvent.click(screen.getByRole('combobox', { name: 'Audio Language' })))
+    await act(async () => fireEvent.click(screen.getByRole('option', { name: 'German' })))
+    const start = vi.spyOn(window.api, 'startDownload')
+    start.mockClear()
+    await act(async () => fireEvent.click(screen.getByRole('button', { name: /^Download · / })))
+    await waitFor(() => expect(start).toHaveBeenCalled())
+    expect(start.mock.calls[0][0]).toMatchObject({ quality: '720', audioLanguage: 'de' })
+    expect(start.mock.calls[0][0].formatId).toBeUndefined()
+  })
+
   it('offers to wait for a premiere, and queues it to', async () => {
     const input = await app()
     fireEvent.change(input, { target: { value: 'https://www.youtube.com/watch?v=mock-premiere' } })

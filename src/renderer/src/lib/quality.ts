@@ -119,6 +119,25 @@ function byQuality(a: VideoFormat, b: VideoFormat): number {
 }
 
 /**
+ * What to queue for this selection, given the language picked on the card.
+ *
+ * A format with sound of its own keeps that sound: the engine, given
+ * `18+ba[language=de]`, takes format 18 alone, in English. So when the format
+ * chosen has audio and not in that language, the height is what is asked for,
+ * and the engine's language-first selector finds the video and the track.
+ */
+export function selectionForLanguage<S extends { quality?: QualityPreset; formatId?: string }>(
+  formats: VideoFormat[],
+  selection: S,
+  language?: string
+): S {
+  if (!language || !selection.formatId) return selection
+  const chosen = formats.find((f) => f.id === selection.formatId)
+  if (chosen?.kind !== 'video+audio' || chosen.language === language) return selection
+  return { ...selection, formatId: undefined, quality: chosen.height ? (`${chosen.height}` as const) : 'best' }
+}
+
+/**
  * The stream this selection resolves to, mirroring the format expression the
  * download builds: an explicit id wins, then a height cap, then "best".
  *

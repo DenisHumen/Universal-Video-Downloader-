@@ -37,6 +37,7 @@ import {
   freeCopySuffix,
   pickOutputStem,
   samePath,
+  sectionSuffix,
   shouldTakeOwnName,
   variantSuffix,
   waitsForNamesake,
@@ -516,7 +517,8 @@ function settleOutputStem(item: DownloadItem, dir: string, settings: AppSettings
   const ranBefore = !item.outputStem && item.log != null
   const legacy = ranBefore && partialsFor(names, base).length ? base : undefined
   const stem = pickOutputStem({
-    wanted: base + variantSuffix(item),
+    // No language here: the file is found by this exact name, and a number keeps two languages apart.
+    wanted: base + sectionSuffix(item.range),
     current: item.outputStem,
     legacy,
     held,
@@ -543,7 +545,7 @@ export function outputTarget(
 ): { path: string; stem?: string } {
   const base = chosenStem(item)
   if (base) {
-    const stem = item.outputStem ?? base + variantSuffix(item)
+    const stem = item.outputStem ?? base + sectionSuffix(item.range)
     return { path: join(dir, `${stem}.%(ext)s`), stem }
   }
   const template = numberedName(settings.filenameTemplate || '%(title)s [%(id)s].%(ext)s', item.playlist)

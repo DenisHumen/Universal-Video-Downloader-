@@ -112,9 +112,11 @@ describe('buildArgs: audio language', () => {
     expect(format(buildArgs(item({ mode: 'audio' }), settings(), '/tmp'))).toBe('bestaudio/best')
   })
 
-  it('names the file after the track, so two languages are two files', () => {
+  it('names the file after the track that came down, so two languages are two files', () => {
     const args = buildArgs(item({ audioLanguage: 'de' }), settings(), '/tmp')
-    expect(args[args.indexOf('-o') + 1]).toContain(' [de].%(ext)s')
+    expect(args[args.indexOf('-o') + 1]).toContain('%(language& [{}]|)s.%(ext)s')
+    const plain = buildArgs(item(), settings(), '/tmp')
+    expect(plain[plain.indexOf('-o') + 1]).not.toContain('language')
   })
 })
 

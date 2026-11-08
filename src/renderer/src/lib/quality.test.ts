@@ -8,7 +8,8 @@ import {
   initialQuality,
   maxHeightOf,
   outcomeResolution,
-  resolveSelection
+  resolveSelection,
+  selectionForLanguage
 } from './quality'
 
 function settings(overrides: Partial<AppSettings> = {}): AppSettings {
@@ -195,5 +196,33 @@ describe('outcomeSummary', () => {
     expect(outcomeSummary({ ext: 'mp3' }, bytes)).toEqual(['MP3'])
     expect(outcomeSummary({ height: 720 }, bytes)).toEqual(['720p'])
     expect(outcomeSummary(null, bytes)).toEqual([])
+  })
+})
+
+describe('selectionForLanguage', () => {
+  const formats = [
+    { id: '18', ext: 'mp4', kind: 'video+audio', resolution: '360p', height: 360, language: 'en' },
+    { id: '19', ext: 'mp4', kind: 'video+audio', resolution: 'source' },
+    { id: '20', ext: 'mp4', kind: 'video+audio', resolution: '360p', height: 360, language: 'de' },
+    { id: '134', ext: 'mp4', kind: 'video', resolution: '360p', height: 360 }
+  ] as VideoFormat[]
+
+  it('asks for the height when the format chosen has sound in another language', () => {
+    expect(selectionForLanguage(formats, { quality: 'best', formatId: '18', targetHeight: 360 }, 'de')).toEqual({
+      quality: '360',
+      formatId: undefined,
+      targetHeight: 360
+    })
+  })
+
+  it('takes the best when that format has no height to go by', () => {
+    expect(selectionForLanguage(formats, { formatId: '19' }, 'de')).toEqual({ quality: 'best', formatId: undefined })
+  })
+
+  it('keeps a format already in that language, a silent one, and any format with no language picked', () => {
+    expect(selectionForLanguage(formats, { formatId: '20' }, 'de').formatId).toBe('20')
+    expect(selectionForLanguage(formats, { formatId: '134' }, 'de').formatId).toBe('134')
+    expect(selectionForLanguage(formats, { formatId: '18' }).formatId).toBe('18')
+    expect(selectionForLanguage(formats, { quality: '720' }, 'de')).toEqual({ quality: '720' })
   })
 })

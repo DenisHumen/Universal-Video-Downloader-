@@ -47,14 +47,25 @@ export function sectionSuffix(range?: TrimRange): string {
   return ` [${sectionTime(range.start ?? 0)}-${end}]`
 }
 
+/*
+  The language of what actually came down, as the engine fills it in: ` [de]`, or
+  nothing when the formats name none.
+
+  Not the language that was asked for. The selector falls back to the plain
+  choice when the site no longer offers that one, so a name written from the
+  request called an English file German. The engine knows what it picked by the
+  time it names the file, whether it was a pair or one format.
+*/
+const LANGUAGE_FIELD = '%(language& [{}]|)s'
+
 /**
  * What sets this entry's file apart from the same video's other files, in its
  * name: the section it covers and the audio track it carries. The engine's name
  * for a video knows neither, and "already downloaded" would then hand a German
- * track's request the English file.
+ * track's request the English file. For the template: it holds an engine field.
  */
 export function variantSuffix(item: Pick<DownloadItem, 'range' | 'audioLanguage'>): string {
-  return sectionSuffix(item.range) + (item.audioLanguage ? ` [${item.audioLanguage}]` : '')
+  return sectionSuffix(item.range) + (item.audioLanguage ? LANGUAGE_FIELD : '')
 }
 
 const EXT_FIELD = /\.%\(ext\)s$/
@@ -224,13 +235,14 @@ const isDownload = (item: DownloadItem): boolean => !item.kind || item.kind === 
 export function waitsForNamesake(item: DownloadItem, all: readonly DownloadItem[]): boolean {
   if (!isDownload(item)) return false
   const link = item.sourceUrl || item.url
-  const tail = variantSuffix(item) + (item.copySuffix ?? '')
+  // Not the language: that only tells two names apart if both languages are still on offer.
+  const tail = sectionSuffix(item.range) + (item.copySuffix ?? '')
   return all.some(
     (other) =>
       other.id !== item.id &&
       isDownload(other) &&
       RUNNING.includes(other.state) &&
       (other.sourceUrl || other.url) === link &&
-      variantSuffix(other) + (other.copySuffix ?? '') === tail
+      sectionSuffix(other.range) + (other.copySuffix ?? '') === tail
   )
 }

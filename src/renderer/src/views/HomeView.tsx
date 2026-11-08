@@ -6,7 +6,7 @@ import type { DetectStage, MediaInfo, SearchResult } from '@shared/types'
 import { engineKnowsHost, looksLikeCollection, youtubeIdOf } from '@shared/urls'
 import { useStore } from '../store'
 import { isProbablyUrl } from '../lib/format'
-import { availableHeights, initialMode, initialQuality, resolveSelection } from '../lib/quality'
+import { availableHeights, initialMode, initialQuality, resolveSelection, selectionForLanguage } from '../lib/quality'
 import { detectIsDone } from '../lib/emphasis'
 import { queueDownload } from '../lib/queue'
 import { escapeClearsHome, isDownloadNowChord } from '../lib/shortcuts'
@@ -181,7 +181,7 @@ export default function HomeView(): JSX.Element {
   const start = async (): Promise<void> => {
     if (!info) return
     const cutting = isCutting(choice)
-    const { selection } = choice
+    const selection = selectionForLanguage(info.formats, choice.selection, choice.audioLanguage)
     setStarting(true)
     let ok = false
     try {

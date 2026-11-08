@@ -337,6 +337,52 @@ describe.runIf(enabled)('subtitles and failures, with the real tools', () => {
     await new Promise((ok) => back.close(ok))
   }, 150_000)
 
+  describe('the audio language in the name', () => {
+    const fetch = async (formats: Record<string, unknown>[], request: Record<string, unknown>, settings = {}): Promise<string[]> => {
+      const dir = mkdtempSync(join(tmpdir(), 'uvd-subs-run-'))
+      h.settings = settings
+      h.infoFile = join(dir, 'detect.info.json')
+      writeFileSync(h.infoFile, JSON.stringify({ id: 'v', title: 't', extractor: 'generic', extractor_key: 'Generic', _type: 'video', formats }))
+      const { id } = await downloader.startDownload({
+        url: `${base}/lang-${Date.now()}`,
+        title: 't',
+        mode: 'video',
+        outputDir: dir,
+        ...request
+      })
+      await vi.waitFor(() => expect(['completed', 'error']).toContain(row(id).state), { timeout: 60_000, interval: 100 })
+      expect(row(id).state).toBe('completed')
+      return readdirSync(dir).filter((f) => !f.endsWith('.info.json'))
+    }
+    const combined = (): Record<string, unknown> => format('18', '/both.mp4', { height: 180, language: 'en' })
+    const silent = (): Record<string, unknown> => format('134', '/v.mp4', { acodec: 'none', height: 180 })
+    const audio = (language: string): Record<string, unknown> =>
+      format(`a-${language}`, '/a.m4a', { vcodec: 'none', ext: 'm4a', language, abr: 128 })
+
+    it('says the language when it came down', async () => {
+      const files = await fetch([combined(), silent(), audio('en'), audio('de')], { quality: '180', audioLanguage: 'de' })
+      expect(files).toEqual(['t [de].mp4'])
+      expect(hits).toContain('/v.mp4')
+      expect(hits).not.toContain('/both.mp4')
+    }, 90_000)
+
+    it('says the one that did when the language has gone away', async () => {
+      const files = await fetch([combined(), silent(), audio('en')], { quality: '180', audioLanguage: 'de' })
+      expect(files).toEqual(['t [en].mp4'])
+    }, 90_000)
+
+    it('says nothing when the formats name no language', async () => {
+      const files = await fetch([format('0', '/both.mp4')], { quality: 'best', audioLanguage: 'de' })
+      expect(files).toEqual(['t.mp4'])
+    }, 90_000)
+
+    it('an audio download names its track too, and restricted names stay legal', async () => {
+      const files = await fetch([audio('en'), audio('de')], { mode: 'audio', quality: 'audio', audioLanguage: 'de' }, { restrictFilenames: true })
+      expect(files).toHaveLength(1)
+      expect(files[0]).toMatch(/^t.*de.*\.mp3$/)
+    }, 90_000)
+  })
+
   it('a refused stream address still reads as stale, so the app can ask the site again', async () => {
     const { isStaleInfoError } = await import('./info-cache')
     const { item } = await run(`${base}/stale`, {

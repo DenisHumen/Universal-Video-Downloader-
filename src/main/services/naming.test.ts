@@ -240,6 +240,11 @@ describe('waitsForNamesake', () => {
     expect(waitsForNamesake(queued(), [resolved])).toBe(true)
   })
 
+  // The name says what came down, so with one language gone both would write one file.
+  it('holds another language of the same link', () => {
+    expect(waitsForNamesake(queued({ audioLanguage: 'de' }), [entry({ id: 'best', audioLanguage: 'en' })])).toBe(true)
+  })
+
   it('does not hold another section, which has a name of its own', () => {
     const clip = entry({ id: 'clip', range: { start: 0, end: 2 } })
     expect(waitsForNamesake(queued(), [clip])).toBe(false)
