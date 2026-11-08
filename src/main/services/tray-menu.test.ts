@@ -18,6 +18,10 @@ const row = (state: DownloadItem['state'], percent = 0, indeterminate?: boolean)
 })
 
 describe('trayStatusLine', () => {
+  it('counts a row waiting for a premiere with the ones waiting for their turn', () => {
+    expect(trayStatusLine([row('waiting'), row('queued')], t)).toBe('2 queued')
+  })
+
   it('counts what is running and averages its progress', () => {
     expect(trayStatusLine([row('downloading', 30), row('processing', 60), row('queued')], t)).toBe(
       '2 downloading · 45%'

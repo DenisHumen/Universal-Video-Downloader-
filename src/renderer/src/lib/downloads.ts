@@ -100,7 +100,8 @@ const LIVE: ReadonlySet<DownloadItem['state']> = new Set(['detecting', 'download
  * now, running ones before the ones still waiting, at most `limit`.
  */
 export function liveDownloads(list: DownloadItem[], limit = 3): DownloadItem[] {
-  const rank = (d: DownloadItem): number => (d.state === 'queued' ? 1 : 0)
+  // A premiere can be waited for over days, and a row waiting for one is not what is moving now.
+  const rank = (d: DownloadItem): number => (d.state === 'queued' || d.state === 'waiting' ? 1 : 0)
   return list
     .filter((d) => LIVE.has(d.state))
     .sort((a, b) => rank(a) - rank(b) || a.createdAt - b.createdAt)

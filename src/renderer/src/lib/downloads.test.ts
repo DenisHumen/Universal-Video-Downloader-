@@ -127,6 +127,16 @@ describe('liveDownloads', () => {
     expect(ids(liveDownloads(list))).toEqual(['d2', 'p3', 'q1'])
     expect(liveDownloads([item('done', 1)])).toEqual([])
   })
+
+  it('does not let old rows waiting for a premiere push a running job off the list', () => {
+    const list = [
+      item('w1', 1, { state: 'waiting' }),
+      item('w2', 2, { state: 'waiting' }),
+      item('w3', 3, { state: 'waiting' }),
+      item('d4', 4, { state: 'downloading' })
+    ]
+    expect(ids(liveDownloads(list))).toEqual(['d4', 'w1', 'w2'])
+  })
 })
 
 describe('recentFinished', () => {

@@ -9,6 +9,11 @@ const row = (state: DownloadItem['state'], percent = 0, indeterminate?: boolean)
 })
 
 describe('taskbarProgress', () => {
+  it('shows nothing for a row waiting for a premiere', () => {
+    expect(taskbarProgress([row('waiting')])).toEqual({ value: -1, mode: 'none' })
+    expect(taskbarProgress([row('waiting'), row('downloading', 40)])).toEqual({ value: 0.4, mode: 'normal' })
+  })
+
   it('clears the bar when nothing is going on', () => {
     expect(taskbarProgress([])).toEqual({ value: -1, mode: 'none' })
     expect(taskbarProgress([row('completed', 100), row('error')])).toEqual({ value: -1, mode: 'none' })

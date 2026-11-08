@@ -27,7 +27,7 @@ export function trayStatusLine(
     const percent = Math.round(known.reduce((n, d) => n + clamp(d.percent), 0) / known.length)
     return fill(t('tray.statusDownloading'), running.length, percent)
   }
-  const queued = items.filter((d) => d.state === 'queued' || d.state === 'detecting').length
+  const queued = items.filter((d) => d.state === 'queued' || d.state === 'detecting' || d.state === 'waiting').length
   if (queued) return fill(t('tray.statusQueued'), queued)
   const paused = items.filter((d) => d.state === 'paused').length
   if (paused) return fill(t('tray.statusPaused'), paused)

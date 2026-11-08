@@ -20,7 +20,12 @@ export interface TaskbarProgress {
 export function taskbarProgress(items: Pick<DownloadItem, 'state' | 'percent' | 'indeterminate'>[]): TaskbarProgress {
   const running = items.filter((d) => d.state === 'downloading' || d.state === 'processing')
   if (!running.length) {
-    // Resolving a link: work is happening, there is just no figure for it yet.
+    /*
+      Resolving a link: work is happening, there is just no figure for it yet.
+      Not a row waiting for a premiere, whose process does nothing but sleep: the
+      bar would animate for days and say the app was busy. The row itself says it
+      is waiting, and the taskbar goes back to work when something comes down.
+    */
     if (items.some((d) => d.state === 'detecting')) return { value: 2, mode: 'indeterminate' }
     const paused = items.filter((d) => d.state === 'paused')
     if (!paused.length) return { value: -1, mode: 'none' }
