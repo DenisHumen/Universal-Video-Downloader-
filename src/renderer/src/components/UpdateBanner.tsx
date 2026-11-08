@@ -1,6 +1,7 @@
 import { AnimatePresence, m } from 'framer-motion'
 import { collapse } from '../lib/motion'
 import { Download, ExternalLink, RefreshCw, X } from '../ui/icons'
+import IconButton from '../ui/IconButton'
 import { useStore } from '../store'
 import { useT } from '../i18n'
 import { updateErrorDetail, updateErrorText } from '../lib/updateError'
@@ -110,9 +111,7 @@ export default function UpdateBanner(): JSX.Element {
                   <RefreshCw size={14} /> {t('common.retry')}
                 </button>
               )}
-              <button className="btn-icon" onClick={dismiss} aria-label={t('common.close')}>
-                <X size={15} />
-              </button>
+              <IconButton label={t('common.close')} icon={<X size={16} />} onClick={dismiss} />
             </div>
           </div>
         </m.div>

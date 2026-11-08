@@ -403,7 +403,7 @@ export function siteFolder(item: Pick<DownloadItem, 'extractor' | 'sourceUrl' | 
     known, so one site landed in `youtube.com`, `youtu.be` and `Youtube`.
   */
   const known = knownSiteFor(page)
-  if (known) return safeName(known.id)
+  if (known) return safeName(known.name)
   if (item.extractor && !NOT_A_SITE.test(item.extractor)) return safeName(item.extractor)
   try {
     return safeName(new URL(page).hostname.replace(/^www\./, ''))

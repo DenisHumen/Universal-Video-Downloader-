@@ -83,6 +83,19 @@
   --z-modal: 70;
 }
 
+/*
+  The focus ring. accent-ink, the accent's text cut, because it already clears
+  4.5:1 on every plane in every accent: accent at .5 measured 1.45-2.14:1, and
+  accent-bright, the shapes' cut, is still 1.5:1 for purple on a night card.
+  Declared wherever an accent is, so it is the accent's own value on the element
+  that carries one. Gated by scripts/check-contrast.mjs.
+*/
+:root,
+[data-theme],
+[data-accent] {
+  --focus: var(--accent-ink);
+}
+
 /* ---- Night: Yaru dark, as the user's GNOME renders it (docs/design/calibration.md) ----
    Window 44, sidebar 48 (lighter, as libadwaita draws it), cards 61. The
    v4 depth stays: the sheet keeps its edge and the v4 shadows. */
@@ -107,9 +120,9 @@
   --line-soft: 39 39 39;
   --line-strong: 89 89 89;
   --text: 247 247 247;
-  /* Yaru's 55% dim label is 4.0:1 on a card; corrected for AA. */
-  --text-2: 172 172 172;
-  --text-3: 172 172 172;
+  /* Yaru's 55% dim label is 4.0:1 on a card; corrected for AA, on a card's row under the pointer too (172 was 4.25:1 there). */
+  --text-2: 178 178 178;
+  --text-3: 178 178 178;
   /* Yaru orange (the default accent); the others are under [data-accent]. */
   --accent: 213 65 0;
   /* The accent as GNOME paints shapes that carry no text (switch track, progress):
@@ -431,6 +444,14 @@ textarea,
   user-select: text;
 }
 
+/* Whatever has no ring of its own gets the app's, not the browser's. Below every class, so any of them can say otherwise. */
+@layer base {
+  :focus-visible {
+    outline: 2px solid rgb(var(--focus));
+    outline-offset: 2px;
+  }
+}
+
 @layer components {
   /* ==================================================================== *
    * Planes, controls and lists in the user's GNOME (A1 + A1.1, values from
@@ -486,13 +507,15 @@ textarea,
     transition:
       background-color var(--t-fast) var(--ease),
       color var(--t-fast) var(--ease),
+      filter var(--t-fast) var(--ease),
       transform var(--t-press) var(--ease);
     @apply no-drag inline-flex cursor-pointer select-none items-center justify-center gap-2 whitespace-nowrap px-3.5 py-1.5 text-control font-bold active:scale-[0.97] disabled:pointer-events-none disabled:opacity-50;
   }
   /* .suggested-action: the one loud action per screen, in the accent. */
   .btn-solid {
     box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.12);
-    @apply btn-base bg-accent text-accent-fg hover:bg-accent/90 active:bg-accent/80;
+    /* Darker, never see-through: on a light plane a translucent fill took the white label to 4.03:1. */
+    @apply btn-base bg-accent text-accent-fg hover:brightness-95 active:brightness-90;
   }
   /* The default button: the text colour at .10. */
   .btn-quiet {
@@ -500,7 +523,7 @@ textarea,
   }
   /* .destructive-action. */
   .btn-danger {
-    @apply btn-base bg-destructive text-destructive-fg hover:bg-destructive/90 active:bg-destructive/80;
+    @apply btn-base bg-destructive text-destructive-fg hover:brightness-95 active:brightness-90;
   }
   /* An image button (34 px, the GTK size; every one needs an aria-label). */
   .btn-icon {
@@ -519,15 +542,15 @@ textarea,
 
   /* ---------------- Entries ---------------- */
 
-  /* GTK entry: a .10 fill, no border; focus is a 2 px accent/.5 outline drawn inside. */
+  /* GTK entry: a .10 fill, no border; focus is the 2 px ring drawn inside. */
   .field {
     border-radius: var(--r-1);
     min-height: 34px;
-    @apply no-drag w-full bg-fill/10 px-3 py-1.5 text-body text-ink outline-none placeholder:text-ink-3;
+    @apply no-drag w-full bg-fill/10 px-3 py-1.5 text-body text-ink outline-none placeholder:text-ink/80;
   }
   .field:focus,
   .field:focus-within {
-    outline: 2px solid rgb(var(--accent) / 0.5);
+    outline: 2px solid rgb(var(--focus));
     outline-offset: -2px;
   }
   /* Download's hero entry. */
@@ -584,11 +607,18 @@ textarea,
     @apply inline-flex min-w-[24px] items-center justify-center bg-fill/10 px-2 py-1 text-caption font-bold leading-none text-ink;
   }
 
+  /*
+    One ring for every control, 2 px clear of its edge. Outside, because that is
+    the only place it is sure to be seen: drawn inside it lands on the control's
+    own fill, where it is 2.6:1 on a checked toggle at night and vanishes into a
+    solid accent button by day. What fills its container (a row, a menu item, an
+    entry) has no outside to draw on, and takes the same ring inset instead.
+  */
   .btn-base:focus-visible,
   .btn-icon:focus-visible,
   .choice:focus-visible,
   .tab:focus-visible {
-    outline: 2px solid rgb(var(--accent) / 0.5);
+    outline: 2px solid rgb(var(--focus));
     outline-offset: 2px;
   }
 }
@@ -604,6 +634,7 @@ textarea,
     transition:
       background-color var(--t-fast) var(--ease),
       color var(--t-fast) var(--ease),
+      filter var(--t-fast) var(--ease),
       transform var(--t-press) var(--ease);
     @apply no-drag relative inline-flex shrink-0 cursor-pointer select-none items-center justify-center whitespace-nowrap font-bold active:scale-[0.97] disabled:pointer-events-none disabled:opacity-50;
   }
@@ -630,7 +661,7 @@ textarea,
   }
   .ui-btn-primary {
     box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.12);
-    @apply bg-accent text-accent-fg hover:bg-accent/90 active:bg-accent/80;
+    @apply bg-accent text-accent-fg hover:brightness-95 active:brightness-90;
   }
   .ui-btn-quiet {
     @apply bg-fill/10 text-ink hover:bg-fill/15 active:bg-fill/25;
@@ -639,7 +670,7 @@ textarea,
     @apply bg-transparent text-ink hover:bg-fill/10 active:bg-fill/25;
   }
   .ui-btn-danger {
-    @apply bg-destructive text-destructive-fg hover:bg-destructive/90 active:bg-destructive/80;
+    @apply bg-destructive text-destructive-fg hover:brightness-95 active:brightness-90;
   }
   /* .pill: the main call to action. */
   .ui-btn-pill {
@@ -672,7 +703,7 @@ textarea,
 
   .ui-field {
     border-radius: var(--r-1);
-    @apply no-drag w-full bg-fill/10 px-3 text-body text-ink outline-none placeholder:text-ink-3 disabled:opacity-50;
+    @apply no-drag w-full bg-fill/10 px-3 text-body text-ink outline-none placeholder:text-ink/80 disabled:opacity-50;
   }
   .ui-field:not(textarea) {
     height: 34px;
@@ -687,7 +718,7 @@ textarea,
   }
   .ui-field:focus,
   .ui-field:focus-within {
-    outline: 2px solid rgb(var(--accent) / 0.5);
+    outline: 2px solid rgb(var(--focus));
     outline-offset: -2px;
   }
   select.ui-field {
@@ -728,7 +759,8 @@ textarea,
     border-radius: var(--r-1);
     width: 18px;
     height: 18px;
-    box-shadow: inset 0 0 0 2px rgb(var(--fill) / 0.25);
+    /* .6: the least that clears 3:1 on every plane by day; at .25 an empty box was 1.57:1. */
+    box-shadow: inset 0 0 0 2px rgb(var(--fill) / 0.6);
     transition: background-color var(--t-fast) var(--ease);
     @apply no-drag relative inline-flex shrink-0 cursor-pointer items-center justify-center text-accent-fg disabled:cursor-not-allowed disabled:opacity-50;
   }
@@ -837,9 +869,11 @@ textarea,
   .ui-headerbar-shade {
     box-shadow: 0 1px 0 rgb(var(--line));
   }
+  /* Equal shares keep the title centred; never below their content, so the title gives way, not a button. */
   .ui-headerbar-start,
   .ui-headerbar-end {
-    @apply flex min-w-0 flex-1 items-center gap-1.5;
+    min-width: max-content;
+    @apply flex flex-1 items-center gap-1.5;
   }
   .ui-headerbar-end {
     @apply justify-end;
@@ -856,9 +890,9 @@ textarea,
     width: min(440px, calc(100% - 300px));
     @apply no-drag absolute left-1/2 top-1/2 flex -translate-x-1/2 -translate-y-1/2 items-center;
   }
+  /* In the flow, between the slots: centred on the bar, as GTK centres it, and it can never run under the end slot. */
   .ui-headerbar-title {
-    max-width: calc(100% - 120px);
-    @apply pointer-events-none absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 truncate text-heading text-ink;
+    @apply pointer-events-none min-w-0 truncate text-heading text-ink;
   }
 
   /* ---- Row parts ---- */
@@ -867,12 +901,8 @@ textarea,
     border-radius: var(--r-1);
     @apply no-drag flex min-w-0 cursor-pointer items-center gap-1.5 text-body outline-none disabled:cursor-not-allowed disabled:opacity-50;
   }
-  .ui-dropdown:focus-visible {
-    outline: 2px solid rgb(var(--accent) / 0.5);
-    outline-offset: -2px;
-  }
   .ui-dropdown-row {
-    @apply max-w-[260px] shrink-0 bg-transparent py-1.5 pl-2.5 pr-1.5 text-right text-ink-2 hover:bg-fill/10 active:bg-fill/25;
+    @apply max-w-[260px] shrink-0 bg-transparent py-1.5 pl-2.5 pr-1.5 text-right text-ink-2 hover:bg-fill/10 hover:text-ink active:bg-fill/25;
   }
   .ui-dropdown-row[aria-expanded='true'] {
     @apply bg-fill/15 text-ink;
@@ -894,11 +924,11 @@ textarea,
     @apply flex w-full cursor-pointer items-center gap-3 px-3 text-left text-body text-ink outline-none hover:bg-fill/10 focus:bg-fill/10;
   }
   .ui-dropdown-item:focus-visible {
-    outline: 2px solid rgb(var(--accent) / 0.5);
+    outline: 2px solid rgb(var(--focus));
     outline-offset: -2px;
   }
   .ui-entry-row:focus-within {
-    outline: 2px solid rgb(var(--accent) / 0.5);
+    outline: 2px solid rgb(var(--focus));
     outline-offset: -2px;
   }
   .ui-entry-row-invalid {
@@ -928,6 +958,26 @@ textarea,
     animation: ui-page-back var(--t-spring) var(--ease-spring);
   }
 
+  /* ---- A clickable poster (Search's result cards) ---- */
+  .ui-poster {
+    @apply no-drag relative block aspect-video w-full cursor-pointer overflow-hidden bg-sink text-left outline-none;
+  }
+  /* Over the picture and its badges: what is under them could be any colour. */
+  .ui-poster::after {
+    content: '';
+    transition: background-color var(--t-fast) var(--ease);
+    @apply pointer-events-none absolute inset-0;
+  }
+  .ui-poster:hover::after {
+    background-color: rgb(255 255 255 / 0.12);
+  }
+  /* Inset: the card clips anything outside it. The dark edge keeps the ring readable on a poster of the same colour. */
+  .ui-poster:focus-visible::after {
+    box-shadow:
+      inset 0 0 0 2px rgb(var(--focus)),
+      inset 0 0 0 4px rgb(var(--osd));
+  }
+
   /* ---- Appearance pickers ---- */
   .ui-style-tile {
     @apply no-drag flex cursor-pointer flex-col items-center gap-2 rounded-3 p-1 outline-none;
@@ -943,7 +993,7 @@ textarea,
     box-shadow: 0 0 0 3px rgb(var(--accent-bright));
   }
   .ui-style-tile:focus-visible .ui-tile-frame {
-    outline: 2px solid rgb(var(--accent) / 0.5);
+    outline: 2px solid rgb(var(--focus));
     outline-offset: 4px;
   }
   .ui-tile-window {
@@ -999,7 +1049,7 @@ textarea,
       0 0 0 4px rgb(var(--text));
   }
   .ui-swatch:focus-visible {
-    outline: 2px solid rgb(var(--accent) / 0.5);
+    outline: 2px solid rgb(var(--focus));
     outline-offset: 5px;
   }
   .ui-swatch-system {
@@ -1057,8 +1107,8 @@ textarea,
     @apply bg-fill/25;
   }
   .ui-caption:focus-visible .ui-caption-circle {
-    outline: 2px solid rgb(var(--accent) / 0.5);
-    outline-offset: 1px;
+    outline: 2px solid rgb(var(--focus));
+    outline-offset: 2px;
   }
   /* Windows' caption overlay (titleBarOverlay) owns this corner. */
   .ui-titlebar-overlay-space {
@@ -1083,15 +1133,24 @@ textarea,
     @apply bg-fill/10 hover:bg-fill/[0.13];
   }
 
-  .ui-nav-item:focus-visible,
+  /* See .btn-base:focus-visible for why controls ring outside and these inside. */
   .ui-btn:focus-visible,
   .ui-icon-btn:focus-visible,
   .ui-switch:focus-visible,
   .ui-check:focus-visible,
   .ui-segment:focus-visible,
+  .ui-dropdown:focus-visible {
+    outline: 2px solid rgb(var(--focus));
+    outline-offset: 2px;
+  }
+  /* Its neighbours are a pixel away and would paint over the ring. */
+  .ui-segment:focus-visible {
+    z-index: 1;
+  }
+  .ui-nav-item:focus-visible,
   .ui-row-activatable:focus-visible,
   .ui-menu-item:focus-visible {
-    outline: 2px solid rgb(var(--accent) / 0.5);
+    outline: 2px solid rgb(var(--focus));
     outline-offset: -2px;
   }
 }

@@ -2,6 +2,7 @@ import {
   cloneElement,
   useEffect,
   useId,
+  useLayoutEffect,
   useRef,
   useState,
   type FocusEvent,
@@ -12,6 +13,8 @@ import { createPortal } from 'react-dom'
 
 /** Hover or focus this long before a tooltip appears (plan 3.1). */
 export const TOOLTIP_DELAY = 500
+/** The least a tooltip keeps from the window's edge. */
+const EDGE = 6
 
 interface Props {
   label: string
@@ -37,6 +40,7 @@ export default function Tooltip({ label, children, side = 'bottom', describes = 
   const [place, setPlace] = useState<Place | null>(null)
   const timer = useRef<ReturnType<typeof setTimeout>>()
   const anchor = useRef<HTMLElement | null>(null)
+  const tip = useRef<HTMLDivElement>(null)
 
   const hide = (): void => {
     clearTimeout(timer.current)
@@ -73,6 +77,22 @@ export default function Tooltip({ label, children, side = 'bottom', describes = 
 
   useEffect(() => () => clearTimeout(timer.current), [])
 
+  /*
+    Centred on its trigger, a tip on a button at the window's edge ran past it:
+    the caption buttons' "Закрыть" lost its last letters. Its width is only known
+    once drawn, so it is nudged here, before the frame is painted.
+  */
+  useLayoutEffect(() => {
+    const node = tip.current
+    if (!node || !place) return
+    const r = node.getBoundingClientRect()
+    if (!r.width) return
+    const over = r.right - (window.innerWidth - EDGE)
+    const under = EDGE - r.left
+    const nudge = over > 0 ? -over : under > 0 ? under : 0
+    if (nudge) setPlace({ ...place, left: place.left + nudge })
+  }, [place])
+
   const props = children.props as Record<string, unknown>
   const chain =
     <E,>(own: unknown, mine: (e: E) => void) =>
@@ -96,6 +116,7 @@ export default function Tooltip({ label, children, side = 'bottom', describes = 
       {place &&
         createPortal(
           <div
+            ref={tip}
             id={id}
             role="tooltip"
             className="ui-tooltip"

@@ -3,6 +3,7 @@ import {
   CircleX,
   FolderOpen,
   Inbox,
+  Pause,
   Play,
   Plus,
   RotateCw,
@@ -16,7 +17,8 @@ import { formatBytes, formatEta, formatSpeed } from '../lib/format'
 import { useT, useTp, type TranslationKey } from '../i18n'
 import QueueRow from '../components/QueueRow'
 import { groupQueue, queueGroupOf, type QueueGroup } from '../lib/downloads'
-import { EmptyState, Icon } from '../ui'
+import { EmptyState, Icon, IconButton } from '../ui'
+import { useMediaQuery } from '../hooks/useMediaQuery'
 import { toast } from '../lib/toast'
 import HeaderSlot from '../shell/HeaderSlot'
 import { SegmentedControl } from '../ui'
@@ -71,6 +73,14 @@ function matches(item: DownloadItem, filter: Filter): boolean {
  */
 const PAGE = 100
 
+/*
+  From here "Pause All" has room in the header bar and "Clear Finished" on the
+  toolbar. Below it the sidebar and the Windows caption overlay leave a few
+  pixels between the label and the centred title, in Russian, so these are
+  icons with a tooltip.
+*/
+const LABELS_FROM = '(min-width: 1000px)'
+
 /**
  * The queue as a document: a header stating the totals, a control strip, then
  * one ruled list. Bulk actions live as icons in the header rather than inside
@@ -82,6 +92,7 @@ export default function DownloadsView(): JSX.Element {
   const downloads = useStore((s) => s.downloads)
   const settings = useStore((s) => s.settings)
   const setView = useStore((s) => s.setView)
+  const headerHasRoom = useMediaQuery(LABELS_FROM)
 
   const [filter, setFilter] = useState<Filter>('all')
   const [query, setQuery] = useState('')
@@ -208,80 +219,90 @@ export default function DownloadsView(): JSX.Element {
   ].filter(Boolean)
 
   return (
-    <div className="mx-auto flex h-full w-full max-w-[800px] flex-col px-6 pb-8 pt-4">
+    /*
+      The scroller is the whole pane and the column sits inside it. The other way
+      round, the scrollbar floated in the middle of a wide window, the wheel did
+      nothing beside the column, and the rows were a scrollbar narrower than the
+      toolbar above them.
+    */
+    <div ref={scrollRef} className="h-full overflow-y-auto">
       {/* GNOME keeps the view's main bulk action in its header bar (A1.1 §3). */}
       <HeaderSlot>
-        {hasRunning && (
-          <button className="btn-quiet" onClick={() => window.api.pauseAll()}>
-            {t('queue.pauseAll')}
-          </button>
-        )}
-        {!hasRunning && hasPaused && (
-          <button className="btn-quiet" onClick={() => window.api.resumeAll()}>
-            {t('queue.resumeAll')}
-          </button>
-        )}
+        {hasRunning &&
+          (headerHasRoom ? (
+            <button className="btn-quiet" onClick={() => window.api.pauseAll()}>
+              {t('queue.pauseAll')}
+            </button>
+          ) : (
+            <IconButton label={t('queue.pauseAll')} icon={<Pause size={16} />} onClick={() => window.api.pauseAll()} />
+          ))}
+        {!hasRunning &&
+          hasPaused &&
+          (headerHasRoom ? (
+            <button className="btn-quiet" onClick={() => window.api.resumeAll()}>
+              {t('queue.resumeAll')}
+            </button>
+          ) : (
+            <IconButton label={t('queue.resumeAll')} icon={<Play size={16} />} onClick={() => window.api.resumeAll()} />
+          ))}
       </HeaderSlot>
-      <header className="flex items-center justify-between gap-4">
+      <div className="mx-auto flex min-h-full w-full max-w-[800px] flex-col px-6 pb-8">
+      {/* Stays in reach however far down the list has been read; rows pass under it, so it has the sheet's own colour. */}
+      <div
+        className={`sticky top-0 z-10 bg-raise pb-3 pt-4 ${visible.length > 0 ? 'border-b border-edge' : ''}`}
+        data-uvd="queue-toolbar"
+      >
+      <header className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
         <div className="min-w-0">
           {/* The title is the header bar's now; this says how the queue stands. */}
           <h2 className="sr-only">{t('queue.title')}</h2>
           <p className="numeric truncate text-meta text-ink-2">{summary.join('  ·  ')}</p>
         </div>
-        <div className="flex shrink-0 items-center gap-1">
+        {/*
+          What these do to many rows at once has to be read, not guessed from an
+          arrow and an octagon, so they keep their words; when words and the
+          summary do not fit on one line, the buttons take a line of their own.
+          A bin says "clear" by itself, so that one gives up its words first.
+        */}
+        <div className="ml-auto flex min-w-0 flex-wrap items-center justify-end gap-1">
           {settings?.downloadDir && (
-            <button
-              className="btn-icon"
-              title={t('queue.openFolder')} aria-label={t('queue.openFolder')}
+            <IconButton
+              label={t('queue.openFolder')}
+              icon={<FolderOpen size={16} />}
               onClick={() =>
                 void window.api.openPath(settings.downloadDir).then((why) => {
                   if (why) toast(t('queue.folderFailed'), 'error')
                 })
               }
-            >
-              <FolderOpen size={16} />
-            </button>
+            />
           )}
           {hasRunning && hasPaused && (
-            <button className="btn-icon-bare" title={t('queue.resumeAll')} aria-label={t('queue.resumeAll')} onClick={() => window.api.resumeAll()}>
-              <Play size={16} />
-            </button>
+            <IconButton label={t('queue.resumeAll')} icon={<Play size={16} />} onClick={() => window.api.resumeAll()} />
           )}
           {hasErrors && (
-            <button
-              className="btn-icon"
-              title={t('queue.retryFailed')} aria-label={t('queue.retryFailed')}
-              onClick={() => window.api.retryFailed()}
-            >
-              <RotateCw size={16} />
+            <button className="btn-quiet" onClick={() => window.api.retryFailed()}>
+              <RotateCw size={14} /> {t('queue.retryFailed')}
             </button>
           )}
-          {hasFinished && (
-            <button
-              className="btn-quiet px-3 py-1.5"
-              title={t('queue.clearFinished')}
-              onClick={clearFinished}
-            >
-              <Trash2 size={14} /> <span className="hidden sm:inline">{t('queue.clearFinished')}</span>
-            </button>
-          )}
+          {hasFinished &&
+            (headerHasRoom ? (
+              <button className="btn-quiet" onClick={clearFinished}>
+                <Trash2 size={14} /> {t('queue.clearFinished')}
+              </button>
+            ) : (
+              <IconButton label={t('queue.clearFinished')} icon={<Trash2 size={16} />} onClick={clearFinished} />
+            ))}
           {/* No question first: it takes the rows' errors and nothing on disk. */}
           {hasFailedRows && (
-            <button
-              className="btn-icon"
-              title={t('queue.clearFailed')}
-              aria-label={t('queue.clearFailed')}
-              data-uvd="clear-failed"
-              onClick={() => void window.api.clearFailed()}
-            >
-              <CircleX size={16} />
+            <button className="btn-quiet" data-uvd="clear-failed" onClick={() => void window.api.clearFailed()}>
+              <CircleX size={14} /> {t('queue.clearFailed')}
             </button>
           )}
         </div>
       </header>
 
       {drawable > 0 && (
-        <div className="mt-6 flex flex-wrap items-center gap-3">
+        <div className="mt-4 flex flex-wrap items-center gap-3">
           <SegmentedControl
             label={t('queue.title')}
             value={filter}
@@ -290,20 +311,21 @@ export default function DownloadsView(): JSX.Element {
           />
           {/* A label, so the whole pill is the target — the padding around a bare
               input is dead to the pointer. */}
-          <label className="field ml-auto flex min-w-[220px] max-w-[300px] flex-1 cursor-text items-center gap-2 px-4 py-1.5">
+          <label className="field ml-auto flex min-w-[176px] max-w-[300px] flex-1 cursor-text items-center gap-2 px-3 py-1.5">
             <Search size={15} className="shrink-0 text-ink-3" />
             <input
               value={query}
               onChange={(e) => changeQuery(e.target.value)}
               placeholder={t('queue.searchPlaceholder')}
-              className="no-drag min-w-0 flex-1 self-stretch bg-transparent text-control text-ink outline-none placeholder:text-ink-3"
+              className="no-drag min-w-0 flex-1 self-stretch bg-transparent text-control text-ink outline-none placeholder:text-ink/80"
               spellCheck={false}
             />
           </label>
         </div>
       )}
+      </div>
 
-      <div ref={scrollRef} className="mt-5 min-h-0 flex-1 overflow-y-auto">
+      <div className="min-h-0 flex-1">
         {downloads.length === 0 ? (
           <EmptyState
             icon={<Icon icon={Inbox} size="xl" />}
@@ -345,7 +367,7 @@ export default function DownloadsView(): JSX.Element {
             }
           />
         ) : (
-          <ul className="border-t border-edge">
+          <ul>
             {/*
               No AnimatePresence around the rows.
               By default it hands every child a fresh context value on each of
@@ -373,6 +395,7 @@ export default function DownloadsView(): JSX.Element {
             {hasMore && <li ref={sentinelRef} aria-hidden className="h-px" />}
           </ul>
         )}
+      </div>
       </div>
     </div>
   )

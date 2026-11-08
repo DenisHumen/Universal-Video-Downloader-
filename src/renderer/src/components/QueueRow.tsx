@@ -124,13 +124,18 @@ function QueueRow({ item, index, animateIn = true, heading }: Props): JSX.Elemen
     jobKindLabel,
     item.jobLabel,
     qualityLabel,
-    active && item.speed ? formatSpeed(item.speed) : null,
-    active && item.eta ? t('queue.eta', { time: formatEta(item.eta) }) : null,
+    /*
+      The line loses its end first when the row is narrow, so the order is what
+      survives: how much, then how long, then the speed, which the queue's
+      header already adds up. A size cut to "53…" says nothing at all.
+    */
     item.state === 'downloading' && item.downloadedBytes
       ? item.totalBytes
         ? `${formatBytes(item.downloadedBytes)} / ${formatBytes(item.totalBytes)}`
         : formatBytes(item.downloadedBytes)
       : null,
+    active && item.eta ? t('queue.eta', { time: formatEta(item.eta) }) : null,
+    active && item.speed ? formatSpeed(item.speed) : null,
     item.state === 'completed' && item.totalBytes ? formatBytes(item.totalBytes) : null,
     item.state === 'queued' && (item.attempts || 0) > 0 ? t('queue.retryingIn') : null
   ].filter(Boolean)
@@ -349,58 +354,31 @@ function QueueRow({ item, index, animateIn = true, heading }: Props): JSX.Elemen
         <div className="flex shrink-0 items-center gap-0.5">
           {item.state === 'completed' && item.filepath && (
             <>
-              <button
-                className="btn-icon-bare"
-                title={t('common.play')}
-                aria-label={t('common.play')}
+              <IconButton
+                label={t('common.play')}
+                icon={<Play size={16} />}
                 onClick={() =>
                   // The OS answers with an error rather than throwing; the click used to do nothing.
                   void window.api.openPath(item.filepath!).then((why) => {
                     if (why) toast(t('queue.openFailed'), 'error')
                   })
                 }
-              >
-                <Play size={15} />
-              </button>
-              <button
-                className="btn-icon-bare"
-                title={t('common.showInFolder')}
-                aria-label={t('common.showInFolder')}
+              />
+              <IconButton
+                label={t('common.showInFolder')}
+                icon={<FolderOpen size={16} />}
                 onClick={() => void showFile(item.filepath!)}
-              >
-                <FolderOpen size={15} />
-              </button>
+              />
             </>
           )}
           {running && (
-            <button
-              className="btn-icon-bare"
-              title={t('common.pause')}
-              aria-label={t('common.pause')}
-              onClick={() => window.api.pauseDownload(item.id)}
-            >
-              <Pause size={15} />
-            </button>
+            <IconButton label={t('common.pause')} icon={<Pause size={16} />} onClick={() => window.api.pauseDownload(item.id)} />
           )}
           {item.state === 'paused' && (
-            <button
-              className="btn-icon-bare"
-              title={t('common.resume')}
-              aria-label={t('common.resume')}
-              onClick={() => window.api.resumeDownload(item.id)}
-            >
-              <Play size={15} />
-            </button>
+            <IconButton label={t('common.resume')} icon={<Play size={16} />} onClick={() => window.api.resumeDownload(item.id)} />
           )}
           {(item.state === 'error' || item.state === 'canceled') && (
-            <button
-              className="btn-icon-bare"
-              title={t('common.retry')}
-              aria-label={t('common.retry')}
-              onClick={() => window.api.retryDownload(item.id)}
-            >
-              <RotateCw size={15} />
-            </button>
+            <IconButton label={t('common.retry')} icon={<RotateCw size={16} />} onClick={() => window.api.retryDownload(item.id)} />
           )}
           {/*
             Remove, in the form the state allows. A row still working is
@@ -410,24 +388,20 @@ function QueueRow({ item, index, animateIn = true, heading }: Props): JSX.Elemen
             A row that has stopped is removed.
           */}
           {running || item.state === 'paused' ? (
-            <button
-              className="btn-icon-bare hover:text-bad"
-              title={t('common.cancel')}
-              aria-label={t('common.cancel')}
+            <IconButton
+              className="hover:text-bad"
               data-uvd="cancel-download"
+              label={t('common.cancel')}
+              icon={<X size={16} />}
               onClick={() => (cancelLosesWork(item) ? setConfirmCancel(true) : void window.api.cancelDownload(item.id))}
-            >
-              <X size={15} />
-            </button>
+            />
           ) : (
-            <button
-              className="btn-icon-bare hover:text-bad"
-              title={t('queue.removeRow')}
-              aria-label={t('queue.removeRow')}
+            <IconButton
+              className="hover:text-bad"
+              label={t('queue.removeRow')}
+              icon={<Trash2 size={16} />}
               onClick={() => window.api.removeDownload(item.id)}
-            >
-              <Trash2 size={15} />
-            </button>
+            />
           )}
           {menu.length > 0 && (
             <Menu

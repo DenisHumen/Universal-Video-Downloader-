@@ -51,6 +51,8 @@ module.exports = {
           // Non-text accent shapes (switch, progress): GNOME's raw accent colour.
           bright: 'rgb(var(--accent-bright) / <alpha-value>)'
         },
+        // The keyboard focus ring.
+        focus: 'rgb(var(--focus) / <alpha-value>)',
         good: 'rgb(var(--good) / <alpha-value>)',
         warn: 'rgb(var(--warn) / <alpha-value>)',
         bad: {

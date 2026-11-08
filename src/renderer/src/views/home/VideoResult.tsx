@@ -300,12 +300,13 @@ export default function VideoResult({
                       className={cx('h-2 w-2 shrink-0 rounded-full', on ? 'bg-accent' : 'bg-fill/25')}
                     />
                     <span className="numeric w-20 shrink-0 text-control text-ink">{f.resolution}</span>
-                    <span className="w-12 shrink-0 text-control uppercase text-ink-2">{f.ext}</span>
-                    <span className="min-w-0 flex-1 truncate text-control text-ink-2">
+                    {/* As on any selected row, the fill takes the dim tier under 4.5:1 at night. */}
+                    <span className={cx('w-12 shrink-0 text-control uppercase', on ? 'text-ink' : 'text-ink-2')}>{f.ext}</span>
+                    <span className={cx('min-w-0 flex-1 truncate text-control', on ? 'text-ink' : 'text-ink-2')}>
                       {f.vcodec?.split('.')[0]}
                       {f.kind === 'video' ? ` ${t('format.plusAudio')}` : ''}
                     </span>
-                    <span className="numeric shrink-0 text-control text-ink-2">
+                    <span className={cx('numeric shrink-0 text-control', on ? 'text-ink' : 'text-ink-2')}>
                       {formatBytes(f.filesize || f.filesizeApprox)}
                     </span>
                   </button>

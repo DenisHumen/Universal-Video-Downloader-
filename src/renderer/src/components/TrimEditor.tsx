@@ -164,7 +164,8 @@ export default function TrimEditor({ duration, value, onChange, hint }: Props): 
                   if (handle === 'start') onChange({ ...value, start: next })
                   else onChange({ ...value, end: next })
                 }}
-                className="absolute top-1/2 z-10 h-[26px] w-2 -translate-x-1/2 -translate-y-1/2 cursor-ew-resize rounded-full bg-accent outline-offset-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
+                // 8 px to look at, 24 to grab.
+                className="absolute top-1/2 z-10 h-[26px] w-2 -translate-x-1/2 -translate-y-1/2 cursor-ew-resize rounded-full bg-accent outline-offset-2 before:absolute before:inset-y-0 before:-inset-x-2 before:content-[''] focus-visible:outline focus-visible:outline-2 focus-visible:outline-focus"
                 style={{ left: `${percentOf(seconds)}%` }}
               />
             )

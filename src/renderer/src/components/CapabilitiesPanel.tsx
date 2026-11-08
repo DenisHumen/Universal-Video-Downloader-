@@ -77,7 +77,7 @@ export default function CapabilitiesPanel(): JSX.Element {
                 }}
                 className={`group flex items-start gap-3.5 py-3.5 transition-colors duration-fast ease-ease ${
                   interactive
-                    ? 'no-drag cursor-pointer outline-offset-[-2px] focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent'
+                    ? 'no-drag cursor-pointer outline-offset-[-2px] focus-visible:outline focus-visible:outline-2 focus-visible:outline-focus'
                     : ''
                 }`}
               >

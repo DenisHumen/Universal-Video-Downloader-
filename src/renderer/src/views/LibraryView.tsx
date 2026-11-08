@@ -267,7 +267,7 @@ export default function LibraryView(): JSX.Element {
                 onChange={(e) => setQuery(e.target.value)}
                 placeholder={t('library.search')}
                 aria-label={t('library.search')}
-                className="no-drag min-w-0 flex-1 bg-transparent text-body text-ink outline-none placeholder:text-ink-3"
+                className="no-drag min-w-0 flex-1 bg-transparent text-body text-ink outline-none placeholder:text-ink/80"
                 spellCheck={false}
               />
             </label>
@@ -324,43 +324,45 @@ export default function LibraryView(): JSX.Element {
                     ) : (
                       gone && <span className="tag shrink-0 text-warn">{t('library.missing')}</span>
                     )}
-                    <IconButton
-                      label={t('common.play')}
-                      icon={<Play size={16} />}
-                      disabled={gone}
-                      onClick={() =>
-                        void window.api.openPath(e.filepath).then((why) => {
-                          if (why) toast(t('queue.openFailed'), 'error')
-                        })
-                      }
-                    />
-                    <IconButton
-                      label={t('common.showInFolder')}
-                      icon={<FolderOpen size={16} />}
-                      disabled={gone}
-                      onClick={() => void showFile(e.filepath)}
-                    />
-                    <Menu
-                      label={t('queue.more')}
-                      items={[
-                        ...(link
-                          ? [
-                              { label: t('queue.copyLink'), onSelect: () => void copyLink(link) },
-                              { label: t('queue.openSource'), onSelect: () => void window.api.openExternal(link) }
-                            ]
-                          : []),
-                        { label: t('library.cut'), onSelect: () => setJob({ entry: e, mode: 'trim' }), disabled: gone },
-                        { label: t('library.convert'), onSelect: () => setJob({ entry: e, mode: 'convert' }), disabled: gone },
-                        ...(gone && !e.remotePath
-                          ? [{ label: t('library.locate'), onSelect: () => void locate(e, 'folder') }]
-                          : []),
-                        ...(link ? [{ label: t('library.again'), onSelect: () => requestDetect(link) }] : []),
-                        'separator' as const,
-                        { label: t('library.forget'), onSelect: () => void window.api.forgetLibraryEntry(e.id) },
-                        ...(gone ? [] : [{ label: t('library.delete'), danger: true, onSelect: () => setConfirm(e) }])
-                      ]}
-                      trigger={(p) => <IconButton {...p} label={t('queue.more')} icon={<MoreHorizontal size={16} />} />}
-                    />
+                    <div className="flex shrink-0 items-center gap-0.5">
+                      <IconButton
+                        label={t('common.play')}
+                        icon={<Play size={16} />}
+                        disabled={gone}
+                        onClick={() =>
+                          void window.api.openPath(e.filepath).then((why) => {
+                            if (why) toast(t('queue.openFailed'), 'error')
+                          })
+                        }
+                      />
+                      <IconButton
+                        label={t('common.showInFolder')}
+                        icon={<FolderOpen size={16} />}
+                        disabled={gone}
+                        onClick={() => void showFile(e.filepath)}
+                      />
+                      <Menu
+                        label={t('queue.more')}
+                        items={[
+                          ...(link
+                            ? [
+                                { label: t('queue.copyLink'), onSelect: () => void copyLink(link) },
+                                { label: t('queue.openSource'), onSelect: () => void window.api.openExternal(link) }
+                              ]
+                            : []),
+                          { label: t('library.cut'), onSelect: () => setJob({ entry: e, mode: 'trim' }), disabled: gone },
+                          { label: t('library.convert'), onSelect: () => setJob({ entry: e, mode: 'convert' }), disabled: gone },
+                          ...(gone && !e.remotePath
+                            ? [{ label: t('library.locate'), onSelect: () => void locate(e, 'folder') }]
+                            : []),
+                          ...(link ? [{ label: t('library.again'), onSelect: () => requestDetect(link) }] : []),
+                          'separator' as const,
+                          { label: t('library.forget'), onSelect: () => void window.api.forgetLibraryEntry(e.id) },
+                          ...(gone ? [] : [{ label: t('library.delete'), danger: true, onSelect: () => setConfirm(e) }])
+                        ]}
+                        trigger={(p) => <IconButton {...p} label={t('queue.more')} icon={<MoreHorizontal size={16} />} />}
+                      />
+                    </div>
                   </div>
                 )
               })}

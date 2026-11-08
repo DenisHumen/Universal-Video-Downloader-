@@ -352,17 +352,18 @@ export default function AutomationView(): JSX.Element {
                     type="button"
                     aria-pressed={on}
                     onClick={() => setSelectedId(w.id)}
-                    className="no-drag flex min-w-0 flex-1 items-center gap-3 self-stretch px-3 py-2 text-left"
+                    className="no-drag flex min-w-0 flex-1 items-center gap-3 self-stretch px-3 py-2 text-left outline-offset-[-2px]"
                   >
                     <Poster src={w.thumbnail} />
                     <span className="min-w-0 flex-1">
                       <span className="ui-row-title block truncate" title={w.title}>
                         {w.title}
                       </span>
-                      <span className="ui-row-subtitle block truncate">
+                      {/* The selected row's fill is what took the dim tier under 4.5:1 at night. */}
+                      <span className={`ui-row-subtitle block truncate ${on ? 'text-ink' : 'text-ink-2'}`}>
                         {[w.translatorName, w.quality].filter(Boolean).join(' · ')}
                       </span>
-                      <span className={`numeric block truncate text-meta ${watchFailing(w) ? 'text-bad' : 'text-ink-2'}`}>
+                      <span className={`numeric block truncate text-meta ${watchFailing(w) ? 'text-bad' : on ? 'text-ink' : 'text-ink-2'}`}>
                         {statusLine(w)}
                         {last ? ` · ${t('auto.lastNew', { episode: last })}` : ''}
                       </span>

@@ -1,4 +1,5 @@
 import { ArrowRight, FolderOpen, Play } from '../ui/icons'
+import Tooltip from '../ui/Tooltip'
 import type { DownloadItem } from '@shared/types'
 import { useStore } from '../store'
 import { useT } from '../i18n'
@@ -102,22 +103,24 @@ export default function HomeActivity(): JSX.Element {
                 )}
                 {item.filepath && i > 0 && (
                   <>
+                    <Tooltip label={t('common.play')}>
                     <button
                       className="btn-icon-bare"
-                      title={t('common.play')}
                       aria-label={`${t('common.play')}: ${item.title}`}
                       onClick={() => openFile(item.filepath!)}
                     >
-                      <Play size={14} />
+                      <Play size={16} />
                     </button>
+                    </Tooltip>
+                    <Tooltip label={t('common.showInFolder')}>
                     <button
                       className="btn-icon-bare"
-                      title={t('common.showInFolder')}
                       aria-label={`${t('common.showInFolder')}: ${item.title}`}
                       onClick={() => void showFile(item.filepath!)}
                     >
-                      <FolderOpen size={14} />
+                      <FolderOpen size={16} />
                     </button>
+                    </Tooltip>
                   </>
                 )}
               </li>

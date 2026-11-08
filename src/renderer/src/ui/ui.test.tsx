@@ -114,6 +114,26 @@ describe('IconButton', () => {
     vi.useRealTimers()
     expect(await axeViolations(document.body)).toEqual([])
   })
+
+  // The window's close button sits 18 px from the edge, and "Закрыть" is 60 px wide.
+  it('keeps its tooltip inside the window', () => {
+    vi.useFakeTimers()
+    const rect = vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (this: HTMLElement) {
+      const left = this.getAttribute('role') === 'tooltip' ? parseFloat(this.style.left) - 30 : window.innerWidth - 36
+      const width = this.getAttribute('role') === 'tooltip' ? 60 : 36
+      return { left, right: left + width, width, top: 0, bottom: 36, height: 36, x: left, y: 0, toJSON: () => ({}) }
+    })
+    try {
+      render(<IconButton label="Закрыть" icon={<svg />} />)
+      fireEvent.mouseEnter(screen.getByRole('button', { name: 'Закрыть' }))
+      act(() => vi.advanceTimersByTime(TOOLTIP_DELAY))
+      const box = screen.getByRole('tooltip').getBoundingClientRect()
+      expect(box.right).toBeLessThanOrEqual(window.innerWidth - 6)
+    } finally {
+      rect.mockRestore()
+      vi.useRealTimers()
+    }
+  })
 })
 
 describe('Field', () => {

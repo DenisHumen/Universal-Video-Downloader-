@@ -8,6 +8,7 @@ import { STEP_LABEL } from '../lib/automationLabels'
 import { emptyTarget, pathOf, ShareForm, TelegramForm, useSecretState } from './AutomationForms'
 import Dialog from '../ui/Dialog'
 import Dropdown from '../ui/Dropdown'
+import IconButton from '../ui/IconButton'
 import {
   DEFAULT_REMOTE_PATH,
   DEFAULT_RENAME_TEMPLATE,
@@ -240,15 +241,11 @@ export default function StepEditor({
                     aria-label={t('auto.replaceTo')}
                     className="field flex-1 text-control"
                   />
-                  <button
-                    className="btn-icon"
-                    aria-label={t('common.remove')}
-                    onClick={() =>
-                      set({ replacements: step.replacements.filter((_, j) => j !== i) })
-                    }
-                  >
-                    <Trash2 size={14} />
-                  </button>
+                  <IconButton
+                    label={t('common.remove')}
+                    icon={<Trash2 size={16} />}
+                    onClick={() => set({ replacements: step.replacements.filter((_, j) => j !== i) })}
+                  />
                 </div>
               ))}
               <button

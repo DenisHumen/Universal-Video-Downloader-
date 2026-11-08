@@ -4,11 +4,13 @@ import {
   useId,
   useState,
   type InputHTMLAttributes,
+  type MouseEvent,
   type ReactNode
 } from 'react'
 import { cx } from './cx'
 import Switch from './Switch'
 import Dropdown from './Dropdown'
+import IconButton from './IconButton'
 import { GoNext, PanDown, ViewConceal, ViewReveal } from './icons'
 
 /*
@@ -174,6 +176,14 @@ export function SwitchRow({ checked, onChange, disabled, ...row }: SwitchRowProp
   )
 }
 
+/** A click on a row's own surface. The control answers for itself, and a link in a subtitle is not the row. */
+const onRowSurface =
+  (act: (row: HTMLElement) => void) =>
+  (e: MouseEvent<HTMLElement>): void => {
+    if ((e.target as HTMLElement).closest('a, button, input, [role="listbox"], [role="option"]')) return
+    act(e.currentTarget)
+  }
+
 /** Internal: a non-activatable row whose suffix is named by its title. */
 function ActionRowWithControl({
   control,
@@ -190,14 +200,7 @@ function ActionRowWithControl({
       id={row.id}
       data-row={row.id}
       className={cx('ui-row', onRowClick && 'ui-row-activatable', row.className)}
-      onClick={
-        onRowClick &&
-        ((e) => {
-          // The control answers for itself, and a link in a subtitle is not the row.
-          if ((e.target as HTMLElement).closest('a, button, input, [role="listbox"], [role="option"]')) return
-          onRowClick(e.currentTarget)
-        })
-      }
+      onClick={onRowClick && onRowSurface(onRowClick)}
     >
       {row.prefix && <span className="flex shrink-0 items-center text-ink">{row.prefix}</span>}
       <span className="min-w-0 flex-1">
@@ -276,15 +279,12 @@ export function PasswordEntryRow({ showLabel, hideLabel, ...props }: EntryRowPro
       suffix={
         <>
           {props.suffix}
-          <button
-            type="button"
-            className="ui-icon-btn ui-icon-btn-md"
-            aria-label={shown ? hideLabel : showLabel}
+          <IconButton
+            label={shown ? hideLabel : showLabel}
+            icon={shown ? <ViewConceal size={16} /> : <ViewReveal size={16} />}
             aria-pressed={shown}
             onClick={() => setShown((v) => !v)}
-          >
-            {shown ? <ViewConceal size={16} /> : <ViewReveal size={16} />}
-          </button>
+          />
         </>
       }
     />
@@ -303,7 +303,7 @@ interface ExpanderRowProps {
   expandLabel: string
 }
 
-/** AdwExpanderRow: a row that reveals child rows; with an enable switch, the children follow it. */
+/** AdwExpanderRow: a row that reveals child rows, from anywhere on it; with an enable switch, the children follow it. */
 export function ExpanderRow({
   title,
   subtitle,
@@ -319,7 +319,7 @@ export function ExpanderRow({
   const panelId = useId()
   return (
     <div id={id} data-row={id} className="border-b border-edge-soft last:border-b-0">
-      <div className="ui-row border-b-0">
+      <div className="ui-row ui-row-activatable border-b-0" onClick={onRowSurface(() => setOpen((v) => !v))}>
         <span className="min-w-0 flex-1">
           <span id={titleId} className="ui-row-title block">
             {title}
@@ -329,16 +329,13 @@ export function ExpanderRow({
         {onEnabledChange && (
           <Switch aria-labelledby={titleId} checked={Boolean(enabled)} onChange={onEnabledChange} />
         )}
-        <button
-          type="button"
-          className="ui-icon-btn ui-icon-btn-md"
-          aria-label={expandLabel}
+        <IconButton
+          label={expandLabel}
+          icon={<PanDown size={16} className={cx('transition-transform duration-fast ease-ease', open && 'rotate-180')} />}
           aria-expanded={open}
           aria-controls={panelId}
           onClick={() => setOpen((v) => !v)}
-        >
-          <PanDown size={16} className={cx('transition-transform duration-fast ease-ease', open && 'rotate-180')} />
-        </button>
+        />
       </div>
       {open && (
         <div id={panelId} className="ui-expander-children" aria-disabled={onEnabledChange ? !enabled : undefined}>

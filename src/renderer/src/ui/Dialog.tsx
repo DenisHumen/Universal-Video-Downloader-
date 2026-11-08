@@ -2,6 +2,7 @@ import { useId, type ReactNode, type RefObject } from 'react'
 import Modal from '../components/Modal'
 import { cx } from './cx'
 import { X } from './icons'
+import IconButton from './IconButton'
 
 interface Props {
   title: ReactNode
@@ -74,9 +75,7 @@ export default function Dialog({
             </h2>
             {subtitle && <p className="truncate text-meta text-ink-2">{subtitle}</p>}
           </div>
-          <button type="button" className="ui-icon-btn ui-icon-btn-md absolute right-1.5 top-1.5" aria-label={closeLabel} onClick={onClose}>
-            <X size={16} />
-          </button>
+          <IconButton className="absolute right-1.5 top-1.5" label={closeLabel} icon={<X size={16} />} onClick={onClose} />
         </div>
         <div className="min-h-0 flex-1 overflow-y-auto px-4 pb-4">
           {description && (

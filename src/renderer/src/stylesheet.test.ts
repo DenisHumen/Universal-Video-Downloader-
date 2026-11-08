@@ -139,6 +139,41 @@ describe('the built stylesheet', () => {
     }
   })
 
+  /*
+    Two rings once: `accent/.5` at 1.45-2.14:1, outside on .btn-* and inside on
+    .ui-*. Controls ring outside, on the plane; what fills its container, inside.
+  */
+  it('rings every control the same way, in the focus token', async () => {
+    for (const control of ['btn-solid', 'btn-quiet', 'ui-btn', 'ui-icon-btn', 'ui-switch', 'ui-check', 'ui-segment', 'ui-dropdown']) {
+      const decls = await declsFor(`.${control}:focus-visible`)
+      expect(decls, control).toContainEqual({ outline: '2px solid rgb(var(--focus))' })
+      expect(decls, control).toContainEqual({ 'outline-offset': '2px' })
+    }
+    for (const filling of ['ui-row-activatable', 'ui-menu-item', 'ui-nav-item']) {
+      const decls = await declsFor(`.${filling}:focus-visible`)
+      expect(decls, filling).toContainEqual({ outline: '2px solid rgb(var(--focus))' })
+      expect(decls, filling).toContainEqual({ 'outline-offset': '-2px' })
+    }
+  })
+
+  it('gives whatever has no ring of its own the same one, below every class', async () => {
+    const decls = await declsFor(':focus-visible')
+    expect(decls).toContainEqual({ outline: '2px solid rgb(var(--focus))' })
+    const all = await rules()
+    expect(all.findIndex((r) => r.selectors.includes(':focus-visible'))).toBeLessThan(
+      all.findIndex((r) => r.selectors.includes('.btn-quiet:focus-visible'))
+    )
+  })
+
+  // bg-accent/90 let the page through, and the white label fell to 4.03:1 on a light one.
+  it('darkens solid buttons under the pointer instead of thinning them', async () => {
+    for (const variant of ['btn-solid', 'ui-btn-primary', 'btn-danger', 'ui-btn-danger']) {
+      const props = (await declsFor(`.${variant}:hover`)).flatMap(Object.keys)
+      expect(props, variant).toContain('filter')
+      expect(props, variant).not.toContain('background-color')
+    }
+  })
+
   // Day's quiet buttons were a 1.06:1 fill on a white panel: there, but unseen.
   /*
     A1 retired the hairline (--control-edge): GNOME's controls are the text

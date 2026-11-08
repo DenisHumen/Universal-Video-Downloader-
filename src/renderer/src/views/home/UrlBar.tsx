@@ -2,7 +2,7 @@ import { forwardRef } from 'react'
 import { ArrowRight, ClipboardPaste, Loader2, Search } from '../../ui/icons'
 import { linkIn } from '../../lib/shortcuts'
 import { useT } from '../../i18n'
-import Tooltip from '../../ui/Tooltip'
+import IconButton from '../../ui/IconButton'
 
 interface Props {
   value: string
@@ -68,15 +68,11 @@ const UrlBar = forwardRef<HTMLInputElement, Props>(function UrlBar(
           }}
           placeholder={t('home.placeholder')}
           aria-label={t('home.placeholder')}
-          className="no-drag min-w-0 flex-1 bg-transparent px-2.5 py-2 text-body text-ink outline-none placeholder:text-ink-3"
+          className="no-drag min-w-0 flex-1 bg-transparent px-2.5 py-2 text-body text-ink outline-none placeholder:text-ink/80"
           spellCheck={false}
           autoComplete="off"
         />
-        <Tooltip label={t('common.paste')}>
-          <button type="button" className="btn-icon-bare" onClick={onPaste} aria-label={t('common.paste')}>
-            <ClipboardPaste size={16} />
-          </button>
-        </Tooltip>
+        <IconButton label={t('common.paste')} icon={<ClipboardPaste size={16} />} onClick={onPaste} />
         <button
           type="button"
           className={done ? 'btn-quiet px-5' : 'btn-solid px-5'}

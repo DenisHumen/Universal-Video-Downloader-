@@ -2,6 +2,7 @@ import { useRef, type FocusEvent } from 'react'
 import { AnimatePresence, m } from 'framer-motion'
 import { enter } from '../lib/motion'
 import { X } from './icons'
+import IconButton from './IconButton'
 import { useToasts, type Toast } from '../lib/toast'
 
 /** Raise a toast: `toast(message, kind?, action?)`. */
@@ -105,15 +106,12 @@ function ToastCard({ toast }: { toast: Toast }): JSX.Element {
           {toast.action.label}
         </button>
       )}
-      <button
-        type="button"
-        className="ui-icon-btn ui-icon-btn-circular h-8 w-8 text-osd-fg hover:bg-osd-fg/10"
-        aria-label={t('common.close')}
-        title={t('common.close')}
+      <IconButton
+        className="ui-icon-btn-circular h-8 w-8 text-osd-fg hover:bg-osd-fg/10"
+        label={t('common.close')}
+        icon={<X size={16} aria-hidden />}
         onClick={() => useToasts.getState().dismiss(toast.id)}
-      >
-        <X size={13} aria-hidden />
-      </button>
+      />
     </m.div>
   )
 }
