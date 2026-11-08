@@ -1,7 +1,24 @@
-import type { TranslateFn } from '../i18n'
+import type { TranslateFn } from '../i18n/translate'
 
 /** A failed request on the way to the engine's download, rather than anything about this computer. */
 const NO_CONNECTION = /\bHTTP \d{3}\b|net::ERR_|ETIMEDOUT|ENOTFOUND|ECONN|EAI_AGAIN|socket|timed? ?out/i
+
+/** An engine that is there and will not start: antivirus, and no connection could fix that. */
+const FAILED_TO_START = /failed to start/i
+const NO_BUILD = /no download engine is published/i
+
+/**
+ * The sentence for a detect or a search that found no engine to run.
+ *
+ * It says to check the connection, which is the usual reason on a first run and
+ * no help at all for the two that are not about the connection.
+ */
+export function engineMissingText(t: TranslateFn, message: string | undefined): string {
+  const raw = message ?? ''
+  if (FAILED_TO_START.test(raw)) return t('engine.startFailed')
+  if (NO_BUILD.test(raw)) return t('engine.noBuild')
+  return t('err.engineMissing')
+}
 
 /**
  * Why the download engine could not be set up or updated, for people.
@@ -13,8 +30,8 @@ const NO_CONNECTION = /\bHTTP \d{3}\b|net::ERR_|ETIMEDOUT|ENOTFOUND|ECONN|EAI_AG
  */
 export function engineFailureText(t: TranslateFn, message: string | undefined, doing: 'setup' | 'update'): string {
   const raw = message ?? ''
-  if (/failed to start/i.test(raw)) return t('engine.startFailed')
-  if (/no download engine is published/i.test(raw)) return t('engine.noBuild')
+  if (FAILED_TO_START.test(raw)) return t('engine.startFailed')
+  if (NO_BUILD.test(raw)) return t('engine.noBuild')
   if (/waiting after a failed attempt/i.test(raw)) return t('engine.updateWaiting')
   if (doing === 'setup') return t('engine.setupFailed')
   return NO_CONNECTION.test(raw) ? t('engine.updateNoConnection') : t('settings.engineFailed')

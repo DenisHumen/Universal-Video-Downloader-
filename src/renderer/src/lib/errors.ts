@@ -1,5 +1,6 @@
 import type { AppErrorCode } from '@shared/types'
 import { t as tNow, type TranslateFn, type TranslationKey } from '../i18n'
+import { engineMissingText } from './engineError'
 import { fixFor } from './fixes'
 import { localizeMainText } from './mainText'
 
@@ -78,7 +79,12 @@ export interface FailureLike {
 export function errorText(t: TranslateFn, failure: FailureLike): string {
   const key = failure.errorCode ? KEYS[failure.errorCode] : undefined
   const said = failure.error?.trim()
-  const base = key ? t(key) : said && localizeMainText(t, said)
+  const base =
+    failure.errorCode === 'engineMissing'
+      ? engineMissingText(t, said)
+      : key
+        ? t(key)
+        : said && localizeMainText(t, said)
   if (!base) return t('error.title')
   // It names a button, so only where the hint is what puts that button there; a code with a fix of its own has said its piece.
   return failure.cookieHint && !fixFor(failure.errorCode) ? `${base} ${t('err.cookieHint')}` : base
