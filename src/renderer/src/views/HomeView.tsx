@@ -133,6 +133,8 @@ export default function HomeView(): JSX.Element {
   const reset = (): void => {
     det.clear()
     setUrl('')
+    // The card and the button that was just pressed go; the keyboard goes back to the start, not the top of the window.
+    inputRef.current?.focus({ preventScroll: true })
   }
 
   /*
@@ -382,6 +384,7 @@ export default function HomeView(): JSX.Element {
               onQueued={() => {
                 setBatchText('')
                 setBatchOpen(false)
+                inputRef.current?.focus({ preventScroll: true })
               }}
             />
           )}

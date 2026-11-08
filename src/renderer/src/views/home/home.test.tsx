@@ -3,6 +3,7 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vite
 import { installMockApi } from '../../lib/mockApi'
 import { useStore } from '../../store'
 import App from '../../App'
+import { en } from '../../i18n/en'
 import { SEARCH_DEBOUNCE_MS } from './hooks'
 
 /*
@@ -20,6 +21,16 @@ async function app(): Promise<HTMLInputElement> {
   await waitFor(() => expect(useStore.getState().ready).toBe(true))
   return (await screen.findByRole('textbox', { name: /search by title/i })) as HTMLInputElement
 }
+
+describe('Download: the keyboard after a card goes', () => {
+  it('goes back to the field when Esc clears the card, not to the top of the window', async () => {
+    const input = await app()
+    const other = screen.getByRole('button', { name: en['common.paste'] })
+    other.focus()
+    fireEvent.keyDown(window, { key: 'Escape' })
+    expect(document.activeElement).toBe(input)
+  })
+})
 
 describe('Download: inline search (5.4)', () => {
   it('does not search a title until typing pauses, then shows a handful of results', async () => {

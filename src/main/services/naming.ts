@@ -64,11 +64,22 @@ const LANGUAGE_FIELD = '%(language& [{}]|)s'
  * for a video knows neither, and "already downloaded" would then hand a German
  * track's request the English file. For the template: it holds an engine field.
  */
-export function variantSuffix(item: Pick<DownloadItem, 'range' | 'audioLanguage'>): string {
-  return sectionSuffix(item.range) + (item.audioLanguage ? LANGUAGE_FIELD : '')
+export function variantSuffix(item: Pick<DownloadItem, 'range' | 'audioLanguage' | 'mode'>): string {
+  return sectionSuffix(item.range) + (item.audioLanguage ? LANGUAGE_FIELD : '') + (item.mode === 'audio' ? AUDIO_NAME : '')
 }
 
 const EXT_FIELD = /\.%\(ext\)s$/
+
+/**
+ * An audio download never shares a name with the video of the same link.
+ *
+ * The engine fetches the stream under the template's name, extracts the sound,
+ * and deletes what it fetched. On a site with one combined format that name is
+ * the video's: it found the finished `Title [id].mp4` "already downloaded",
+ * extracted from it, and deleted it. Getting the sound out of a video you had
+ * cost you the video. Checked on the real engine.
+ */
+export const AUDIO_NAME = ' (audio)'
 
 /**
  * The user's filename template with `suffix` on the end of the name: before a

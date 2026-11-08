@@ -294,7 +294,14 @@ const defaultFetcher: Fetcher = (url, headers) => fetchText(url, headers, { time
  * scrape found nothing and the app said the page had no video on it.
  */
 export function refererFor(url: string, parent?: string): string {
-  return parent ?? `https://${hostOf(url)}/`
+  if (parent) return parent
+  /*
+    The page's own scheme, not always https. An https Referer on a plain http
+    request is a downgrade Chromium will not send: the request died at once with
+    ERR_BLOCKED_BY_CLIENT, so the scrape of every http:// page failed unseen, a
+    dead host went unrecognised, and every such link waited out the hidden browser.
+  */
+  return /^http:/i.test(url) ? `http://${hostOf(url)}/` : `https://${hostOf(url)}/`
 }
 
 async function scrapeOne(

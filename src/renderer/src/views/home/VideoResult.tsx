@@ -19,6 +19,7 @@ import { toast } from '../../lib/toast'
 import { audioLanguages, languageName } from '../../lib/languages'
 import { resolveLanguage, useI18n, useT, useTp } from '../../i18n'
 import { useStore } from '../../store'
+import { siteNameOf } from '@shared/library'
 import { ActionRow, ComboRow, ExpanderRow, PreferencesGroup, SegmentedControl, cx } from '../../ui'
 import Thumbnail from '../../components/Thumbnail'
 import TrimEditor from '../../components/TrimEditor'
@@ -94,6 +95,7 @@ export default function VideoResult({
   const links = [info.downloadUrl, info.webpageUrl, detectedUrl].filter((l): l is string => Boolean(l))
   const hits = useLibraryHits(links)
   const held = links.map((l) => hits.get(l)).find(Boolean)
+  const site = siteNameOf(info.extractor)
   const locale = useStore((s) => resolveLanguage(s.settings?.language ?? 'auto', s.appInfo?.locale ?? 'en'))
   const { selection } = choice
   const mode = selection.mode
@@ -196,7 +198,7 @@ export default function VideoResult({
           </h2>
           {meta && <p className="numeric mt-1 truncate text-meta text-ink-2">{meta}</p>}
           <div className="mt-2 flex flex-wrap items-center gap-1">
-            <span className="tag">{info.extractor}</span>
+            {site && <span className="tag">{site}</span>}
             {maxHeightOf(info.formats) > 0 && (
               <span className="tag">{t('format.upTo', { height: maxHeightOf(info.formats) })}</span>
             )}

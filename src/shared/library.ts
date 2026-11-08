@@ -45,16 +45,28 @@ export interface LibraryEntry {
 }
 
 /**
+ * The extractor's name when it names a site.
+ *
+ * The rest are the engine's and this app's words for "no extractor of its own
+ * for this one": "Generic" and "HTML5MediaEmbed" on a card told a person nothing.
+ */
+export function siteNameOf(extractor: string | undefined): string | undefined {
+  return extractor && !/^(universal|generic|browser|html5mediaembed)$/i.test(extractor) ? extractor : undefined
+}
+
+/**
  * The site a Library entry is grouped under, or undefined when nothing says.
  *
  * Download Now, a batch and the terminal record no extractor, so their files
  * went under "Other", apart from the same site's files that were detected first.
  */
-export function librarySite(entry: Pick<LibraryEntry, 'url' | 'sourceUrl' | 'extractor'>): string | undefined {
-  const page = pageUrlOf(entry.sourceUrl || entry.url)
+export function librarySite(entry: Pick<LibraryEntry, 'url' | 'sourceUrl' | 'originUrl' | 'extractor'>): string | undefined {
+  // A clip's own `url` is the file it was cut from; the page it came from is `originUrl`.
+  const page = pageUrlOf(entry.originUrl || entry.sourceUrl || entry.url)
   const known = knownSiteFor(page)
   if (known) return known.name
-  if (entry.extractor && !/^(universal|generic|browser)$/i.test(entry.extractor)) return entry.extractor
+  const named = siteNameOf(entry.extractor)
+  if (named) return named
   try {
     const { protocol, hostname } = new URL(page)
     return /^https?:$/.test(protocol) ? hostname.replace(/^www\./, '') : undefined

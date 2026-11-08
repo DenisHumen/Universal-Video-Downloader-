@@ -279,4 +279,8 @@ describe('refererFor', () => {
   it('falls back to the site root of the URL itself when there is no parent', () => {
     expect(refererFor('https://site.test/watch/42')).toBe('https://site.test/')
   })
+
+  it('keeps a plain http page on http, since Chromium blocks a request claiming an https Referer', () => {
+    expect(refererFor('http://site.test:8080/watch/42')).toBe('http://site.test:8080/')
+  })
 })

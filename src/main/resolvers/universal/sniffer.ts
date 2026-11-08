@@ -145,6 +145,23 @@ export const PROBE_SCRIPT = `(() => {
  */
 const MANIFEST_GRACE_MS = 1200
 
+/** What a navigation ending in a download (a saved mp4, not a dead one) reports. */
+const ERR_ABORTED = -3
+
+/**
+ * Leave out the addresses the window itself failed to open.
+ *
+ * Capture scores a request by its URL as it goes out, before anything has
+ * answered. So a dead link ending in `.mp4` was "seen on the wire" the moment
+ * the window tried it, and the card offered a video called "Video" for a server
+ * that had said 403, 500, or nothing at all; the failure only came at Download.
+ * Only the failed addresses go: a page behind a challenge can answer 403 and
+ * still start a real player.
+ */
+export function withoutFailedPages(found: MediaCandidate[], failed: ReadonlySet<string>): MediaCandidate[] {
+  return found.filter((c) => !failed.has(c.url))
+}
+
 /** Sniffs are serialised: one hidden window at a time is plenty. */
 let queue: Promise<unknown> = Promise.resolve()
 
@@ -169,6 +186,7 @@ async function sniffOnce(
 ): Promise<SniffResult | null> {
   if (signal?.aborted) return null
   const found: MediaCandidate[] = []
+  const failedPages = new Set<string>()
   let resolveEarly: (() => void) | null = null
   let deadlineTimer: NodeJS.Timeout | null = null
   let onAbort: (() => void) | null = null
@@ -236,6 +254,12 @@ async function sniffOnce(
     sniffers.add(ownWebContentsId)
     win.webContents.setAudioMuted(true)
     win.webContents.setWindowOpenHandler(() => ({ action: 'deny' }))
+    win.webContents.on('did-navigate', (_event, url, status) => {
+      if (status >= 400) failedPages.add(url)
+    })
+    win.webContents.on('did-fail-load', (_event, code, _description, url, isMainFrame) => {
+      if (isMainFrame && code !== ERR_ABORTED) failedPages.add(url)
+    })
 
     /*
       Three ways this ends: a manifest turns up, the clock runs out, or the user
@@ -304,7 +328,7 @@ async function sniffOnce(
       }
     }
 
-    const all = rank(found)
+    const all = rank(withoutFailedPages(found, failedPages))
     const candidate = all.find((c) => c.score >= 40)
     if (!candidate) return null
     return {

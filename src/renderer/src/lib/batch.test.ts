@@ -6,7 +6,13 @@ describe('parseBatch (5.4 inline batch)', () => {
     const r = parseBatch('https://a.example/1\nnot a link\nhttps://b.example/2\n\nhttps://a.example/1')
     expect(r.links).toEqual(['https://a.example/1', 'https://b.example/2'])
     expect(r.duplicates).toBe(1)
-    expect(r.invalid).toEqual(['not', 'a', 'link'])
+    expect(r.invalid).toEqual(['not a link'])
+  })
+
+  it('reads links however the line holds them, and words beside a link as nothing wrong', () => {
+    const r = parseBatch('https://a.example/1 https://b.example/2\r\nlook at this https://c.example/3')
+    expect(r.links).toEqual(['https://a.example/1', 'https://b.example/2', 'https://c.example/3'])
+    expect(r.invalid).toEqual([])
   })
 
   it('treats several links as a batch, one link or a title as not', () => {

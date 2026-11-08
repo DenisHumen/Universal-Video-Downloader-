@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { showFile } from '../lib/showFile'
-import { librarySite, pageLinkOf, type LibraryEntry, type LibraryGroup } from '@shared/library'
+import { librarySite, pageLinkOf, siteNameOf, type LibraryEntry, type LibraryGroup } from '@shared/library'
 import type { DownloadItem } from '@shared/types'
 import { useStore } from '../store'
 import { useI18n, useT } from '../i18n'
@@ -311,7 +311,7 @@ export default function LibraryView(): JSX.Element {
                           e.duration ? formatDuration(e.duration) : null,
                           e.sizeBytes ? formatBytes(e.sizeBytes) : null,
                           e.container?.toUpperCase(),
-                          group !== 'site' ? e.extractor : null,
+                          group !== 'site' ? siteNameOf(e.extractor) : null,
                           // It says why a search for a channel found this row; under its own heading it would only repeat it.
                           e.uploader !== e.seriesId || group !== 'series' ? e.uploader : null
                         ]

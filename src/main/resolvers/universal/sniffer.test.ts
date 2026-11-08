@@ -1,5 +1,21 @@
 import { describe, expect, it } from 'vitest'
-import { PROBE_SCRIPT } from './sniffer'
+import { PROBE_SCRIPT, withoutFailedPages } from './sniffer'
+import type { MediaCandidate } from './candidates'
+
+const candidate = (url: string): MediaCandidate => ({ url, kind: 'file', score: 82, source: 'network' })
+
+describe('withoutFailedPages', () => {
+  it('does not offer the address the window could not open', () => {
+    const failed = new Set(['https://site.test/gone.mp4'])
+    expect(withoutFailedPages([candidate('https://site.test/gone.mp4')], failed)).toEqual([])
+  })
+
+  it('keeps what a page behind a refusal still played', () => {
+    const failed = new Set(['https://site.test/watch/1'])
+    const real = candidate('https://cdn.test/real.mp4')
+    expect(withoutFailedPages([real], failed)).toEqual([real])
+  })
+})
 
 /*
   The script the hidden browser runs in each page is written as a template
