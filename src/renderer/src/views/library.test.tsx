@@ -157,7 +157,7 @@ describe('you already have this', () => {
   const detect = async (link: string): Promise<void> => {
     await app()
     act(() => useStore.getState().requestDetect(link))
-    await screen.findByRole('button', { name: /^Download|^Trim/ }, { timeout: 3000 })
+    await screen.findByRole('button', { name: /^(Download|Trim) ·|^Download Anyway/ }, { timeout: 3000 })
   }
 
   it('says so on the result card, with Play, Show in Folder and Download Anyway', async () => {

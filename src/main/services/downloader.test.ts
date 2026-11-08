@@ -185,7 +185,7 @@ describe('siteFolder', () => {
     // Every universally detected site shared one folder named after the fallback.
     const sourceUrl = sniffUrlFor('https://www.ok.ru/video/1')
     expect(siteFolder({ url: 'https://cdn.test/x.m3u8', sourceUrl: sniffUrlFor('https://kino.example/1'), extractor: 'Universal' })).toBe('kino.example')
-    expect(siteFolder({ url: 'https://cdn.test/x.m3u8', sourceUrl, extractor: 'Universal' })).toBe('ok')
+    expect(siteFolder({ url: 'https://cdn.test/x.m3u8', sourceUrl, extractor: 'Universal' })).toBe('Одноклассники')
   })
 
   it('files a stream picked in the built-in browser under the page it came from', () => {
@@ -213,7 +213,7 @@ describe('siteFolder', () => {
       { url: 'https://youtu.be/abc' },
       { url: 'https://music.youtube.com/watch?v=abc' }
     ].map(siteFolder)
-    expect(new Set(folders)).toEqual(new Set(['youtube']))
+    expect(new Set(folders)).toEqual(new Set(['YouTube']))
   })
 
   it('falls back to nothing, and so to "other", for a link it cannot read', () => {

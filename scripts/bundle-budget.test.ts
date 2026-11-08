@@ -23,9 +23,11 @@ const BUDGET = {
   /**
    * Entry JS, gzip. 3.26.1 minified: ~180 kB. 4.0.5: ~195 kB, the headroom
    * spent on features rather than a dependency (Yaru rows, sign-ins, the share
-   * browser), so it is given back: +15 kB again from here.
+   * browser), so it is given back: +15 kB again from here. 4.3: ~213 kB, for
+   * every main-process sentence in Russian and the Library's new actions, with
+   * no new dependency.
    */
-  entryJs: 210_000,
+  entryJs: 225_000,
   /** All CSS, gzip. 3.26.1: ~11 kB. */
   css: 16_000
 }
