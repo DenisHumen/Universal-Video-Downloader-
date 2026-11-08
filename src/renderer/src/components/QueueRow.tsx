@@ -27,7 +27,7 @@ import { useT } from '../i18n'
 import { STATE_META } from '../lib/states'
 import { toast } from '../lib/toast'
 import { showFile } from '../lib/showFile'
-import { cancelLosesWork } from '../lib/downloads'
+import { cancelLosesWork, failedRecordingCanBeSaved } from '../lib/downloads'
 import ConfirmDialog from './ConfirmDialog'
 import MediaJobModal, { type JobMode } from './MediaJobModal'
 import Thumbnail from './Thumbnail'
@@ -140,7 +140,7 @@ function QueueRow({ item, index, animateIn = true, heading }: Props): JSX.Elemen
     (item.state === 'downloading' ||
       // A wait paused before anything came down has nothing to save.
       (item.state === 'paused' && (!item.waitForVideo || Boolean(item.partialPaths?.length))) ||
-      (item.state === 'error' && Boolean(item.partialPaths?.length) && !item.keptPartial && item.errorCode !== 'liveEmpty'))
+      failedRecordingCanBeSaved(item))
 
   const facts = [
     item.live && item.state === 'downloading' ? t('queue.recording') : null,

@@ -65,6 +65,33 @@ describe('the clear buttons', () => {
   })
 })
 
+describe('Clear Failed with a recording that can still be saved', () => {
+  const recording = {
+    state: 'error',
+    live: true,
+    partialPaths: ['/d/a.mp4'],
+    errorCode: 'network'
+  } as const
+
+  it('asks first, says it can be saved, and clears only on yes', async () => {
+    window.__uvdMock!.queue({ id: 'rec', title: 'A broadcast', ...recording })
+    const clear = vi.spyOn(window.api, 'clearFailed')
+    clear.mockClear()
+    await open('downloads')
+    await rowOf('A broadcast')
+    fireEvent.click(screen.getByRole('button', { name: en['queue.clearFailed'] }))
+    expect(clear).not.toHaveBeenCalled()
+    const dialog = await screen.findByRole('alertdialog')
+    expect(dialog.textContent).toContain(en['queue.stopSave'])
+    fireEvent.click(within(dialog).getByRole('button', { name: en['common.cancel'] }))
+    expect(clear).not.toHaveBeenCalled()
+    await waitFor(() => expect(screen.queryByRole('alertdialog')).toBeNull())
+    fireEvent.click(screen.getByRole('button', { name: en['queue.clearFailed'] }))
+    fireEvent.click(within(await screen.findByRole('alertdialog')).getByRole('button', { name: en['queue.clearFailed'] }))
+    expect(clear).toHaveBeenCalledTimes(1)
+  })
+})
+
 describe('a finished file that has moved', () => {
   it('says so instead of doing nothing', async () => {
     window.__uvdMock!.queue({ id: 'moved', title: 'Moved away', state: 'completed', filepath: '/gone/a.mp4', finishedAt: Date.now() })

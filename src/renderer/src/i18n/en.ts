@@ -310,6 +310,8 @@ export const en = {
   'queue.openFolder': 'Open Folder',
   'queue.clearFinished': 'Clear Finished',
   'queue.clearFailed': 'Clear Failed',
+  'queue.clearFailedConfirm': 'Clear Without Saving?',
+  'queue.clearFailedBody': 'A recording in this list stopped with an error and can still be saved: press Stop and Save on its row first. If you clear it, what was recorded stays on disk, but the app can no longer make a file of it.',
   'queue.cancelConfirm': 'Delete the Downloaded Part?',
   'queue.cancelBody': '{amount} is already downloaded. Cancelling deletes it, and the download would start over. Pause keeps it for later.',
   'queue.cancelButton': 'Delete and Stop',

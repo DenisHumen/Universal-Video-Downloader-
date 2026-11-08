@@ -16,7 +16,8 @@ import { useStore } from '../store'
 import { formatBytes, formatEta, formatSpeed } from '../lib/format'
 import { useT, useTp, type TranslationKey } from '../i18n'
 import QueueRow from '../components/QueueRow'
-import { groupQueue, queueGroupOf, type QueueGroup } from '../lib/downloads'
+import { failedRecordingCanBeSaved, groupQueue, queueGroupOf, type QueueGroup } from '../lib/downloads'
+import ConfirmDialog from '../components/ConfirmDialog'
 import { EmptyState, Icon, IconButton } from '../ui'
 import { useMediaQuery } from '../hooks/useMediaQuery'
 import { toast } from '../lib/toast'
@@ -97,6 +98,7 @@ export default function DownloadsView(): JSX.Element {
 
   const [filter, setFilter] = useState<Filter>('all')
   const [query, setQuery] = useState('')
+  const [confirmClearFailed, setConfirmClearFailed] = useState(false)
   const [limit, setLimit] = useState(PAGE)
   const scrollRef = useRef<HTMLDivElement>(null)
   const sentinelRef = useRef<HTMLLIElement>(null)
@@ -293,9 +295,18 @@ export default function DownloadsView(): JSX.Element {
             ) : (
               <IconButton label={t('queue.clearFinished')} icon={<Trash2 size={16} />} onClick={clearFinished} />
             ))}
-          {/* No question first: it takes the rows' errors and nothing on disk. */}
+          {/*
+            It takes the rows' errors and nothing on disk, so no question first,
+            unless a row is the only way left to save what a recording got.
+          */}
           {hasFailedRows && (
-            <button className="btn-quiet" data-uvd="clear-failed" onClick={() => void window.api.clearFailed()}>
+            <button
+              className="btn-quiet"
+              data-uvd="clear-failed"
+              onClick={() =>
+                downloads.some(failedRecordingCanBeSaved) ? setConfirmClearFailed(true) : void window.api.clearFailed()
+              }
+            >
               <CircleX size={14} /> {t('queue.clearFailed')}
             </button>
           )}
@@ -398,6 +409,18 @@ export default function DownloadsView(): JSX.Element {
         )}
       </div>
       </div>
+      {confirmClearFailed && (
+        <ConfirmDialog
+          title={t('queue.clearFailedConfirm')}
+          body={t('queue.clearFailedBody')}
+          confirmLabel={t('queue.clearFailed')}
+          onConfirm={() => {
+            setConfirmClearFailed(false)
+            void window.api.clearFailed()
+          }}
+          onCancel={() => setConfirmClearFailed(false)}
+        />
+      )}
     </div>
   )
 }

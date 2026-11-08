@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { DownloadItem, DownloadProgress } from '@shared/types'
-import { applyDownloadProgress, applyDownloadsChanged, cancelLosesWork, groupQueue, liveDownloads, overallPercent, recentFinished } from './downloads'
+import { applyDownloadProgress, applyDownloadsChanged, cancelLosesWork, failedRecordingCanBeSaved, groupQueue, liveDownloads, overallPercent, recentFinished } from './downloads'
 
 function item(id: string, createdAt: number, overrides: Partial<DownloadItem> = {}): DownloadItem {
   return {
@@ -95,6 +95,23 @@ describe('applyDownloadsChanged', () => {
     const next = applyDownloadsChanged(big, { updated: [], removed: doomed })
     expect(next).toHaveLength(40)
     expect(next[0].id).toBe('r0')
+  })
+})
+
+describe('failedRecordingCanBeSaved', () => {
+  const failed = { state: 'error', live: true, partialPaths: ['/d/a.mp4'] } as const
+
+  it('is a failed recording with something to save', () => {
+    expect(failedRecordingCanBeSaved(item('a', 1, failed))).toBe(true)
+  })
+
+  it('is not anything else', () => {
+    expect(failedRecordingCanBeSaved(item('a', 1, { ...failed, live: undefined }))).toBe(false)
+    expect(failedRecordingCanBeSaved(item('a', 1, { ...failed, partialPaths: [] }))).toBe(false)
+    // Cancelling deleted the partial, and these two are where saving itself ended.
+    expect(failedRecordingCanBeSaved(item('a', 1, { ...failed, state: 'canceled' }))).toBe(false)
+    expect(failedRecordingCanBeSaved(item('a', 1, { ...failed, errorCode: 'liveEmpty' }))).toBe(false)
+    expect(failedRecordingCanBeSaved(item('a', 1, { ...failed, keptPartial: '/d/a.mp4.part' }))).toBe(false)
   })
 })
 

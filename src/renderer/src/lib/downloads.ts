@@ -79,6 +79,20 @@ export function applyDownloadProgress(list: DownloadItem[], batch: DownloadProgr
   return next ?? list
 }
 
+/**
+ * A failed recording whose partial can still be made into a file, by Stop and
+ * Save on its row. Not when saving is what failed, or found nothing.
+ */
+export function failedRecordingCanBeSaved(item: DownloadItem): boolean {
+  return (
+    Boolean(item.live) &&
+    item.state === 'error' &&
+    Boolean(item.partialPaths?.length) &&
+    !item.keptPartial &&
+    item.errorCode !== 'liveEmpty'
+  )
+}
+
 const LIVE: ReadonlySet<DownloadItem['state']> = new Set(['detecting', 'downloading', 'processing', 'queued', 'waiting'])
 
 /**
