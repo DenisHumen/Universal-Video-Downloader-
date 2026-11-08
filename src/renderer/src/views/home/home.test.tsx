@@ -96,7 +96,7 @@ describe('Download: the result card (5.4, A1)', () => {
     start.mockClear()
     await act(async () => fireEvent.click(wait))
     await waitFor(() => expect(start).toHaveBeenCalled())
-    expect(start.mock.calls[0][0]).toMatchObject({ waitForVideo: true, url: expect.stringContaining('mock-premiere') })
+    expect(start.mock.calls[0][0]).toMatchObject({ waitForVideo: true, live: true, url: expect.stringContaining('mock-premiere') })
   })
 
   it('has no audio language row for one track', async () => {

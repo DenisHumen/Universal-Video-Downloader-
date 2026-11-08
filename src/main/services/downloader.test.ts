@@ -64,6 +64,20 @@ describe('buildArgs: waiting for a video', () => {
   })
 })
 
+describe('buildArgs: a live recording', () => {
+  it('writes a transport stream, and turns it back into an mp4 at the end', () => {
+    const args = buildArgs(item({ live: true }), settings(), '/tmp')
+    expect(args).toContain('--hls-use-mpegts')
+    expect(args[args.indexOf('--use-postprocessor') + 1]).toBe('FFmpegFixupM3u8')
+  })
+
+  it('leaves an ordinary download to the engine', () => {
+    const args = buildArgs(item(), settings(), '/tmp')
+    expect(args).not.toContain('--hls-use-mpegts')
+    expect(args).not.toContain('--use-postprocessor')
+  })
+})
+
 describe('buildArgs: audio language', () => {
   const format = (args: string[]): string => args[args.indexOf('-f') + 1]
 

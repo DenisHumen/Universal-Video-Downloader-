@@ -138,7 +138,8 @@ function QueueRow({ item, index, animateIn = true, heading }: Props): JSX.Elemen
     item.live &&
     !item.savingLive &&
     (item.state === 'downloading' ||
-      item.state === 'paused' ||
+      // A wait paused before anything came down has nothing to save.
+      (item.state === 'paused' && (!item.waitForVideo || Boolean(item.partialPaths?.length))) ||
       (item.state === 'error' && Boolean(item.partialPaths?.length) && !item.keptPartial && item.errorCode !== 'liveEmpty'))
 
   const facts = [
@@ -223,7 +224,8 @@ function QueueRow({ item, index, animateIn = true, heading }: Props): JSX.Elemen
       extractor: item.extractor,
       uploader: item.uploader,
       series: item.series,
-      live: item.live,
+      // As on Home: what a wait turns into may well be a broadcast.
+      live: (change.waitForVideo ?? item.waitForVideo) ? true : item.live,
       section: item.range,
       preciseSection: item.precise,
       subtitles: change.mode === 'audio' ? undefined : item.subtitles,
@@ -239,6 +241,12 @@ function QueueRow({ item, index, animateIn = true, heading }: Props): JSX.Elemen
     item.state === 'processing' ||
     item.state === 'detecting' ||
     item.state === 'waiting'
+
+  // Until it has started there is nothing being recorded for Stop and Save to keep.
+  const canPause =
+    running &&
+    (!item.live ||
+      (Boolean(item.waitForVideo) && item.state !== 'downloading' && item.state !== 'processing'))
 
   /*
     Everything but the row's one primary action and its remove, behind "⋯".
@@ -418,7 +426,7 @@ function QueueRow({ item, index, animateIn = true, heading }: Props): JSX.Elemen
               {t('queue.stopSave')}
             </button>
           )}
-          {running && !item.live && (
+          {canPause && (
             <IconButton label={t('common.pause')} icon={<Pause size={16} />} onClick={() => window.api.pauseDownload(item.id)} />
           )}
           {item.state === 'paused' && (

@@ -295,7 +295,9 @@ export default function HomeView(): JSX.Element {
       mode,
       quality: mode === 'audio' ? 'audio' : initialQuality(settings),
       outputDir: saveDir || undefined,
-      waitForVideo: true
+      waitForVideo: true,
+      // What comes may well be a broadcast, and a broadcast has to be recorded as one from its first second.
+      live: true
     })
     if (ok) reset()
   }

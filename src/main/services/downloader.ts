@@ -85,6 +85,8 @@ export const POSTPROCESS_PREFIX = '@@UVDPP@@'
 const WAIT_FOR_VIDEO_RANGE = '60-1800'
 /** Automatic retries for transient network failures before we bother the user. */
 const AUTO_RETRIES = 2
+/** How soon a wait that lost the network looks again. */
+const WAIT_RETRY_MS = 60_000
 const LOG_TAIL_CHARS = 4000
 
 const items = new Map<string, DownloadItem>()
@@ -608,7 +610,15 @@ export function buildArgs(
     readable wherever it is cut. The engine only does this for streams it knows
     are live, and the two do not always agree.
   */
-  if (item.live) args.push('--hls-use-mpegts')
+  /*
+    Saying so outright also tells the engine not to turn the file back into an mp4
+    at the end, which it does only for a stream it knows is live and nobody asked
+    about. Checked on the real engine: a finished HLS download then stays a
+    transport stream named .mp4, which many players refuse, and a broadcast that
+    ended by itself or a premiere fetched after it aired is exactly that. Run the
+    fix-up by hand; it looks at the file and leaves anything else alone.
+  */
+  if (item.live) args.push('--hls-use-mpegts', '--use-postprocessor', 'FFmpegFixupM3u8')
   args.push(...accessArgs(settings, browserCookiesFile()))
   args.push(...headerArgs(item.headers))
   if (item.referer) args.push('--referer', item.referer)
@@ -1406,6 +1416,12 @@ async function runDownload(item: DownloadItem): Promise<void> {
 
   item.state = item.waitForVideo ? 'waiting' : 'downloading'
   emitUpdated(item)
+  /*
+    It just gave its slot back, and nothing else was going to say so: a row that
+    waits ends no download, so whatever was queued behind it stayed queued. After
+    a restart that was everything, for as long as the premiere took.
+  */
+  if (item.waitForVideo) processQueue()
   const retried = item.attempts || 0
   log.info('download', 'Started', { ...downloadFields(item), attempt: retried ? retried + 1 : undefined })
 
@@ -1672,8 +1688,44 @@ function retryUnderOwnName(item: DownloadItem, existing: string): void {
   processQueue()
 }
 
+/**
+ * A wait that lost the network goes on waiting.
+ *
+ * The row promises to wait however long it takes, and a premiere can be days
+ * away: two automatic retries a few seconds apart turned a router restart into a
+ * failed row and a missed premiere. Attempts are for downloads. Nothing has come
+ * down here, so nothing is spent, and the row keeps saying what it is doing. A
+ * failure that is not the network's (a private video, a removed one) still fails.
+ *
+ * Started straight from the timer and not through the queue, like the stream it
+ * is waiting for: `activeCount` does not count it, and a full queue must not make
+ * it miss the start. The timer is an ordinary retry timer, so pause, cancel,
+ * remove and shutdown all clear it.
+ */
+function keepWaiting(item: DownloadItem): void {
+  item.state = 'waiting'
+  appendLog(item, 'Could not reach the site; looking again in a minute\n')
+  emitUpdated(item)
+  log.info('download', 'Waiting; network failure', downloadFields(item))
+  const timer = setTimeout(() => {
+    retryTimers.delete(item.id)
+    if (items.get(item.id) === item && item.state === 'waiting' && !procs.has(item.id)) void runDownload(item)
+  }, WAIT_RETRY_MS)
+  retryTimers.set(item.id, timer)
+}
+
 /** Mark a failure, retrying transient ones automatically with a short backoff. */
 function fail(item: DownloadItem, rawError: string): void {
+  // `detecting`: each look starts by resolving the link, and that can lose the network too.
+  if (
+    item.waitForVideo &&
+    (item.state === 'waiting' || item.state === 'detecting') &&
+    items.has(item.id) &&
+    isTransientError(rawError)
+  ) {
+    keepWaiting(item)
+    return
+  }
   const attempts = (item.attempts || 0) + 1
   item.attempts = attempts
   if (attempts <= AUTO_RETRIES && isTransientError(rawError) && items.has(item.id)) {

@@ -143,6 +143,7 @@ describe.runIf(enabled)('subtitles and failures, with the real tools', () => {
     make('v.mp4', ...picture, ...encode)
     make('both.mp4', ...picture, '-f', 'lavfi', '-i', 'sine=d=2', ...encode, '-c:a', 'aac')
     make('a.m4a', '-f', 'lavfi', '-i', 'sine=d=2', '-c:a', 'aac')
+    make('seg0.ts', ...picture, '-f', 'lavfi', '-i', 'sine=d=2', ...encode, '-c:a', 'aac', '-f', 'mpegts')
 
     server = http.createServer((req, res) => {
       const path = (req.url ?? '').split('?')[0]
@@ -152,6 +153,13 @@ describe.runIf(enabled)('subtitles and failures, with the real tools', () => {
         res.end(body)
       }
       if (/^\/(429|403|404)/.test(path)) return send(Number(path.slice(1, 4)))
+      if (path.endsWith('.m3u8')) {
+        return send(
+          200,
+          '#EXTM3U\n#EXT-X-VERSION:3\n#EXT-X-TARGETDURATION:2\n#EXTINF:2.0,\n/seg0.ts\n#EXT-X-ENDLIST\n',
+          'application/vnd.apple.mpegurl'
+        )
+      }
       if (path === '/garbage.mp4') return send(200, Buffer.alloc(2000, 120))
       if (path.endsWith('.vtt')) return send(200, `WEBVTT\n\n00:00.000 --> 00:01.000\n${path}\n`, 'text/vtt')
       const page = /^\/page-(.+)\.html$/.exec(path)
@@ -278,6 +286,56 @@ describe.runIf(enabled)('subtitles and failures, with the real tools', () => {
     expect(item.state).toBe('error')
     expect(item.errorCode).toBe('postprocess')
   }, 90_000)
+
+  // A premiere that had already aired when the wait ended: what comes is an ordinary HLS video.
+  it('a wait that turns out to be an ordinary video ends in a real mp4', async () => {
+    h.settings = {}
+    const dir = mkdtempSync(join(tmpdir(), 'uvd-subs-run-'))
+    const { id } = await downloader.startDownload({
+      url: `${base}/premiere.m3u8`,
+      title: 'premiere',
+      mode: 'video',
+      quality: 'best',
+      live: true,
+      waitForVideo: true,
+      outputDir: dir
+    })
+    await vi.waitFor(() => expect(row(id).state).toBe('completed'), { timeout: 60_000, interval: 100 })
+    const name = execFileSync(FFPROBE!, ['-v', 'error', '-show_entries', 'format=format_name', '-of', 'csv=p=0', row(id).filepath!], {
+      encoding: 'utf-8'
+    })
+    expect(row(id).filepath).toMatch(/\.mp4$/)
+    expect(name).toContain('mp4')
+    expect(name).not.toContain('mpegts')
+    expect(row(id).partialPaths?.length).toBe(1)
+    expect(readdirSync(dir).filter((f) => f.includes('.part'))).toEqual([])
+  }, 90_000)
+
+  // Real seconds: the look after a lost connection is a minute away.
+  it('a wait outlasts the site being unreachable, and fetches it once it is back', async () => {
+    h.settings = {}
+    const closed = http.createServer((_req, res) => res.end())
+    await new Promise<void>((ok) => closed.listen(0, '127.0.0.1', ok))
+    const port = (closed.address() as { port: number }).port
+    await new Promise((ok) => closed.close(ok))
+    const { id } = await downloader.startDownload({
+      url: `http://127.0.0.1:${port}/premiere.m3u8`,
+      title: 'outage',
+      mode: 'video',
+      quality: 'best',
+      live: true,
+      waitForVideo: true,
+      outputDir: mkdtempSync(join(tmpdir(), 'uvd-subs-run-'))
+    })
+    await vi.waitFor(() => expect(row(id).log).toContain('looking again in a minute'), { timeout: 30_000, interval: 100 })
+    expect(row(id).state).toBe('waiting')
+    expect(row(id).attempts).toBe(0)
+    const back = http.createServer((req, res) => server.emit('request', req, res))
+    await new Promise<void>((ok) => back.listen(port, '127.0.0.1', ok))
+    await vi.waitFor(() => expect(row(id).state).toBe('completed'), { timeout: 90_000, interval: 200 })
+    expect(row(id).attempts).toBe(0)
+    await new Promise((ok) => back.close(ok))
+  }, 150_000)
 
   it('a refused stream address still reads as stale, so the app can ask the site again', async () => {
     const { isStaleInfoError } = await import('./info-cache')

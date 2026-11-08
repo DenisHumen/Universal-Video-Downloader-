@@ -48,6 +48,42 @@ const show = (item: DownloadItem): void =>
     </ul>
   )
 
+describe('a row waiting for a video to start', () => {
+  const waiting = { live: true, waitForVideo: true }
+
+  it('can be paused while it waits, with nothing yet to save', () => {
+    const pause = vi.spyOn(window.api, 'pauseDownload')
+    show(row({ ...waiting, state: 'waiting' }))
+    expect(screen.queryByRole('button', { name: 'Stop and Save' })).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: 'Pause' }))
+    expect(pause).toHaveBeenCalledWith('row')
+  })
+
+  it('turns into a recording once something comes down', () => {
+    show(row({ ...waiting, state: 'downloading' }))
+    expect(screen.queryByRole('button', { name: 'Pause' })).toBeNull()
+    expect(screen.getByRole('button', { name: 'Stop and Save' })).toBeTruthy()
+  })
+
+  it('offers no saving when paused before anything was recorded, and does after', () => {
+    show(row({ ...waiting, state: 'paused' }))
+    expect(screen.queryByRole('button', { name: 'Stop and Save' })).toBeNull()
+    cleanup()
+    show(row({ ...waiting, state: 'paused', partialPaths: ['/downloads/a.mp4'] }))
+    expect(screen.getByRole('button', { name: 'Stop and Save' })).toBeTruthy()
+  })
+
+  it('the Wait and Download fix queues it as a recording too', async () => {
+    const start = vi.spyOn(window.api, 'startDownload')
+    show(row({ state: 'error', errorCode: 'upcoming' }))
+    const wait = screen.queryByRole('button', { name: 'Wait and Download' })
+    expect(wait).toBeTruthy()
+    fireEvent.click(wait!)
+    await waitFor(() => expect(start).toHaveBeenCalled())
+    expect(start.mock.calls[0][0]).toMatchObject({ waitForVideo: true, live: true })
+  })
+})
+
 describe('Stop and Save on a queue row', () => {
   it('replaces pause on a live recording, in words', () => {
     const stop = vi.spyOn(window.api, 'stopLiveRecording')
