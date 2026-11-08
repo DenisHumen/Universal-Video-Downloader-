@@ -570,7 +570,9 @@ export function outputTarget(
   }
   const template = numberedName(settings.filenameTemplate || '%(title)s [%(id)s].%(ext)s', item.playlist)
   const suffix = variantSuffix(item) + (item.copySuffix ?? '')
-  return { path: join(dir, withNameSuffix(template, suffix)) }
+  const name = withNameSuffix(template, suffix)
+  // The engine's switch only reaches the fields; the spaces in the template itself are ours.
+  return { path: join(dir, settings.restrictFilenames ? name.replace(/ (?![^(]*\))/g, '_') : name) }
 }
 
 /** An audio download into a container with no place for cover art. */
@@ -831,14 +833,19 @@ export function finalPathCandidate(
  * `.f137` stream number are the only parts of the name that are not the title.
  */
 export function titleFromFile(path: string): string | undefined {
-  const name = basename(path).replace(/\.[^.]+$/, '').replace(/\.f\d[\w-]*$/, '')
+  const name = basename(path)
+    .replace(/\.[^.]+$/, '')
+    .replace(/\.f\d[\w-]*$/, '')
+    .replace(/ \(\d+\)$/, '')
+    .replace(/ \(audio\)$/, '')
   return name.replace(/(^| )\[[^\]]+\]$/, '').trim() || undefined
 }
 
 function parseFinalPath(line: string, item: DownloadItem): void {
   const found = finalPathCandidate(line)
   if (!found) return
-  if (/^https?:\/\//i.test(item.title ?? '') && isMediaName(found.path)) {
+  // With restricted names the file holds what is left of the title, which for Cyrillic can be nothing.
+  if (/^https?:\/\//i.test(item.title ?? '') && isMediaName(found.path) && !getSettings().restrictFilenames) {
     const title = titleFromFile(found.path)
     if (title) {
       item.title = title

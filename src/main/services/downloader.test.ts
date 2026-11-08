@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { join } from 'path'
 import type { AppSettings, DownloadItem } from '@shared/types'
-import { buildArgs, pickFinishedFile, safeName, siteFolder, titleFromFile } from './downloader'
+import { buildArgs, outputTarget, pickFinishedFile, safeName, siteFolder, titleFromFile } from './downloader'
 import { pageUrlOf } from '@shared/page-url'
 import { sniffUrlFor } from '../resolvers/universal'
 import { directUrlFor } from '../resolvers/universal/direct'
@@ -399,11 +399,32 @@ describe('safeName', () => {
   })
 })
 
+describe('outputTarget', () => {
+  const entry = (overrides: Partial<DownloadItem>): DownloadItem => ({ id: 'a', url: 'https://x.test/v', title: 't', mode: 'video', ...overrides }) as DownloadItem
+
+  it('never gives audio the name of the video of the same link, which the engine would delete', () => {
+    const video = outputTarget(entry({}), settings(), 'd').path
+    const audio = outputTarget(entry({ mode: 'audio', quality: 'audio' }), settings(), 'd').path
+    expect(video).toBe(join('d', '%(title)s [%(id)s].%(ext)s'))
+    expect(audio).toBe(join('d', '%(title)s [%(id)s] (audio).%(ext)s'))
+  })
+
+  it('takes the spaces out of the template too when names are restricted, leaving the folder alone', () => {
+    const path = outputTarget(entry({}), settings({ restrictFilenames: true }), 'My Videos').path
+    expect(path).toBe(join('My Videos', '%(title)s_[%(id)s].%(ext)s'))
+  })
+})
+
 describe('titleFromFile', () => {
   it('takes the title out of the name the engine gave the file', () => {
     expect(titleFromFile(join('d', 'Мой ролик [abc123].mp4'))).toBe('Мой ролик')
     expect(titleFromFile(join('d', 'Мой ролик [abc123].f137.mp4'))).toBe('Мой ролик')
     expect(titleFromFile(join('d', 'A plain name.mkv'))).toBe('A plain name')
+  })
+
+  it('leaves off what the app itself put on the name', () => {
+    expect(titleFromFile(join('d', 'Мой ролик [abc123] (audio).mp3'))).toBe('Мой ролик')
+    expect(titleFromFile(join('d', 'Мой ролик [abc123] (2).mp4'))).toBe('Мой ролик')
   })
 
   it('has nothing to offer when the name was only an id', () => {
