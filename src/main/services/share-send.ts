@@ -16,6 +16,18 @@ import { SECRET, getSecretWhenReady } from './secrets'
  * The folder is share-relative as the folder dialog gives it, the target's own
  * folder included, so the target goes in without one.
  */
+/**
+ * A request from the window, if it can be acted on. Everything it says comes over
+ * the bridge, and `..` in the folder would be filed as a folder of that name by
+ * nothing but the far end's good nature: the upload only drops empty segments.
+ */
+export function cleanShareRequest(raw: unknown): ShareSendRequest | null {
+  const { id, targetId, folder, replace } = (raw ?? {}) as Partial<Record<keyof ShareSendRequest, unknown>>
+  if (typeof id !== 'string' || !id || typeof targetId !== 'string' || !targetId || typeof folder !== 'string') return null
+  if (folder.split(/[\\/]/).some((segment) => segment === '.' || segment === '..')) return null
+  return { id, targetId, folder, replace: replace === true }
+}
+
 export async function sendToShare(
   request: ShareSendRequest,
   file: string,

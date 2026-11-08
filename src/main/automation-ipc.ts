@@ -19,13 +19,14 @@ import { createSmbFolder, listSmbFolders, testTarget } from './services/automati
 import { shareForFolder } from './services/automation/share-folder'
 import { sendTest } from './services/automation/telegram'
 import { getSecretWhenReady, hasSecret, SECRET, secretsPersist, setSecret } from './services/secrets'
-import { logFilePath } from './services/log'
+import { log, logFilePath } from './services/log'
 import { getSettings } from './services/settings'
 import { coalesce } from './services/coalesce'
 import { getDownload, relocateItem } from './services/downloader'
 import { entryFile, followEntry } from './services/library'
-import { sendToShare } from './services/share-send'
-import type { ShareSendRequest, ShareSendResult } from '@shared/types'
+import { cleanShareRequest, sendToShare } from './services/share-send'
+import { fromRenderer } from './services/navigation'
+import type { ShareSendResult } from '@shared/types'
 import {
   duplicateAfterEdit,
   exactDuplicate,
@@ -210,7 +211,14 @@ export function registerAutomationIpc(): void {
     share it knows. Asking about progress several times a second is plenty: the
     upload reports per chunk, and a big file has tens of thousands of those.
   */
-  ipcMain.handle(IPC.shareSend, async (event, request: ShareSendRequest): Promise<ShareSendResult> => {
+  ipcMain.handle(IPC.shareSend, async (event, raw: unknown): Promise<ShareSendResult> => {
+    // A page in the built-in browser has no business sending the user's files anywhere.
+    if (!fromRenderer(event)) {
+      log.warn('app', 'Refused a call from a page that is not the app', { channel: IPC.shareSend })
+      throw new Error(`${IPC.shareSend} is only available to the app itself`)
+    }
+    const request = cleanShareRequest(raw)
+    if (!request) return { status: 'failed', kind: 'path', message: 'That is not a folder on the share.' }
     const file = getDownload(request.id)?.filepath ?? entryFile(request.id)
     if (!file || !existsSync(file)) {
       return { status: 'failed', kind: 'noFile', message: 'The file is no longer on this computer.' }

@@ -116,3 +116,34 @@ describe('sendToShare', () => {
     expect(await sendToShare(request, local, [target])).toMatchObject({ status: 'failed', kind: 'full' })
   })
 })
+
+describe('cleanShareRequest', () => {
+  const good = { id: 'row', targetId: 'nas', folder: 'video/2026' }
+
+  it('takes a good request, with no folder as the share itself', async () => {
+    const { cleanShareRequest } = await import('./share-send')
+    expect(cleanShareRequest(good)).toEqual({ ...good, replace: false })
+    expect(cleanShareRequest({ ...good, folder: '', replace: true })).toEqual({ ...good, folder: '', replace: true })
+    // A dot inside a name is a name.
+    expect(cleanShareRequest({ ...good, folder: 'v1.2/..hidden' })?.folder).toBe('v1.2/..hidden')
+  })
+
+  it.each([
+    ['nothing', undefined],
+    ['not an object', 'row'],
+    ['no id', { targetId: 'nas', folder: '' }],
+    ['an empty id', { ...good, id: '' }],
+    ['an id that is not a string', { ...good, id: 7 }],
+    ['no target', { id: 'row', folder: '' }],
+    ['a target that is not a string', { ...good, targetId: {} }],
+    ['no folder', { id: 'row', targetId: 'nas' }],
+    ['a folder that is not a string', { ...good, folder: ['a'] }],
+    ['a climb out', { ...good, folder: '../secret' }],
+    ['a climb partway', { ...good, folder: 'a/../../b' }],
+    ['a climb with the other slash', { ...good, folder: 'a\\..\\b' }],
+    ['a dot segment', { ...good, folder: 'a/./b' }]
+  ])('refuses %s', async (_name, raw) => {
+    const { cleanShareRequest } = await import('./share-send')
+    expect(cleanShareRequest(raw)).toBeNull()
+  })
+})
