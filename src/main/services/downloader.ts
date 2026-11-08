@@ -54,12 +54,11 @@ import { markOf, shouldEmitProgress, type ProgressMark } from './throttle'
 import { recordDownloadFailure } from './report'
 import { normalisePlaylist, playlistDir, playlistTagArgs } from './playlist'
 import { resolveUrl } from '../resolvers'
-import { pageUrlFromSniffUrl, SNIFF_SCHEME } from '../resolvers/universal'
-import { DIRECT_SCHEME, parseDirectUrl } from '../resolvers/universal/direct'
 import { isAbsoluteUrl, isWebLink, normalizeUrl } from '@shared/urls'
 import { infoKey, isStaleInfoError } from './info-cache'
 import { infoCache } from './info-store'
 import { numberedName } from '@shared/playlist'
+import { pageUrlOf } from '@shared/page-url'
 import { cleanLanguage, cleanLanguages } from '@shared/languages'
 import { browserCookiesFile } from './browser-logins'
 import { hasTrim } from '@shared/types'
@@ -406,20 +405,6 @@ export function safeName(title: string): string {
   - the long tail a folder per site is most useful for - shared one folder.
 */
 const NOT_A_SITE = /^(universal|generic|browser)$/i
-
-/**
- * The page a queued link stands for. A sniff or a browser pick is queued under
- * an app-internal scheme whose host means nothing; the page it came from is
- * inside.
- */
-function pageUrlOf(src: string): string {
-  if (src.startsWith(SNIFF_SCHEME)) return pageUrlFromSniffUrl(src)
-  if (src.startsWith(DIRECT_SCHEME)) {
-    const payload = parseDirectUrl(src)
-    return payload?.pageUrl || payload?.referer || payload?.url || ''
-  }
-  return src
-}
 
 /** The site a download came from, for the per-site subfolder. */
 export function siteFolder(item: Pick<DownloadItem, 'extractor' | 'sourceUrl' | 'url'>): string {

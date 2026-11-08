@@ -40,6 +40,17 @@ describe('listLibrary: grouping by site', () => {
 })
 
 describe('librarySite', () => {
+  // The same links, made by the resolvers' own functions, in src/main/services/downloader.test.ts.
+  const sniff = (page: string): string => `uvd-sniff://${btoa(page).replace(/=+$/, '')}`
+  const direct = (payload: object): string => `uvd-direct://${btoa(JSON.stringify(payload)).replace(/=+$/, '')}`
+
+  it('looks inside the app\'s internal links, as the folder per site does', () => {
+    expect(librarySite({ url: sniff('https://www.media.example/film') })).toBe('media.example')
+    expect(librarySite({ url: sniff('https://youtu.be/abc') })).toBe('YouTube')
+    expect(librarySite({ url: direct({ url: 'https://cdn.example/a.m3u8', pageUrl: 'https://www.media.example/1' }) })).toBe('media.example')
+    expect(librarySite({ url: direct({ url: 'https://cdn.example/a.m3u8' }) })).toBe('cdn.example')
+  })
+
   it('names a known site the same whichever way the file came in', () => {
     expect(librarySite({ url: 'https://youtu.be/abc' })).toBe('YouTube')
     expect(librarySite({ url: 'https://www.youtube.com/watch?v=abc', extractor: 'Youtube' })).toBe('YouTube')

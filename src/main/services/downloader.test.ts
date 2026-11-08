@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { join } from 'path'
 import type { AppSettings, DownloadItem } from '@shared/types'
 import { buildArgs, pickFinishedFile, safeName, siteFolder } from './downloader'
+import { pageUrlOf } from '@shared/page-url'
 import { sniffUrlFor } from '../resolvers/universal'
 import { directUrlFor } from '../resolvers/universal/direct'
 
@@ -55,6 +56,23 @@ function settings(overrides: Partial<AppSettings> = {}): AppSettings {
     ...overrides
   }
 }
+
+describe('pageUrlOf: the links the resolvers really make', () => {
+  it('reads them back, with characters outside ASCII intact', () => {
+    expect(pageUrlOf(sniffUrlFor('https://media.example/фильм?a=1'))).toBe('https://media.example/фильм?a=1')
+    expect(pageUrlOf(directUrlFor({ url: 'https://cdn.example/a.m3u8', pageUrl: 'https://media.example/страница' }))).toBe(
+      'https://media.example/страница'
+    )
+    expect(pageUrlOf(directUrlFor({ url: 'https://cdn.example/a.m3u8', referer: 'https://media.example/r' }))).toBe(
+      'https://media.example/r'
+    )
+  })
+
+  it('has nothing to say about a link that does not read, and leaves an ordinary one alone', () => {
+    expect(pageUrlOf('uvd-direct://abc')).toBe('')
+    expect(pageUrlOf('https://media.example/a')).toBe('https://media.example/a')
+  })
+})
 
 describe('buildArgs: waiting for a video', () => {
   it('asks the engine to wait, only when told to', () => {

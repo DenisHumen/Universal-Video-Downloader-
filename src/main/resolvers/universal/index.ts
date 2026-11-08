@@ -1,3 +1,4 @@
+import { SNIFF_SCHEME } from '@shared/page-url'
 import { b64urlDecode, b64urlEncode, hostOf, withSignal } from '../http'
 import { unreachableCode } from '../neterror'
 import { kodikOnPage, resolveKodikPlayer } from '../sites/kodik'
@@ -48,7 +49,7 @@ export interface UniversalOptions {
 
 export { scrapeStatic, type StaticScrape } from './static'
 
-export const SNIFF_SCHEME = 'uvd-sniff://'
+export { SNIFF_SCHEME }
 
 /** The queue URL that re-runs universal resolution on every (re)start. */
 export function sniffUrlFor(pageUrl: string): string {

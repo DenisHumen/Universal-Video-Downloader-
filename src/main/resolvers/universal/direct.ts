@@ -1,3 +1,4 @@
+import { DIRECT_SCHEME } from '@shared/page-url'
 import { b64urlDecode, b64urlEncode } from '../http'
 import type { ResolveOptions, ResolvedUrl } from '../types'
 
@@ -11,7 +12,7 @@ import type { ResolveOptions, ResolvedUrl } from '../types'
  * cookies the user established in the browser.
  */
 
-export const DIRECT_SCHEME = 'uvd-direct://'
+export { DIRECT_SCHEME }
 
 /** How long a captured stream URL is assumed to still be valid. */
 const FRESH_MS = 5 * 60 * 1000

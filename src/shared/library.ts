@@ -1,4 +1,5 @@
 import { knownSiteFor } from './auto-sources'
+import { pageUrlOf } from './page-url'
 import type { DownloadItem } from './types'
 import { isWebLink, normalizeUrl } from './urls'
 
@@ -50,7 +51,7 @@ export interface LibraryEntry {
  * went under "Other", apart from the same site's files that were detected first.
  */
 export function librarySite(entry: Pick<LibraryEntry, 'url' | 'sourceUrl' | 'extractor'>): string | undefined {
-  const page = entry.sourceUrl || entry.url
+  const page = pageUrlOf(entry.sourceUrl || entry.url)
   const known = knownSiteFor(page)
   if (known) return known.name
   if (entry.extractor && !/^(universal|generic|browser)$/i.test(entry.extractor)) return entry.extractor
