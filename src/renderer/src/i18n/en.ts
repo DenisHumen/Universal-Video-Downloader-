@@ -908,6 +908,7 @@ export const en = {
   'err.corruptLink': 'This download link is corrupted — pick the video again.',
   'err.notALink': 'This isn’t a link the app can open. Paste the full address, starting with https://',
   'err.emptyPage': 'No videos found on this page.',
+  'err.notMedia': 'This link gave a file that is not a video or audio, so it was not kept.',
   'err.cutFailed': 'Nothing was recorded from the point you chose to start at, so there was nothing to process. Try downloading it whole, then trim the file.',
   'err.upcoming': 'This video hasn’t started yet — it’s a scheduled premiere or live stream. Try again once it begins.',
   'err.badSetting': 'The engine refused one of your settings. Check the speed limit in settings → downloads and the filename template in settings → post-processing.',

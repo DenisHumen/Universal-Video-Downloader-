@@ -1,7 +1,7 @@
 import { app } from 'electron'
 import { spawn } from 'child_process'
 import { randomUUID } from 'crypto'
-import { existsSync, mkdirSync } from 'fs'
+import { existsSync, mkdirSync, rmSync } from 'fs'
 import { join, resolve } from 'path'
 import type { AppSettings, DownloadItem } from '@shared/types'
 import { normalizeUrl } from '@shared/urls'
@@ -18,6 +18,8 @@ import {
   PROGRESS_PREFIX
 } from '../services/downloader'
 import { classifyYtdlpError, hasCookies, refusesMidStreamInit, withPostprocessHeading } from '../services/options'
+import { siteOf } from '../services/log-fields'
+import { isMediaName, isSidecarName } from '../services/naming'
 import { killTree } from '../services/process'
 import { lineReader } from '../services/engine-output'
 import { ffmpegProgressSeconds, splitOutputLines } from '../services/ffmpeg-output'
@@ -199,6 +201,13 @@ async function download(link: string, outputDir: string, choice: CliChoice): Pro
   }
   if (result.code === 0) {
     const path = result.finalPath
+    // The window's queue refuses the same files; see `refuseFinalFile`.
+    if (path && !isMediaName(path)) {
+      if (!result.alreadyThere && !isSidecarName(path)) rmSync(path, { force: true })
+      say('✗ This link gave a file that is not a video or audio, so it was not kept.')
+      log.warn('cli', 'Download was not a video or audio file', { site: siteOf(item.url) })
+      return 1
+    }
     say(path && existsSync(path) ? `✓ Saved to ${path}` : `✓ Done. Saved in ${dir}`)
     log.info('cli', 'Download finished', { url: item.url, path })
     return 0
@@ -214,6 +223,8 @@ interface EngineRun {
   code: number | null
   stderrTail: string
   finalPath?: string
+  /** The engine found that file there and wrote nothing. */
+  alreadyThere?: boolean
   /** The engine could not be started at all. */
   startError?: string
 }
@@ -223,7 +234,7 @@ function runEngine(item: DownloadItem, settings: AppSettings, dir: string): Prom
   return new Promise((done) => {
     const child = spawn(ytdlpBinaryPath(), buildArgs(item, settings, dir, ffmpegLocation()), ytdlpSpawnOptions())
     live = child
-    let finalPath: { path: string; priority: number } | undefined
+    let finalPath: { path: string; priority: number; alreadyDownloaded: boolean } | undefined
     let announced = false
     let stderrTail = ''
     // SponsorBlock's lookup is a post-processor too, and runs before anything is fetched.
@@ -244,8 +255,10 @@ function runEngine(item: DownloadItem, settings: AppSettings, dir: string): Prom
           if (fetched) postprocessing = true
           return
         }
-        const found = finalPathCandidate(line)
-        if (found && (!finalPath || found.priority >= finalPath.priority)) finalPath = found
+        const found = finalPathCandidate(line, dir)
+        // A subtitle file never takes over from a video, as in the window's queue.
+        const outranked = finalPath && isMediaName(finalPath.path) && found && !isMediaName(found.path)
+        if (found && (!finalPath || (found.priority >= finalPath.priority && !outranked))) finalPath = found
         if (found && !announced) {
           announced = true
           say(`  saving as ${displayName(found.path)}`)
@@ -276,7 +289,8 @@ function runEngine(item: DownloadItem, settings: AppSettings, dir: string): Prom
       settle({
         code,
         stderrTail: code !== 0 && postprocessing ? withPostprocessHeading(stderrTail) : stderrTail,
-        finalPath: finalPath?.path
+        finalPath: finalPath?.path,
+        alreadyThere: finalPath?.alreadyDownloaded
       })
     })
   })

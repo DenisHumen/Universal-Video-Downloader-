@@ -57,6 +57,7 @@ const KEYS: Record<AppErrorCode, TranslationKey> = {
   corruptLink: 'err.corruptLink',
   notALink: 'err.notALink',
   emptyPage: 'err.emptyPage',
+  notMedia: 'err.notMedia',
   cutFailed: 'err.cutFailed',
   upcoming: 'err.upcoming',
   badSetting: 'err.badSetting',

@@ -176,6 +176,8 @@ export type AppErrorCode =
   | 'corruptLink'
   | 'notALink'
   | 'emptyPage'
+  /** The site's file came down, and it is not a video or audio: an .svg, an .m3u. */
+  | 'notMedia'
   | 'cutFailed'
   | 'upcoming'
   | 'badSetting'

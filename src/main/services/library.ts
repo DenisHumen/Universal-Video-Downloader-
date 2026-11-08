@@ -283,6 +283,11 @@ export async function trashFile(filepath: string): Promise<'trashed' | 'failed' 
   return (await trashEntry(entry.id)) ? 'trashed' : 'failed'
 }
 
+/** Every file the Library holds, for the check on what the window may open. */
+export function libraryFiles(): string[] {
+  return lib.entries.map((e) => e.filepath)
+}
+
 /** The file an entry stands for, when there is such an entry. */
 export function entryFile(id: string): string | undefined {
   return lib.entries.find((e) => e.id === id)?.filepath

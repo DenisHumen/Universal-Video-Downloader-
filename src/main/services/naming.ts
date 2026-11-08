@@ -1,3 +1,4 @@
+import { isAbsolute, relative, resolve, sep } from 'path'
 import { hasTrim, type DownloadItem, type TrimRange } from '@shared/types'
 
 /*
@@ -168,6 +169,37 @@ export function freeCopySuffix(stem: string, names: readonly string[]): string {
   let n = 2
   while (hasFileNamed(names, copyName(stem, n))) n++
   return ` (${n})`
+}
+
+/**
+ * What a finished download may be called: real video and audio containers. The
+ * engine saves whatever extension a site names, and it allows `.svg`, `.xml`,
+ * `.m3u`, `.asx`, `.swf`, `.ico`, `.bin`, `.json` as well as these, and on older
+ * builds `.url`, `.desktop` and `.webloc`.
+ */
+const MEDIA_EXTENSION =
+  /^(mp4|m4v|mkv|webm|mov|flv|f4v|ts|m2ts|mts|avi|wmv|asf|mpg|mpeg|3gp|3g2|ogv|vob|m4a|m4b|mp3|mp2|opus|flac|wav|ogg|oga|aac|mka|weba|wma|aif|aiff|caf|ac3|eac3|dts)$/i
+
+export function isMediaName(path: string): boolean {
+  return MEDIA_EXTENSION.test(path.split('.').pop() ?? '')
+}
+
+/** A subtitle file beside the video: not what a download is for, but not ours to delete. */
+export function isSidecarName(path: string): boolean {
+  return /\.(vtt|srt|ass|ssa|lrc|ttml|dfxp|sbv|srv[123]|json3)$/i.test(path)
+}
+
+/**
+ * Whether a path the engine printed is a file inside the folder this run writes
+ * to. Works from the strings alone: asking the disk about a `\\host\share` path
+ * is already a connection to that host.
+ */
+export function isInsideFolder(path: string, folder: string): boolean {
+  if (/[\u0000-\u001f]/.test(path) || !isAbsolute(path)) return false
+  // A later colon is an NTFS stream: `x.exe:y.mp4` is not the .mp4 it says it is.
+  if (sep === '\\' && path.lastIndexOf(':') > 1) return false
+  const rel = relative(resolve(folder).normalize('NFC'), resolve(path).normalize('NFC'))
+  return rel !== '' && rel !== '..' && !rel.startsWith(`..${sep}`) && !isAbsolute(rel)
 }
 
 /** One path, written either way round and in any case. */

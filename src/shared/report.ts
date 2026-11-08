@@ -108,6 +108,8 @@ export const REPORTABLE: Record<AppErrorCode, boolean> = {
   engineMissing: false,
   // A premiere that has not started, or a title the site does not carry.
   upcoming: false,
+  // The site really did send something else.
+  notMedia: false,
   notOnYummyAnime: false,
   // Something the app could learn to do.
   noFormats: true,

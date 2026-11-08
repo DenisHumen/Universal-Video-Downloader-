@@ -4,6 +4,7 @@ import {
   forgetEntry,
   forgetMissing,
   libraryEntry,
+  libraryFiles,
   locateFile,
   locateInFolder,
   lookupLinks,
@@ -88,7 +89,8 @@ import {
 import { takePending } from './index'
 import { registerAutomationIpc } from './automation-ipc'
 import { fromRenderer } from './services/navigation'
-import { log } from './services/log'
+import { log, logFilePath } from './services/log'
+import { mayOpen, mayShow, type KnownPaths } from './services/open-guard'
 import {
   checkForUpdates,
   downloadUpdate,
@@ -118,6 +120,19 @@ function requireRenderer(event: IpcMainInvokeEvent, channel: string): void {
   if (fromRenderer(event)) return
   log.warn('app', 'Refused a call from a page that is not the app', { channel })
   throw new Error(`${channel} is only available to the app itself`)
+}
+
+/** Everything Play, Show in Folder and Open Folder may be pointed at. See open-guard.ts. */
+function knownPaths(): KnownPaths {
+  const rows = listDownloads()
+  return {
+    files: [
+      ...rows.flatMap((row) => [row.filepath ?? '', row.keptPartial ?? '']),
+      ...libraryFiles(),
+      logFilePath()
+    ],
+    folders: [getSettings().downloadDir, ...rows.map((row) => row.outputDir)]
+  }
 }
 
 /** In-flight detections, so the UI can cancel a slow universal scan. */
@@ -335,11 +350,20 @@ export function registerIpc({ getWindow, openSearchWindow, onSettingsChanged }: 
   })
   ipcMain.handle(IPC.openPath, (event, path: string) => {
     requireRenderer(event, IPC.openPath)
+    if (!mayOpen(path, knownPaths())) {
+      log.warn('app', 'Refused to open a file the app does not know', { channel: IPC.openPath })
+      return Promise.resolve('This is not a file the app downloaded, so it was not opened.')
+    }
     return shell.openPath(path)
   })
   // The OS call reports nothing, so a moved file used to mean a click that did nothing.
   ipcMain.handle(IPC.showInFolder, async (event, path: string) => {
     requireRenderer(event, IPC.showInFolder)
+    // Before `access`, which on a network path is already a connection to that host.
+    if (!mayShow(path, knownPaths())) {
+      log.warn('app', 'Refused to show a file the app does not know', { channel: IPC.showInFolder })
+      return false
+    }
     try {
       await access(path)
     } catch {

@@ -36,6 +36,9 @@ import {
 import { IN_FLIGHT_STATES, isSameDownload } from './dedupe'
 import {
   freeCopySuffix,
+  isInsideFolder,
+  isMediaName,
+  isSidecarName,
   pickOutputStem,
   samePath,
   sectionSuffix,
@@ -803,29 +806,50 @@ export function buildArgs(
   return args
 }
 
-const ALREADY_DOWNLOADED = /\[download\]\s*(.+?) has already been downloaded/
+const ALREADY_DOWNLOADED = /^\[download\]\s*(.+?) has already been downloaded\s*$/
 const DESTINATION_PRIORITY = 2
 
+/*
+  Anchored, and only ever asked about the engine's standard output.
+
+  What follows the engine's own words can be anyone's: `[generic] <name from the
+  link>: Downloading webpage`, and an mp4's title tag echoed on standard error by
+  the ffmpeg it runs. Unanchored, a link redirecting to a path spelling
+  `[Merger] Merging formats into "C:\...\calc.exe"` named the row's file, above
+  the true destination, and then Play opened it, Delete File trashed it and a
+  watch uploaded and deleted it. Checked on the real engine: every line naming a
+  finished file comes on standard output, ffmpeg-fetched downloads included.
+
+  An anchor alone is not enough. The name is unquoted before it is printed, so a
+  `%0A` in the link starts a line of its own that the engine really does print,
+  which is why `finalPathCandidate` also wants the path inside this run's folder.
+*/
 const FINAL_PATH_RULES: { re: RegExp; priority: number }[] = [
-  { re: /\[Merger\] Merging formats into "(.+?)"/, priority: 6 },
-  { re: /\[ExtractAudio\] Destination:\s*(.+?)\s*$/, priority: 6 },
-  { re: /\[SponsorBlock\].*?to "(.+?)"/, priority: 5 },
+  { re: /^\[Merger\] Merging formats into "(.+)"\s*$/, priority: 6 },
+  { re: /^\[ExtractAudio\] Destination:\s*(.+?)\s*$/, priority: 6 },
+  { re: /^\[SponsorBlock\].*?to "(.+)"\s*$/, priority: 5 },
   { re: ALREADY_DOWNLOADED, priority: 4 },
-  { re: /\[Metadata\] .*?to "(.+?)"/, priority: 3 },
-  { re: /\[download\] Destination:\s*(.+?)\s*$/, priority: DESTINATION_PRIORITY }
+  { re: /^\[Metadata\] .*?to "(.+)"\s*$/, priority: 3 },
+  { re: /^\[download\] Destination:\s*(.+?)\s*$/, priority: DESTINATION_PRIORITY }
 ]
 
 /**
  * The file a line of engine output names as where the download ends up, and
  * how much to trust it: the merger's output outranks the first stream's
- * destination. Pure, so the queue and the command line read paths the same way.
+ * destination. Nothing outside `runDir` is ever the answer, and nothing here
+ * touches the disk, so a path on someone's server is never so much as looked at.
+ * Pure, so the queue and the command line read paths the same way.
  */
 export function finalPathCandidate(
-  line: string
+  line: string,
+  runDir: string
 ): { path: string; priority: number; alreadyDownloaded: boolean } | null {
   for (const { re, priority } of FINAL_PATH_RULES) {
     const m = line.match(re)
-    if (m && m[1]) return { path: m[1].trim(), priority, alreadyDownloaded: re === ALREADY_DOWNLOADED }
+    if (!m || !m[1]) continue
+    const path = m[1].trim()
+    if (!isInsideFolder(path, runDir)) return null
+    return { path, priority, alreadyDownloaded: re === ALREADY_DOWNLOADED }
   }
   return null
 }
@@ -848,8 +872,8 @@ export function titleFromFile(path: string): string | undefined {
   return name.replace(/(^| )\[[^\]]+\]$/, '').trim() || undefined
 }
 
-function parseFinalPath(line: string, item: DownloadItem): void {
-  const found = finalPathCandidate(line)
+function parseFinalPath(line: string, item: DownloadItem, runDir: string): void {
+  const found = finalPathCandidate(line, runDir)
   if (!found) return
   // With restricted names the file holds what is left of the title, which for Cyrillic can be nothing.
   if (/^https?:\/\//i.test(item.title ?? '') && isMediaName(found.path) && !getSettings().restrictFilenames) {
@@ -860,7 +884,9 @@ function parseFinalPath(line: string, item: DownloadItem): void {
     }
   }
   const current = finalPaths.get(item.id)
-  if (!current || found.priority >= current.priority) {
+  // A subtitle file never takes over from a video, whichever order they are announced in.
+  const outranked = current && isMediaName(current.path) && !isMediaName(found.path)
+  if (!current || (found.priority >= current.priority && !outranked)) {
     finalPaths.set(item.id, { path: found.path, priority: found.priority })
   }
   if (found.alreadyDownloaded) alreadyOnDisk.set(item.id, found.path)
@@ -872,13 +898,6 @@ function parseFinalPath(line: string, item: DownloadItem): void {
       scheduleSave()
     }
   }
-}
-
-/** What the engine can name a finished download, after the stem we gave it. */
-const MEDIA_EXTENSION = /^(mp4|mkv|webm|m4a|mp3|opus|flac|wav|ogg|aac|mov|m4v|flv|ts)$/i
-
-function isMediaName(path: string): boolean {
-  return MEDIA_EXTENSION.test(path.split('.').pop() ?? '')
 }
 
 /**
@@ -897,7 +916,7 @@ export function pickFinishedFile(
 ): string | undefined {
   const prefix = stem + '.'
   const ours = (name: string): boolean =>
-    name.startsWith(prefix) && MEDIA_EXTENSION.test(name.slice(prefix.length))
+    name.startsWith(prefix) && !name.slice(prefix.length).includes('.') && isMediaName(name)
   return files.filter((file) => ours(file.name)).sort((a, b) => b.mtimeMs - a.mtimeMs)[0]?.name
 }
 
@@ -1496,9 +1515,10 @@ async function runDownload(item: DownloadItem): Promise<void> {
   */
   let child: ChildProcessWithoutNullStreams
   let infoFile: string | null = null
+  let dir: string
   try {
     const settings = getSettings()
-    const dir = outputDirFor(item, settings)
+    dir = outputDirFor(item, settings)
     if (item.live) setAsideRecording(item)
     const stem = settleOutputStem(item, dir, settings)
     expectedNames.delete(item.id)
@@ -1546,7 +1566,7 @@ async function runDownload(item: DownloadItem): Promise<void> {
     } else if (line.startsWith(POSTPROCESS_PREFIX)) {
       handlePostprocessLine(line, item)
     } else if (line.trim()) {
-      parseFinalPath(line, item)
+      parseFinalPath(line, item, dir)
       appendLog(item, line + '\n')
       log.debug('engine', line, { id: shortId })
     }
@@ -1559,7 +1579,6 @@ async function runDownload(item: DownloadItem): Promise<void> {
       handleFfmpegProgress(seconds, item, line)
       return
     }
-    parseFinalPath(line, item)
     if (isFfmpegNoise(line)) return
     const missed = subtitleMissIn(line)
     if (missed && !item.subtitlesMissed?.includes(missed)) {
@@ -1643,6 +1662,7 @@ async function runDownload(item: DownloadItem): Promise<void> {
       retryUnderOwnName(item, existing)
       return
     }
+    if (code === 0 && refuseFinalFile(item, existing)) return
     if (code === 0) {
       item.state = 'completed'
       finishProgress(item)
@@ -1721,6 +1741,33 @@ async function runDownload(item: DownloadItem): Promise<void> {
     const tail = stderrTail || `yt-dlp exited with code ${code}`
     fail(item, item.state === 'processing' ? withPostprocessHeading(tail) : tail)
   })
+}
+
+/**
+ * The site chose what the file is, and it is nothing a person downloads a video
+ * for: an .svg, an .xml, an .m3u, a .swf. The engine saves those under whatever
+ * extension the server says, and from there the row's Play would hand it to
+ * whatever Windows opens that with. So the row fails before anything can open it,
+ * and the file goes, unless it was already there before this run or is a subtitle
+ * file, which is the user's.
+ */
+function refuseFinalFile(item: DownloadItem, existing: string | undefined): boolean {
+  const final = finalPaths.get(item.id)?.path
+  if (!final || isMediaName(final)) return false
+  if (final !== existing && !isSidecarName(final)) {
+    try {
+      rmSync(final, { force: true })
+    } catch (err) {
+      log.warn('download', 'Could not remove a file that is not a video', failure(err))
+    }
+  }
+  finalPaths.delete(item.id)
+  expectedNames.delete(item.id)
+  item.filepath = undefined
+  item.speed = undefined
+  item.eta = undefined
+  failWith(item, 'notMedia', 'This link gave a file that is not a video or audio, so it was not kept.')
+  return true
 }
 
 /**
