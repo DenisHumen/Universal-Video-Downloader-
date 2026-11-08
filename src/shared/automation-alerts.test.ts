@@ -57,7 +57,7 @@ describe('watchFailing', () => {
   password was fixed. These are the ways a person lowers it.
 */
 describe('settleRunError', () => {
-  const cleared = { lastRunError: undefined, lastRunFailedAt: undefined }
+  const cleared = { lastRunError: undefined, lastRunErrorCode: undefined, lastRunFailedAt: undefined }
 
   it('clears it when the steps are edited, which is how a chain gets fixed', () => {
     expect(settleRunError({ steps: [] })).toMatchObject(cleared)

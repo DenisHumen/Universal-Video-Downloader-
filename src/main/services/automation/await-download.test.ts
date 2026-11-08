@@ -1,7 +1,7 @@
 import { EventEmitter } from 'events'
 import { describe, expect, it, vi } from 'vitest'
 import type { DownloadItem } from '@shared/types'
-import { awaitDownload, DownloadStopped, type QueueView } from './await-download'
+import { awaitDownload, DownloadFailed, DownloadStopped, type QueueView } from './await-download'
 
 const item = (state: DownloadItem['state'], extra: Partial<DownloadItem> = {}): DownloadItem => ({
   id: 'd1',
@@ -49,6 +49,16 @@ describe('awaitDownload', () => {
       'HTTP 403'
     )
     await expect(awaitDownload('d1', queue(item('canceled')))).rejects.toThrow('cancelled')
+  })
+
+  // The code is what lets the watch say it in Russian; the sentence alone only ever said it in English.
+  it('rejects a failed item with the code the queue gave it', async () => {
+    const failure = await awaitDownload(
+      'd1',
+      queue(item('error', { error: 'Your disk is full.', errorCode: 'diskFull' }))
+    ).catch((err: unknown) => err)
+    expect(failure).toBeInstanceOf(DownloadFailed)
+    expect(failure).toMatchObject({ message: 'Your disk is full.', code: 'diskFull' })
   })
 
   it('rejects an id the queue has never heard of instead of waiting for it', async () => {

@@ -15,7 +15,7 @@ import { getSettings } from '../settings'
 import { leftoversOf, mayRemoveFolder, splitLocalPath } from '@shared/cleanup'
 import { getSecretWhenReady, SECRET } from '../secrets'
 import { log } from '../log'
-import { awaitDownload, DownloadStopped, type QueueView } from './await-download'
+import { awaitDownload, DownloadFailed, DownloadStopped, type QueueView } from './await-download'
 import { carryOver } from './carry-over'
 import { downloadUrlFor } from './detect'
 import { addRun, getWatch, lastRunFor, updateRun, updateWatch } from './store'
@@ -456,8 +456,8 @@ export async function runEpisode(
     updateWatch(
       watch.id,
       notifyTrouble
-        ? { lastRunError: notifyTrouble, lastRunFailedAt: Date.now() }
-        : { lastRunError: undefined, lastRunFailedAt: undefined }
+        ? { lastRunError: notifyTrouble, lastRunErrorCode: undefined, lastRunFailedAt: Date.now() }
+        : { lastRunError: undefined, lastRunErrorCode: undefined, lastRunFailedAt: undefined }
     )
     log.info('watcher', `Finished ${seriesTitle} ${episodeKey(ref)}`, { id: shortId })
   } catch (err) {
@@ -478,7 +478,8 @@ export async function runEpisode(
       return stoppedBy ? 'stopped' : 'skipped'
     }
 
-    if (failing) Object.assign(failing, { state: 'failed', message: why, finishedAt: Date.now() })
+    const code = err instanceof DownloadFailed ? err.code : undefined
+    if (failing) Object.assign(failing, { state: 'failed', message: why, code, finishedAt: Date.now() })
     updateRun(run.id, {
       state: 'failed',
       filepath,
@@ -492,7 +493,7 @@ export async function runEpisode(
       watch's history - so every episode could be failing to upload while the
       series read as healthy everywhere a person would glance.
     */
-    updateWatch(watch.id, { lastRunError: why, lastRunFailedAt: Date.now() })
+    updateWatch(watch.id, { lastRunError: why, lastRunErrorCode: code, lastRunFailedAt: Date.now() })
     log.error('watcher', `Failed on ${seriesTitle} ${episodeKey(ref)}: ${why}`, { id: shortId })
 
     /*

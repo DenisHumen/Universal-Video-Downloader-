@@ -6,6 +6,7 @@
  * will produce before anything is downloaded.
  */
 
+import type { AppErrorCode } from './types'
 import { normalizeUrl } from './urls'
 
 export type StepKind = 'download' | 'rename' | 'upload' | 'notify'
@@ -153,6 +154,8 @@ export interface Watch {
    * pausing or resuming, or dismissing it.
    */
   lastRunError?: string
+  /** What the queue called that failure, when it was the download: the screen says it in the user's language. */
+  lastRunErrorCode?: AppErrorCode
   lastRunFailedAt?: number
   /**
    * Failed goes so far at each episode not yet given up on, by `episodeKey`.
@@ -169,6 +172,8 @@ export interface RunStep {
   kind: StepKind
   state: StepState
   message?: string
+  /** The queue's code for a failed download, beside its English sentence. */
+  code?: AppErrorCode
   startedAt?: number
   finishedAt?: number
 }
@@ -916,5 +921,5 @@ export function watchFailing(watch: Watch): boolean {
  */
 export function settleRunError(patch: Partial<Watch>): Partial<Watch> {
   if (!('steps' in patch || 'enabled' in patch || 'lastRunError' in patch)) return patch
-  return { ...patch, lastRunError: undefined, lastRunFailedAt: undefined }
+  return { ...patch, lastRunError: undefined, lastRunErrorCode: undefined, lastRunFailedAt: undefined }
 }

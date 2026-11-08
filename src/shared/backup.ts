@@ -217,6 +217,7 @@ function portableWatch(watch: Watch): Watch {
   delete copy.lastCheckedAt
   delete copy.lastError
   delete copy.lastRunError
+  delete copy.lastRunErrorCode
   delete copy.lastRunFailedAt
   delete copy.attempts
   return copy

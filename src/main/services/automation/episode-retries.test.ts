@@ -12,7 +12,7 @@ import type { DownloadItem, DownloadRequest } from '@shared/types'
   not, so nothing ever tried it again.
 */
 
-type Plan = 'ok' | 'fail' | 'cancel' | 'hang'
+type Plan = 'ok' | 'fail' | 'failCoded' | 'cancel' | 'hang'
 
 const h = vi.hoisted(() => {
   class TelegramError extends Error {
@@ -134,6 +134,10 @@ vi.mock('../downloader', async () => {
         } else if (plan === 'fail') {
           item.state = 'error'
           item.error = 'HTTP 502 from the player'
+        } else if (plan === 'failCoded') {
+          item.state = 'error'
+          item.error = 'Your disk is full — free some space and try again.'
+          item.errorCode = 'diskFull'
         } else if (plan === 'cancel') {
           item.state = 'canceled'
         } else {
@@ -226,6 +230,21 @@ describe('an episode that fails', () => {
     const has = (p: string): boolean => taken.has(p)
     expect(m.pipeline.freePath('/d/Free.mp4', has)).toBe('/d/Free.mp4')
     expect(m.pipeline.freePath('/d/Show S01E01.mp4', has)).toBe('/d/Show S01E01 (3).mp4')
+  })
+
+  it('keeps the code of a failed download on the step and the watch, until the episode goes through', async () => {
+    h.plan = ['failCoded', 'ok']
+
+    await check()
+    expect(runs()[0].steps[0]).toMatchObject({ state: 'failed', code: 'diskFull' })
+    expect(m.store.getWatch('w1')).toMatchObject({
+      lastRunError: 'Your disk is full — free some space and try again.',
+      lastRunErrorCode: 'diskFull'
+    })
+
+    await check()
+    expect(m.store.getWatch('w1')?.lastRunError).toBeUndefined()
+    expect(m.store.getWatch('w1')?.lastRunErrorCode).toBeUndefined()
   })
 
   it('is tried again at the next check, and given up on - with one message - after the third', async () => {
