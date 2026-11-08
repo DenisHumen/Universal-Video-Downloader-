@@ -1,6 +1,6 @@
-import { mkdtempSync, rmSync, writeFileSync } from 'fs'
+import { existsSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from 'fs'
 import { tmpdir } from 'os'
-import { join } from 'path'
+import { dirname, join } from 'path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 /*
@@ -30,6 +30,7 @@ afterEach(() => rmSync(h.dir, { recursive: true, force: true }))
 
 const logins = (): Promise<typeof import('./browser-logins')> => import('./browser-logins')
 const jar = (text: string): void => writeFileSync(join(h.dir, 'browser-cookies.txt'), text)
+const appJar = (): string => join(h.dir, 'browser-cookies.txt')
 
 describe('the terminal reading the app’s jar', () => {
   it('hands over nothing until it is asked to read', async () => {
@@ -40,9 +41,55 @@ describe('the terminal reading the app’s jar', () => {
 
   it('hands over a jar with cookies in it', async () => {
     jar(`${HEADER}${ENTRY}\n`)
-    const { browserCookiesFile, readSavedBrowserJar } = await logins()
+    const { browserCookiesFile, dropSavedBrowserJar, readSavedBrowserJar } = await logins()
     readSavedBrowserJar()
-    expect(browserCookiesFile()).toBe(join(h.dir, 'browser-cookies.txt'))
+    const copy = browserCookiesFile()!
+    expect(readFileSync(copy, 'utf8')).toBe(`${HEADER}${ENTRY}\n`)
+    dropSavedBrowserJar()
+  })
+
+  // The engine rewrites its --cookies file on the way out, with what it read at the start.
+  it('hands over a copy, so the engine cannot put cookies back after a sign-out', async () => {
+    jar(`${HEADER}${ENTRY}\n`)
+    const { browserCookiesFile, dropSavedBrowserJar, readSavedBrowserJar } = await logins()
+    readSavedBrowserJar()
+    const copy = browserCookiesFile()!
+    expect(copy).not.toBe(appJar())
+    expect(dirname(copy).startsWith(h.dir)).toBe(false)
+    jar(HEADER) // Signed out in the window meanwhile.
+    writeFileSync(copy, `${HEADER}${ENTRY}\n`) // The engine, exiting.
+    expect(readFileSync(appJar(), 'utf8')).toBe(HEADER)
+    dropSavedBrowserJar()
+  })
+
+  it.skipIf(process.platform === 'win32')('keeps the copy to its owner', async () => {
+    jar(`${HEADER}${ENTRY}\n`)
+    const { browserCookiesFile, dropSavedBrowserJar, readSavedBrowserJar } = await logins()
+    readSavedBrowserJar()
+    expect(statSync(browserCookiesFile()!).mode & 0o777).toBe(0o600)
+    expect(statSync(dirname(browserCookiesFile()!)).mode & 0o777).toBe(0o700)
+    dropSavedBrowserJar()
+  })
+
+  it('takes the copy away again and forgets it, however many times it is told', async () => {
+    jar(`${HEADER}${ENTRY}\n`)
+    const { browserCookiesFile, dropSavedBrowserJar, readSavedBrowserJar } = await logins()
+    readSavedBrowserJar()
+    const copy = browserCookiesFile()!
+    dropSavedBrowserJar()
+    expect(existsSync(copy)).toBe(false)
+    expect(existsSync(dirname(copy))).toBe(false)
+    expect(browserCookiesFile()).toBeUndefined()
+    expect(() => dropSavedBrowserJar()).not.toThrow()
+    expect(existsSync(appJar())).toBe(true)
+  })
+
+  it('makes no copy of an empty jar', async () => {
+    jar(HEADER)
+    const { browserCookiesFile, dropSavedBrowserJar, readSavedBrowserJar } = await logins()
+    readSavedBrowserJar()
+    expect(browserCookiesFile()).toBeUndefined()
+    dropSavedBrowserJar()
   })
 
   it('does not take the blank lines of a rewritten jar for cookies', async () => {

@@ -21,7 +21,7 @@ import { classifyYtdlpError, hasCookies, refusesMidStreamInit, withPostprocessHe
 import { killTree } from '../services/process'
 import { lineReader } from '../services/engine-output'
 import { ffmpegProgressSeconds, splitOutputLines } from '../services/ffmpeg-output'
-import { browserCookiesFile, readSavedBrowserJar } from '../services/browser-logins'
+import { browserCookiesFile, dropSavedBrowserJar, readSavedBrowserJar } from '../services/browser-logins'
 import { flushLog, initLog, log } from '../services/log'
 import {
   describeFailure,
@@ -74,6 +74,8 @@ function say(text: string): void {
 }
 
 function finish(code: number): void {
+  // Every way out comes through here: done, failed and Ctrl-C.
+  dropSavedBrowserJar()
   // A secret still being sealed (a proxy password lifted out of settings) lands first.
   void flushSecrets().finally(() => {
     flushLog()

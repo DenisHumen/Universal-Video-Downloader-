@@ -1,7 +1,8 @@
 import { app, type Cookie } from 'electron'
 import { spawn } from 'child_process'
-import { chmodSync, readFileSync, renameSync, rmSync, writeFileSync } from 'fs'
-import { join } from 'path'
+import { chmodSync, mkdtempSync, readFileSync, renameSync, rmSync, writeFileSync } from 'fs'
+import { tmpdir } from 'os'
+import { dirname, join } from 'path'
 import { browsingSession } from '../resolvers/universal/capture'
 import { getSettings } from './settings'
 import { getSecret, SECRET, setSecret } from './secrets'
@@ -44,6 +45,8 @@ let jarTimer: NodeJS.Timeout | null = null
 let started = false
 /** Reading the jar the app left, for the terminal. */
 let reading = false
+/** The terminal's own copy of that jar. See `readSavedBrowserJar`. */
+let privateJar: string | undefined
 
 function writeJar(cookies: Cookie[]): void {
   const text = toNetscape(cookies)
@@ -90,7 +93,7 @@ export function initBrowserLogins(): void {
 /** The jar for the engine's `--cookies`, when there is one worth passing. */
 export function browserCookiesFile(): string | undefined {
   if ((!started && !reading) || !getSettings().browserStaySignedIn || jarCount === 0) return undefined
-  return JAR()
+  return privateJar ?? JAR()
 }
 
 /**
@@ -100,14 +103,38 @@ export function browserCookiesFile(): string | undefined {
  * own with no sign-ins in it, so `initBrowserLogins` there would replace the
  * app's jar with an empty one, and without either the terminal went out as a
  * stranger on a site the person had signed in to.
+ *
+ * A copy, because the engine rewrites its `--cookies` file when it exits, with
+ * whatever it read at the start. Handed the app's own jar, a run that outlasted
+ * "sign out of every site" put every cookie back. The copy is as secret as the
+ * jar: its own folder, owner only, and gone again through `dropSavedBrowserJar`.
  */
 export function readSavedBrowserJar(): void {
   reading = true
+  jarCount = 0
   try {
-    jarCount = netscapeCount(readFileSync(JAR(), 'utf8'))
+    const text = readFileSync(JAR(), 'utf8')
+    const count = netscapeCount(text)
+    if (!count) return
+    const file = join(mkdtempSync(join(tmpdir(), 'uvd-cookies-')), 'cookies.txt')
+    writeFileSync(file, text, { mode: 0o600, flag: 'wx' })
+    privateJar = file
+    jarCount = count
   } catch {
-    // The app has never written one: nothing to pass.
-    jarCount = 0
+    // The app has never written one, or there is nowhere to put a copy: nothing to pass.
+  }
+}
+
+/** The terminal is finished with its copy of the jar. Safe to call more than once. */
+export function dropSavedBrowserJar(): void {
+  const file = privateJar
+  privateJar = undefined
+  jarCount = 0
+  if (!file) return
+  try {
+    rmSync(dirname(file), { recursive: true, force: true, maxRetries: 3, retryDelay: 100 })
+  } catch (err) {
+    log.warn('browser', 'Could not remove the copy of the cookie jar', { why: String(err) })
   }
 }
 
