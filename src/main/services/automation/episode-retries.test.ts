@@ -2,7 +2,14 @@ import { existsSync, mkdtempSync, rmSync } from 'fs'
 import { tmpdir } from 'os'
 import { join } from 'path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { newEpisodes, type EpisodeRef, type Run, type Watch } from '@shared/automation'
+import {
+  newEpisodes,
+  settleTokenSaved,
+  TELEGRAM_NO_TOKEN,
+  type EpisodeRef,
+  type Run,
+  type Watch
+} from '@shared/automation'
 import type { DownloadItem, DownloadRequest } from '@shared/types'
 
 /*
@@ -33,6 +40,7 @@ const h = vi.hoisted(() => {
     send: vi.fn(),
     failures: [] as unknown[][],
     TelegramError,
+    token: 'example-secret' as string | undefined,
     /** Power-save blockers started and not yet stopped. */
     blockers: new Set<number>()
   }
@@ -65,7 +73,7 @@ vi.mock('../settings', () => ({
 }))
 vi.mock('../secrets', () => ({
   getSecret: () => 'example-secret',
-  getSecretWhenReady: async () => 'example-secret',
+  getSecretWhenReady: async (key: string) => (key === 'telegram' ? h.token : 'example-secret'),
   SECRET: { smbPassword: (id: string) => `smb:${id}`, telegramToken: () => 'telegram' }
 }))
 vi.mock('./smb', () => ({ uploadFile: h.upload }))
@@ -353,6 +361,32 @@ describe('an episode that fails', () => {
     await check()
     expect(h.started).toHaveLength(1)
     expect(h.upload).toHaveBeenCalledTimes(1)
+  })
+
+  // Half set up: a run read "done" and the news just never came.
+  it('puts a chat with no bot token on the watch, where saving a token can take it down', async () => {
+    h.token = undefined
+    try {
+      await check()
+      const [run] = runs()
+      expect(run.state).toBe('done')
+      expect(run.steps[2]).toMatchObject({ kind: 'notify', state: 'failed', message: TELEGRAM_NO_TOKEN })
+      expect(m.store.getWatch('w1')?.lastRunError).toBe(TELEGRAM_NO_TOKEN)
+      expect(h.send).not.toHaveBeenCalled()
+    } finally {
+      h.token = 'example-secret'
+    }
+    expect(settleTokenSaved(m.store.getWatch('w1') as Watch)).toBeDefined()
+  })
+
+  it('has nowhere to send an alert while the token is missing', async () => {
+    h.token = undefined
+    try {
+      expect(await m.pipeline.alertChannel(watch())).toBeUndefined()
+    } finally {
+      h.token = 'example-secret'
+    }
+    expect(await m.pipeline.alertChannel(watch())).toBeDefined()
   })
 
   // A blocked bot fails every episode's message, and the watch is where somebody looks.

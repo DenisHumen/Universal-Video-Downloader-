@@ -20,7 +20,10 @@ import { useStore } from '../store'
 import { resolveLanguage, useT, type TranslateFn, type TranslationKey } from '../i18n'
 import { toast } from '../lib/toast'
 import { describeCheck } from '../lib/checkSummary'
+import { describeError, errorText } from '../lib/errors'
+import { localizeMainText } from '../lib/mainText'
 import AutomationSettings from '../components/AutomationSettings'
+import { useSecretState } from '../components/AutomationForms'
 import HeaderSlot from '../shell/HeaderSlot'
 import { ActionRow, ComboRow, EmptyState, Icon, IconButton, PreferencesGroup, PreferencesPage, Switch, SwitchRow } from '../ui'
 import { span, type SpanUnit } from '../lib/span'
@@ -203,10 +206,15 @@ export default function AutomationView(): JSX.Element {
     void useStore.getState().refreshWatchAlerts()
   }, [])
 
+  const secrets = useSecretState()
+  const refreshSecrets = secrets.refresh
   useEffect(() => {
     void refresh()
-    return window.api.onAutomationChanged(() => void refresh())
-  }, [refresh])
+    return window.api.onAutomationChanged(() => {
+      void refresh()
+      refreshSecrets()
+    })
+  }, [refresh, refreshSecrets])
 
   const [, setClock] = useState(0)
   useEffect(() => {
@@ -242,7 +250,7 @@ export default function AutomationView(): JSX.Element {
       const { text, kind } = describeCheck(summary, t, (at) => releaseDate(at, locale))
       toast(text, kind)
     } catch (err) {
-      toast(err instanceof Error ? err.message : String(err), 'error')
+      toast(describeError(err), 'error')
     } finally {
       setChecking((current) => {
         const next = new Set(current)
@@ -264,9 +272,9 @@ export default function AutomationView(): JSX.Element {
       if ('started' in answer) toast(t('auto.retryStarted'), 'success')
       else if ('busy' in answer) toast(t('auto.checkBusy'), 'info')
       else if ('paused' in answer) toast(t('auto.retryPaused'), 'info')
-      else toast(answer.error, 'error')
+      else toast(localizeMainText(t, answer.error), 'error')
     } catch (err) {
-      toast(err instanceof Error ? err.message : String(err), 'error')
+      toast(describeError(err), 'error')
     }
   }
 
@@ -413,7 +421,16 @@ export default function AutomationView(): JSX.Element {
                   onChange={(v) => void patch({ intervalMinutes: Number(v) })}
                   options={[15, 30, 60, 180, 360, 720, 1440].map((n) => ({ value: String(n), label: every(n, t) }))}
                 />
-                {selected.lastError && <ActionRow title={t('auto.failing')} subtitle={<span className="text-bad">{selected.lastError}</span>} />}
+                {selected.lastError && (
+                  <ActionRow
+                    title={t('auto.failing')}
+                    subtitle={
+                      <span className="text-bad" title={selected.lastError}>
+                        {localizeMainText(t, selected.lastError)}
+                      </span>
+                    }
+                  />
+                )}
                 {/*
                   Only an episode that gets all the way through clears this, and one
                   that has been given up on never will, so it can be put away by hand.
@@ -421,12 +438,16 @@ export default function AutomationView(): JSX.Element {
                 {selected.lastRunError && (
                   <ActionRow
                     title={selected.lastRunFailedAt ? t('auto.runFailedAt', { when: ago(selected.lastRunFailedAt, t) }) : t('auto.runFailing')}
-                    subtitle={<span className="text-bad">{selected.lastRunError}</span>}
+                    subtitle={
+                      <span className="text-bad" title={selected.lastRunError}>
+                        {errorText(t, { error: selected.lastRunError, errorCode: selected.lastRunErrorCode })}
+                      </span>
+                    }
                     suffix={
                       <IconButton
                         label={t('auto.dismissRunError')}
                         icon={<X size={16} />}
-                        onClick={() => void patch({ lastRunError: undefined, lastRunFailedAt: undefined })}
+                        onClick={() => void patch({ lastRunError: undefined, lastRunErrorCode: undefined, lastRunFailedAt: undefined })}
                       />
                     }
                   />
@@ -465,7 +486,9 @@ export default function AutomationView(): JSX.Element {
                             : step.kind === 'upload'
                               ? `${step.remotePath} · ${t(step.deleteLocalAfter ? 'auto.localDeleted' : 'auto.localKept')}`
                               : step.kind === 'notify' && settings?.telegramChatId
-                                ? t('auto.notifyTo', { id: settings.telegramChatId })
+                                ? secrets.telegram || !secrets.known
+                                  ? t('auto.notifyTo', { id: settings.telegramChatId })
+                                  : <span className="text-bad">{t('auto.notifyNoToken', { id: settings.telegramChatId })}</span>
                                 : undefined
                         }
                         value={step.enabled ? <Check size={16} className="text-good" /> : <X size={16} className="text-ink-2" />}
@@ -506,10 +529,12 @@ export default function AutomationView(): JSX.Element {
                           <span
                             key={i}
                             className={`text-meta ${st.state === 'failed' ? 'text-bad' : 'text-ink-2'}`}
-                            title={st.message}
+                            title={st.message && errorText(t, { error: st.message, errorCode: st.code })}
                           >
                             {t(STEP_LABEL[st.kind])}
-                            {(st.state === 'failed' || (run.state === 'skipped' && st.state === 'skipped')) && st.message ? `: ${st.message}` : ''}
+                            {(st.state === 'failed' || (run.state === 'skipped' && st.state === 'skipped')) && st.message
+                              ? `: ${errorText(t, { error: st.message, errorCode: st.code })}`
+                              : ''}
                           </span>
                         ))}
                       </div>

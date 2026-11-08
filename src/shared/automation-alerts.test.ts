@@ -1,5 +1,13 @@
 import { describe, expect, it } from 'vitest'
-import { migrateWatches, settleRunError, watchFailing, watchTrouble, type Watch } from './automation'
+import {
+  migrateWatches,
+  settleRunError,
+  settleTokenSaved,
+  TELEGRAM_NO_TOKEN,
+  watchFailing,
+  watchTrouble,
+  type Watch
+} from './automation'
 
 const watch = (over: Partial<Watch> = {}): Watch => ({
   id: 'w1',
@@ -56,6 +64,18 @@ describe('watchFailing', () => {
   series nothing on the schedule would lower the flag for a week after the
   password was fixed. These are the ways a person lowers it.
 */
+describe('settleTokenSaved', () => {
+  it('takes down the missing token, and only that', () => {
+    expect(settleTokenSaved(watch({ lastRunError: TELEGRAM_NO_TOKEN, lastRunFailedAt: 5 }))).toEqual({
+      lastRunError: undefined,
+      lastRunErrorCode: undefined,
+      lastRunFailedAt: undefined
+    })
+    expect(settleTokenSaved(watch({ lastRunError: 'access denied' }))).toBeUndefined()
+    expect(settleTokenSaved(watch({}))).toBeUndefined()
+  })
+})
+
 describe('settleRunError', () => {
   const cleared = { lastRunError: undefined, lastRunErrorCode: undefined, lastRunFailedAt: undefined }
 

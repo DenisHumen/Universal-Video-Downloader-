@@ -19,8 +19,15 @@ describe('describeCheck', () => {
     })
   })
 
-  it('passes a failure through as an error', () => {
-    expect(describeCheck({ error: 'HTTP 503' }, en, date)).toEqual({ text: 'HTTP 503', kind: 'error' })
+  it('passes a failure it does not know through as an error', () => {
+    expect(describeCheck({ error: 'Something new' }, en, date)).toEqual({ text: 'Something new', kind: 'error' })
+  })
+
+  it('says a failure main is known to report in the interface language', () => {
+    expect(describeCheck({ error: 'HTTP 503' }, ru, date)).toEqual({
+      text: 'На сервере сайта сбой (ошибка 503). Попробуйте позже.',
+      kind: 'error'
+    })
   })
 
   it('counts what went to the queue', () => {

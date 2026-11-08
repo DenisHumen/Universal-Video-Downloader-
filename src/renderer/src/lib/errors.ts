@@ -1,5 +1,6 @@
 import type { AppErrorCode } from '@shared/types'
 import { t as tNow, type TranslateFn, type TranslationKey } from '../i18n'
+import { localizeMainText } from './mainText'
 
 /**
  * Say what went wrong in the user's language.
@@ -73,7 +74,8 @@ export interface FailureLike {
 /** The sentence to show for a failure, translated when the code is known. */
 export function errorText(t: TranslateFn, failure: FailureLike): string {
   const key = failure.errorCode ? KEYS[failure.errorCode] : undefined
-  const base = key ? t(key) : failure.error?.trim()
+  const said = failure.error?.trim()
+  const base = key ? t(key) : said && localizeMainText(t, said)
   if (!base) return t('error.title')
   return failure.cookieHint ? `${base} ${t('err.cookieHint')}` : base
 }
@@ -100,9 +102,10 @@ export function errorReport(t: TranslateFn, failure: FailureLike & { log?: strin
  * `Error invoking remote method 'auto:test-smb': SmbError: There is no share
  * by that name on the server.` - and the careful sentence written in main is
  * buried behind a channel name and a class name that mean nothing to anyone
- * reading a toast. This takes the machinery off and leaves the sentence; the
- * message itself is kept verbatim, so whatever main went to the trouble of
- * saying still reaches the screen.
+ * reading a toast. This takes the machinery off and leaves the sentence, in the
+ * interface language when it is one main is known to say; anything else is kept
+ * verbatim, so whatever main went to the trouble of saying still reaches the
+ * screen.
  *
  * `fallback` is for the rare throw that carries no words at all. A caller that
  * knows what was being attempted passes its own translated line; the rest get
@@ -123,5 +126,5 @@ export function describeError(err: unknown, fallback: string = tNow('error.title
   const classed = text.match(/^(?:[A-Z][A-Za-z0-9]*)?Error:\s+(.*)$/s)
   if (classed) text = classed[1].trim()
 
-  return text || fallback
+  return text ? localizeMainText(tNow, text) : fallback
 }
