@@ -22,6 +22,13 @@ export interface LibraryEntry {
   originUrl?: string
   title: string
   extractor?: string
+  /** Who published it, when detection said. */
+  uploader?: string
+  /**
+   * What "By Series or Channel" groups on. A name, not a site's id, because a
+   * name is all that is known of a playlist, a watch or a channel across sites.
+   * Absent on entries from before it was filled in: those are "Other".
+   */
   seriesId?: string
   /** Seconds. */
   duration?: number
@@ -54,6 +61,8 @@ export function entryFromItem(item: DownloadItem): LibraryEntry | null {
     originUrl: item.originUrl,
     title: item.title,
     extractor: item.extractor,
+    uploader: item.uploader,
+    seriesId: item.playlist?.title || item.series || item.uploader || undefined,
     duration: item.duration,
     sizeBytes: item.totalBytes,
     container: extOf(item.filepath),
@@ -214,12 +223,31 @@ export interface LibraryPage {
   total: number
 }
 
-/** A page of the library, newest first, filtered by title words. Grouping is the view's (it only orders). */
+// One collator: sorting a whole library for every page with `localeCompare` is measurably slower.
+const collator = new Intl.Collator()
+
+/**
+ * A page of the library, newest first, filtered by the words of its title and
+ * channel. Grouping is the view's (it only orders); what has no series or
+ * channel comes last, under "Other".
+ */
 export function listLibrary(lib: LibraryFile, q: LibraryQuery = {}): LibraryPage {
   const words = (q.query ?? '').toLowerCase().split(/\s+/).filter(Boolean)
-  let list = lib.entries.filter((e) => words.every((w) => e.title.toLowerCase().includes(w)))
-  if (q.group === 'site') list = [...list].sort((a, b) => (a.extractor ?? '').localeCompare(b.extractor ?? '') || b.finishedAt - a.finishedAt)
-  if (q.group === 'series') list = [...list].sort((a, b) => (a.seriesId ?? '').localeCompare(b.seriesId ?? '') || b.finishedAt - a.finishedAt)
+  let list = words.length
+    ? lib.entries.filter((e) => {
+        const text = `${e.title} ${e.uploader ?? ''} ${e.seriesId ?? ''}`.toLowerCase()
+        return words.every((w) => text.includes(w))
+      })
+    : lib.entries
+  if (q.group === 'site') list = [...list].sort((a, b) => collator.compare(a.extractor ?? '', b.extractor ?? '') || b.finishedAt - a.finishedAt)
+  if (q.group === 'series') {
+    list = [...list].sort(
+      (a, b) =>
+        Number(!a.seriesId) - Number(!b.seriesId) ||
+        collator.compare(a.seriesId ?? '', b.seriesId ?? '') ||
+        b.finishedAt - a.finishedAt
+    )
+  }
   const offset = Math.max(0, q.offset ?? 0)
   const limit = Math.min(500, Math.max(1, q.limit ?? 100))
   return { entries: list.slice(offset, offset + limit), total: list.length }

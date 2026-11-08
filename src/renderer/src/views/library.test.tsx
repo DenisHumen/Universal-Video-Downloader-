@@ -173,6 +173,33 @@ describe('Library (5.3)', () => {
     await waitFor(() => expect(screen.queryByText('Finished last week')).toBeNull())
   })
 
+  it('shows a date as well as a time when grouped by site, and the length', async () => {
+    const at = new Date(2021, 2, 9, 14, 30).getTime()
+    window.__uvdMock!.queue({ id: 'dated', title: 'Dated film', state: 'completed', percent: 100, finishedAt: at, filepath: '/v/dated.mp4', extractor: 'zzz', duration: 3725 })
+    await app()
+    act(() => useStore.getState().setView('library'))
+    await screen.findByText('Dated film')
+    const line = (): string => document.querySelector('[data-row="dated"] .ui-row-subtitle')!.textContent ?? ''
+    expect(line()).toMatch(/1:02:05/)
+    expect(line()).not.toMatch(/2021/)
+    await act(async () => fireEvent.click(screen.getByRole('radio', { name: 'Site' })))
+    await waitFor(() => expect(line()).toMatch(/2021/))
+    expect(line()).toMatch(/1:02:05/)
+    await act(async () => fireEvent.click(screen.getByRole('radio', { name: 'Date' })))
+  })
+
+  it('groups by series or channel, with what has neither under Other', async () => {
+    const q = window.__uvdMock!.queue
+    q({ id: 'ch', title: 'Channel video', state: 'completed', percent: 100, finishedAt: Date.now(), filepath: '/v/ch.mp4', uploader: 'Some Channel' })
+    await app()
+    act(() => useStore.getState().setView('library'))
+    await screen.findByText('Channel video')
+    await act(async () => fireEvent.click(screen.getByRole('radio', { name: 'Series or Channel' })))
+    expect(await screen.findByRole('heading', { name: 'Some Channel' })).toBeTruthy()
+    expect(screen.getByRole('heading', { name: 'Other' })).toBeTruthy()
+    await act(async () => fireEvent.click(screen.getByRole('radio', { name: 'Date' })))
+  })
+
   it('offers Locate… on a missing file, and choosing the file by hand when the folder has no match', async () => {
     const mock = window.__uvdMock!
     mock.queue({ id: 'lost', title: 'Lost film', state: 'completed', percent: 100, finishedAt: Date.now(), filepath: '/v/lost.mp4' })

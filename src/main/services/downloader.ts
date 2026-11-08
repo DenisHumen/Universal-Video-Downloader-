@@ -1167,6 +1167,13 @@ async function runMediaJob(item: DownloadItem): Promise<void> {
     item.state = 'completed'
     finishProgress(item)
     item.finishedAt = Date.now()
+    // No engine reported these, so the row and the Library had no size or length for a clip at all.
+    try {
+      if (item.filepath) item.downloadedBytes = item.totalBytes = statSync(item.filepath).size
+    } catch {
+      // Already moved or deleted; there is no size to give.
+    }
+    if (totalSeconds) item.duration = totalSeconds
     log.info('download', 'Finished', downloadFields(item))
     emitUpdated(item)
     processQueue()
@@ -1621,6 +1628,8 @@ export async function startDownload(request: DownloadRequest): Promise<DownloadI
     duration: req.duration,
     extractor: req.extractor,
     playlist: normalisePlaylist(req.playlist),
+    uploader: req.uploader,
+    series: req.series,
     state: 'queued',
     percent: 0,
     attempts: 0,
@@ -1692,6 +1701,9 @@ export function startMediaJob(req: MediaJobRequest): DownloadItem {
     url: req.sourcePath,
     sourcePath: req.sourcePath,
     originUrl: isWebLink(req.originUrl) ? req.originUrl : undefined,
+    extractor: req.extractor,
+    uploader: req.uploader,
+    series: req.series,
     title: req.title,
     thumbnail: req.thumbnail,
     mode: req.target?.mode ?? 'video',

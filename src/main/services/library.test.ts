@@ -176,6 +176,38 @@ describe('isolation (SE-4)', () => {
   })
 })
 
+describe('by series or channel', () => {
+  const place = { title: 'A Course', index: 1, count: 3, folder: true, numbered: true }
+
+  it('fills the group from the playlist, else the watch’s series, else the uploader', () => {
+    expect(entryFromItem(done('a', '/d/a.mp4', 1, { playlist: place, series: 'S', uploader: 'U' }))?.seriesId).toBe('A Course')
+    expect(entryFromItem(done('b', '/d/b.mp4', 1, { series: 'S', uploader: 'U' }))?.seriesId).toBe('S')
+    expect(entryFromItem(done('c', '/d/c.mp4', 1, { uploader: 'U' }))).toMatchObject({ seriesId: 'U', uploader: 'U' })
+    expect(entryFromItem(done('d', '/d/d.mp4', 1))?.seriesId).toBeUndefined()
+  })
+
+  it('sorts by series, newest first inside one, with old entries last', () => {
+    let lib = EMPTY_LIBRARY
+    lib = upsertEntry(lib, entryFromItem(done('old', '/d/old.mp4', 9))!)
+    lib = upsertEntry(lib, entryFromItem(done('b1', '/d/b1.mp4', 1, { uploader: 'Bravo' }))!)
+    lib = upsertEntry(lib, entryFromItem(done('b2', '/d/b2.mp4', 2, { uploader: 'Bravo' }))!)
+    lib = upsertEntry(lib, entryFromItem(done('a1', '/d/a1.mp4', 3, { uploader: 'Alpha' }))!)
+    expect(listLibrary(lib, { group: 'series' }).entries.map((e) => e.id)).toEqual(['a1', 'b2', 'b1', 'old'])
+  })
+
+  it('finds a video by its channel’s name, in any case, across words', () => {
+    const lib = upsertEntry(EMPTY_LIBRARY, entryFromItem(done('a', '/d/a.mp4', 1, { title: 'Rocket launch', uploader: 'Блендер Foundation' }))!)
+    expect(listLibrary(lib, { query: 'блендер' }).total).toBe(1)
+    expect(listLibrary(lib, { query: 'rocket foundation' }).total).toBe(1)
+    expect(listLibrary(lib, { query: 'nasa' }).total).toBe(0)
+  })
+
+  it('reads a damaged entry’s odd channel without failing the search', () => {
+    const lib = normaliseLibrary({ version: 1, entries: [{ id: 'x', filepath: '/x', url: 'u', title: 'T', finishedAt: 1, uploader: 5 as unknown as string }] })
+    expect(listLibrary(lib, { query: 't' }).total).toBe(1)
+  })
+})
+
 describe('deleting by file, from a queue row', () => {
   it('moves a file the library holds to the trash, and says when it holds no such file', async () => {
     const lib = await import('./library')

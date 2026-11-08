@@ -194,6 +194,7 @@ export const en = {
   'library.groupBy': 'Group By',
   'library.byDate': 'Date',
   'library.bySite': 'Site',
+  'library.bySeries': 'Series or Channel',
   'library.search': 'Search the Library',
   'library.noMatch': 'Nothing in the library matches',
   'library.today': 'Today',

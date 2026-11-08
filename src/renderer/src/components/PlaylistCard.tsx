@@ -115,6 +115,7 @@ export default function PlaylistCard({ info, onDone, saveDir, onSaveDirChange }:
             resolver's when they start.
           */
           extractor: e.extractor,
+          uploader: info.uploader,
           outputDir: saveDir || undefined,
           playlist
         }))

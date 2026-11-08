@@ -3,7 +3,7 @@ import { pageLinkOf, type LibraryEntry, type LibraryGroup } from '@shared/librar
 import type { DownloadItem } from '@shared/types'
 import { useStore } from '../store'
 import { useI18n, useT } from '../i18n'
-import { formatBytes } from '../lib/format'
+import { formatBytes, formatDuration } from '../lib/format'
 import { toast } from '../lib/toast'
 import ConfirmDialog from '../components/ConfirmDialog'
 import MediaJobModal, { type JobMode } from '../components/MediaJobModal'
@@ -58,7 +58,9 @@ function asItem(e: LibraryEntry): DownloadItem {
     filepath: e.filepath,
     duration: e.duration,
     totalBytes: e.sizeBytes,
-    extractor: e.extractor
+    extractor: e.extractor,
+    uploader: e.uploader,
+    series: e.seriesId
   }
 }
 
@@ -211,7 +213,9 @@ export default function LibraryView(): JSX.Element {
       const title =
         group === 'site'
           ? e.extractor || t('library.otherSite')
-          : dayLabel(e.finishedAt, language, t('library.today'), t('library.yesterday'))
+          : group === 'series'
+            ? e.seriesId || t('library.otherSite')
+            : dayLabel(e.finishedAt, language, t('library.today'), t('library.yesterday'))
       const last = out[out.length - 1]
       if (last && last.title === title) last.rows.push(e)
       else out.push({ title, rows: [e] })
@@ -250,7 +254,8 @@ export default function LibraryView(): JSX.Element {
               onChange={setGroup}
               options={[
                 { value: 'date', label: t('library.byDate') },
-                { value: 'site', label: t('library.bySite') }
+                { value: 'site', label: t('library.bySite') },
+                { value: 'series', label: t('library.bySeries') }
               ]}
             />
             <label className="field ml-auto flex min-w-[220px] max-w-[300px] flex-1 cursor-text items-center gap-2">
@@ -267,8 +272,9 @@ export default function LibraryView(): JSX.Element {
             </label>
           </div>
           {entries.length === 0 && <p className="py-10 text-center text-body text-ink-2">{t('library.noMatch')}</p>}
-          {sections.map((s) => (
-            <PreferencesGroup key={s.title} title={s.title}>
+          {sections.map((s, i) => (
+            // With the index: a channel can be called "Other" as well as the heading for those without one.
+            <PreferencesGroup key={`${i}:${s.title}`} title={s.title}>
               {s.rows.map((e) => {
                 const gone = missing.has(e.filepath)
                 const link = pageLinkOf(e)
@@ -288,10 +294,22 @@ export default function LibraryView(): JSX.Element {
                       </p>
                       <p className="ui-row-subtitle numeric truncate">
                         {[
-                          new Date(e.finishedAt).toLocaleTimeString(language, { hour: '2-digit', minute: '2-digit' }),
+                          // Under a day's heading the time is enough; under anything else it needs its date.
+                          group === 'date'
+                            ? new Date(e.finishedAt).toLocaleTimeString(language, { hour: '2-digit', minute: '2-digit' })
+                            : new Date(e.finishedAt).toLocaleString(language, {
+                                day: 'numeric',
+                                month: 'short',
+                                year: 'numeric',
+                                hour: '2-digit',
+                                minute: '2-digit'
+                              }),
+                          e.duration ? formatDuration(e.duration) : null,
                           e.sizeBytes ? formatBytes(e.sizeBytes) : null,
                           e.container?.toUpperCase(),
-                          group === 'date' ? e.extractor : null
+                          group !== 'site' ? e.extractor : null,
+                          // It says why a search for a channel found this row; under its own heading it would only repeat it.
+                          e.uploader !== e.seriesId || group !== 'series' ? e.uploader : null
                         ]
                           .filter(Boolean)
                           .join(' · ')}

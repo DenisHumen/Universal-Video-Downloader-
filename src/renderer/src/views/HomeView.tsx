@@ -197,6 +197,7 @@ export default function HomeView(): JSX.Element {
         duration: info.duration,
         // Names the per-site subfolder.
         extractor: info.extractor,
+        uploader: info.uploader,
         outputDir: saveDir || undefined,
         // Only when a video is fetched: a cut left set in audio mode is not applied.
         section: cutting ? choice.section : undefined,
@@ -244,6 +245,7 @@ export default function HomeView(): JSX.Element {
         thumbnail: preview?.thumbnail ?? (ytId ? `https://i.ytimg.com/vi/${ytId}/mqdefault.jpg` : undefined),
         mode,
         quality: mode === 'audio' ? 'audio' : initialQuality(settings),
+        uploader: preview?.author,
         outputDir: saveDir || undefined
       })
     } finally {

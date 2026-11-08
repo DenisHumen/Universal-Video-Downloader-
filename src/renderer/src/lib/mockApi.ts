@@ -379,6 +379,8 @@ export function installMockApi(): void {
         mode: req.mode,
         quality: req.quality,
         playlist: req.playlist,
+        uploader: req.uploader,
+        series: req.series,
         state: 'queued',
         percent: 0,
         outputDir: req.outputDir || settings.downloadDir,

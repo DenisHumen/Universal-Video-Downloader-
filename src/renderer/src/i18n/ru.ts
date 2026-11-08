@@ -187,6 +187,7 @@ export const ru: Dictionary = {
   'library.groupBy': 'Группировать',
   'library.byDate': 'По дате',
   'library.bySite': 'По сайту',
+  'library.bySeries': 'По сериалу или каналу',
   'library.search': 'Поиск в библиотеке',
   'library.noMatch': 'В библиотеке ничего не нашлось',
   'library.today': 'Сегодня',

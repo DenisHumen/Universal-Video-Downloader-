@@ -30,7 +30,7 @@ function handledLinks(): Set<string> {
 /** Pure: what to queue for a link, from what detection learned, using the defaults from Settings. */
 export function autoRequest(
   url: string,
-  info: Pick<MediaInfo, 'title' | 'thumbnail' | 'duration' | 'extractor'> | undefined,
+  info: Pick<MediaInfo, 'title' | 'thumbnail' | 'duration' | 'extractor' | 'uploader'> | undefined,
   defaults: { defaultMode: DownloadRequest['mode']; defaultQuality: DownloadRequest['quality'] }
 ): DownloadRequest {
   const mode = defaults.defaultMode === 'audio' ? 'audio' : 'video'
@@ -42,6 +42,7 @@ export function autoRequest(
     thumbnail: info?.thumbnail ?? (ytId ? `https://i.ytimg.com/vi/${ytId}/mqdefault.jpg` : undefined),
     duration: info?.duration,
     extractor: info?.extractor,
+    uploader: info?.uploader,
     mode,
     quality: mode === 'audio' ? 'audio' : !pref || pref === 'audio' ? 'best' : pref
   }

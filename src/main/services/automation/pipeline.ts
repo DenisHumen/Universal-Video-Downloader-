@@ -255,6 +255,7 @@ export async function runEpisode(
     const item = await startDownload({
       url: downloadUrlFor(watch, ref),
       title: `${seriesTitle} ${episodeKey(ref)}`,
+      series: seriesTitle,
       thumbnail: watch.thumbnail,
       mode: 'video',
       quality: watch.quality as never

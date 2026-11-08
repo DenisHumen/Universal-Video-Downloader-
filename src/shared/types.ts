@@ -281,6 +281,10 @@ export interface DownloadRequest {
   targetHeight?: number
   /** Picked from a playlist or channel: its number, its folder, its track tag. */
   playlist?: PlaylistPlace
+  /** Who published it, when detection said. The Library groups and searches by it. */
+  uploader?: string
+  /** The show an episode belongs to (a watch, a streaming site), for the Library's grouping. */
+  series?: string
 }
 
 /** What ffmpeg found inside a local file. */
@@ -298,6 +302,10 @@ export interface MediaJobRequest {
   thumbnail?: string
   /** The page the source file came from, when it has one: what "Download Again" goes back to. */
   originUrl?: string
+  /** Handed on from the source, so a clip lands beside it in the Library's groups. */
+  extractor?: string
+  uploader?: string
+  series?: string
   /** trim only */
   range?: TrimRange
   /** trim only — re-encode for a frame-accurate cut instead of copying. */
@@ -372,6 +380,9 @@ export interface DownloadItem {
   /** The height this download resolves to, when it was known at queue time. */
   targetHeight?: number
   playlist?: PlaylistPlace
+  /** Who published it, and the show it belongs to: see DownloadRequest. */
+  uploader?: string
+  series?: string
   state: DownloadState
   percent: number
   speed?: number
