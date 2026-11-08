@@ -496,6 +496,8 @@ export interface DownloadItem {
   error?: string
   /** Machine-readable reason, so the UI can say it in the user's language. */
   errorCode?: AppErrorCode
+  /** Subtitle languages the site would not give, by code. The video came down without them. */
+  subtitlesMissed?: string[]
   /** The failure looks like an access gate and cookies aren't set up yet. */
   cookieHint?: boolean
   /**

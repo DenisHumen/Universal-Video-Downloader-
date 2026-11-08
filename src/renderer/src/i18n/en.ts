@@ -359,6 +359,7 @@ export const en = {
   'queue.retryingIn': 'Retrying automatically…',
   'queue.waitingHint': 'Downloads by itself once it starts, while the app is open',
   'queue.onShare': 'On the share: {path}',
+  'queue.subtitlesMissed': 'Subtitles could not be fetched: {languages}. The video itself is fine',
   'queue.openFailed': 'Could not open that file — it may have been moved or deleted',
   'queue.showFailed': 'Could not find that file — it may have been moved or deleted',
   'queue.folderFailed': 'Could not open that folder — it may have been moved or deleted',

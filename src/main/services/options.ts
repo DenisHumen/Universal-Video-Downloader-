@@ -535,6 +535,16 @@ function failureTail(raw: string): string {
 }
 
 /**
+ * The language of a subtitle track the engine gave up on, from its warning.
+ *
+ * `--ignore-errors` is what lets a 429 on a caption cost only the caption, and it
+ * makes that a line in a log nobody opens, so the row has to be told separately.
+ */
+export function subtitleMissIn(line: string): string | undefined {
+  return line.match(/Unable to download video subtitles for '([^']+)'/)?.[1]
+}
+
+/**
  * The engine's own HLS downloader refused a playlist that names a new
  * initialisation segment partway through.
  *

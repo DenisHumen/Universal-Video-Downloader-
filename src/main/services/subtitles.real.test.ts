@@ -84,7 +84,7 @@ describe.runIf(enabled)('subtitles and failures, with the real tools', () => {
 
   const row = (id: string): DownloadItem => downloader.listDownloads().find((d) => d.id === id)!
 
-  async function run(url: string, options: { info?: Record<string, unknown>; settings?: Record<string, unknown> } = {}): Promise<{
+  async function run(url: string, options: { info?: Record<string, unknown>; settings?: Record<string, unknown>; mode?: 'video' | 'audio' } = {}): Promise<{
     item: DownloadItem
     files: string[]
     dir: string
@@ -100,7 +100,7 @@ describe.runIf(enabled)('subtitles and failures, with the real tools', () => {
       )
     }
     hits.length = 0
-    const { id } = await downloader.startDownload({ url, title: 't', mode: 'video', quality: 'best', outputDir: dir })
+    const { id } = await downloader.startDownload({ url, title: 't', mode: options.mode ?? 'video', quality: options.mode === 'audio' ? 'audio' : 'best', outputDir: dir })
     await vi.waitFor(
       () => {
         if (!['completed', 'error'].includes(row(id).state)) throw new Error(row(id).state)
@@ -239,9 +239,37 @@ describe.runIf(enabled)('subtitles and failures, with the real tools', () => {
     expect(item.state).toBe('completed')
     expect(hits).toContain('/429.vtt')
     expect(hits).toContain('/both.mp4')
+    // And the row knows: the engine only said so in a warning.
+    expect(item.subtitlesMissed).toEqual(['en'])
     // The page's one video is named by the engine; only the video is there.
     expect(files).toHaveLength(1)
     expect(files[0]).toMatch(/\.mp4$/)
+  }, 90_000)
+
+  it('a caption that came down leaves nothing to say on the row', async () => {
+    const { item } = await run(`${base}/both`, {
+      settings: onlyEmbed,
+      info: { formats: [format('0', '/both.mp4')], subtitles: { de: track('/human.vtt') } }
+    })
+    expect(item.state).toBe('completed')
+    expect(item.subtitlesMissed).toBeUndefined()
+  }, 90_000)
+
+  // The thumbnail step fails a good .wav or .aac; the metadata one must not, or the row would say the download failed.
+  it.each(['wav', 'aac'])('metadata does not fail a good %s', async (audioFormat) => {
+    const { item, files } = await run(`${base}/both`, {
+      mode: 'audio',
+      settings: { audioFormat, embedMetadata: true },
+      info: {
+        formats: [format('0', '/both.mp4')],
+        title: 'Проверка "звука"',
+        description: 'Описание\n'.repeat(400),
+        chapters: [{ start_time: 0, end_time: 1, title: 'one' }]
+      }
+    })
+    expect(item.errorCode).toBeUndefined()
+    expect(item.state).toBe('completed')
+    expect(files).toHaveLength(1)
   }, 90_000)
 
   it('a video that cannot be fetched is a failure, as it was', async () => {
