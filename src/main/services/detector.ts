@@ -10,6 +10,7 @@ import { engineKnowsHost, isAbsoluteUrl, looksLikeCollection, normalizeUrl } fro
 import { cleanListingDepth } from '@shared/playlist'
 import { reportDetectFailure, type DetectVerdict } from './report'
 import { infoKey, infoReusable } from './info-cache'
+import { withoutEmbedNumber } from './naming'
 import { infoCache } from './info-store'
 import { browserCookiesFile } from './browser-logins'
 import type { DetectTrace } from '@shared/report'
@@ -759,7 +760,7 @@ async function probeWithEngine(
 
   const info: MediaInfo = {
     id: primary.id || raw.id || 'unknown',
-    title: raw.title || primary.title || 'Untitled',
+    title: withoutEmbedNumber(raw.title || primary.title || 'Untitled', raw.extractor_key),
     description: primary.description,
     thumbnail: pickThumbnail(primary) || pickThumbnail(raw),
     duration: primary.duration,

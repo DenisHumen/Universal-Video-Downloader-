@@ -427,6 +427,12 @@ describe('titleFromFile', () => {
     expect(titleFromFile(join('d', 'Мой ролик [abc123] (2).mp4'))).toBe('Мой ролик')
   })
 
+  it('leaves off the number the engine gives a video alone on its page', () => {
+    expect(titleFromFile(join('d', 'Страница с видео (1) [page-1].mp4'))).toBe('Страница с видео')
+    // Only that shape: here the title really does end like that.
+    expect(titleFromFile(join('d', 'Часть (1) [abc123].mp4'))).toBe('Часть (1)')
+  })
+
   it('has nothing to offer when the name was only an id', () => {
     expect(titleFromFile(join('d', '[abc123].mp4'))).toBeUndefined()
   })

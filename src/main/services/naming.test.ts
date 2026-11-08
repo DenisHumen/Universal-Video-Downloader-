@@ -2,15 +2,55 @@ import { describe, expect, it } from 'vitest'
 import type { DownloadItem } from '@shared/types'
 import {
   freeCopySuffix,
+  idRepeatsTitle,
   pickOutputStem,
   samePath,
   sectionSuffix,
   sectionTime,
   shouldTakeOwnName,
+  templateFor,
   waitsForNamesake,
   withNameSuffix,
+  withoutEmbedNumber,
   type StemChoice
 } from './naming'
+
+describe('idRepeatsTitle', () => {
+  it('sees a plain file named after itself, spaces and all', () => {
+    expect(idRepeatsTitle({ url: 'https://files.test/media/big.mp4', title: 'big' })).toBe(true)
+    expect(idRepeatsTitle({ url: 'https://files.test/my%20clip.webm?x=1', title: 'my clip' })).toBe(true)
+  })
+
+  it('goes by the address when nothing was detected', () => {
+    expect(idRepeatsTitle({ url: 'https://files.test/big.mp4', title: 'https://files.test/big.mp4' })).toBe(true)
+    expect(idRepeatsTitle({ url: 'https://files.test/big.mp4', title: '' })).toBe(true)
+    expect(idRepeatsTitle({ url: 'https://video.test/watch?v=1', title: '' })).toBe(false)
+  })
+
+  it('leaves a real id alone', () => {
+    expect(idRepeatsTitle({ url: 'https://video.test/watch?v=1', title: 'A film' })).toBe(false)
+    expect(idRepeatsTitle({ url: 'https://files.test/big.mp4', title: 'Big Buck Bunny' })).toBe(false)
+    expect(idRepeatsTitle({ url: 'uvd-sniff://abc', title: 'abc' })).toBe(false)
+  })
+
+  it('takes only the id out of the template', () => {
+    const plain = { url: 'https://files.test/big.mp4', title: 'big' }
+    expect(templateFor('%(title)s [%(id)s].%(ext)s', plain)).toBe('%(title)s.%(ext)s')
+    expect(templateFor('%(uploader)s/%(title)s.%(ext)s', plain)).toBe('%(uploader)s/%(title)s.%(ext)s')
+    expect(templateFor('%(title)s [%(id)s].%(ext)s', { url: 'https://video.test/1', title: 'Film' })).toBe(
+      '%(title)s [%(id)s].%(ext)s'
+    )
+  })
+})
+
+describe('withoutEmbedNumber', () => {
+  it('drops the number only from a video alone on its page', () => {
+    expect(withoutEmbedNumber('Страница с видео (1)', 'HTML5MediaEmbed')).toBe('Страница с видео')
+    expect(withoutEmbedNumber('Страница (2)', 'HTML5MediaEmbed')).toBe('Страница (2)')
+    expect(withoutEmbedNumber('Part (1)', 'Youtube')).toBe('Part (1)')
+    expect(withoutEmbedNumber('Part (1)', undefined)).toBe('Part (1)')
+  })
+})
 
 /*
   The engine treats a file that already has the requested name as the job

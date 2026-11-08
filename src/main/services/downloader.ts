@@ -36,10 +36,12 @@ import {
 import { IN_FLIGHT_STATES, isSameDownload } from './dedupe'
 import {
   freeCopySuffix,
+  isLoneEmbed,
   pickOutputStem,
   samePath,
   sectionSuffix,
   shouldTakeOwnName,
+  templateFor,
   variantSuffix,
   waitsForNamesake,
   withNameSuffix
@@ -580,7 +582,7 @@ export function outputTarget(
     const stem = item.outputStem ?? base + sectionSuffix(item.range)
     return { path: join(dir, `${stem}.%(ext)s`), stem }
   }
-  const template = numberedName(settings.filenameTemplate || '%(title)s [%(id)s].%(ext)s', item.playlist)
+  const template = numberedName(templateFor(settings.filenameTemplate || '%(title)s [%(id)s].%(ext)s', item), item.playlist)
   const suffix = variantSuffix(item) + (item.copySuffix ?? '')
   const name = withNameSuffix(template, suffix)
   // The engine's switch only reaches the fields; the spaces in the template itself are ours.
@@ -669,6 +671,8 @@ export function buildArgs(
     sharing one name used to cost.
   */
   args.push('-o', outputTarget(item, settings, dir).path)
+  // The file and its tags say what the card said; see `isLoneEmbed`.
+  if (isLoneEmbed(item.extractor)) args.push('--replace-in-metadata', 'title', ' \\(1\\)$', '')
 
   // Progress as machine-readable lines
   args.push(
@@ -856,6 +860,8 @@ export function titleFromFile(path: string): string | undefined {
     .replace(/\.f\d[\w-]*$/, '')
     .replace(/ \(\d+\)$/, '')
     .replace(/ \(audio\)$/, '')
+    // A video alone on its page; with nothing detected, its name is all there is to go on.
+    .replace(/ \(1\)( \[[^\]]*-1\])$/, '$1')
   return name.replace(/(^| )\[[^\]]+\]$/, '').trim() || undefined
 }
 
