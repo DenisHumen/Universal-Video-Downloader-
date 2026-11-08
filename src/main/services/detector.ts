@@ -11,6 +11,7 @@ import { cleanListingDepth } from '@shared/playlist'
 import { reportDetectFailure, type DetectVerdict } from './report'
 import { infoKey, infoReusable } from './info-cache'
 import { withoutEmbedNumber } from './naming'
+import { fileFacts, plainFileAddress } from './file-facts'
 import { infoCache } from './info-store'
 import { browserCookiesFile } from './browser-logins'
 import type { DetectTrace } from '@shared/report'
@@ -28,6 +29,7 @@ import type {
 
 export interface RawFormat {
   format_id: string
+  url?: string
   ext?: string
   vcodec?: string
   acodec?: string
@@ -784,5 +786,20 @@ async function probeWithEngine(
     manifest is a moving target.
   */
   const reusable = !isPlaylist && !primary.is_live
+  const plainFile = isPlaylist
+    ? undefined
+    : plainFileAddress({
+        extractor: info.extractor,
+        formats: primary.formats,
+        duration: info.duration,
+        thumbnail: info.thumbnail,
+        isLive: info.isLive,
+        needsAccess: Boolean(settings.proxy?.trim() || resolved.referer || resolved.headers)
+      })
+  if (plainFile) {
+    const facts = await fileFacts(plainFile, signal)
+    info.duration ||= facts.duration
+    info.thumbnail ||= facts.poster
+  }
   return { ok: true, info, json: reusable ? result.text : undefined }
 }

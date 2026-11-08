@@ -118,6 +118,14 @@ export interface MediaProbe {
   audioCodec?: string
 }
 
+/** The length in the report ffmpeg prints when it opens a file. */
+export function parseDuration(report: string): number | undefined {
+  const m = report.match(/Duration:\s*(\d+):(\d{2}):(\d{2})\.(\d+)/)
+  if (!m) return undefined
+  const seconds = Number(m[1]) * 3600 + Number(m[2]) * 60 + Number(m[3]) + Number(`0.${m[4]}`)
+  return Number.isFinite(seconds) ? seconds : undefined
+}
+
 /**
  * Inspect a media file. ffmpeg-static ships no ffprobe, so we ask ffmpeg to
  * open the file and parse the report it prints before bailing out on the
@@ -133,12 +141,8 @@ export function probeMedia(path: string): Promise<MediaProbe> {
     let stderr = ''
     const finish = (): void => {
       clearTimeout(timer)
-      const m = stderr.match(/Duration:\s*(\d+):(\d{2}):(\d{2})\.(\d+)/)
-      const seconds = m
-        ? Number(m[1]) * 3600 + Number(m[2]) * 60 + Number(m[3]) + Number(`0.${m[4]}`)
-        : undefined
       resolve({
-        duration: seconds != null && Number.isFinite(seconds) ? seconds : undefined,
+        duration: parseDuration(stderr),
         hasVideo: /Stream #\d+:\d+.*: Video:/.test(stderr),
         hasAudio: /Stream #\d+:\d+.*: Audio:/.test(stderr),
         // Which codecs, not merely whether there are any: a conversion that
