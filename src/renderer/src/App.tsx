@@ -11,6 +11,7 @@ import LibraryView from './views/LibraryView'
 import SettingsView from './views/settings/SettingsView'
 import AutomationView from './views/AutomationView'
 import SearchView from './views/SearchView'
+import HelpView from './views/HelpView'
 import Logo from './components/Logo'
 import MacNotice from './components/MacNotice'
 import { ToastViewport as Toasts } from './ui'
@@ -96,6 +97,7 @@ export default function App(): JSX.Element {
             {view === 'library' && <LibraryView />}
             {view === 'automation' && <AutomationView />}
             {view === 'settings' && <SettingsView />}
+            {view === 'guide' && <HelpView />}
           </div>
         ) : (
           <div className="flex h-full flex-col items-center justify-center gap-4">

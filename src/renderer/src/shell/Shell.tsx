@@ -72,6 +72,8 @@ export default function Shell({ platform, notices, children }: Props): JSX.Eleme
   }, [pinned, overlayOpen, setOverlayOpen])
 
   const section = NAV_ALL.find((s) => s.id === view)
+  // Help is reached from the menu and the palette, so it has a title and no row.
+  const title = view === 'guide' ? t('help.title') : section && t(section.label)
   const ownHeader = OWN_HEADER.includes(view)
 
   return (
@@ -89,7 +91,7 @@ export default function Shell({ platform, notices, children }: Props): JSX.Eleme
           <HeaderBar
             data-uvd="sheet-drag"
             shade={scrolled}
-            title={section ? (CENTERED.includes(view) ? <span className="sr-only">{t(section.label)}</span> : t(section.label)) : undefined}
+            title={CENTERED.includes(view) ? <span className="sr-only">{title}</span> : title}
             center={CENTERED.includes(view) ? <div id={HEADER_CENTER_ID} className="ui-headerbar-center" /> : undefined}
             start={
               <>

@@ -54,6 +54,7 @@ export default function Sidebar({ platform, overlay }: Props): JSX.Element {
               { label: t('browser.open'), onSelect: () => void window.api.openBrowser() },
               { label: t('setup.menu'), onSelect: () => useStore.getState().setSetupOpen(true) },
               'separator',
+              { label: t('help.title'), onSelect: () => useStore.getState().openHelp() },
               { label: t('shell.about'), onSelect: () => openSettings('system/about') }
             ]}
             trigger={(p) => <IconButton {...p} label={t('shell.mainMenu')} icon={<OpenMenu size={16} />} />}
