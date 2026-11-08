@@ -241,6 +241,32 @@ const RULES: Rule[] = [
       'YouTube is asking this computer to prove it is not a bot. That is about your network, not this video: ' +
       'cookies from a browser where you are signed in to YouTube get past it, or try again later or from another network.'
   },
+  /*
+    The Russian sites' resolvers, in their own exact words. They arrive here
+    with no engine in the way, and said nothing a rule could read: a queued
+    episode or a watch printed them in English, and offered a report for a dub
+    nobody but the site could change.
+  */
+  {
+    re: /answered with a bot check/,
+    code: 'siteBotCheck',
+    message: 'The site is asking for a bot check. Open the page in the built-in browser, pass it, and try again.'
+  },
+  {
+    re: /requires hdrezka premium/,
+    code: 'premiumOnly',
+    message: "This translation is for HDrezka Premium only, so it can't be downloaded. Choose another one."
+  },
+  {
+    re: /has no stream for|no playable stream found|no streams returned by|no downloadable streams found|episode not found (?:in|on) (?:the|this) |no episodes found in this/,
+    code: 'noStream',
+    message: 'There is no video for this translation and episode. Choose another translation.'
+  },
+  {
+    re: /player params not found|something other than its player data|did not list the episodes|cannot tell which hdrezka title|answered with a page instead of release data|answered with no release data|did not say which release/,
+    code: 'playerChanged',
+    message: "The site's player could not be read; it may have changed. Update the app or send a report."
+  },
   {
     re: /http error 4(?:04|10)|^http 4(?:04|10)|\b404:? not found|\bgone\b|has been removed|video.*deleted|video.*not found|no such video/,
     code: 'unavailable',

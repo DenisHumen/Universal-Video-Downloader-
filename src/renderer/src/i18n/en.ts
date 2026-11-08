@@ -755,6 +755,10 @@ export const en = {
   'err.rateLimited': 'The site is rate-limiting us. Wait a minute and retry, or set a proxy.',
   'err.signIn': 'This video is only available after signing in on the site. Sign in, then press Retry.',
   'err.botCheck': 'YouTube thinks a robot is using your internet connection. The video itself is fine. Wait an hour, try another connection (a phone hotspot, say), or use cookies from a browser where you are signed in to YouTube.',
+  'err.siteBotCheck': 'The site is asking for a bot check. Open the page in the built-in browser, pass it, and try again.',
+  'err.noStream': 'There is no video for this translation and episode. Choose another translation.',
+  'err.premiumOnly': 'This translation is for HDrezka Premium only, so it can’t be downloaded. Choose another one.',
+  'err.playerChanged': 'The site’s player could not be read; it may have changed. Update the app or send a report.',
   'err.cookiesLocked':
     "Your browser's cookies could not be read. Close the browser and try again; on Windows, Chrome and Edge keep them locked even then, so choose Firefox or an exported cookies.txt in settings → access.",
   'err.forbidden': 'The site refused the request.',

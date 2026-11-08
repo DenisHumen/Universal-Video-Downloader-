@@ -75,10 +75,9 @@ export type StageReporter = (stage: DetectStage) => void
  * A resolver threw.
  *
  * When the wording matches something the app knows how to explain, the code
- * travels too and the UI can say it in the user's language. When it doesn't —
- * "this translation requires Premium", say — the resolver's own sentence goes
- * through untouched: it knows more about the site than any rule matching a
- * substring of it ever will.
+ * travels too and the UI can say it in the user's language. When it doesn't,
+ * the resolver's own sentence goes through untouched: it knows more about the
+ * site than any rule matching a substring of it ever will.
  */
 function errorResult(err: unknown): DetectResult {
   const raw = err instanceof Error ? err.message : String(err)

@@ -27,6 +27,7 @@ const BY_CODE: Partial<Record<AppErrorCode, FixKind>> = {
   cookiesNotFound: 'cookies',
   cookiesFileBad: 'cookiesFile',
   // Blocked, unsupported, empty: a person in a browser can often get past it.
+  siteBotCheck: 'browser',
   forbidden: 'browser',
   unsupportedPlayer: 'browser',
   emptyPage: 'browser',

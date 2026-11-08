@@ -86,6 +86,9 @@ const REPORTABLE: Record<AppErrorCode, boolean> = {
   ageRestricted: false,
   signIn: false,
   botCheck: false,
+  siteBotCheck: false,
+  premiumOnly: false,
+  noStream: false,
   // The user's own cookies setting, which the developer cannot change.
   cookiesLocked: false,
   drm: false,
@@ -115,7 +118,9 @@ const REPORTABLE: Record<AppErrorCode, boolean> = {
   noAudioTrack: true,
   ffmpegMissing: true,
   // A player the app has no extractor for yet - exactly what a report is for.
-  unsupportedPlayer: true
+  unsupportedPlayer: true,
+  // A site changed what its player answers, which only an update of the app can follow.
+  playerChanged: true
 }
 
 /**

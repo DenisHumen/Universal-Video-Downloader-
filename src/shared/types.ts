@@ -116,6 +116,14 @@ export type AppErrorCode =
   | 'signIn'
   /** YouTube asking this network to prove it is not a bot - not about the video. */
   | 'botCheck'
+  /** A site's own bot check, in front of its player: a person passes it in the built-in browser. */
+  | 'siteBotCheck'
+  /** The site has no video for this dub and episode. */
+  | 'noStream'
+  /** The dub is for the site's paying members. */
+  | 'premiumOnly'
+  /** A site's player answered in a shape the resolver cannot read: it has probably changed. */
+  | 'playerChanged'
   /** The cookies setting could not be read: a locked or encrypted browser profile. */
   | 'cookiesLocked'
   /** The chosen browser has no cookie database: not installed, or no profile. */

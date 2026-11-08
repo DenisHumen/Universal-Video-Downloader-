@@ -382,6 +382,33 @@ describe('classifyYtdlpError', () => {
     expect(code('ERROR: [site] 1: This video is not available in your region')).toBe('geo')
   })
 
+  // The exact sentences the Russian sites' resolvers throw; a new one has to be classified here too.
+  it.each([
+    ['HDrezka answered with a bot check instead of the video.', 'siteBotCheck'],
+    ['This translation requires HDrezka Premium — it can’t be downloaded.', 'premiumOnly'],
+    ['HDrezka has no stream for this translation and episode.', 'noStream'],
+    ['No playable stream found for this episode.', 'noStream'],
+    ['No streams returned by Kodik', 'noStream'],
+    ['No streams returned by Aksor', 'noStream'],
+    ['AniLiberty has no stream for this episode.', 'noStream'],
+    ['No downloadable streams found for this title.', 'noStream'],
+    ['Episode not found in the Kodik player', 'noStream'],
+    ['Episode not found in the Aksor player', 'noStream'],
+    ['Episode not found on this AniLiberty release.', 'noStream'],
+    ['No episodes found in this Kodik player.', 'noStream'],
+    ['Kodik player params not found', 'playerChanged'],
+    ['HDrezka answered with something other than its player data.', 'playerChanged'],
+    ['HDrezka did not list the episodes of this translation.', 'playerChanged'],
+    ['Cannot tell which HDrezka title this link is.', 'playerChanged'],
+    ['aniliberty.top answered with a page instead of release data', 'playerChanged'],
+    ['aniliberty.top answered with no release data', 'playerChanged'],
+    ["AniLiberty's answer did not say which release it was.", 'playerChanged']
+  ])('classifies the resolver sentence "%s"', (sentence, expected) => {
+    const result = classifyYtdlpError(sentence, false)
+    expect(result.code).toBe(expected)
+    expect(result.cookieHint).toBe(false)
+  })
+
   // Every YouTube video from a flagged network said it needed an account.
   it("tells YouTube's bot check apart from a video that needs an account", () => {
     const said = (apostrophe: string): string =>
