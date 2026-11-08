@@ -314,7 +314,7 @@ export default function PlaylistCard({ info, onDone, saveDir, onSaveDirChange }:
 }
 
 /** A yes/no about how the files land, drawn like the entries' own check boxes above it. */
-function LayoutOption({
+export function LayoutOption({
   on,
   onChange,
   label,

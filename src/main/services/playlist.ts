@@ -30,7 +30,8 @@ export function playlistDir(dir: string, playlist?: PlaylistPlace): string {
  * number the site supplied - which for an album playlist is the same number.
  */
 export function playlistTagArgs(playlist: PlaylistPlace | undefined, embedMetadata: boolean): string[] {
-  if (!playlist || !embedMetadata) return []
+  // No track 0: players read it as no number at all, and a special has no place in the count.
+  if (!playlist || !embedMetadata || playlist.index < 1) return []
   return ['--postprocessor-args', `Metadata+ffmpeg:-metadata track=${playlist.index}/${playlist.count}`]
 }
 
@@ -38,15 +39,17 @@ export function playlistTagArgs(playlist: PlaylistPlace | undefined, embedMetada
  * The playlist part of a request, as the main process will trust it.
  *
  * It arrives over IPC, and the index ends up in a file name and on ffmpeg's
- * command line, so anything that is not a positive whole number is refused
- * rather than written into either. A count shorter than the index - a list
- * that grew between listing and queueing - is stretched to fit.
+ * command line, so anything that is not a whole number from zero up is refused
+ * rather than written into either. Zero is a real place: a series' "episode 0"
+ * special, refused here, lost its folder and landed in the download root. A
+ * count shorter than the index - a list that grew between listing and queueing
+ * - is stretched to fit.
  */
 export function normalisePlaylist(raw: unknown): PlaylistPlace | undefined {
   if (!raw || typeof raw !== 'object') return undefined
   const p = raw as Record<string, unknown>
   const index = Number(p.index)
-  if (!Number.isSafeInteger(index) || index < 1) return undefined
+  if (!Number.isSafeInteger(index) || index < 0) return undefined
   const count = Number(p.count)
   return {
     title: typeof p.title === 'string' ? p.title : '',
