@@ -220,6 +220,16 @@ describe('you already have this', () => {
     expect(lib.holdsLink('https://example.com/v')).toBe(false)
   })
 
+  it('answers for a listing as deep as Load More goes', async () => {
+    const lib = await import('./library')
+    lib.loadLibrary()
+    writeFileSync(join(h.dir, 'deep.mp4'), 'x')
+    lib.recordFinished(done('deep', join(h.dir, 'deep.mp4'), 1, { sourceUrl: 'https://example.com/deep' }))
+    const links = Array.from({ length: 19_999 }, (_, i) => `https://example.com/${i}`)
+    expect(await lib.lookupLinks([...links, 'https://example.com/deep'])).toHaveLength(1)
+    expect(await lib.lookupLinks([...links, 'https://example.com/a', 'https://example.com/deep'])).toEqual([])
+  })
+
   it('matches a streaming link only exactly: another dub or quality is another file', async () => {
     const lib = await import('./library')
     lib.loadLibrary()

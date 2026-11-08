@@ -1,3 +1,4 @@
+import { MAX_LISTING_DEPTH } from '@shared/playlist'
 import { app, shell } from 'electron'
 import { existsSync, readFileSync } from 'fs'
 import { access, readdir, stat } from 'fs/promises'
@@ -190,8 +191,8 @@ export function holdsLink(link: string): boolean {
   return lib.entries.some((e) => keptLinkOf(e) === link && Boolean(e.remotePath || existsSync(e.filepath)))
 }
 
-/** The most links asked about at once: as deep as a channel listing goes. */
-const MOST_LINKS = 5000
+/** The most links asked about at once: as deep as Load More can take a channel's listing. */
+const MOST_LINKS = MAX_LISTING_DEPTH
 
 /**
  * Which of these links are already kept, for the result card and a playlist's
