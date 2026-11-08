@@ -51,6 +51,18 @@ let quiet = false
 /** True from the click on "download" until electron-updater settles it. */
 let downloadRequested = false
 
+/**
+ * One line of what electron-updater said.
+ *
+ * Its failures carry the whole HTTP exchange, and a failed feed request carries
+ * the feed: one 504 wrote every recent release's notes into the log, a thousand
+ * lines at ERROR, burying whatever a report was meant to show.
+ */
+function firstLine(message: unknown): string {
+  const line = String(message).trim().split(/\r?\n/, 1)[0]
+  return line.length > 500 ? `${line.slice(0, 500)}…` : line
+}
+
 function emit(status: UpdateStatus): void {
   const previous = currentStatus
   currentStatus = { ...status, manual: status.manual ?? isManualPlatform() }
@@ -62,7 +74,10 @@ function emit(status: UpdateStatus): void {
   */
   if (status.state !== 'downloading' || previous.state !== 'downloading') {
     if (status.state === 'error') {
-      log.warn('updater', 'Update failed', { error: status.message })
+      // The updater's `error` event and the rejected call report the same failure.
+      if (previous.state !== 'error' || previous.message !== status.message) {
+        log.warn('updater', 'Update failed', { error: firstLine(status.message) })
+      }
     } else {
       log.info('updater', `Update status: ${status.state}`, {
         version: status.version,
@@ -120,6 +135,8 @@ function wire(): void {
   autoUpdater.autoDownload = false
   autoUpdater.autoInstallOnAppQuit = true
   autoUpdater.allowDowngrade = false
+  // Releases ship a full installer, and the default warns about it on every start.
+  autoUpdater.disableWebInstaller = true
 
   if (!app.isPackaged) {
     // Lets us exercise the update flow in development without a build.
@@ -133,9 +150,9 @@ function wire(): void {
     report needs.
   */
   autoUpdater.logger = {
-    info: (message?: unknown) => log.info('updater', String(message)),
-    warn: (message?: unknown) => log.warn('updater', String(message)),
-    error: (message?: unknown) => log.error('updater', String(message)),
+    info: (message?: unknown) => log.info('updater', firstLine(message)),
+    warn: (message?: unknown) => log.warn('updater', firstLine(message)),
+    error: (message?: unknown) => log.error('updater', firstLine(message)),
     debug: () => undefined
   }
 
@@ -393,7 +410,7 @@ export async function backgroundCheck(): Promise<void> {
     }
   } catch (err) {
     log.warn('updater', 'Scheduled update check failed', {
-      error: err instanceof Error ? err.message : String(err)
+      error: firstLine(err instanceof Error ? err.message : err)
     })
   } finally {
     quiet = false

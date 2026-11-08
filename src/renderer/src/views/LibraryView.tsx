@@ -170,7 +170,11 @@ export default function LibraryView(): JSX.Element {
                       label={t('common.play')}
                       icon={<Play size={16} />}
                       disabled={gone}
-                      onClick={() => void window.api.openPath(e.filepath)}
+                      onClick={() =>
+                        void window.api.openPath(e.filepath).then((why) => {
+                          if (why) toast(t('queue.openFailed'), 'error')
+                        })
+                      }
                     />
                     <IconButton
                       label={t('common.showInFolder')}
@@ -183,11 +187,13 @@ export default function LibraryView(): JSX.Element {
                       items={[
                         { label: t('library.cut'), onSelect: () => setJob({ entry: e, mode: 'trim' }), disabled: gone },
                         { label: t('library.convert'), onSelect: () => setJob({ entry: e, mode: 'convert' }), disabled: gone },
-                        { label: t('library.again'), onSelect: () => requestDetect(e.sourceUrl || e.url) },
-                        'separator',
-                        gone
-                          ? { label: t('library.forget'), onSelect: () => void window.api.forgetLibraryEntry(e.id) }
-                          : { label: t('library.delete'), danger: true, onSelect: () => setConfirm(e) }
+                        // A cut or a conversion has a file on disk for its address, not a page to go back to.
+                        ...(/^https?:\/\//i.test(e.sourceUrl || e.url)
+                          ? [{ label: t('library.again'), onSelect: () => requestDetect(e.sourceUrl || e.url) }]
+                          : []),
+                        'separator' as const,
+                        { label: t('library.forget'), onSelect: () => void window.api.forgetLibraryEntry(e.id) },
+                        ...(gone ? [] : [{ label: t('library.delete'), danger: true, onSelect: () => setConfirm(e) }])
                       ]}
                       trigger={(p) => <IconButton {...p} label={t('queue.more')} icon={<MoreHorizontal size={16} />} />}
                     />

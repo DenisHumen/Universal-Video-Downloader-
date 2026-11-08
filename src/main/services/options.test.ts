@@ -376,7 +376,7 @@ describe('classifyYtdlpError', () => {
     )
     expect(code('ERROR: [site] 1: This video is age-restricted')).toBe('ageRestricted')
     expect(code('ERROR: [site] 1: Login required to view this video')).toBe('signIn')
-    expect(code('ERROR: [site] 1: Join this channel to get access to members-only content')).toBe('signIn')
+    expect(code('ERROR: [site] 1: Join this channel to get access to members-only content')).toBe('membersOnly')
     expect(code('ERROR: [site] 1: This video is not available from your location due to geo restriction')).toBe('geo')
     expect(code('ERROR: [youtube] x: The uploader has not made this video available in your country')).toBe('geo')
     expect(code('ERROR: [site] 1: This video is not available in your region')).toBe('geo')
@@ -394,7 +394,7 @@ describe('classifyYtdlpError', () => {
       expect(result.cookieHint).toBe(false)
     }
     expect(classifyYtdlpError('ERROR: [youtube] x: Join this channel to get access to members-only content', false).code).toBe(
-      'signIn'
+      'membersOnly'
     )
   })
 
@@ -495,15 +495,15 @@ describe('classifyYtdlpError, in the words of the engine', () => {
       'ERROR: [youtube] abc: Video unavailable. This video is no longer available because the YouTube account associated with this video has been terminated.',
       'unavailable'
     ],
-    ['ERROR: [youtube] abc: This video is only available for subscribers', 'signIn'],
+    ['ERROR: [youtube] abc: This video is only available for subscribers', 'membersOnly'],
     [
       'ERROR: [youtube] abc: Join this channel to get access to members-only content like this video, and other exclusive perks.',
-      'signIn'
+      'membersOnly'
     ],
     ['ERROR: [youtube] abc: Your IP address is blocked from accessing this post', 'geo'],
     [
       'ERROR: [youtube] abc: Requested format is not available. Use --list-formats for a list of available formats',
-      'noFormats'
+      'noSuchFormat'
     ],
     ['ERROR: [youtube] abc: The uploader has not made this video available in your country', 'geo'],
     ['ERROR: [youtube] abc: This video is not available from your location due to geo restriction', 'geo'],
@@ -616,5 +616,54 @@ describe('refusesMidStreamInit', () => {
   it('leaves every other failure alone', () => {
     expect(refusesMidStreamInit('ERROR: Unsupported URL: https://example.com/')).toBe(false)
     expect(refusesMidStreamInit('ERROR: unable to download video data: HTTP Error 403: Forbidden')).toBe(false)
+  })
+})
+
+describe('classifyYtdlpError, reading the engine and not the file name', () => {
+  const code = (raw: string): string | undefined => classifyYtdlpError(raw, false).code
+
+  it.each([
+    ["ERROR: unable to open for writing: [Errno 13] Permission denied: 'C:\\V\\My Account Login.mp4.part'", 'permission'],
+    ["ERROR: [WinError 5] Access is denied: 'Top 404 clips.mp4.part'", 'permission'],
+    ["ERROR: unable to rename file: [WinError 32] The process cannot access the file because it is being used by another process: 'a.mp4.part'", 'fileBusy'],
+    ["ERROR: [WinError 206] The filename or extension is too long: 'x.mp4'", 'pathTooLong'],
+    ['ERROR: [Errno 36] File name too long', 'pathTooLong'],
+    ['ERROR: [WinError 112] There is not enough space on the disk', 'diskFull'],
+    ['ERROR: Postprocessing: Conversion failed: No space left on device', 'diskFull'],
+    ["ENOENT: no such file or directory, mkdir 'Z:\\Videos'", 'folderMissing']
+  ])('%s', (line, expected) => {
+    expect(code(line)).toBe(expected)
+  })
+
+  it('does not take a count of bytes or a fragment number for an HTTP status', () => {
+    expect(code('ERROR: Got error: 401 bytes read, 1024 more expected')).not.toBe('forbidden')
+    expect(code('ERROR: fragment 404 not found, unable to continue')).toBe('interrupted')
+  })
+
+  it('says a transfer broke, not that the video downloaded, when ffmpeg was fetching', () => {
+    expect(code('ERROR: ffmpeg exited with code 1')).toBe('interrupted')
+    expect(code('ERROR: Postprocessing: Conversion failed!')).toBe('postprocess')
+  })
+
+  it('tells a failing server from a missing engine', () => {
+    expect(code('ERROR: unable to download video data: HTTP Error 503: Service Unavailable')).toBe('serverError')
+    expect(code('spawn UNKNOWN')).toBe('engineBlocked')
+    expect(code('spawn EPERM')).toBe('engineBlocked')
+    expect(code('yt-dlp exited with code 3221225781')).toBe('engineBlocked')
+  })
+
+  it('does not read a trailing warning as the reason', () => {
+    const raw = 'ERROR: [site] 1: Login required to view this video\nWARNING: Unable to extract metadata: ffprobe not found.'
+    expect(code(raw)).toBe('signIn')
+  })
+
+  it('names private videos and offline channels', () => {
+    expect(code('ERROR: [youtube] abc: Private video. Sign in if you have been granted access')).toBe('privateVideo')
+    expect(code('ERROR: [twitch:stream] abc: The channel is not currently live')).toBe('notLive')
+    expect(code('ERROR: [Instagram] abc: rate-limit reached or login required')).toBe('signIn')
+  })
+
+  it('does not retry by itself because of a word in the file name', () => {
+    expect(isTransientError("ERROR: Permission denied: 'Network Regional News.mp4.part'")).toBe(false)
   })
 })

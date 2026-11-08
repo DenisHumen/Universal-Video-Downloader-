@@ -172,10 +172,12 @@ function QueueRow({ item, index, animateIn = true, heading }: Props): JSX.Elemen
   const requeue = async (change: { mode?: 'audio'; outputDir?: string }): Promise<void> => {
     await window.api.removeDownload(item.id)
     await queueDownload({
-      url: item.url,
+      // The page, not the stream a resolver found on it: that address expires and carries no referer.
+      url: item.sourceUrl || item.url,
       title: item.title,
       thumbnail: item.thumbnail,
       mode: change.mode ?? item.mode,
+      playlist: item.playlist,
       quality: change.mode === 'audio' ? 'audio' : item.quality,
       formatId: change.mode === 'audio' ? undefined : item.formatId,
       targetHeight: change.mode === 'audio' ? undefined : item.targetHeight,
@@ -260,7 +262,9 @@ function QueueRow({ item, index, animateIn = true, heading }: Props): JSX.Elemen
     >
       {/* In the row rather than between rows, so the list stays one <ul> of <li>s. */}
       {heading && <p className="label border-b border-edge pb-2 pt-5">{heading}</p>}
-      <div className="flex items-center gap-3 py-2.5 pl-1 pr-1 transition-colors duration-fast ease-ease group-hover:bg-raise">
+      {/* The whole row, its error and buttons included. `bg-raise` was the sheet's own colour: no visible hover at all. */}
+      <div className="transition-colors duration-fast ease-ease hover:bg-fill/[0.04]">
+      <div className="flex items-center gap-3 py-2.5 pl-1 pr-1">
         <span className="mono w-6 shrink-0 text-center text-meta tabular-nums text-ink-3">
           {String(index + 1).padStart(2, '0')}
         </span>
@@ -278,7 +282,7 @@ function QueueRow({ item, index, animateIn = true, heading }: Props): JSX.Elemen
           <p className="truncate text-body font-medium text-ink" title={item.title}>
             {item.title}
           </p>
-          <p className="mono mt-0.5 flex items-center gap-2 truncate text-meta text-ink-2">
+          <p className="numeric mt-0.5 flex items-center gap-2 truncate text-meta text-ink-2">
             <span className={`inline-flex shrink-0 items-center gap-1.5 ${meta.text}`}>
               <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${meta.dot}`} />
               {t(meta.label)}
@@ -504,6 +508,7 @@ function QueueRow({ item, index, animateIn = true, heading }: Props): JSX.Elemen
       )}
 
       {jobModal && <MediaJobModal item={item} mode={jobModal} onClose={() => setJobModal(null)} />}
+    </div>
     </m.li>
   )
 }

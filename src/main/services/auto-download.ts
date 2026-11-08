@@ -3,6 +3,7 @@ import { normalizeUrl, youtubeIdOf } from '@shared/urls'
 import type { DownloadRequest, MediaInfo } from '@shared/types'
 import { detect } from './detector'
 import { listDownloads, startDownload } from './downloader'
+import { holdsLink } from './library'
 import { log } from './log'
 import { getSettings } from './settings'
 
@@ -61,7 +62,8 @@ export async function handleCopiedLink(url: string, hooks: CopiedLinkHooks): Pro
     autoDownload: settings.autoDownload,
     autoDownloadOff: settings.autoDownloadOff,
     clipboardWatch: settings.clipboardWatch,
-    known: handledLinks()
+    // Copying the link of a video already kept, to share it, must not fetch it again.
+    known: holdsLink(normalizeUrl(url)) ? new Set([...handledLinks(), normalizeUrl(url)]) : handledLinks()
   })
   if (action === 'offer') hooks.offer(url)
   if (action !== 'download') return

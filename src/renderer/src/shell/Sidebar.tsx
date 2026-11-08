@@ -86,6 +86,7 @@ function NavItem({ section }: { section: NavSection }): JSX.Element {
     section.id === 'downloads' ? s.downloads.filter((d) => ACTIVE_STATES.includes(d.state)).length : 0
   )
   const overall = useStore((s) => (section.id === 'downloads' ? overallPercent(s.downloads) : null))
+  const failed = useStore((s) => (section.id === 'downloads' ? s.downloads.filter((d) => d.state === 'error').length : 0))
   const alerts = useStore((s) => (section.id === 'automation' ? s.watchAlerts : 0))
   const unseen = useStore((s) => (section.id === 'library' ? s.libraryUnseen : 0))
   const label = t(section.label)
@@ -101,6 +102,13 @@ function NavItem({ section }: { section: NavSection }): JSX.Element {
       <span className="min-w-0 flex-1 truncate text-left">{label}</span>
       {active > 0 && <Badge>{overall != null ? `${overall}%` : active}</Badge>}
       {unseen > 0 && <Badge label={t('library.unseen', { n: String(unseen) })}>{unseen}</Badge>}
+      {failed > 0 && active === 0 && (
+        <span
+          className="h-2 w-2 rounded-pill bg-bad"
+          role="img"
+          aria-label={t('queue.failedCount', { n: String(failed) })}
+        />
+      )}
       {alerts > 0 && (
         <span
           className="h-2 w-2 rounded-pill bg-bad"

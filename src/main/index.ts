@@ -15,7 +15,7 @@ import { registerIpc } from './ipc'
 import { holdQuitForSecrets, initSecretsWithin } from './services/secrets'
 import { createStartupGate, SECRETS_STARTUP_CAP_MS } from './startup-gate'
 import { flushSettings, getSettings } from './services/settings'
-import { flushLibrary, loadLibrary, recordFinished } from './services/library'
+import { flushLibrary, loadLibrary, followEntry, recordFinished } from './services/library'
 import { handleCopiedLink } from './services/auto-download'
 import { applyProxy } from './services/proxy'
 import { answerProxyLoginsForPages } from './services/proxy-auth'
@@ -745,6 +745,7 @@ if (cliArgs) {
     // so the downloader never imports it and clearing Activity cannot reach it.
     loadLibrary()
     downloadEvents.on('updated', (item) => recordFinished(item))
+    downloadEvents.on('relocated', (id, patch) => followEntry(id, patch))
     /*
       Episodes a watch sent to a share before the Library learned to follow
       them: their rows already say where the file went, the entries do not.

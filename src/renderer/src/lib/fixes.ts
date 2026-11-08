@@ -7,30 +7,42 @@ import type { TranslationKey } from '../i18n'
 
     signIn / ageGate / members-only  → Use Cookies From…   (inline browser choice)
     blocked / unsupported / empty    → Open in Built-in Browser
-    noFormats                        → Audio Only
-    disk full / permission           → Change Folder
-    rateLimited                      → Retry in 5 Min
+    noFormats                        → Open in Built-in Browser
+    noSuchFormat                     → Audio Only
+    disk full / permission / path    → Change Folder
+    region / network / timeout       → Proxy Settings
+    rateLimited / serverError        → Retry in 5 Min
 */
 
-export type FixKind = 'cookies' | 'browser' | 'audioOnly' | 'changeFolder' | 'retryLater'
+export type FixKind = 'cookies' | 'cookiesFile' | 'browser' | 'audioOnly' | 'changeFolder' | 'retryLater' | 'proxy'
 
 const BY_CODE: Partial<Record<AppErrorCode, FixKind>> = {
-  // Sign-in, age gate; "members only" arrives as signIn or as a cookie hint.
   signIn: 'cookies',
+  privateVideo: 'cookies',
+  membersOnly: 'cookies',
   ageRestricted: 'cookies',
   // YouTube's bot check lifts for a signed-in browser's cookies; a locked browser needs another one picked.
   botCheck: 'cookies',
   cookiesLocked: 'cookies',
+  cookiesNotFound: 'cookies',
+  cookiesFileBad: 'cookiesFile',
   // Blocked, unsupported, empty: a person in a browser can often get past it.
   forbidden: 'browser',
-  geo: 'browser',
   unsupportedPlayer: 'browser',
   emptyPage: 'browser',
   needsPicker: 'browser',
-  noFormats: 'audioOnly',
+  noFormats: 'browser',
+  noSuchFormat: 'audioOnly',
   diskFull: 'changeFolder',
   permission: 'changeFolder',
-  rateLimited: 'retryLater'
+  pathTooLong: 'changeFolder',
+  folderMissing: 'changeFolder',
+  // The built-in browser leaves from the same address, so it cannot get past a region block.
+  geo: 'proxy',
+  network: 'proxy',
+  timeout: 'proxy',
+  rateLimited: 'retryLater',
+  serverError: 'retryLater'
 }
 
 /** The fix for a failure, or none: then Retry, Report and Copy Error are what is offered. */
@@ -44,6 +56,8 @@ export function fixFor(errorCode: AppErrorCode | undefined, cookieHint = false):
 
 export const FIX_LABEL: Record<FixKind, TranslationKey> = {
   cookies: 'fix.cookies',
+  cookiesFile: 'fix.cookiesFile',
+  proxy: 'fix.proxy',
   browser: 'fix.browser',
   audioOnly: 'fix.audioOnly',
   changeFolder: 'fix.changeFolder',

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { Fragment, useCallback, useEffect, useMemo, useState } from 'react'
 import { m } from 'framer-motion'
 import {
   Check,
@@ -145,7 +145,7 @@ function QueueLink({ id }: { id: string }): JSX.Element | null {
   return (
     <div className="mt-1.5 flex items-center gap-2">
       <span
-        className={`mono min-w-0 flex-1 truncate text-caption ${paused ? 'text-warn' : 'text-ink-2'}`}
+        className={`numeric min-w-0 flex-1 truncate text-caption ${paused ? 'text-warn' : 'text-ink-2'}`}
       >
         {text}
       </span>
@@ -387,7 +387,7 @@ export default function AutomationView(): JSX.Element {
                       {checking.has(selected.id) ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
                       {t('auto.checkNow')}
                     </button>
-                    <button type="button" className="btn-danger" onClick={() => setConfirmRemove(true)}>
+                    <button type="button" className="btn-quiet text-bad" onClick={() => setConfirmRemove(true)}>
                       <Trash2 size={14} /> {t('auto.remove')}
                     </button>
                   </div>
@@ -454,7 +454,7 @@ export default function AutomationView(): JSX.Element {
                   .filter((s) => s.kind !== 'download')
                   .sort(byStepOrder)
                   .map((step) => (
-                    <div key={step.id}>
+                    <Fragment key={step.id}>
                       <ActionRow
                         title={t(STEP_LABEL[step.kind])}
                         prefix={STEP_ICON[step.kind]}
@@ -475,12 +475,13 @@ export default function AutomationView(): JSX.Element {
                       {/* On the screen, not only inside the editor: tucked away there, nobody found it. */}
                       {step.kind === 'upload' && (
                         <SwitchRow
+                          className="pl-[39px]"
                           title={t('auto.deleteLocal')}
                           checked={step.deleteLocalAfter}
                           onChange={(v) => void saveStep({ ...step, deleteLocalAfter: v })}
                         />
                       )}
-                    </div>
+                    </Fragment>
                   ))}
               </PreferencesGroup>
 

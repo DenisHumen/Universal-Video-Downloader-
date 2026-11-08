@@ -2,7 +2,7 @@ import type { TranslateFn } from '../i18n'
 
 /** The server, or the way to it, rather than anything about this install. */
 const NOT_ANSWERING =
-  /(^|\D)(429|50[0-4])(\D|$)|gateway|timed? ?out|ETIMEDOUT|ECONN|ENOTFOUND|EAI_AGAIN|ERR_(INTERNET|NETWORK|NAME|CONNECTION|TIMED|ADDRESS|PROXY)/i
+  /(^|\D)(429|50[0-4])(\D|$)|gateway|timed? ?out|ETIMEDOUT|ECONN|ENOTFOUND|EAI_AGAIN|ERR_(INTERNET|NETWORK|NAME|CONNECTION|TIMED|ADDRESS|PROXY|HTTP2|QUIC|TUNNEL|EMPTY_RESPONSE)/i
 
 const MAX_CHARS = 160
 

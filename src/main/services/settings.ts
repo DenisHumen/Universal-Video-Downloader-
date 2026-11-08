@@ -392,7 +392,15 @@ export function setSettings(partial: Partial<AppSettings>): AppSettings {
 
 export function resetSettings(): AppSettings {
   proxyPasswordStore.forget()
-  cache = defaults()
+  /*
+    Not preferences but connections, and watches depend on them: resetting a
+    theme or a cookie problem left every watch failing with "the share this
+    watch uploads to is no longer configured", dropped its Telegram alerts, and
+    orphaned the passwords in the secret store. Backup treats them as separate
+    data for the same reason, and the first-run questions were already answered.
+  */
+  const { smbTargets, telegramChatId, setupDone } = getSettings()
+  cache = { ...defaults(), smbTargets, telegramChatId, setupDone }
   scrubBackup = true
   // A reset is a change to every setting, and lands on the file whenever it can be read.
   if (unread.active) interim = { ...cache }

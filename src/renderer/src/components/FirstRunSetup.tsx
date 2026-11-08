@@ -1,19 +1,24 @@
 import { useEffect, useState } from 'react'
 import { ACCENTS, type AccentChoice } from '@shared/accent'
-import { SUPPORTED_COOKIE_BROWSERS, type AppSettings, type ThemeId } from '@shared/types'
+import type { AppSettings, ThemeId } from '@shared/types'
 import { Folder } from '../ui/icons'
-import { AccentSwatches, ActionRow, ComboRow, Dialog, PreferencesGroup, StyleTiles, SwitchRow, type TileStyle } from '../ui'
+import { AccentSwatches, ActionRow, Dialog, PreferencesGroup, StyleTiles, SwitchRow, type TileStyle } from '../ui'
 import { useT } from '../i18n'
 import { useStore } from '../store'
 import { ACCENT_LABEL } from '../views/settings/panels'
 
-/** The three steps (6.3). */
-export const SETUP_STEPS = ['folder', 'cookies', 'look'] as const
+/**
+ * The steps (6.3). There was a third, "which browser's cookies": asked of someone
+ * who has not downloaded anything yet, in a word they may not know, and on
+ * Windows the obvious answer, Chrome, broke every download afterwards. A failure
+ * that needs signing in now offers it, at the moment it means something.
+ */
+export const SETUP_STEPS = ['folder', 'look'] as const
 export type SetupStep = (typeof SETUP_STEPS)[number]
 
 /**
- * First-run setup (6.3): three skippable steps — where files go, which
- * browser's cookies to use, then notifications, style and accent. Every
+ * First-run setup (6.3): skippable steps — where files go, then
+ * notifications, style and accent. Every
  * choice saves as it is made, so leaving at any step keeps what was chosen.
  * Shown once (`setupDone`), and again from the primary menu.
  */
@@ -57,7 +62,6 @@ function Steps({ settings, onClose }: { settings: AppSettings; onClose: () => vo
 
   const TITLES: Record<SetupStep, [string, string]> = {
     folder: [t('setup.folderTitle'), t('setup.folderBody')],
-    cookies: [t('setup.cookiesTitle'), t('setup.cookiesBody')],
     look: [t('setup.lookTitle'), t('setup.lookBody')]
   }
 
@@ -103,19 +107,6 @@ function Steps({ settings, onClose }: { settings: AppSettings; onClose: () => vo
                 <Folder size={14} /> {t('common.change')}
               </button>
             }
-          />
-        </PreferencesGroup>
-      )}
-      {at === 'cookies' && (
-        <PreferencesGroup>
-          <ComboRow
-            title={t('prefs.row.cookiesFrom')}
-            value={settings.cookiesFromBrowser}
-            onChange={(v) => void save({ cookiesFromBrowser: v })}
-            options={[
-              { value: '', label: t('prefs.value.none') },
-              ...SUPPORTED_COOKIE_BROWSERS.map((b) => ({ value: b, label: b.charAt(0).toUpperCase() + b.slice(1) }))
-            ]}
           />
         </PreferencesGroup>
       )}

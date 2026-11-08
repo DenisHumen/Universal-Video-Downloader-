@@ -178,7 +178,6 @@ export default function DownloadsView(): JSX.Element {
     ['downloading', 'processing', 'detecting', 'queued'].includes(d.state)
   )
   const hasPaused = downloads.some((d) => d.state === 'paused')
-  const hasFailed = downloads.some((d) => d.state === 'error' || d.state === 'canceled')
   const hasErrors = downloads.some((d) => d.state === 'error')
 
   const running = downloads.filter((d) => d.state === 'downloading')
@@ -197,8 +196,11 @@ export default function DownloadsView(): JSX.Element {
   */
   const totalEta = totalSpeed > 0 && remainingBytes > 0 ? remainingBytes / totalSpeed : 0
 
+  // Finished rows from before today stay in the queue's history but are not drawn: they are the Library's now.
+  const drawable = downloads.filter((d) => matches(d, 'all')).length
+
   const summary = [
-    tp('queue.items', downloads.length),
+    tp('queue.items', drawable),
     totalSpeed > 0 ? formatSpeed(totalSpeed) : null,
     remainingBytes > 0 ? t('queue.remaining', { size: formatBytes(remainingBytes) }) : null,
     totalEta > 0 ? t('queue.etaAll', { time: formatEta(totalEta) }) : null
@@ -240,7 +242,7 @@ export default function DownloadsView(): JSX.Element {
               <Play size={16} />
             </button>
           )}
-          {hasFailed && (
+          {hasErrors && (
             <button
               className="btn-icon"
               title={t('queue.retryFailed')} aria-label={t('queue.retryFailed')}
@@ -272,7 +274,7 @@ export default function DownloadsView(): JSX.Element {
         </div>
       </header>
 
-      {downloads.length > 0 && (
+      {drawable > 0 && (
         <div className="mt-6 flex flex-wrap items-center gap-3">
           <SegmentedControl
             label={t('queue.title')}
@@ -304,6 +306,18 @@ export default function DownloadsView(): JSX.Element {
             action={
               <button className="btn-solid rounded-pill px-6" onClick={() => setView('home')}>
                 <Plus size={15} /> {t('queue.add')}
+              </button>
+            }
+          />
+        ) : drawable === 0 ? (
+          /* Only yesterday's rows: not a filter's doing, and there was nothing for "Show Everything" to show. */
+          <EmptyState
+            icon={<Icon icon={Inbox} size="xl" />}
+            title={t('queue.nothingToday')}
+            hint={t('queue.nothingTodayHint')}
+            action={
+              <button className="btn-solid rounded-pill px-6" onClick={() => setView('library')}>
+                {t('queue.openLibrary')}
               </button>
             }
           />

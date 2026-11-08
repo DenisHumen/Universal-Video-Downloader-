@@ -130,6 +130,65 @@ const RULES: Rule[] = [
       'and the filename template in Settings → Post-processing.'
   },
   /*
+    The engine never ran. Node's own words, or the process dying with a Windows
+    status (0xC…) before saying anything; antivirus is what usually does this.
+    Ahead of the permission rule, which took `spawn EPERM` for the download
+    folder and offered another folder, which could not help.
+  */
+  {
+    re: /^spawn\b|failed to load python dll|\[pyi-|yt-dlp exited with code (?:32|42)\d{8}/,
+    code: 'engineBlocked',
+    message:
+      "The download engine won't start; antivirus has probably blocked or removed it. " +
+      "Add the app's folder to its exclusions and press Retry."
+  },
+  /*
+    The computer's own refusals, ahead of the ffmpeg rule: a full disk during a
+    merge reads "Postprocessing: ... No space left on device", and it is the
+    disk that needs doing something about. Windows has its own wording for each.
+  */
+  {
+    re: /no space left|enospc|disk full|winerror 112\b|not enough space/,
+    code: 'diskFull',
+    message: 'Your disk is full — free some space and try again.'
+  },
+  {
+    re: /winerror 206\b|errno 36\b|file ?name too long|filename or extension is too long/,
+    code: 'pathTooLong',
+    message: 'The file name or path is too long. Pick a folder closer to the drive root.'
+  },
+  {
+    re: /winerror 32\b|being used by another process/,
+    code: 'fileBusy',
+    message: 'Another program, often antivirus or a player, is holding the file. Close it and retry.'
+  },
+  {
+    re: /winerror 3\b|cannot find the path specified|enoent: no such file or directory, mkdir/,
+    code: 'folderMissing',
+    message: "The download folder isn't reachable; the drive may be disconnected. Pick another."
+  },
+  {
+    re: /permission denied|winerror 5\b|access is denied|\beacces\b|\beperm\b/,
+    code: 'permission',
+    message: 'No permission to write to the download folder. Pick another one in Settings.'
+  },
+  /*
+    The transfer broke off. `ffmpeg exited with code` is what the engine says
+    when ffmpeg was doing the fetching; a post-processing failure opens with
+    "Postprocessing:" instead. It used to land on the rule below and report
+    that the video had downloaded, the one thing that certainly had not happened.
+  */
+  {
+    re: /ffmpeg exited with code|giving up after \d+ (?:fragment )?retries|did not get any data blocks|downloaded file is empty|fragment \d+ not found|http error 416/,
+    code: 'interrupted',
+    message: 'The download broke off because the site stopped sending the video. Try again.'
+  },
+  {
+    re: /http error 5\d\d|^http 5\d\d|\b5\d\d:? (?:internal server error|bad gateway|service unavailable|gateway time-?out)/,
+    code: 'serverError',
+    message: "The site's server is having trouble; it isn't you. Try again later."
+  },
+  /*
     Ahead of the guesses on purpose. A tool that is missing or has failed says
     so unambiguously, while several of the rules below are guesses from vaguer
     wording - and one of them used to win this race. `not found` in the "unavailable" rule matched
@@ -158,6 +217,16 @@ const RULES: Rule[] = [
       "Your browser's cookies could not be read. Close the browser and try again; on Windows, Chrome " +
       'and Edge keep them locked even then, so choose Firefox or an exported cookies.txt in Settings → Access.'
   },
+  {
+    re: /could not find \w+ cookies database/,
+    code: 'cookiesNotFound',
+    message: "No cookies found in that browser; it isn't installed or has no profile. Pick another."
+  },
+  {
+    re: /does not look like a netscape format/,
+    code: 'cookiesFileBad',
+    message: 'The cookies file is in the wrong format. It must be a Netscape cookies.txt.'
+  },
   /*
     YouTube refusing this network, not this video: "Sign in to confirm you're
     not a bot". It reads like a members-only video, and the "sign in" rule took
@@ -173,7 +242,7 @@ const RULES: Rule[] = [
       'cookies from a browser where you are signed in to YouTube get past it, or try again later or from another network.'
   },
   {
-    re: /\b410\b|http error 404|\bgone\b|\b404\b|has been removed|video.*deleted|video.*not found|no such video/,
+    re: /http error 4(?:04|10)|^http 4(?:04|10)|\b404:? not found|\bgone\b|has been removed|video.*deleted|video.*not found|no such video/,
     code: 'unavailable',
     message:
       'This video is unavailable — it may have been removed, made private, or the site is blocking access from your region.',
@@ -190,8 +259,7 @@ const RULES: Rule[] = [
   {
     re: /unsupported url|no video formats|unable to extract|nothing to download/,
     code: 'noFormats',
-    message: 'Could not find a downloadable video at this link.',
-    cookies: true
+    message: 'Could not find a downloadable video at this link.'
   },
   /*
     The engine's own wording for outcomes that the looser rules further down
@@ -204,25 +272,36 @@ const RULES: Rule[] = [
   */
   {
     re: /requested format is not available/,
-    code: 'noFormats',
-    message: 'Could not find a downloadable video at this link.'
+    code: 'noSuchFormat',
+    message: "This video doesn't come in the quality you picked. Choose another, or take the sound only."
   },
   {
-    re: /not available from your location|geo.?restrict|made this video available in your country|not available in your country|ip address is blocked|blocked from accessing/,
-    code: 'geo',
-    message: 'This video is not available in your region.'
+    re: /not currently live/,
+    code: 'notLive',
+    message: "This channel isn't live right now."
   },
   {
-    re: /video (is )?unavailable|no longer available|account .* terminated/,
-    code: 'unavailable',
-    message:
-      'This video is unavailable — it may have been removed, made private, or the site is blocking access from your region.',
+    re: /private video|video is private/,
+    code: 'privateVideo',
+    message: 'This video is private. If the author gave you access, sign in and retry.',
     cookies: true
   },
   {
     re: /only available for (subscribers|members)|members?[- ]only|join this channel/,
-    code: 'signIn',
-    message: 'This video requires you to be signed in.',
+    code: 'membersOnly',
+    message: 'This video is for channel members only. If you are one, sign in and retry.',
+    cookies: true
+  },
+  {
+    re: /not available from your location|geo.?restrict|made this video available in your country|not available in your country|blocked it in your country|ip address is blocked|blocked from accessing/,
+    code: 'geo',
+    message: 'This video is not available in your region.'
+  },
+  {
+    re: /video (is )?unavailable|this video is not available\.?$|no longer available|account .* terminated/,
+    code: 'unavailable',
+    message:
+      'This video is unavailable — it may have been removed, made private, or the site is blocking access from your region.',
     cookies: true
   },
   {
@@ -255,6 +334,13 @@ const RULES: Rule[] = [
     message: 'This content is age-restricted.',
     cookies: true
   },
+  // Instagram's refusal names both; it lifts for signing in, not for waiting.
+  {
+    re: /login required|access restricted/,
+    code: 'signIn',
+    message: 'This video requires you to be signed in.',
+    cookies: true
+  },
   {
     re: /\b429\b|too many requests|rate.?limit/,
     code: 'rateLimited',
@@ -268,7 +354,8 @@ const RULES: Rule[] = [
     cookies: true
   },
   {
-    re: /\b40[13]\b|forbidden/,
+    // A status only as a status: "401 bytes read" and "fragment 403" are neither.
+    re: /http error 40[13]|^http 40[13]|\b40[13]:? (?:forbidden|unauthorized)|forbidden|unauthorized/,
     code: 'forbidden',
     message: 'The site refused the request.',
     cookies: true
@@ -282,16 +369,6 @@ const RULES: Rule[] = [
     re: /\bdrm\b|widevine|fairplay|playready/,
     code: 'drm',
     message: 'This video is DRM-protected and cannot be downloaded.'
-  },
-  {
-    re: /no space left|enospc|disk full/,
-    code: 'diskFull',
-    message: 'Your disk is full — free some space and try again.'
-  },
-  {
-    re: /permission denied|eacces|eperm/,
-    code: 'permission',
-    message: 'No permission to write to the download folder. Pick another one in Settings.'
   },
   /*
     A player the resolver recognises and knows it cannot read (Kodik's /uv/).
@@ -341,6 +418,11 @@ const RULES: Rule[] = [
  */
 const WROTE_NOTHING = /size=\s*0ki?b\s+time=n\/a|video:0ki?b audio:0ki?b/
 
+/** A quoted file name or path: between quotes, holding a slash or ending in an extension. */
+const QUOTED_PATH = /(['"])[^'"\n]*(?:[\\/][^'"\n]*|\.\w{2,5})\1/g
+
+const withoutPaths = (text: string): string => text.replace(QUOTED_PATH, ' ')
+
 export function classifyYtdlpError(raw: string, cookiesEnabled: boolean): ClassifiedError {
   if (WROTE_NOTHING.test(raw.toLowerCase())) {
     return {
@@ -351,18 +433,24 @@ export function classifyYtdlpError(raw: string, cookiesEnabled: boolean): Classi
       cookieHint: false
     }
   }
-  const line =
-    raw
-      .split('\n')
-      .map((l) => l.trim())
-      .filter(Boolean)
-      .pop() || raw.trim()
+  const lines = raw
+    .split('\n')
+    .map((l) => l.trim())
+    .filter(Boolean)
   /*
-    The rules read the engine's words, not the link or the video id it quotes.
-    Either can say anything: `Unsupported URL: https://site/region/403-login`
-    is still an unsupported URL, and `[generic] geology-101:` is a slug.
+    A warning is not why the run ended, even when it is the last thing said:
+    every download here warns that ffprobe is missing, and that line would be
+    read as a post-processing failure.
   */
-  const lower = line
+  const line = lines.filter((l) => !/^WARNING:/i.test(l)).pop() || lines.pop() || raw.trim()
+  /*
+    The rules read the engine's words, not the link, the video id or the file
+    name it quotes. Any of those can say anything: `Unsupported URL:
+    https://site/region/403-login` is still an unsupported URL, `[generic]
+    geology-101:` is a slug, and `Permission denied: 'My Account Login.mp4.part'`
+    is about the folder, not about signing in.
+  */
+  const lower = withoutPaths(line)
     .toLowerCase()
     .replace(/\b[a-z][a-z0-9+.-]*:\/\/\S+/g, ' ')
     .replace(/\[[\w:.-]+\]\s+[^\s:]+:\s/g, ' ')
@@ -406,12 +494,13 @@ const NOT_THE_FAILURE =
  * above the engine's flat "ffmpeg exited with code 1".
  */
 function failureTail(raw: string): string {
-  return raw
-    .split('\n')
-    .filter((line) => line.trim() && !NOT_THE_FAILURE.test(line))
-    .slice(-4)
-    .join('\n')
-    .toLowerCase()
+  return withoutPaths(
+    raw
+      .split('\n')
+      .filter((line) => line.trim() && !NOT_THE_FAILURE.test(line))
+      .slice(-4)
+      .join('\n')
+  ).toLowerCase()
 }
 
 /**

@@ -575,7 +575,7 @@ textarea,
   /* A read-only fact (extractor, container, count). */
   .tag {
     border-radius: var(--r-1);
-    @apply numeric inline-flex items-center gap-1 bg-fill/10 px-2 py-1 text-caption leading-none text-ink-2;
+    @apply numeric inline-flex items-center gap-1 bg-fill/10 px-2 py-1 text-caption leading-none text-ink;
   }
   /* A keycap, as GNOME's shortcuts window draws one. */
   .kbd {

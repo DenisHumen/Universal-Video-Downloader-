@@ -118,6 +118,25 @@ export type AppErrorCode =
   | 'botCheck'
   /** The cookies setting could not be read: a locked or encrypted browser profile. */
   | 'cookiesLocked'
+  /** The chosen browser has no cookie database: not installed, or no profile. */
+  | 'cookiesNotFound'
+  | 'cookiesFileBad'
+  /** The engine never ran: usually antivirus. */
+  | 'engineBlocked'
+  | 'pathTooLong'
+  /** Windows: another program holds the file. */
+  | 'fileBusy'
+  /** The download folder cannot be reached, as on a drive that was unplugged. */
+  | 'folderMissing'
+  /** The transfer broke off partway. */
+  | 'interrupted'
+  /** The site's server failed (5xx). */
+  | 'serverError'
+  /** The picked quality does not exist. A link with no video at all is `noFormats`. */
+  | 'noSuchFormat'
+  | 'notLive'
+  | 'privateVideo'
+  | 'membersOnly'
   | 'forbidden'
   | 'geo'
   | 'drm'
@@ -549,6 +568,20 @@ export const SUPPORTED_COOKIE_BROWSERS = [
   'opera',
   'vivaldi'
 ] as const
+
+/**
+ * The browsers worth offering on this computer. Safari exists only on a Mac,
+ * and on Windows the engine cannot decrypt Chrome's or Edge's cookies at all
+ * (app-bound encryption): choosing either broke every later download, public
+ * videos included. A choice already saved stays valid; it just isn't offered.
+ */
+export function cookieBrowsersFor(platform: string | undefined): (typeof SUPPORTED_COOKIE_BROWSERS)[number][] {
+  return SUPPORTED_COOKIE_BROWSERS.filter((b) => {
+    if (b === 'safari') return platform === 'darwin'
+    if (b === 'chrome' || b === 'edge') return platform !== 'win32'
+    return true
+  })
+}
 
 export type YtDlpState = 'idle' | 'checking' | 'downloading' | 'ready' | 'error'
 

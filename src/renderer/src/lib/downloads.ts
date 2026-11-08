@@ -93,6 +93,14 @@ export function liveDownloads(list: DownloadItem[], limit = 3): DownloadItem[] {
     .slice(0, limit)
 }
 
+/** What failed and is still owed an answer, newest first. */
+export function recentFailed(list: DownloadItem[], limit = 3): DownloadItem[] {
+  return list
+    .filter((d) => d.state === 'error')
+    .sort((a, b) => (b.finishedAt ?? b.createdAt) - (a.finishedAt ?? a.createdAt))
+    .slice(0, limit)
+}
+
 /** The last `limit` finished downloads, newest first. */
 export function recentFinished(list: DownloadItem[], limit = 5): DownloadItem[] {
   return list

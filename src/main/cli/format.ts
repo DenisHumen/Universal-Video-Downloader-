@@ -262,7 +262,8 @@ export function describeFailure(code: AppErrorCode | undefined, message: string,
     return {
       exitCode: EXIT_NOT_DETECTED,
       lines: [
-        "✗ Couldn't find a video to download at this link.",
+        // With no code the sentence is the only reason there is; a 503 or a locked file was hidden behind this line.
+        code ? "✗ Couldn't find a video to download at this link." : `✗ ${message}`,
         '  Open Universal Video Downloader and try it there: the app can also read',
         '  the page itself and catch the stream in its built-in browser.'
       ]

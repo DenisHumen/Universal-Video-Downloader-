@@ -9,15 +9,19 @@ describe('fix buttons (6.2): the error code decides the fix', () => {
     ['signIn', 'cookies'],
     ['ageRestricted', 'cookies'],
     ['forbidden', 'browser'],
-    ['geo', 'browser'],
+    ['geo', 'proxy'],
     ['unsupportedPlayer', 'browser'],
     ['emptyPage', 'browser'],
-    ['noFormats', 'audioOnly'],
+    ['noFormats', 'browser'],
+    ['noSuchFormat', 'audioOnly'],
+    ['pathTooLong', 'changeFolder'],
+    ['serverError', 'retryLater'],
+    ['privateVideo', 'cookies'],
     ['diskFull', 'changeFolder'],
     ['permission', 'changeFolder'],
     ['rateLimited', 'retryLater'],
-    ['network', null],
-    ['timeout', null],
+    ['network', 'proxy'],
+    ['timeout', 'proxy'],
     ['drm', null]
   ]
   it.each(cases)('%s → %s', (code, fix) => {
@@ -36,7 +40,7 @@ describe('fix buttons (6.2): the error code decides the fix', () => {
       expect(en[key]).toBeTruthy()
       expect(ru[key]).toBeTruthy()
     }
-    expect(en['fix.cookies']).toBe('Use Cookies From…')
+    expect(en['fix.cookies']).toBe('Sign In or Use Cookies…')
     expect(en['fix.browser']).toBe('Open in Built-in Browser')
     expect(en['fix.audioOnly']).toBe('Audio Only')
     expect(en['fix.changeFolder']).toBe('Change Folder')

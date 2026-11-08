@@ -56,8 +56,9 @@ export function PreferencesGroup({ title, description, suffix, children, id, foo
   return (
     <section id={id} data-row={id} aria-labelledby={title ? titleId : undefined} className="space-y-3">
       {(title || description || suffix) && (
-        <div className="flex items-end gap-3">
-          <div className="min-w-0 flex-1">
+        <div className="flex flex-wrap items-end gap-x-3 gap-y-2">
+          {/* A long title keeps its width and the buttons drop below it, rather than one word per line. */}
+          <div className="min-w-[min(100%,260px)] flex-1">
             {title && (
               <h2 id={titleId} className="text-heading text-ink">
                 {title}
@@ -165,6 +166,7 @@ export function SwitchRow({ checked, onChange, disabled, ...row }: SwitchRowProp
   return (
     <ActionRowWithControl
       {...row}
+      onRowClick={disabled ? undefined : () => onChange(!checked)}
       control={(titleId) => (
         <Switch aria-labelledby={titleId} checked={checked} onChange={onChange} disabled={disabled} />
       )}
@@ -175,11 +177,28 @@ export function SwitchRow({ checked, onChange, disabled, ...row }: SwitchRowProp
 /** Internal: a non-activatable row whose suffix is named by its title. */
 function ActionRowWithControl({
   control,
+  onRowClick,
   ...row
-}: Omit<RowProps, 'suffix'> & { control: (titleId: string) => ReactNode }): JSX.Element {
+}: Omit<RowProps, 'suffix'> & {
+  control: (titleId: string) => ReactNode
+  /** The row answers a click anywhere, and looks it: the same highlight as a row that opens something. */
+  onRowClick?: (row: HTMLElement) => void
+}): JSX.Element {
   const id = useId()
   return (
-    <div id={row.id} data-row={row.id} className={cx('ui-row', row.className)}>
+    <div
+      id={row.id}
+      data-row={row.id}
+      className={cx('ui-row', onRowClick && 'ui-row-activatable', row.className)}
+      onClick={
+        onRowClick &&
+        ((e) => {
+          // The control answers for itself, and a link in a subtitle is not the row.
+          if ((e.target as HTMLElement).closest('a, button, input, [role="listbox"], [role="option"]')) return
+          onRowClick(e.currentTarget)
+        })
+      }
+    >
       {row.prefix && <span className="flex shrink-0 items-center text-ink">{row.prefix}</span>}
       <span className="min-w-0 flex-1">
         <span id={id} className="ui-row-title block">
@@ -210,6 +229,7 @@ export function ComboRow({ value, options, onChange, ...row }: ComboRowProps): J
   return (
     <ActionRowWithControl
       {...row}
+      onRowClick={row.disabled ? undefined : (el) => el.querySelector<HTMLElement>('[role="combobox"]')?.click()}
       control={(titleId) => (
         <Dropdown aria-labelledby={titleId} value={value} options={options} onChange={onChange} disabled={row.disabled} />
       )}

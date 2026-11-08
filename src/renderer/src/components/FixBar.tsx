@@ -1,5 +1,5 @@
 import { useSyncExternalStore } from 'react'
-import { SUPPORTED_COOKIE_BROWSERS, type AppErrorCode } from '@shared/types'
+import { cookieBrowsersFor, type AppErrorCode } from '@shared/types'
 import { ChannelSecure, Clock, Copy, Folder, Globe, Multimedia, Send } from '../ui/icons'
 import { Menu } from '../ui'
 import { useT } from '../i18n'
@@ -47,6 +47,9 @@ export default function FixBar({
   const t = useT()
   const saveSettings = useStore((s) => s.saveSettings)
   const openSettings = useStore((s) => s.openSettings)
+  const platform = useStore((s) => s.appInfo?.platform)
+  // A cookies file takes precedence over a browser, so picking one would change nothing.
+  const usesCookiesFile = useStore((s) => Boolean(s.settings?.cookiesFile))
   const fix = fixFor(errorCode, cookieHint)
   const waitingUntil = useSyncExternalStore(subscribeRetries, () => retryAt(retryKey))
 
@@ -66,19 +69,38 @@ export default function FixBar({
 
   const fixButton = (): JSX.Element | null => {
     switch (fix) {
+      case 'cookiesFile':
+        return (
+          <button type="button" className="btn-quiet" data-fix="cookiesFile" onClick={() => openSettings('access#cookies')}>
+            <ChannelSecure size={14} /> {t(FIX_LABEL.cookiesFile)}
+          </button>
+        )
+      case 'proxy':
+        return (
+          <button type="button" className="btn-quiet" data-fix="proxy" onClick={() => openSettings('network')}>
+            <Globe size={14} /> {t(FIX_LABEL.proxy)}
+          </button>
+        )
       case 'cookies':
         return (
           <Menu
             label={t(FIX_LABEL.cookies)}
             align="start"
             items={[
-              ...SUPPORTED_COOKIE_BROWSERS.map((b) => ({
-                label: browserLabel(b),
-                onSelect: () => {
-                  void saveSettings({ cookiesFromBrowser: b }).then(onRetry)
-                }
-              })),
+              // What the built-in browser signs in to, downloads use too: no browser to pick.
+              { label: t('fix.signInHere'), onSelect: () => window.api.openBrowser(url || undefined) },
               'separator' as const,
+              ...(usesCookiesFile
+                ? []
+                : [
+                    ...cookieBrowsersFor(platform).map((b) => ({
+                      label: t('fix.cookiesFrom', { browser: browserLabel(b) }),
+                      onSelect: () => {
+                        void saveSettings({ cookiesFromBrowser: b }).then(onRetry)
+                      }
+                    })),
+                    'separator' as const
+                  ]),
               { label: t('fix.cookiesSettings'), onSelect: () => openSettings('access#cookies') }
             ]}
             trigger={(props) => (

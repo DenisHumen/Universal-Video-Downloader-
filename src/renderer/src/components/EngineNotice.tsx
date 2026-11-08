@@ -50,14 +50,11 @@ export default function EngineNotice(): JSX.Element | null {
         </span>
 
         <div className="min-w-0 flex-1">
-          <p className="text-body font-medium text-ink">
+          {/* The system's own words stay on hover: they help a report, not the person reading this. */}
+          <p className="text-body font-medium text-ink" title={failed ? ytdlp.message : undefined}>
             {failed ? t('engine.setupFailed') : t('engine.setupTitle')}
           </p>
-          {failed ? (
-            <p className="mono truncate text-meta text-ink-2" title={ytdlp.message}>
-              {ytdlp.message}
-            </p>
-          ) : (
+          {failed ? null : (
             <div className="mt-1.5 flex items-center gap-3">
               <div
                 className="h-1 min-w-0 flex-1 overflow-hidden rounded-full bg-sink"

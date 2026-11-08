@@ -3,7 +3,8 @@ import type { DownloadItem } from '@shared/types'
 import { useStore } from '../store'
 import { useT } from '../i18n'
 import { formatSpeed } from '../lib/format'
-import { liveDownloads, recentFinished } from '../lib/downloads'
+import { liveDownloads, recentFailed, recentFinished } from '../lib/downloads'
+import { errorText } from '../lib/errors'
 import { STATE_META } from '../lib/states'
 import { toast } from '../lib/toast'
 
@@ -22,6 +23,7 @@ export default function HomeActivity(): JSX.Element {
   const setView = useStore((s) => s.setView)
   const live = liveDownloads(downloads)
   const recent = recentFinished(downloads)
+  const failed = recentFailed(downloads)
 
   return (
     <div className="space-y-6">
@@ -31,6 +33,33 @@ export default function HomeActivity(): JSX.Element {
           <ul className="ui-boxed-list">
             {live.map((item) => (
               <LiveRow key={item.id} item={item} />
+            ))}
+          </ul>
+        </section>
+      )}
+
+      {/*
+        A failed row used to leave this screen without a word: it had gone from
+        "now", it never reached "finished", and with notifications off nothing
+        else said so. To the person watching, it looked as if nothing happened.
+      */}
+      {failed.length > 0 && (
+        <section>
+          <h3 className="mb-3 text-heading text-ink">{t('home.failed')}</h3>
+          <ul className="ui-boxed-list">
+            {failed.map((item) => (
+              <li key={item.id} className="ui-row min-h-[50px]">
+                <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-bad" aria-hidden="true" />
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-control text-ink" title={item.title}>
+                    {item.title}
+                  </span>
+                  <span className="line-clamp-2 text-meta text-ink-2">{errorText(t, item)}</span>
+                </span>
+                <button className="btn-quiet shrink-0" onClick={() => setView('downloads')}>
+                  {t('home.whatToDo')}
+                </button>
+              </li>
             ))}
           </ul>
         </section>
@@ -100,7 +129,7 @@ function LiveRow({ item }: { item: DownloadItem }): JSX.Element {
         <span className="min-w-0 flex-1 truncate text-control text-ink" title={item.title}>
           {item.title}
         </span>
-        <span className="mono shrink-0 text-meta text-ink-2">{facts.join(' · ')}</span>
+        <span className="numeric shrink-0 text-meta text-ink-2">{facts.join(' · ')}</span>
       </div>
       {item.state !== 'queued' && (
         <div className="absolute inset-x-0 bottom-0 h-[2px] bg-edge" aria-hidden="true">

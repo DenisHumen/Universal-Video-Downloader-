@@ -128,6 +128,24 @@ export function noteRemote(lib: LibraryFile, id: string, remotePath: string): Li
   return { version: LIBRARY_VERSION, entries }
 }
 
+/** A file moved on with no queue row left to report it: renamed here, or sent to a share. */
+export function relocateEntry(
+  lib: LibraryFile,
+  id: string,
+  patch: { filepath?: string; remotePath?: string }
+): LibraryFile {
+  const at = lib.entries.findIndex((e) => e.id === id)
+  if (at < 0) return lib
+  const entries = lib.entries.slice()
+  entries[at] = {
+    ...entries[at],
+    // Deleted here: the old path stays as the entry's key, as in `noteRemote`.
+    filepath: patch.filepath ?? entries[at].filepath,
+    remotePath: patch.remotePath ?? entries[at].remotePath
+  }
+  return { version: LIBRARY_VERSION, entries }
+}
+
 export function removeEntry(lib: LibraryFile, id: string): LibraryFile {
   return { version: LIBRARY_VERSION, entries: lib.entries.filter((e) => e.id !== id) }
 }

@@ -129,10 +129,6 @@ function ErrorCard({
       </div>
       <div className="p-4">
         <p className="selectable break-words text-body leading-relaxed text-ink">{errorText(t, { error, errorCode, cookieHint })}</p>
-        {/* The engine's own words, kept but demoted: what goes into a bug report. */}
-        {error && errorCode && (
-          <p className="mono selectable mt-2 break-words text-meta leading-relaxed text-ink-2">{error}</p>
-        )}
         <div className="mt-4 flex flex-wrap items-center gap-2">
           {/* The honest escape hatch, unless the fix below already is it. */}
           {fix !== 'browser' && (

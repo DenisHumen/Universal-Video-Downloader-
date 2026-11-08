@@ -1428,6 +1428,16 @@ async function runDownload(item: DownloadItem): Promise<void> {
         const recovered = findByExpectedName(item.id)
         if (recovered) item.filepath = recovered
       }
+      /*
+        The figures so far were the engine's estimate, for a job made of
+        fragments, and it stayed on the finished row: a Twitch VOD said 9.05 GB
+        beside a file of 8.80 GB. The file is the answer now.
+      */
+      try {
+        if (item.filepath) item.downloadedBytes = item.totalBytes = statSync(item.filepath).size
+      } catch {
+        // Already moved or deleted; the last estimate is all there is.
+      }
       finalPaths.delete(item.id)
       expectedNames.delete(item.id)
       log.info('download', 'Finished', downloadFields(item))
@@ -2024,7 +2034,8 @@ export function prioritizeDownload(id: string): void {
 
 export function retryFailed(): void {
   for (const item of [...items.values()]) {
-    if (item.state === 'error' || item.state === 'canceled') retryDownload(item.id)
+    // Not cancelled rows: those were stopped on purpose, and one real failure must not revive them all.
+    if (item.state === 'error') retryDownload(item.id)
   }
 }
 

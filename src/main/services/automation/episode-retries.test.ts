@@ -220,6 +220,14 @@ describe('an episode that fails', () => {
     rmSync(h.dir, { recursive: true, force: true })
   })
 
+  // A second watch at another quality wants the same name; it used to delete the first one's file.
+  it('never takes a name another file already has', () => {
+    const taken = new Set(['/d/Show S01E01.mp4', '/d/Show S01E01 (2).mp4'])
+    const has = (p: string): boolean => taken.has(p)
+    expect(m.pipeline.freePath('/d/Free.mp4', has)).toBe('/d/Free.mp4')
+    expect(m.pipeline.freePath('/d/Show S01E01.mp4', has)).toBe('/d/Show S01E01 (3).mp4')
+  })
+
   it('is tried again at the next check, and given up on - with one message - after the third', async () => {
     h.plan = ['fail', 'fail', 'fail']
 

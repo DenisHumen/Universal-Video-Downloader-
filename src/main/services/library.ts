@@ -1,5 +1,5 @@
 import { app, shell } from 'electron'
-import { readFileSync } from 'fs'
+import { existsSync, readFileSync } from 'fs'
 import { access } from 'fs/promises'
 import { join } from 'path'
 import {
@@ -10,6 +10,7 @@ import {
   listLibrary,
   normaliseLibrary,
   noteRemote,
+  relocateEntry,
   removeEntry,
   seedFromHistory,
   upsertEntry,
@@ -18,6 +19,7 @@ import {
   type LibraryQuery
 } from '@shared/library'
 import type { DownloadItem } from '@shared/types'
+import { normalizeUrl } from '@shared/urls'
 import { ReadFailure, failure, noteRefusedWrite, readJsonStore, writeJsonAtomic } from './json-store'
 import { log } from './log'
 
@@ -164,6 +166,26 @@ export function recordFinished(item: DownloadItem): void {
   changed()
 }
 
+/** A file that moved after its queue row was cleared. */
+export function followEntry(id: string, patch: { filepath?: string; remotePath?: string }): void {
+  const next = relocateEntry(lib, id, patch)
+  if (next === lib) return
+  lib = next
+  changed()
+}
+
+/**
+ * Whether this link's video is already kept: the file is still here, or it went
+ * to a share. A link whose file was deleted can be fetched again.
+ */
+export function holdsLink(link: string): boolean {
+  return lib.entries.some(
+    (e) =>
+      normalizeUrl(e.sourceUrl ?? e.url) === link &&
+      Boolean(e.remotePath || existsSync(e.filepath))
+  )
+}
+
 export function queryLibrary(q: LibraryQuery): LibraryPage {
   return listLibrary(lib, q)
 }
@@ -174,7 +196,8 @@ export async function missingFiles(paths: string[]): Promise<string[]> {
   // Only paths the library holds: the renderer cannot probe arbitrary files through this.
   const known = new Set(lib.entries.map((e) => e.filepath))
   await Promise.all(
-    paths.filter((p) => known.has(p)).slice(0, 200).map(async (p) => {
+    // Up to what the view asks for: past 200, moved files looked present and Play silently did nothing.
+    paths.filter((p) => known.has(p)).slice(0, 1000).map(async (p) => {
       try {
         await access(p)
       } catch {

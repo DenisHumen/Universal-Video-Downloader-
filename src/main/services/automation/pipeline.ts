@@ -1,6 +1,6 @@
 import { randomUUID } from 'crypto'
 import { existsSync, readdirSync, renameSync, rmdirSync, rmSync, statSync } from 'fs'
-import { dirname, extname, join } from 'path'
+import { basename, dirname, extname, join } from 'path'
 import {
   cancelDownload,
   downloadEvents,
@@ -35,6 +35,24 @@ import {
   type TemplateValues,
   type Watch
 } from '@shared/automation'
+
+/**
+ * This path, or the first free ` (2)`, ` (3)` beside it.
+ *
+ * A rename used to delete whatever had the name. A second watch on the same
+ * series at another quality has the same name, which the dialog recommends, so
+ * the 720p copy silently replaced the 1080p one, and a file of the user's own
+ * went the same way. A retry never lands here: its file already has the name.
+ */
+export function freePath(target: string, taken: (path: string) => boolean = existsSync): string {
+  if (!taken(target)) return target
+  const ext = extname(target)
+  const stem = target.slice(0, target.length - ext.length)
+  for (let n = 2; ; n++) {
+    const next = `${stem} (${n})${ext}`
+    if (!taken(next)) return next
+  }
+}
 
 /**
  * Taking one episode through a watch's chain of steps.
@@ -221,7 +239,15 @@ export async function runEpisode(
    * meanwhile, and its new file is not this run's to account for.
    */
   const follow = (from: string, patch: { filepath?: string; remotePath?: string }): void => {
-    if (queueId && getDownload(queueId)?.filepath === from) relocateItem(queueId, patch)
+    if (!queueId) return
+    const row = getDownload(queueId)
+    if (row?.filepath === from) relocateItem(queueId, patch)
+    /*
+      The row can be cleared while an upload runs, since it already reads
+      "Completed". The Library hears about a file through its row, so it was
+      left pointing at the deleted copy and showed "File Missing".
+    */
+    else if (!row) downloadEvents.emit('relocated', queueId, patch)
   }
 
   /** Put the episode on the queue, wait for it, and say where it landed. */
@@ -306,15 +332,17 @@ export async function runEpisode(
       const source = localFile()
       const name = renameFor(renameStep, values())
       const target = join(dirname(source), name)
+      let finalName = name
       if (target !== source) {
-        if (existsSync(target)) rmSync(target, { force: true })
-        renameSync(source, target)
-        filepath = target
+        const free = freePath(target)
+        finalName = basename(free)
+        renameSync(source, free)
+        filepath = free
         updateRun(run.id, { filepath })
-        follow(source, { filepath: target })
+        follow(source, { filepath: free })
       }
-      markStep(run, 'rename', { state: 'done', finishedAt: Date.now(), message: name })
-      log.info('watcher', `Renamed to ${name}`, { id: shortId })
+      markStep(run, 'rename', { state: 'done', finishedAt: Date.now(), message: finalName })
+      log.info('watcher', `Renamed to ${finalName}`, { id: shortId })
     }
 
     // --- upload -------------------------------------------------------------

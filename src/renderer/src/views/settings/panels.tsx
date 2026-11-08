@@ -1,8 +1,10 @@
 import { useEffect, useState, type ReactNode } from 'react'
 import { ACCENTS, type AccentChoice } from '@shared/accent'
 import { AUTO_SOURCES } from '@shared/auto-sources'
+import { parseProxy } from '@shared/proxy'
 import {
   SUPPORTED_COOKIE_BROWSERS,
+  cookieBrowsersFor,
   type AppSettings,
   type CliStatus,
   type DownloadMode,
@@ -18,6 +20,7 @@ import { toast } from '../../lib/toast'
 import { describeCliCommand } from '../../lib/cliCommand'
 import { updateErrorText } from '../../lib/updateError'
 import AutomationSettings from '../../components/AutomationSettings'
+import { useSecretState } from '../../components/AutomationForms'
 import ConfirmDialog from '../../components/ConfirmDialog'
 import Logo from '../../components/Logo'
 import {
@@ -303,6 +306,8 @@ export function ProcessingPanel({ settings, set }: PanelProps): JSX.Element {
 
 export function WatchingPanel({ settings, set, go }: PanelProps): JSX.Element {
   const t = useT()
+  // A chat with no bot token sends nothing: a backup restores the chat but never the token.
+  const secrets = useSecretState()
   const shares = settings.smbTargets?.length ?? 0
   return (
     <PreferencesPage>
@@ -326,7 +331,7 @@ export function WatchingPanel({ settings, set, go }: PanelProps): JSX.Element {
         <ActionRow
           id="telegram"
           title={t('prefs.sub.telegram')}
-          value={settings.telegramChatId ? t('prefs.value.on') : t('prefs.value.off')}
+          value={settings.telegramChatId ? (secrets.telegram ? t('prefs.value.on') : t('prefs.value.noToken')) : t('prefs.value.off')}
           navigation
           onActivate={() => go({ panel: 'watching', sub: ['telegram'] })}
         />
@@ -414,6 +419,7 @@ const baseName = (p: string): string => p.split(/[\\/]/).pop() || p
 
 export function AccessPanel({ settings, set, go }: PanelProps): JSX.Element {
   const t = useT()
+  const platform = useStore((s) => s.appInfo?.platform)
   const [signOut, setSignOut] = useState(false)
   return (
     <PreferencesPage>
@@ -482,7 +488,11 @@ export function AccessPanel({ settings, set, go }: PanelProps): JSX.Element {
           onChange={(v) => set('cookiesFromBrowser', v)}
           options={[
             { value: '', label: t('prefs.value.none') },
-            ...SUPPORTED_COOKIE_BROWSERS.map((b) => ({ value: b, label: b.charAt(0).toUpperCase() + b.slice(1) }))
+            // A saved choice stays listed, or the row could not show what is set.
+            ...[...new Set([...cookieBrowsersFor(platform), ...(settings.cookiesFromBrowser ? [settings.cookiesFromBrowser] : [])])].map((b) => ({
+              value: b,
+              label: b.charAt(0).toUpperCase() + b.slice(1)
+            }))
           ]}
         />
       </PreferencesGroup>
@@ -661,12 +671,8 @@ export function CookiesFilePage({ settings, set }: PanelProps): JSX.Element {
 
 export function NetworkPanel({ settings, go }: PanelProps): JSX.Element {
   const t = useT()
-  let host = ''
-  try {
-    host = settings.proxy ? new URL(settings.proxy).host : ''
-  } catch {
-    host = settings.proxy
-  }
+  // Not `new URL`: it reads "localhost:8080" as a scheme with no host, and the row said Off.
+  const host = settings.proxy ? parseProxy(settings.proxy).address : ''
   return (
     <PreferencesPage>
       <PreferencesGroup title={t('prefs.group.proxy')}>

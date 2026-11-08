@@ -11,6 +11,7 @@ describe('updateErrorText', () => {
     expect(updateErrorText(t, raw)).toBe('update.notAnswering')
     expect(updateErrorText(t, 'net::ERR_INTERNET_DISCONNECTED')).toBe('update.notAnswering')
     expect(updateErrorText(t, 'connect ETIMEDOUT 140.82.121.3:443')).toBe('update.notAnswering')
+    expect(updateErrorText(t, 'net::ERR_HTTP2_SERVER_REFUSED_STREAM')).toBe('update.notAnswering')
   })
 
   it('keeps the first line of anything else, cut to a readable length', () => {

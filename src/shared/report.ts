@@ -61,6 +61,19 @@ export const REPORT_TARGET = {
 const REPORTABLE: Record<AppErrorCode, boolean> = {
   // The user's machine or network.
   canceled: false,
+  cookiesNotFound: false,
+  cookiesFileBad: false,
+  engineBlocked: false,
+  pathTooLong: false,
+  fileBusy: false,
+  folderMissing: false,
+  interrupted: false,
+  serverError: false,
+  notLive: false,
+  privateVideo: false,
+  membersOnly: false,
+  // The app asked for a quality the video does not have, which it should have known.
+  noSuchFormat: true,
   diskFull: false,
   permission: false,
   network: false,
