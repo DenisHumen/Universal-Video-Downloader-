@@ -10,6 +10,9 @@
  * bridge, but with the animations left on, grabbing frames as it goes. The
  * frames become docs/assets/tour.webp (what the README shows) and
  * docs/assets/tour.mp4 (what it links to). Silent: there is nothing to hear.
+ *
+ * `--offscreen` renders without a window on screen and takes each frame as it is
+ * painted, for a machine where grabbing a visible window fails (UnknownVizError).
  */
 import { app, BrowserWindow } from 'electron'
 import { execFileSync } from 'child_process'
@@ -25,6 +28,7 @@ const OUT = join(root, 'docs', 'assets')
 const FPS = 15
 const WIDTH = 1280
 const HEIGHT = 800
+const OFFSCREEN = process.argv.includes('--offscreen')
 
 const wait = (ms) => new Promise((r) => setTimeout(r, ms))
 
@@ -79,10 +83,17 @@ app.whenReady().then(async () => {
   const win = new BrowserWindow({
     width: WIDTH,
     height: HEIGHT,
-    show: true,
+    show: !OFFSCREEN,
     backgroundColor: '#242424',
-    webPreferences: { contextIsolation: true, sandbox: false, backgroundThrottling: false }
+    webPreferences: { contextIsolation: true, sandbox: false, backgroundThrottling: false, offscreen: OFFSCREEN }
   })
+  let painted = null
+  if (OFFSCREEN) {
+    win.webContents.setFrameRate(FPS)
+    win.webContents.on('paint', (_event, _dirty, image) => {
+      painted = image.toPNG()
+    })
+  }
   await win.loadURL(BASE)
   await wait(1500)
   await win.webContents.executeJavaScript(DRIVER, true)
@@ -94,7 +105,7 @@ app.whenReady().then(async () => {
   const grab = async () => {
     while (recording) {
       const due = Math.floor(((Date.now() - started) / 1000) * FPS)
-      const image = (await win.webContents.capturePage()).toPNG()
+      const image = OFFSCREEN ? painted : (await win.webContents.capturePage()).toPNG()
       while (n <= due) writeFileSync(join(frames, `${String(n++).padStart(5, '0')}.png`), image)
       await wait(Math.max(0, started + (n * 1000) / FPS - Date.now()))
     }

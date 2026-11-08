@@ -10,6 +10,11 @@ describe('a failure with a proxy set', () => {
     expect(proxyMayBeWhy('net::ERR_PROXY_CONNECTION_FAILED', 'http://192.168.1.10:3128')).toBe(true)
   })
 
+  it('reads the system refusing to run the file as the engine not starting', () => {
+    expect(engineFailureText(t, 'spawn UNKNOWN', 'setup')).toBe('engine.startFailed')
+    expect(proxyMayBeWhy('spawn EPERM', 'http://192.168.1.10:3128')).toBe(false)
+  })
+
   it('does not blame it for what no proxy could cause, or when there is none', () => {
     expect(engineFailureText(t, 'yt-dlp failed to start', 'setup', 'http://192.168.1.10:3128')).toBe('engine.startFailed')
     expect(proxyMayBeWhy('yt-dlp failed to start', 'http://192.168.1.10:3128')).toBe(false)

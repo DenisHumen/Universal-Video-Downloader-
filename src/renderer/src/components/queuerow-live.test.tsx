@@ -48,6 +48,36 @@ const show = (item: DownloadItem): void =>
     </ul>
   )
 
+describe('asking before a cancel', () => {
+  const asked = (): string => screen.getByRole('alertdialog').textContent ?? ''
+  const ask = (item: DownloadItem): void => {
+    show(item)
+    fireEvent.click(document.querySelector('[data-uvd="cancel-download"]')!)
+  }
+
+  it('names what is at stake', () => {
+    ask(row({ state: 'paused', percent: 42 }))
+    expect(asked()).toContain('42%')
+  })
+
+  it('does not end its sentence on a dash when the row started over underneath it', () => {
+    const item = row({ state: 'downloading', percent: 40 })
+    const { rerender } = render(
+      <ul>
+        <QueueRow item={item} index={0} />
+      </ul>
+    )
+    fireEvent.click(document.querySelector('[data-uvd="cancel-download"]')!)
+    rerender(
+      <ul>
+        <QueueRow item={{ ...item, percent: 0 }} index={0} />
+      </ul>
+    )
+    expect(asked()).not.toContain('—')
+    expect(asked()).toMatch(/Cancelling deletes what has been downloaded/)
+  })
+})
+
 describe('a row waiting for a video to start', () => {
   const waiting = { live: true, waitForVideo: true }
 

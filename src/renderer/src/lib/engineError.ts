@@ -4,7 +4,7 @@ import type { TranslateFn } from '../i18n/translate'
 const NO_CONNECTION = /\bHTTP \d{3}\b|net::ERR_|ETIMEDOUT|ENOTFOUND|ECONN|EAI_AGAIN|socket|timed? ?out/i
 
 /** An engine that is there and will not start: antivirus, and no connection could fix that. */
-const FAILED_TO_START = /failed to start/i
+const FAILED_TO_START = /failed to start|^spawn\b/i
 const NO_BUILD = /no download engine is published/i
 
 /**
