@@ -466,6 +466,11 @@ export interface DownloadItem {
    */
   copySuffix?: string
   /**
+   * The folder this entry's files go to, settled on its first run and kept, so a
+   * resume finds its own partial whatever the rule for naming folders has become.
+   */
+  runDir?: string
+  /**
    * Fetch this item's HLS stream with ffmpeg instead of the engine's own
    * fragment downloader. Set when that downloader refused the playlist, and
    * kept, so a pause, a retry or a restart does not run into the same refusal.

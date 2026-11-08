@@ -452,6 +452,7 @@ export function siteFolder(item: Pick<DownloadItem, 'extractor' | 'sourceUrl' | 
 
 /** Where this item's file goes, without touching the disk. */
 export function plannedDir(item: DownloadItem, settings: AppSettings): string {
+  if (item.runDir) return item.runDir
   const site = settings.createSubfolders
     ? join(item.outputDir, siteFolder(item) || 'other')
     : item.outputDir
@@ -459,13 +460,47 @@ export function plannedDir(item: DownloadItem, settings: AppSettings): string {
   return playlistDir(site, item.playlist)
 }
 
+/**
+ * The folder a row that ran before `runDir` existed was using, when it is there.
+ *
+ * Those went by extractor and then by host, before a site the app knows got its
+ * own name: `youtube.com` is `YouTube` now. Going by the new name, a row cut short
+ * under the old one would start from zero in a new folder and leave its partial
+ * where nothing would ever find it. `log` is how to tell it has run, as in
+ * `settleOutputStem`.
+ */
+function folderFromBefore(item: DownloadItem, settings: AppSettings): string | undefined {
+  if (!settings.createSubfolders || item.log == null) return undefined
+  let site = item.extractor && !NOT_A_SITE.test(item.extractor) ? safeName(item.extractor) : ''
+  if (!site) {
+    try {
+      site = safeName(new URL(pageUrlOf(item.sourceUrl || item.url)).hostname.replace(/^www\./, ''))
+    } catch {
+      return undefined
+    }
+  }
+  const dir = site ? playlistDir(join(item.outputDir, site), item.playlist) : undefined
+  return dir && existsSync(dir) ? dir : undefined
+}
+
+/**
+ * Where this run writes, made if need be. The first answer stands for every later
+ * run: `--continue` only finds a partial in the folder it was left in, and the
+ * rule can give another answer next time, because a resolve has since learned the
+ * extractor, or because an update changed it.
+ */
 function outputDirFor(item: DownloadItem, settings: AppSettings): string {
-  const dir = plannedDir(item, settings)
-  if (dir === item.outputDir) return dir
-  try {
-    if (!existsSync(dir)) mkdirSync(dir, { recursive: true })
-  } catch {
-    return item.outputDir
+  const dir = item.runDir ?? folderFromBefore(item, settings) ?? plannedDir(item, settings)
+  if (dir !== item.outputDir) {
+    try {
+      if (!existsSync(dir)) mkdirSync(dir, { recursive: true })
+    } catch {
+      return item.outputDir
+    }
+  }
+  if (item.runDir !== dir) {
+    item.runDir = dir
+    scheduleSave()
   }
   return dir
 }
