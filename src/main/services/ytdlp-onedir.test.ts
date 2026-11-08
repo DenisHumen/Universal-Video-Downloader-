@@ -181,9 +181,9 @@ describe('the onedir engine', () => {
     publish({ 'yt-dlp_linux.zip': 403 })
     const m = await fresh()
     await m.ensureYtdlp()
-    await settle()
+    // Thirty milliseconds was not always enough on the slowest build machine.
+    await vi.waitFor(() => expect(existsSync(join(binDir(), 'migration-failed'))).toBe(true), { timeout: 8000 })
     expect(m.ytdlpBinaryPath()).toBe(onefile())
-    expect(existsSync(join(binDir(), 'migration-failed'))).toBe(true)
 
     h.requested = []
     await (await fresh()).ensureYtdlp()

@@ -65,11 +65,12 @@ describe('a library longer than one page', () => {
     try {
       await app()
       act(() => useStore.getState().setView('library'))
-      await screen.findByText('Video 99')
+      await screen.findByText('Video 99', undefined, { timeout: 8000 })
       expect(screen.queryByText('Video 100')).toBeNull()
       expect(list.mock.lastCall?.[0]).toMatchObject({ offset: 0, limit: 100 })
       await act(async () => reveal())
-      await screen.findByText('Video 199')
+      // The slowest build machine can take over a second to draw a hundred rows.
+      await screen.findByText('Video 199', undefined, { timeout: 8000 })
       expect(list.mock.lastCall?.[0]).toMatchObject({ offset: 100, limit: 100 })
       expect(missing.mock.lastCall?.[0]).toContain('/v/199.mp4')
       expect(missing.mock.lastCall?.[0]).not.toContain('/v/0.mp4')
