@@ -1,4 +1,8 @@
 import { describe, expect, it } from 'vitest'
+
+/** How much `finalPathCandidate` trusts each line. */
+const DESTINATION = 2
+const EXTRACTED = 6
 import {
   cliArgvFrom,
   describeFailure,
@@ -7,12 +11,14 @@ import {
   EXIT_NOT_DETECTED,
   formatBytes,
   formatEta,
+  namesTheFile,
   parseCliArgs,
   parseProgress,
   parseQuality,
   ffmpegProgressLine,
   postprocessLine,
   progressLine,
+  subtitleMissLine,
   USAGE
 } from './format'
 
@@ -176,6 +182,19 @@ describe('progress', () => {
     expect(postprocessLine('Merger')).toMatch(/merging video and audio/)
     expect(postprocessLine('EmbedThumbnail')).toMatch(/thumbnail/)
     expect(postprocessLine(undefined)).toMatch(/finishing up/)
+  })
+
+  it('names a file only once it is the one being kept', () => {
+    // An audio run fetches a video first and turns it into something else.
+    expect(namesTheFile('/d/Song [x].webm', DESTINATION, true)).toBe(false)
+    expect(namesTheFile('/d/Song [x] (audio).mp3', EXTRACTED, true)).toBe(true)
+    expect(namesTheFile('/d/Film [x].f137.mp4', DESTINATION, false)).toBe(true)
+    // Captions come down before the video does.
+    expect(namesTheFile('/d/Film [x].en.vtt', DESTINATION, false)).toBe(false)
+  })
+
+  it('says when a subtitle was skipped, in English like the rest', () => {
+    expect(subtitleMissLine('pt-BR')).toBe('  ! could not fetch the pt-BR subtitles; the video itself is fine')
   })
 
   it('shows the name the file ends up with, not a stream about to be merged', () => {

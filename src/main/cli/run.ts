@@ -17,7 +17,7 @@ import {
   POSTPROCESS_PREFIX,
   PROGRESS_PREFIX
 } from '../services/downloader'
-import { classifyYtdlpError, hasCookies, refusesMidStreamInit, withPostprocessHeading } from '../services/options'
+import { classifyYtdlpError, hasCookies, refusesMidStreamInit, subtitleMissIn, withPostprocessHeading } from '../services/options'
 import { killTree } from '../services/process'
 import { lineReader } from '../services/engine-output'
 import { ffmpegProgressSeconds, splitOutputLines } from '../services/ffmpeg-output'
@@ -28,10 +28,12 @@ import {
   downloadChoice,
   ffmpegProgressLine,
   displayName,
+  namesTheFile,
   parseCliArgs,
   parseProgress,
   postprocessLine,
   progressLine,
+  subtitleMissLine,
   USAGE,
   type CliChoice,
   type CliOptions
@@ -229,6 +231,7 @@ function runEngine(item: DownloadItem, settings: AppSettings, dir: string): Prom
     live = child
     let finalPath: { path: string; priority: number } | undefined
     let announced = false
+    const saidMissing = new Set<string>()
     let stderrTail = ''
     // SponsorBlock's lookup is a post-processor too, and runs before anything is fetched.
     let fetched = false
@@ -250,7 +253,7 @@ function runEngine(item: DownloadItem, settings: AppSettings, dir: string): Prom
         }
         const found = finalPathCandidate(line)
         if (found && (!finalPath || found.priority >= finalPath.priority)) finalPath = found
-        if (found && !announced) {
+        if (found && !announced && namesTheFile(found.path, found.priority, item.mode === 'audio')) {
           announced = true
           say(`  saving as ${displayName(found.path)}`)
         }
@@ -260,6 +263,11 @@ function runEngine(item: DownloadItem, settings: AppSettings, dir: string): Prom
       // ffmpeg fetching an HLS stream says how far it has got here, and nowhere else.
       const seconds = ffmpegProgressSeconds(line)
       if (seconds != null) return status(ffmpegProgressLine(seconds))
+      const missed = subtitleMissIn(line)
+      if (missed && !saidMissing.has(missed)) {
+        saidMissing.add(missed)
+        say(subtitleMissLine(missed))
+      }
       stderrTail = (stderrTail + line + '\n').slice(-4000)
     })
     child.stdout?.on('data', (chunk: Buffer) => stdout.push(chunk))
