@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { join } from 'path'
 import type { AppSettings, DownloadItem } from '@shared/types'
-import { buildArgs, pickFinishedFile, safeName, siteFolder } from './downloader'
+import { buildArgs, pickFinishedFile, safeName, siteFolder, titleFromFile } from './downloader'
 import { pageUrlOf } from '@shared/page-url'
 import { sniffUrlFor } from '../resolvers/universal'
 import { directUrlFor } from '../resolvers/universal/direct'
@@ -396,6 +396,18 @@ describe('safeName', () => {
 
   it('leaves non-Latin titles alone', () => {
     expect(safeName('Серия 1 — пилот')).toBe('Серия 1 — пилот')
+  })
+})
+
+describe('titleFromFile', () => {
+  it('takes the title out of the name the engine gave the file', () => {
+    expect(titleFromFile(join('d', 'Мой ролик [abc123].mp4'))).toBe('Мой ролик')
+    expect(titleFromFile(join('d', 'Мой ролик [abc123].f137.mp4'))).toBe('Мой ролик')
+    expect(titleFromFile(join('d', 'A plain name.mkv'))).toBe('A plain name')
+  })
+
+  it('has nothing to offer when the name was only an id', () => {
+    expect(titleFromFile(join('d', '[abc123].mp4'))).toBeUndefined()
   })
 })
 

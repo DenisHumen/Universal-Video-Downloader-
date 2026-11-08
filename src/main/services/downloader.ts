@@ -821,9 +821,30 @@ export function finalPathCandidate(
   return null
 }
 
+/**
+ * A title for a row that only had its link for a name, read off the file.
+ *
+ * A batch, Download Now and the terminal queue a link with nothing known about
+ * it, and the address stayed the row's title for good: in the queue, in the
+ * Library, in the notification. The engine's own title is what the file is named
+ * after, so it can be had from there; the default template's ` [id]` and a
+ * `.f137` stream number are the only parts of the name that are not the title.
+ */
+export function titleFromFile(path: string): string | undefined {
+  const name = basename(path).replace(/\.[^.]+$/, '').replace(/\.f\d[\w-]*$/, '')
+  return name.replace(/(^| )\[[^\]]+\]$/, '').trim() || undefined
+}
+
 function parseFinalPath(line: string, item: DownloadItem): void {
   const found = finalPathCandidate(line)
   if (!found) return
+  if (/^https?:\/\//i.test(item.title ?? '') && isMediaName(found.path)) {
+    const title = titleFromFile(found.path)
+    if (title) {
+      item.title = title
+      emitUpdated(item)
+    }
+  }
   const current = finalPaths.get(item.id)
   if (!current || found.priority >= current.priority) {
     finalPaths.set(item.id, { path: found.path, priority: found.priority })
