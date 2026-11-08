@@ -7,6 +7,7 @@ import {
   entryFromItem,
   isLibraryFile,
   isNewerLibrary,
+  keptLinkOf,
   listLibrary,
   normaliseLibrary,
   noteRemote,
@@ -17,6 +18,7 @@ import {
   upsertEntry,
   type LibraryEntry,
   type LibraryFile,
+  type LibraryHit,
   type LibraryPage,
   type LibraryQuery,
   type LocateResult
@@ -42,6 +44,9 @@ import { log } from './log'
 
 const FILE = (): string => join(app.getPath('userData'), 'library.json')
 const HISTORY = (): string => join(app.getPath('userData'), 'history.json')
+
+/** The most files checked at once: a whole big library must not fill the thread pool ahead of everything else. */
+const SCAN_WIDTH = 16
 
 let lib: LibraryFile = EMPTY_LIBRARY
 const unread = new ReadFailure()
@@ -182,11 +187,50 @@ export function followEntry(id: string, patch: { filepath?: string; remotePath?:
  * to a share. A link whose file was deleted can be fetched again.
  */
 export function holdsLink(link: string): boolean {
-  return lib.entries.some(
-    (e) =>
-      normalizeUrl(e.sourceUrl ?? e.url) === link &&
-      Boolean(e.remotePath || existsSync(e.filepath))
+  return lib.entries.some((e) => keptLinkOf(e) === link && Boolean(e.remotePath || existsSync(e.filepath)))
+}
+
+/** The most links asked about at once: as deep as a channel listing goes. */
+const MOST_LINKS = 5000
+
+/**
+ * Which of these links are already kept, for the result card and a playlist's
+ * rows. An entry whose file is gone does not count, so a deleted video reads as
+ * new; one that went to a share does. The disk is only asked about entries whose
+ * link matched, so a long playlist costs its matches and not its length.
+ */
+export async function lookupLinks(links: string[]): Promise<LibraryHit[]> {
+  const byLink = new Map<string, LibraryEntry[]>()
+  for (const e of lib.entries) {
+    const key = keptLinkOf(e)
+    if (!key) continue
+    const held = byLink.get(key)
+    if (held) held.push(e)
+    else byLink.set(key, [e])
+  }
+  const asked = links.slice(0, MOST_LINKS).flatMap((link) => {
+    const held = byLink.get(normalizeUrl(link))
+    return held ? [{ link, held }] : []
+  })
+  const hits: LibraryHit[] = []
+  let next = 0
+  await Promise.all(
+    Array.from({ length: SCAN_WIDTH }, async () => {
+      while (next < asked.length) {
+        const { link, held } = asked[next++]
+        let here: LibraryEntry | undefined
+        for (const e of held) {
+          if (await access(e.filepath).then(() => true, () => false)) {
+            here = e
+            break
+          }
+        }
+        const entry = here ?? held.find((e) => e.remotePath)
+        if (entry) hits.push({ link, entry, onDisk: Boolean(here) })
+      }
+    })
   )
+  return hits
 }
 
 export function queryLibrary(q: LibraryQuery): LibraryPage {
@@ -245,9 +289,6 @@ export function forgetEntry(id: string): void {
   lib = next
   changed()
 }
-
-/** The most files checked at once: a whole big library must not fill the thread pool ahead of everything else. */
-const SCAN_WIDTH = 16
 
 /**
  * Entries whose file is gone from here, across the whole library and not just

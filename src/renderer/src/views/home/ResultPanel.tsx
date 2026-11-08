@@ -21,6 +21,8 @@ interface Props {
   settings: AppSettings | null
   /** The text in the entry, for "Open in Built-in Browser". */
   url: string
+  /** The link the card on screen came from. */
+  detectedUrl: string
   choice: ResultChoice
   onChoice: (next: ResultChoice) => void
   saveDir: string
@@ -46,6 +48,7 @@ export default function ResultPanel({
   failure,
   settings,
   url,
+  detectedUrl,
   choice,
   onChoice,
   saveDir,
@@ -91,6 +94,7 @@ export default function ResultPanel({
   return (
     <VideoResult
       info={info}
+      detectedUrl={detectedUrl}
       settings={settings}
       choice={choice}
       onChoice={onChoice}

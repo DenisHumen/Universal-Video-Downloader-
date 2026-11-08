@@ -6,6 +6,7 @@ import {
   libraryEntry,
   locateFile,
   locateInFolder,
+  lookupLinks,
   missingFiles,
   onLibraryChanged,
   queryLibrary,
@@ -202,6 +203,10 @@ export function registerIpc({ getWindow, openSearchWindow, onSettingsChanged }: 
   ipcMain.handle(IPC.libraryForget, (event, id: string) => {
     requireRenderer(event, IPC.libraryForget)
     return forgetEntry(String(id))
+  })
+  ipcMain.handle(IPC.libraryLookup, (event, links: unknown) => {
+    requireRenderer(event, IPC.libraryLookup)
+    return lookupLinks(Array.isArray(links) ? links.filter((l): l is string => typeof l === 'string') : [])
   })
   ipcMain.handle(IPC.libraryCountMissing, (event) => {
     requireRenderer(event, IPC.libraryCountMissing)

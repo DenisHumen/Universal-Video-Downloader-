@@ -21,6 +21,8 @@ export const IPC = {
   libraryTrash: 'library:trash',
   libraryTrashFile: 'library:trash-file',
   libraryForget: 'library:forget',
+  /** Which of these links are already kept, by canonical address. */
+  libraryLookup: 'library:lookup',
   libraryCountMissing: 'library:count-missing',
   libraryForgetMissing: 'library:forget-missing',
   /** Find a missing entry's file: main asks the person where, the renderer only names the entry. */

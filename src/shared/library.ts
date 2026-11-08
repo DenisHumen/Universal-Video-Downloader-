@@ -1,5 +1,5 @@
 import type { DownloadItem } from './types'
-import { isWebLink } from './urls'
+import { isWebLink, normalizeUrl } from './urls'
 
 /**
  * The Library (plan 5.3, [v2] SE-4): every finished file, kept in its own
@@ -33,6 +33,8 @@ export interface LibraryEntry {
   /** Seconds. */
   duration?: number
   sizeBytes?: number
+  /** Only a section of the video was fetched, so its link is not "already have it". */
+  partial?: boolean
   /** The file's extension, lower case. */
   container?: string
   /** A poster for it: the download's thumbnail address. */
@@ -65,6 +67,7 @@ export function entryFromItem(item: DownloadItem): LibraryEntry | null {
     seriesId: item.playlist?.title || item.series || item.uploader || undefined,
     duration: item.duration,
     sizeBytes: item.totalBytes,
+    partial: item.range ? true : undefined,
     container: extOf(item.filepath),
     thumb: item.thumbnail,
     finishedAt: item.finishedAt ?? item.createdAt
@@ -75,6 +78,28 @@ export function entryFromItem(item: DownloadItem): LibraryEntry | null {
 export function pageLinkOf(from: { originUrl?: string; sourceUrl?: string; url: string }): string | undefined {
   const link = from.originUrl || from.sourceUrl || from.url
   return isWebLink(link) ? link : undefined
+}
+
+/**
+ * The link this entry means "you already have", in canonical form. A cut has
+ * none: it is not the video. Neither has a clip made here, whose page is in
+ * `originUrl` and not in `sourceUrl`.
+ *
+ * `normalizeUrl` leaves the internal `uvd-*://` streaming links as they are, and
+ * those carry the dub and the quality, so one matches only exactly: the same
+ * episode in another voice is a different file, and rightly not "already had".
+ */
+export function keptLinkOf(e: LibraryEntry): string | undefined {
+  return e.partial ? undefined : normalizeUrl(e.sourceUrl ?? e.url)
+}
+
+/** "You already have this": a link detection found, and the entry that holds it. */
+export interface LibraryHit {
+  /** The link as it was asked about. */
+  link: string
+  entry: LibraryEntry
+  /** The file is here to play. If not, it went to a share (`entry.remotePath`). */
+  onDisk: boolean
 }
 
 /** Whether parsed JSON can be read as a library at all. */

@@ -375,6 +375,7 @@ export default function HomeView(): JSX.Element {
             failure={det.failure}
             settings={settings}
             url={url}
+            detectedUrl={det.detectedUrl}
             choice={choice}
             onChoice={setChoice}
             saveDir={saveDir}

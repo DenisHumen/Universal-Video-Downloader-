@@ -6,7 +6,7 @@ import { contextBridge, ipcRenderer } from 'electron'
 import { IPC } from '@shared/ipc'
 import { themeFromArgv } from '@shared/theme-boot'
 import type { ButtonLayout } from '@shared/desktop'
-import type { LibraryPage, LibraryQuery, LocateResult } from '@shared/library'
+import type { LibraryHit, LibraryPage, LibraryQuery, LocateResult } from '@shared/library'
 import type {
   AppSettings,
   BrowserLoginOffer,
@@ -86,6 +86,7 @@ const api = {
   trashLibraryFile: (filepath: string): Promise<'trashed' | 'failed' | 'noEntry'> =>
     ipcRenderer.invoke(IPC.libraryTrashFile, filepath),
   forgetLibraryEntry: (id: string): Promise<void> => ipcRenderer.invoke(IPC.libraryForget, id),
+  libraryLookup: (links: string[]): Promise<LibraryHit[]> => ipcRenderer.invoke(IPC.libraryLookup, links),
   libraryCountMissing: (): Promise<number> => ipcRenderer.invoke(IPC.libraryCountMissing),
   forgetMissingEntries: (): Promise<number> => ipcRenderer.invoke(IPC.libraryForgetMissing),
   locateLibraryEntry: (id: string, how: 'folder' | 'file'): Promise<LocateResult> =>

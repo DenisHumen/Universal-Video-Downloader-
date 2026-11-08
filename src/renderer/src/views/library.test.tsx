@@ -1,6 +1,8 @@
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { LibraryEntry } from '@shared/library'
+import type { MediaInfo } from '@shared/types'
+import PlaylistCard from '../components/PlaylistCard'
 import { installMockApi } from '../lib/mockApi'
 import { useStore } from '../store'
 import App from '../App'
@@ -148,6 +150,68 @@ describe('the same actions in both lists', () => {
     await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Move to Trash' })))
     await screen.findByText(/no longer in the Library/)
     expect(screen.getByText('Not in the Library')).toBeTruthy()
+  })
+})
+
+describe('you already have this', () => {
+  const detect = async (link: string): Promise<void> => {
+    await app()
+    act(() => useStore.getState().requestDetect(link))
+    await screen.findByRole('button', { name: /^Download|^Trim/ }, { timeout: 3000 })
+  }
+
+  it('says so on the result card, with Play, Show in Folder and Download Anyway', async () => {
+    const link = 'https://example.com/watch?v=kept'
+    window.__uvdMock!.queue({ id: 'kept', title: 'Kept', state: 'completed', percent: 100, finishedAt: Date.now(), filepath: '/v/kept.mp4', url: link, sourceUrl: link })
+    await detect(link)
+    await screen.findByText('You Already Have This')
+    const card = document.querySelector('[data-uvd="already-have"]')!
+    expect(within(card as HTMLElement).getByRole('button', { name: 'Play' })).toBeTruthy()
+    expect(within(card as HTMLElement).getByRole('button', { name: 'Show in Folder' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: /^Download Anyway/ })).toBeTruthy()
+  })
+
+  it('marks a playlist’s rows that are kept, and only those', async () => {
+    const kept = 'https://example.com/watch?v=ep1'
+    window.__uvdMock!.queue({ id: 'ep1', title: 'Episode one', state: 'completed', percent: 100, finishedAt: Date.now(), filepath: '/v/ep1.mp4', url: kept, sourceUrl: kept })
+    const info = {
+      id: 'p',
+      title: 'A playlist',
+      webpageUrl: 'https://example.com/list',
+      extractor: 'example',
+      isPlaylist: true,
+      formats: [],
+      entries: [
+        { url: `${kept}&utm_source=shared`, title: 'Episode one' },
+        { url: 'https://example.com/watch?v=ep2', title: 'Episode two' }
+      ]
+    } as unknown as MediaInfo
+    await app()
+    render(<PlaylistCard info={info} onDone={() => undefined} saveDir="" onSaveDirChange={() => undefined} />)
+    const row = (await screen.findByText('In Library')).closest('button')!
+    expect(row.textContent).toMatch(/Episode one/)
+    expect(screen.getAllByText('In Library')).toHaveLength(1)
+  })
+
+  it('stays quiet about a link whose file is gone', async () => {
+    const link = 'https://example.com/watch?v=lost'
+    window.__uvdMock!.queue({ id: 'lost2', title: 'Lost', state: 'completed', percent: 100, finishedAt: Date.now(), filepath: '/v/lost2.mp4', url: link, sourceUrl: link })
+    window.__uvdMock!.missing(['/v/lost2.mp4'])
+    await detect(link)
+    await act(async () => undefined)
+    expect(screen.queryByText('You Already Have This')).toBeNull()
+    window.__uvdMock!.missing([])
+  })
+
+  it('offers no Play for a file on a share', async () => {
+    const link = 'https://example.com/watch?v=sent'
+    window.__uvdMock!.queue({ id: 'sent', title: 'Sent', state: 'completed', percent: 100, finishedAt: Date.now(), filepath: '/v/sent.mp4', url: link, sourceUrl: link, remotePath: 'anime/sent.mp4' })
+    window.__uvdMock!.missing(['/v/sent.mp4'])
+    await detect(link)
+    await screen.findByText('You Already Have This')
+    expect(within(document.querySelector('[data-uvd="already-have"]') as HTMLElement).queryByRole('button', { name: 'Play' })).toBeNull()
+    expect(screen.getByText(/anime\/sent\.mp4/)).toBeTruthy()
+    window.__uvdMock!.missing([])
   })
 })
 

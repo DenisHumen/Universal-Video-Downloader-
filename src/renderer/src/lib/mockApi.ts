@@ -1,6 +1,7 @@
 import {
   EMPTY_LIBRARY,
   entryFromItem,
+  keptLinkOf,
   listLibrary,
   rekeyEntry,
   removeEntry,
@@ -8,6 +9,7 @@ import {
   type LibraryEntry,
   type LibraryFile
 } from '@shared/library'
+import { normalizeUrl } from '@shared/urls'
 import type { ButtonLayout } from '@shared/desktop'
 import type { UvdApi, AppInfo } from '../../../preload/index'
 import type {
@@ -738,6 +740,15 @@ export function installMockApi(): void {
       return listLibrary(mockLibrary, q)
     },
     libraryMissing: async (paths) => paths.filter((p) => mockMissing.has(p)),
+    libraryLookup: async (links) => {
+      syncMockLibrary()
+      return links.flatMap((link) => {
+        const held = mockLibrary.entries.filter((e) => keptLinkOf(e) === normalizeUrl(link))
+        const here = held.find((e) => !mockMissing.has(e.filepath))
+        const entry = here ?? held.find((e) => e.remotePath)
+        return entry ? [{ link, entry, onDisk: Boolean(here) }] : []
+      })
+    },
     libraryCountMissing: async () => mockLibrary.entries.filter(isMockLost).length,
     forgetMissingEntries: async () => {
       const lost = mockLibrary.entries.filter(isMockLost)

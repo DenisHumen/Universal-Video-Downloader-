@@ -176,6 +176,62 @@ describe('isolation (SE-4)', () => {
   })
 })
 
+describe('you already have this', () => {
+  it('matches a link in any form, ignoring entries whose file is gone', async () => {
+    const lib = await import('./library')
+    lib.loadLibrary()
+    writeFileSync(join(h.dir, 'here.mp4'), 'x')
+    const here = join(h.dir, 'here.mp4')
+    lib.recordFinished(done('here', here, 2, { sourceUrl: 'https://www.youtube.com/watch?v=aaaaaaaaaaa' }))
+    lib.recordFinished(done('gone', join(h.dir, 'gone.mp4'), 1, { sourceUrl: 'https://www.youtube.com/watch?v=bbbbbbbbbbb' }))
+    const hits = await lib.lookupLinks([
+      'https://youtu.be/aaaaaaaaaaa?si=shared',
+      'https://www.youtube.com/watch?v=bbbbbbbbbbb',
+      'https://example.com/never'
+    ])
+    expect(hits.map((x) => [x.link, x.entry.id, x.onDisk])).toEqual([['https://youtu.be/aaaaaaaaaaa?si=shared', 'here', true]])
+  })
+
+  it('counts a file on a share, without a file to play', async () => {
+    const lib = await import('./library')
+    lib.loadLibrary()
+    lib.recordFinished(done('s', join(h.dir, 'sent.mp4'), 1, { sourceUrl: 'https://example.com/s', remotePath: 'anime/s.mp4' }))
+    const [hit] = await lib.lookupLinks(['https://example.com/s'])
+    expect(hit).toMatchObject({ onDisk: false, entry: { remotePath: 'anime/s.mp4' } })
+  })
+
+  it('prefers a copy still here to an older entry whose file went', async () => {
+    const lib = await import('./library')
+    lib.loadLibrary()
+    writeFileSync(join(h.dir, 'old.mp4'), 'x')
+    lib.recordFinished(done('old', join(h.dir, 'old.mp4'), 1, { sourceUrl: 'https://example.com/v' }))
+    lib.recordFinished(done('new', join(h.dir, 'new.mp4'), 2, { sourceUrl: 'https://example.com/v' }))
+    expect((await lib.lookupLinks(['https://example.com/v']))[0].entry.id).toBe('old')
+  })
+
+  it('does not take a cut, or a clip made from the file, for the video', async () => {
+    const lib = await import('./library')
+    lib.loadLibrary()
+    writeFileSync(join(h.dir, 'cut.mp4'), 'x')
+    writeFileSync(join(h.dir, 'clip.mp4'), 'x')
+    lib.recordFinished(done('cut', join(h.dir, 'cut.mp4'), 1, { sourceUrl: 'https://example.com/v', range: { start: 5, end: 9 } }))
+    lib.recordFinished(done('clip', join(h.dir, 'clip.mp4'), 2, { kind: 'trim', url: '/src.mp4', originUrl: 'https://example.com/v' }))
+    expect(await lib.lookupLinks(['https://example.com/v'])).toEqual([])
+    expect(lib.holdsLink('https://example.com/v')).toBe(false)
+  })
+
+  it('matches a streaming link only exactly: another dub or quality is another file', async () => {
+    const lib = await import('./library')
+    lib.loadLibrary()
+    writeFileSync(join(h.dir, 'ep.mp4'), 'x')
+    const link = 'uvd-rezka://show?season=1&episode=2&translator=56&quality=720p'
+    lib.recordFinished(done('ep', join(h.dir, 'ep.mp4'), 1, { url: link, sourceUrl: link }))
+    expect(await lib.lookupLinks([link])).toHaveLength(1)
+    expect(await lib.lookupLinks([link.replace('translator=56', 'translator=110')])).toEqual([])
+    expect(await lib.lookupLinks([link.replace('720p', '1080p')])).toEqual([])
+  })
+})
+
 describe('by series or channel', () => {
   const place = { title: 'A Course', index: 1, count: 3, folder: true, numbered: true }
 
