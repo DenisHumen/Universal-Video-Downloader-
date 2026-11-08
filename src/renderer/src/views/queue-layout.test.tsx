@@ -69,7 +69,7 @@ describe('the queue screen', () => {
   it('names what it does to many rows at once, in words', async () => {
     await queue(1200)
     expect(screen.getByRole('button', { name: 'Retry Failed' }).textContent).toContain('Retry Failed')
-    expect(screen.getByRole('button', { name: 'Clear Failed' }).textContent).toContain('Clear Failed')
+    expect(screen.getByRole('button', { name: 'Clear Not Downloaded' }).textContent).toContain('Clear Not Downloaded')
     expect(screen.getByRole('button', { name: 'Clear Finished' }).textContent).toContain('Clear Finished')
   })
 

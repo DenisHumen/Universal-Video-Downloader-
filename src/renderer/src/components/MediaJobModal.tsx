@@ -162,9 +162,9 @@ export default function MediaJobModal({ item, mode, onClose }: Props): JSX.Eleme
           <>
             {hasVideo && hasAudio && (
               <div>
-                <p className="label mb-2">{t('common.format')}</p>
+                <p className="label mb-2">{t('convert.keep')}</p>
                 <Choice
-                  label={t('common.format')}
+                  label={t('convert.keep')}
                   value={audioOnly ? 'audio' : 'video'}
                   onChange={(v) => {
                     const next = v === 'audio'
