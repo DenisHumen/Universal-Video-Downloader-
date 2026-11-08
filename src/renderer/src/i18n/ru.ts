@@ -326,6 +326,13 @@ export const ru: Dictionary = {
   'playlist.selectAll': 'Выбрать все',
   'playlist.range': 'Номера',
   'playlist.selectRange': 'Выбрать диапазон',
+  'playlist.cut': 'Показаны только первые {count}. Список может быть длиннее',
+  'playlist.cutDeepest': 'Показаны только первые {count}: глубже приложение не смотрит',
+  'playlist.loadMore': 'Загрузить ещё',
+  'playlist.loadMoreFailed': 'Не удалось получить больше видео. Список на экране остался прежним',
+  'playlist.wholeList': 'Это весь список',
+  'playlist.confirmAll': 'Скачать все видео ({count})?',
+  'playlist.confirmAllBody': 'Это {count} видео сразу: скачивание может занять много времени и места на диске',
   'playlist.added':
     'В очередь добавлено {count} видео|В очередь добавлено {count} видео|В очередь добавлено {count} видео',
   'playlist.numbering': 'Нумеровать файлы',

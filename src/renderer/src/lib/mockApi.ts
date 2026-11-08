@@ -148,6 +148,28 @@ function fakeInfo(url: string): MediaInfo {
   }
 }
 
+/** A link with "mock-channel" in it: a channel longer than the listing depth, for "Load More". */
+function fakeChannel(url: string, depth: number): MediaInfo {
+  const count = Math.min(depth, 730)
+  return {
+    id: 'mock-channel',
+    title: 'A very long channel',
+    webpageUrl: url,
+    originalUrl: url,
+    extractor: 'YoutubeTab',
+    isLive: false,
+    formats: [],
+    isPlaylist: true,
+    playlistCount: count,
+    entries: Array.from({ length: count }, (_, i) => ({
+      url: `https://example.com/watch?v=c${i}`,
+      title: `Episode ${i + 1} of the channel`,
+      extractor: 'Youtube'
+    })),
+    ...(count >= depth ? { listingCut: depth } : {})
+  }
+}
+
 function fakeResults(query: string, scope: string): SearchResult[] {
   // The same choice main makes, so the preview never shows what the setting hides.
   const services =
@@ -319,8 +341,11 @@ export function installMockApi(): void {
     }
   }
   const api: UvdApi = {
-    detect: async (url) => {
+    detect: async (url, _requestId, options) => {
       await delay(700)
+      if (/mock-channel/.test(url)) {
+        return { ok: true, info: fakeChannel(url, options?.playlistEnd ?? settings.playlistLimit) }
+      }
       if (url.startsWith('uvd-yummy-item://')) return { ok: true, info: fakeAnimeInfo(url) }
       // A link with "unsupported" in it fails the way an unknown site does, report offer and all.
       if (/unsupported/i.test(url)) {

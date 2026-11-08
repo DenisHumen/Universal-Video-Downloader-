@@ -51,6 +51,12 @@ export interface MediaInfo {
   playlistCount?: number
   isPlaylist?: boolean
   entries?: PlaylistEntry[]
+  /**
+   * The listing depth this list ran into, when it did: there may be more past
+   * it. Reaching the depth is the signal, because `playlist_count` often only
+   * counts what was listed.
+   */
+  listingCut?: number
   // For streaming sites needing translator/episode/quality selection
   streaming?: StreamingInfo
   /**
@@ -728,6 +734,8 @@ export interface DetectOptions {
    * clipboard never opens a window or fetches a page behind the user's back.
    */
   prefetch?: boolean
+  /** List a channel or playlist this deep instead of the setting's depth: "Load More". */
+  playlistEnd?: number
 }
 
 export type DetectStage =

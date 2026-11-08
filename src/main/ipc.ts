@@ -144,7 +144,7 @@ export function registerIpc({ getWindow, openSearchWindow, onSettingsChanged }: 
       const engineFailure = await engineUnavailable()
       if (engineFailure) return engineFailure
       if (controller.signal.aborted) return { ok: false, error: 'Detection canceled.', errorCode: 'canceled' }
-      return await detect(url, report, controller.signal, { prefetch: options?.prefetch === true })
+      return await detect(url, report, controller.signal, { prefetch: options?.prefetch === true, playlistEnd: options?.playlistEnd })
     } finally {
       if (requestId) detections.delete(requestId)
       // Every exit ends the narration, not only the ones the detector marks 'done'.
