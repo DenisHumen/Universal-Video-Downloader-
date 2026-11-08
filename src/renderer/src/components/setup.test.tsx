@@ -20,19 +20,16 @@ async function app(): Promise<void> {
 }
 
 describe('first-run setup (6.3)', () => {
-  it('opens by itself on a new install and walks three steps, saving as it goes', async () => {
+  it('opens by itself on a new install and walks its steps, saving as it goes, and never asks about cookies', async () => {
     await window.api.setSettings({ setupDone: false })
     vi.spyOn(window.api, 'chooseDirectory').mockResolvedValue('/home/me/Films')
     await app()
     const dialog = await screen.findByRole('dialog', { name: 'Where Should Downloads Go?' })
-    expect(within(dialog).getByText('Step 1 of 3')).toBeTruthy()
+    expect(within(dialog).getByText('Step 1 of 2')).toBeTruthy()
     await act(async () => fireEvent.click(within(dialog).getByRole('button', { name: /Change/ })))
     await waitFor(() => expect(useStore.getState().settings?.downloadDir).toBe('/home/me/Films'))
     await act(async () => fireEvent.click(within(dialog).getByRole('button', { name: 'Next' })))
 
-    const cookies = screen.getByRole('dialog', { name: 'Use Cookies From a Browser?' })
-    // Skipped: nothing chosen, nothing saved.
-    await act(async () => fireEvent.click(within(cookies).getByRole('button', { name: 'Skip' })))
     expect(useStore.getState().settings?.cookiesFromBrowser).toBe('')
 
     const look = screen.getByRole('dialog', { name: 'Notifications and Look' })

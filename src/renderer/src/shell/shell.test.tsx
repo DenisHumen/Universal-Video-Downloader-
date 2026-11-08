@@ -103,7 +103,7 @@ describe('sidebar', () => {
   it(`is pinned from ${SIDEBAR_PINNED_FROM}px, with the section title in the content header`, async () => {
     await shell('linux', SIDEBAR_PINNED_FROM)
     const nav = screen.getByRole('navigation')
-    expect(within(nav).getByRole('button', { name: /download/i }).getAttribute('aria-current')).toBe('page')
+    expect(within(nav).getByRole('button', { name: /^download/i }).getAttribute('aria-current')).toBe('page')
     expect(screen.getByRole('heading', { name: 'Download' })).toBeTruthy()
     expect(screen.queryByRole('button', { name: 'Sidebar' })).toBeNull()
     expect(await axeViolations(document.body)).toEqual([])
@@ -121,7 +121,7 @@ describe('sidebar', () => {
   it('switches views, marks the current one, and closes the overlay', async () => {
     await shell('linux', 700)
     fireEvent.click(screen.getByRole('button', { name: 'Sidebar' }))
-    act(() => within(screen.getByRole('navigation')).getByRole('button', { name: /activity/i }).click())
+    act(() => within(screen.getByRole('navigation')).getByRole('button', { name: /my downloads/i }).click())
     expect(useStore.getState().view).toBe('downloads')
     expect(useStore.getState().sidebarOverlayOpen).toBe(false)
   })

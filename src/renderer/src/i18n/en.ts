@@ -38,7 +38,7 @@ export const en = {
 
   // ---- navigation ----
   'nav.home': 'Download',
-  'nav.queue': 'Downloads',
+  'nav.queue': 'My Downloads',
   'nav.search': 'Search',
   'nav.settings': 'Settings',
   'nav.label': 'Sections',
@@ -244,7 +244,7 @@ export const en = {
   'home.dropHint': 'Drop to download',
   'home.active': 'Active',
   'home.recent': 'Finished',
-  'home.openQueue': 'All Downloads',
+  'home.openQueue': 'All My Downloads',
   'home.downloadSummary': 'Download · {details}',
   'home.downloadNow': 'Download Now',
   'home.downloadNowHint': 'Starts right away; no need to choose a quality.',
@@ -260,7 +260,7 @@ export const en = {
   'home.clipboardFound': 'Link on your clipboard',
   'home.clipboardUse': 'Use It',
   'home.addedToQueue': 'Added to Downloads',
-  'toast.viewQueue': 'Show Downloads',
+  'toast.viewQueue': 'Show My Downloads',
   'home.startFailed': 'Could not start the download',
   'home.liveHint':
     'This is a live stream — it records from now until you stop it, so there is no length to trim and no percentage to report.',
@@ -276,7 +276,7 @@ export const en = {
   'detect.elapsed': '{seconds} s',
 
   // ---- queue ----
-  'queue.title': 'Downloads',
+  'queue.title': 'My Downloads',
   'queue.items': '{count} item|{count} items',
   'queue.empty': 'Nothing Here Yet',
   'queue.emptyHint': 'Paste a link to get started',
@@ -604,7 +604,7 @@ export const en = {
   // ---- shortcuts ----
   'shortcuts.title': 'Keyboard Shortcuts',
   'shortcuts.newDownload': 'New Download',
-  'shortcuts.queue': 'Downloads',
+  'shortcuts.queue': 'My Downloads',
   'shortcuts.search': 'Search by Title',
   'shortcuts.settings': 'Settings',
   'shortcuts.watch': 'Watched Series',
@@ -863,7 +863,7 @@ export const en = {
   'auto.retryStarted': 'Trying this episode again',
   'auto.retryPaused': 'Paused — resume the series to try this episode again',
   'auto.runQueuePaused': 'Paused in the queue — resume it there to carry on',
-  'auto.showInQueue': 'Show in Downloads',
+  'auto.showInQueue': 'Show in My Downloads',
   'auto.addTitle': 'Watch a Series…',
   'auto.seriesUrl': 'Link to the Series',
   'auto.seriesUrlHint': 'The page listing its episodes, not one episode',

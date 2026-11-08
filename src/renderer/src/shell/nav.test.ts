@@ -5,9 +5,9 @@ import { ru } from '../i18n/ru'
 import { NAV_ALL, NAV_BOTTOM, NAV_MAIN } from './nav'
 
 describe('4.0 sections', () => {
-  it('are Download, Search, Downloads, Watching, with Settings at the bottom', () => {
+  it('are Download, Search, My Downloads, Watching, with Settings at the bottom', () => {
     // Sentence case: the 4.0 copy voice reaches the shell first ([v3] VD note).
-    expect(NAV_MAIN.map((s) => en[s.label])).toEqual(['Download', 'Search', 'Downloads', 'Library', 'Watching'])
+    expect(NAV_MAIN.map((s) => en[s.label])).toEqual(['Download', 'Search', 'My Downloads', 'Library', 'Watching'])
     expect(NAV_BOTTOM.map((s) => en[s.label])).toEqual(['Settings'])
     expect(NAV_ALL.map((s) => ru[s.label])).toEqual(['Скачать', 'Поиск', 'Загрузки', 'Библиотека', 'Слежение', 'Настройки'])
   })

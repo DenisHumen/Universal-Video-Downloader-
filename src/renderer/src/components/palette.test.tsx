@@ -28,7 +28,7 @@ describe('command palette', () => {
     await app()
     act(() => useStore.getState().setPaletteOpen(true))
     const box = await screen.findByRole('combobox')
-    fireEvent.change(box, { target: { value: 'activity' } })
+    fireEvent.change(box, { target: { value: 'my downloads' } })
     fireEvent.keyDown(box, { key: 'Enter' })
     expect(useStore.getState().view).toBe('downloads')
     expect(useStore.getState().paletteOpen).toBe(false)

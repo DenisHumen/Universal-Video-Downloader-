@@ -24,7 +24,7 @@ describe('queueing a download', () => {
     const [only, ...rest] = useToasts.getState().toasts
     expect(rest).toEqual([])
     expect(only.kind).toBe('success')
-    expect(only.action?.label).toBe('View in Activity')
+    expect(only.action?.label).toBe('Show My Downloads')
     only.action!.run()
     expect(useStore.getState().view).toBe('downloads')
   })

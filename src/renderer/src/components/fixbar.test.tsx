@@ -15,7 +15,7 @@ beforeAll(() => {
   q({ id: 'gate', title: 'Members only clip', state: 'error', errorCode: 'signIn', error: 'Sign in to confirm', url: 'https://www.youtube.com/watch?v=gate' })
   q({ id: 'disk', title: 'Too big for the disk', state: 'error', errorCode: 'diskFull', error: 'No space left', url: 'https://www.youtube.com/watch?v=disk' })
   q({ id: 'limit', title: 'Rate limited one', state: 'error', errorCode: 'rateLimited', error: 'HTTP 429', url: 'https://www.youtube.com/watch?v=limit' })
-  q({ id: 'nofmt', title: 'Podcast with no video', state: 'error', errorCode: 'noFormats', error: 'No video formats', url: 'https://www.youtube.com/watch?v=nofmt' })
+  q({ id: 'nofmt', title: 'Podcast with no video', state: 'error', errorCode: 'noSuchFormat', error: 'Requested format is not available', url: 'https://www.youtube.com/watch?v=nofmt' })
 })
 beforeEach(() => useStore.setState({ view: 'downloads' }))
 
@@ -27,15 +27,15 @@ async function row(title: string): Promise<HTMLElement> {
 }
 
 describe('fix buttons on failed rows (6.2)', () => {
-  it('signIn: "Use Cookies From…" picks a browser inline, saves it and retries', async () => {
+  it('signIn: "Sign In or Use Cookies…" picks a browser inline, saves it and retries', async () => {
     const r = await row('Members only clip')
     const retry = vi.spyOn(window.api, 'retryDownload')
-    await act(async () => fireEvent.click(within(r).getByRole('button', { name: 'Use Cookies From…' })))
-    await act(async () => fireEvent.click(screen.getByRole('menuitem', { name: 'Firefox' })))
+    await act(async () => fireEvent.click(within(r).getByRole('button', { name: 'Sign In or Use Cookies…' })))
+    await act(async () => fireEvent.click(screen.getByRole('menuitem', { name: 'Cookies From Firefox' })))
     await waitFor(() => expect(useStore.getState().settings?.cookiesFromBrowser).toBe('firefox'))
     await waitFor(() => expect(retry).toHaveBeenCalledWith('gate'))
     // And the way to the full settings.
-    await act(async () => fireEvent.click(within(r).getByRole('button', { name: 'Use Cookies From…' })))
+    await act(async () => fireEvent.click(within(r).getByRole('button', { name: 'Sign In or Use Cookies…' })))
     expect(screen.getByRole('menuitem', { name: 'Settings › Access & Cookies…' })).toBeTruthy()
   })
 
@@ -48,7 +48,7 @@ describe('fix buttons on failed rows (6.2)', () => {
     expect(start.mock.calls[0][0]).toMatchObject({ outputDir: '/mnt/big' })
   })
 
-  it('noFormats: "Audio Only" re-queues it as audio', async () => {
+  it('noSuchFormat: "Audio Only" re-queues it as audio', async () => {
     const r = await row('Podcast with no video')
     const start = vi.spyOn(window.api, 'startDownload')
     start.mockClear()
