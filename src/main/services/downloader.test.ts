@@ -119,7 +119,37 @@ describe('buildArgs: subtitles', () => {
     expect(args).toContain('--embed-subs')
     expect(args).toContain('--write-auto-subs')
     expect(langs(args)).toEqual(['ru,en-orig'])
+  })
+
+  // Run through the real engine: without `--write-subs` a video with both tracks got the machine's.
+  it('asks for written tracks beside machine-made ones, and keeps no file of them', () => {
+    const args = buildArgs(item({ subtitles: ['de'] }), settings(), '/tmp')
+    expect(args).toContain('--write-subs')
+    expect(args).toContain('--write-auto-subs')
+    expect(args[args.indexOf('--compat-options') + 1]).toBe('no-keep-subs')
+  })
+
+  it('keeps the files when Settings wants them beside the video as well', () => {
+    const args = buildArgs(item(), settings({ embedSubtitles: true, writeSubtitles: true }), '/tmp')
+    expect(args).toContain('--embed-subs')
+    expect(args).toContain('--write-subs')
+    expect(args).not.toContain('--compat-options')
+  })
+
+  // The engine's own rule still applies there: it writes them, embeds them and removes them.
+  it('leaves "all" to --embed-subs alone', () => {
+    const args = buildArgs(item(), settings({ embedSubtitles: true, subtitleLanguages: 'all' }), '/tmp')
+    expect(args).toContain('--embed-subs')
     expect(args).not.toContain('--write-subs')
+    expect(args).not.toContain('--compat-options')
+  })
+
+  it('does not let a failed caption end the run, and only then', () => {
+    expect(buildArgs(item({ subtitles: ['de'] }), settings(), '/tmp')).toContain('--ignore-errors')
+    expect(buildArgs(item(), settings({ embedSubtitles: true }), '/tmp')).toContain('--ignore-errors')
+    expect(buildArgs(item({ mode: 'audio' }), settings({ writeSubtitles: true }), '/tmp')).toContain('--ignore-errors')
+    expect(buildArgs(item(), settings(), '/tmp')).not.toContain('--ignore-errors')
+    expect(buildArgs(item({ mode: 'audio' }), settings({ embedSubtitles: true }), '/tmp')).not.toContain('--ignore-errors')
   })
 
   it('picked languages outrank the Settings list', () => {

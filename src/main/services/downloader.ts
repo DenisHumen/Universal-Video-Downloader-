@@ -29,7 +29,8 @@ import {
   hasCookies,
   headerArgs,
   isTransientError,
-  refusesMidStreamInit
+  refusesMidStreamInit,
+  withPostprocessHeading
 } from './options'
 import { IN_FLIGHT_STATES, isSameDownload } from './dedupe'
 import {
@@ -698,8 +699,28 @@ export function buildArgs(
     to, which is a hundred and fifty requests, and it answers those with a 429.
   */
   const autoSubs = /(^|,)\s*all\s*(,|$)/i.test(subLangs) ? [] : ['--write-auto-subs']
-  if (item.mode === 'video' && (settings.embedSubtitles || (picked && !settings.writeSubtitles))) {
-    args.push('--embed-subs', ...autoSubs, '--sub-langs', subLangs)
+  const embedSubs = item.mode === 'video' && (settings.embedSubtitles || Boolean(picked && !settings.writeSubtitles))
+  /*
+    A caption is a side dish, and the engine fetches it before the video: one
+    429 on a track ended the whole run with nothing downloaded. Only this switch
+    turns that into a warning. Checked against the real engine, a failed video
+    or a failed merge still exits 1 with it, so the row still fails; what changes
+    is that a post-processing failure loses its "Postprocessing:" opening, which
+    `withPostprocessHeading` gives back.
+  */
+  if (embedSubs || settings.writeSubtitles) args.push('--ignore-errors')
+  if (embedSubs) {
+    /*
+      `--embed-subs` switches on written subtitles by itself only when machine
+      captions were not asked for. Asked for, a video with both came down with
+      the machine's, and written tracks with no machine ones came down as nothing.
+      Naming `--write-subs` also tells the engine the files are wanted beside the
+      video, which `no-keep-subs` takes back unless Settings does want them.
+    */
+    const written = autoSubs.length
+      ? ['--write-subs', ...autoSubs, ...(settings.writeSubtitles ? [] : ['--compat-options', 'no-keep-subs'])]
+      : []
+    args.push('--embed-subs', ...written, '--sub-langs', subLangs)
   }
   if (settings.writeSubtitles) {
     args.push('--write-subs', ...autoSubs, '--sub-langs', subLangs, '--convert-subs', 'srt')
@@ -1618,7 +1639,8 @@ async function runDownload(item: DownloadItem): Promise<void> {
       processQueue()
       return
     }
-    fail(item, stderrTail || `yt-dlp exited with code ${code}`)
+    const tail = stderrTail || `yt-dlp exited with code ${code}`
+    fail(item, item.state === 'processing' ? withPostprocessHeading(tail) : tail)
   })
 }
 

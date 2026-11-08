@@ -549,6 +549,20 @@ export function refusesMidStreamInit(raw: string): boolean {
 }
 
 /**
+ * A run that failed in post-processing, in the words the rules read it by.
+ *
+ * With `--ignore-errors`, which a run with subtitles has, the engine prints only
+ * ffmpeg's own last line ("Error opening input files: ..."), not the
+ * "Postprocessing:" it otherwise opens with, and that line matches no rule. Only
+ * the caller can tell which stage the run had reached.
+ */
+export function withPostprocessHeading(raw: string): string {
+  const at = raw.lastIndexOf('ERROR: ')
+  if (at < 0 || raw.startsWith('Postprocessing:', at + 7)) return raw
+  return `${raw.slice(0, at + 7)}Postprocessing: ${raw.slice(at + 7)}`
+}
+
+/**
  * Transient failures worth retrying automatically before bothering the user.
  *
  * Read from the end of the output only, and a 5xx only where it is an HTTP

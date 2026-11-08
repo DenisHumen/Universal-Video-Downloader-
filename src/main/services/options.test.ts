@@ -7,6 +7,7 @@ import {
   headerArgs,
   humanizeYtdlpError,
   isTransientError,
+  withPostprocessHeading,
   stalledConnecting,
   proxyEnv,
   refusesMidStreamInit
@@ -217,6 +218,27 @@ describe('humanizeYtdlpError', () => {
     expect(humanizeYtdlpError('warning: something\nERROR: totally novel failure', true)).toBe(
       'totally novel failure'
     )
+  })
+})
+
+describe('withPostprocessHeading', () => {
+  // Word for word what the engine prints for a failed merge with --ignore-errors, and for a full disk.
+  it('gives a bare ffmpeg line back to the post-processing rule', () => {
+    const raw = [
+      "WARNING: Unable to download video subtitles for 'en': HTTP Error 429: Too Many Requests",
+      'ERROR: Error opening input files: Invalid data found when processing input',
+      'WARNING: Skipping embedding en subtitle because the file is missing',
+      ''
+    ].join('\n')
+    expect(classifyYtdlpError(raw, false).code).toBeUndefined()
+    expect(classifyYtdlpError(withPostprocessHeading(raw), false).code).toBe('postprocess')
+    expect(isTransientError(withPostprocessHeading(raw))).toBe(false)
+  })
+
+  it('leaves the rule for a full disk first, and a line already headed alone', () => {
+    expect(classifyYtdlpError(withPostprocessHeading('ERROR: Error writing trailer: No space left on device'), false).code).toBe('diskFull')
+    expect(withPostprocessHeading('ERROR: Postprocessing: x')).toBe('ERROR: Postprocessing: x')
+    expect(withPostprocessHeading('nothing said')).toBe('nothing said')
   })
 })
 

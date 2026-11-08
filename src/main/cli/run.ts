@@ -17,7 +17,7 @@ import {
   POSTPROCESS_PREFIX,
   PROGRESS_PREFIX
 } from '../services/downloader'
-import { classifyYtdlpError, hasCookies, refusesMidStreamInit } from '../services/options'
+import { classifyYtdlpError, hasCookies, refusesMidStreamInit, withPostprocessHeading } from '../services/options'
 import { killTree } from '../services/process'
 import { lineReader } from '../services/engine-output'
 import { ffmpegProgressSeconds, splitOutputLines } from '../services/ffmpeg-output'
@@ -224,17 +224,22 @@ function runEngine(item: DownloadItem, settings: AppSettings, dir: string): Prom
     let finalPath: { path: string; priority: number } | undefined
     let announced = false
     let stderrTail = ''
+    // SponsorBlock's lookup is a post-processor too, and runs before anything is fetched.
+    let fetched = false
+    let postprocessing = false
 
     const stdout = lineReader(
       (text) => text.split(/\r?\n/),
       (line) => {
         if (line.startsWith(PROGRESS_PREFIX)) {
+          fetched = true
           status(progressLine(parseProgress(line.slice(PROGRESS_PREFIX.length))))
           return
         }
         if (line.startsWith(POSTPROCESS_PREFIX)) {
           const [state, postprocessor] = line.slice(POSTPROCESS_PREFIX.length).split('\t')
           if (state === 'started') status(postprocessLine(postprocessor))
+          if (fetched) postprocessing = true
           return
         }
         const found = finalPathCandidate(line)
@@ -266,7 +271,11 @@ function runEngine(item: DownloadItem, settings: AppSettings, dir: string): Prom
     child.on('close', (code) => {
       stdout.flush()
       stderr.flush()
-      settle({ code, stderrTail, finalPath: finalPath?.path })
+      settle({
+        code,
+        stderrTail: code !== 0 && postprocessing ? withPostprocessHeading(stderrTail) : stderrTail,
+        finalPath: finalPath?.path
+      })
     })
   })
 }
