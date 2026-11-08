@@ -284,7 +284,11 @@ export function listLibrary(lib: LibraryFile, q: LibraryQuery = {}): LibraryPage
         return words.every((w) => text.includes(w))
       })
     : lib.entries
-  if (q.group === 'site') list = [...list].sort((a, b) => collator.compare(librarySite(a) ?? '', librarySite(b) ?? '') || b.finishedAt - a.finishedAt)
+  if (q.group === 'site') {
+    // Once per entry and not per comparison: it parses a link, and at 20,000 entries that was a second a page.
+    const sites = new Map(list.map((e) => [e, librarySite(e) ?? '']))
+    list = [...list].sort((a, b) => collator.compare(sites.get(a) as string, sites.get(b) as string) || b.finishedAt - a.finishedAt)
+  }
   if (q.group === 'series') {
     list = [...list].sort(
       (a, b) =>

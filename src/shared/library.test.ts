@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { librarySite, listLibrary, type LibraryEntry } from './library'
 
 const entry = (id: string, overrides: Partial<LibraryEntry>): LibraryEntry => ({
@@ -8,6 +8,35 @@ const entry = (id: string, overrides: Partial<LibraryEntry>): LibraryEntry => ({
   title: id,
   finishedAt: 1,
   ...overrides
+})
+
+afterEach(() => {
+  vi.unstubAllGlobals()
+})
+
+describe('listLibrary: grouping by site', () => {
+  it('reads each link a fixed number of times, however many comparisons the sort makes', () => {
+    const entries = Array.from({ length: 2000 }, (_, i) =>
+      entry(`e${i}`, { url: `https://site${(i * 7919) % 2000}.example/${i}`, finishedAt: i })
+    )
+    const count = (list: LibraryEntry[]): number => {
+      let reads = 0
+      const Real = URL
+      vi.stubGlobal(
+        'URL',
+        class extends Real {
+          constructor(url: string, base?: string) {
+            super(url, base)
+            reads++
+          }
+        }
+      )
+      listLibrary({ version: 1, entries: list }, { group: 'site', limit: 1 })
+      vi.unstubAllGlobals()
+      return reads
+    }
+    expect(count(entries) / count(entries.slice(0, 200))).toBeLessThan(11)
+  })
 })
 
 describe('librarySite', () => {
