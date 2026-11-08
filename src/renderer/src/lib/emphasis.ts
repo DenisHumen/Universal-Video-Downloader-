@@ -38,8 +38,18 @@ export function detectIsDone(state: DetectButtonState): boolean {
 const TRANSIENT: ReadonlySet<AppErrorCode> = new Set<AppErrorCode>([
   'network',
   'timeout',
-  'rateLimited'
+  'rateLimited',
+  'engineMissing'
 ])
+
+/**
+ * Whether the built-in browser is any answer to this failure. It finds streams,
+ * and handing one to a download engine that will not install or start gets
+ * nowhere, so a card about the engine has no business offering it.
+ */
+export function browserCanHelp(code?: AppErrorCode): boolean {
+  return code !== 'engineMissing' && code !== 'engineProxy'
+}
 
 /**
  * The error card's one solid button. For a dropped connection, a timeout or a

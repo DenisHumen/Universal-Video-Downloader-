@@ -35,6 +35,7 @@ import { groupSpawnOptions } from './process'
 import { log } from './log'
 import { proxyEnv } from './options'
 import { getSettings } from './settings'
+import { proxyMayBeWhy } from '../../renderer/src/lib/engineError'
 import { proxyUrl, withProxyAuth } from './proxy-auth'
 import {
   afterFailure,
@@ -531,7 +532,7 @@ export function ensureYtdlp(): Promise<string> {
 export interface EngineFailure {
   ok: false
   error: string
-  errorCode: 'engineMissing'
+  errorCode: 'engineMissing' | 'engineProxy'
 }
 
 /**
@@ -551,7 +552,7 @@ export async function engineUnavailable(): Promise<EngineFailure | undefined> {
     return undefined
   } catch (err) {
     const error = err instanceof Error ? err.message : String(err)
-    return { ok: false, error, errorCode: 'engineMissing' }
+    return { ok: false, error, errorCode: proxyMayBeWhy(error, getSettings().proxy) ? 'engineProxy' : 'engineMissing' }
   }
 }
 

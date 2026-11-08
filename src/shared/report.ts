@@ -72,6 +72,11 @@ export const REPORTABLE: Record<AppErrorCode, boolean> = {
   notLive: false,
   privateVideo: false,
   membersOnly: false,
+  // A refusal by the site, working as the site intends: the card offers another way in.
+  forbidden: false,
+  // A silent video can't become an audio file, and a damaged file was damaged before it got here.
+  noAudioTrack: false,
+  damagedSource: false,
   // The app asked for a quality the video does not have, which it should have known.
   noSuchFormat: true,
   diskFull: false,
@@ -106,6 +111,7 @@ export const REPORTABLE: Record<AppErrorCode, boolean> = {
   liveNotSaved: true,
   // The engine could not be installed - nearly always the network, not a site.
   engineMissing: false,
+  engineProxy: false,
   // A premiere that has not started, or a title the site does not carry.
   upcoming: false,
   notOnYummyAnime: false,
@@ -114,12 +120,9 @@ export const REPORTABLE: Record<AppErrorCode, boolean> = {
   emptyPage: true,
   postprocess: true,
   cutFailed: true,
-  damagedSource: true,
   streamGone: true,
   corruptLink: true,
-  forbidden: true,
   unknownEncoder: true,
-  noAudioTrack: true,
   ffmpegMissing: true,
   // A player the app has no extractor for yet - exactly what a report is for.
   unsupportedPlayer: true,

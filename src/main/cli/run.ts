@@ -147,7 +147,11 @@ async function run(options: CliOptions): Promise<number> {
     await ensureYtdlp()
   } catch (error) {
     say(`✗ Could not set up the download engine: ${error instanceof Error ? error.message : String(error)}`)
-    say('  Check the connection, or open Universal Video Downloader once and let it finish setting up.')
+    say(
+      settings.proxy.trim()
+        ? '  A proxy is set: check it, or turn it off in the app\'s settings, and try again.'
+        : '  Check the connection, or open Universal Video Downloader once and let it finish setting up.'
+    )
     return 1
   }
 

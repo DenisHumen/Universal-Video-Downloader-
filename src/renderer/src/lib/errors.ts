@@ -63,6 +63,7 @@ const KEYS: Record<AppErrorCode, TranslationKey> = {
   unsupportedPlayer: 'err.unsupportedPlayer',
   notOnYummyAnime: 'err.notOnYummyAnime',
   engineMissing: 'err.engineMissing',
+  engineProxy: 'err.engineProxy',
   adultHidden: 'err.adultHidden',
   needsPicker: 'err.needsPicker',
   liveEmpty: 'err.liveEmpty',

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { detectIsDone, errorLead, telegramChanged } from './emphasis'
+import { browserCanHelp, detectIsDone, errorCardLead, errorLead, telegramChanged } from './emphasis'
 
 const link = 'https://www.youtube.com/watch?v=dQw4w9WgXcQ'
 const other = 'https://vimeo.com/76979871'
@@ -52,6 +52,20 @@ describe('errorLead', () => {
     expect(errorLead('signIn')).toBe('browser')
     expect(errorLead('emptyPage')).toBe('browser')
     expect(errorLead(undefined)).toBe('browser')
+  })
+})
+
+describe('a card about the engine', () => {
+  it('offers what can help: trying again, or the proxy when one is set', () => {
+    expect(errorCardLead('engineMissing', null)).toBe('retry')
+    expect(errorCardLead('engineProxy', 'proxy')).toBe('fix')
+  })
+
+  it('does not send anybody to the built-in browser, which needs the engine too', () => {
+    expect(browserCanHelp('engineMissing')).toBe(false)
+    expect(browserCanHelp('engineProxy')).toBe(false)
+    expect(browserCanHelp('forbidden')).toBe(true)
+    expect(browserCanHelp(undefined)).toBe(true)
   })
 })
 
