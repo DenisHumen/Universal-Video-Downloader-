@@ -30,6 +30,7 @@ import {
   headerArgs,
   isTransientError,
   refusesMidStreamInit,
+  subtitleMissIn,
   withPostprocessHeading
 } from './options'
 import { IN_FLIGHT_STATES, isSameDownload } from './dedupe'
@@ -706,6 +707,12 @@ export function buildArgs(
     if (settings.preferCompatible) args.push('-S', 'res,vcodec:h264,acodec:aac')
   }
 
+  /*
+    Unlike the thumbnail step below, this one is safe on every audio format, wav
+    and aac included: the engine only copies the streams into a new file, and a
+    container with no room for a tag drops it. Checked against the real engine and
+    both ffmpegs, with Cyrillic titles, long descriptions and chapters.
+  */
   if (settings.embedMetadata) args.push('--embed-metadata')
   args.push(...playlistTagArgs(item.playlist, settings.embedMetadata))
   /*
@@ -1495,6 +1502,8 @@ async function runDownload(item: DownloadItem): Promise<void> {
 
   let stderrTail = ''
   const shortId = item.id.slice(0, 8)
+  // This run's answer: a retry may well get the track the last one was refused.
+  item.subtitlesMissed = undefined
 
   /*
     The engine's own words go to the log only when "detailed log" is on. They
@@ -1524,6 +1533,10 @@ async function runDownload(item: DownloadItem): Promise<void> {
     }
     parseFinalPath(line, item)
     if (isFfmpegNoise(line)) return
+    const missed = subtitleMissIn(line)
+    if (missed && !item.subtitlesMissed?.includes(missed)) {
+      item.subtitlesMissed = [...(item.subtitlesMissed ?? []), missed]
+    }
     stderrTail = (stderrTail + line + '\n').slice(-4000)
     appendLog(item, line + '\n')
     log.debug('engine', line, { id: shortId })

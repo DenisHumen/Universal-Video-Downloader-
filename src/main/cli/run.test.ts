@@ -10,7 +10,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
   one in a temporary folder. What this is about is the private copy of that jar,
   which has to be gone by the time the process is, whichever way it went.
 */
-const h = vi.hoisted(() => ({ dir: '', exit: vi.fn() }))
+const h = vi.hoisted(() => ({ dir: '', exit: vi.fn(), language: 'en', locale: 'en-US' }))
 const spawn = vi.hoisted(() => vi.fn())
 
 vi.mock('child_process', async (importOriginal) => ({
@@ -21,6 +21,7 @@ vi.mock('electron', () => ({
   app: {
     getPath: () => h.dir,
     getVersion: () => '0',
+    getLocale: () => h.locale,
     disableHardwareAcceleration: vi.fn(),
     commandLine: { appendSwitch: vi.fn() },
     setPath: vi.fn(),
@@ -32,6 +33,7 @@ vi.mock('electron', () => ({
 vi.mock('../resolvers/universal/capture', () => ({ browsingSession: vi.fn() }))
 vi.mock('../services/settings', () => ({
   getSettings: () => ({
+    language: h.language,
     browserStaySignedIn: true,
     downloadDir: h.dir,
     defaultMode: 'video',
@@ -86,6 +88,8 @@ beforeEach(() => {
   h.dir = mkdtempSync(join(tmpdir(), 'uvd-cli-'))
   writeFileSync(join(h.dir, 'browser-cookies.txt'), `# Netscape HTTP Cookie File\n${ENTRY}\n`)
   h.exit.mockReset()
+  h.language = 'en'
+  h.locale = 'en-US'
   spawn.mockReset()
   spawn.mockImplementation(() => Object.assign(new EventEmitter(), { stdout: new PassThrough(), stderr: new PassThrough() }))
   vi.spyOn(process.stdout, 'write').mockImplementation(((_text: string, done?: () => void) => {
@@ -147,5 +151,74 @@ describe('the terminal’s copy of the cookie jar', () => {
     engine.emit('close', 0)
     await vi.waitFor(() => expect(h.exit).toHaveBeenCalled())
     expect(readdirSync(h.dir)).toContain('browser-cookies.txt')
+  })
+})
+
+describe('what it prints, and in which language', () => {
+  const written = (stream: 'stdout' | 'stderr'): string =>
+    (process[stream].write as unknown as { mock: { calls: unknown[][] } }).mock.calls.map((c) => String(c[0])).join('')
+  let wasTty: boolean | undefined
+
+  beforeEach(() => {
+    wasTty = process.stdout.isTTY
+    vi.spyOn(process.stderr, 'write').mockImplementation((() => true) as typeof process.stderr.write)
+  })
+  afterEach(() => {
+    process.stdout.isTTY = wasTty as boolean
+  })
+
+  async function runIt(args: string[], terminal: boolean): Promise<Engine | undefined> {
+    process.stdout.isTTY = terminal
+    const { startCli } = await import('./run')
+    startCli(args)
+    if (args[0]?.startsWith('https')) {
+      await vi.waitFor(() => expect(spawn).toHaveBeenCalled())
+      return spawn.mock.results[0].value as Engine
+    }
+    return undefined
+  }
+
+  const FAILS = 'ERROR: unable to download video data: HTTP Error 404: Not Found\n'
+
+  it('speaks the app’s language on a terminal, and exits the same', async () => {
+    h.language = 'ru'
+    const engine = await runIt(['https://media.example/v'], true)
+    engine!.stderr.emit('data', Buffer.from(FAILS))
+    engine!.emit('close', 1)
+    await vi.waitFor(() => expect(h.exit).toHaveBeenCalled())
+    expect(written('stdout')).toMatch(/✗ [А-Я]/)
+    expect(written('stdout')).not.toMatch(/video|Open Universal/)
+    expect(h.exit.mock.calls[0][0]).toBe(1)
+  })
+
+  it('follows the system’s language when the setting is auto', async () => {
+    h.language = 'auto'
+    h.locale = 'ru-RU'
+    await runIt(['--help'], false)
+    await vi.waitFor(() => expect(h.exit).toHaveBeenCalledWith(0))
+    expect(written('stdout')).toMatch(/Как запускать: uvd/)
+  })
+
+  it('stays in English in a pipe, for the scripts that read it', async () => {
+    h.language = 'ru'
+    const engine = await runIt(['https://media.example/v'], false)
+    engine!.emit('close', 0)
+    await vi.waitFor(() => expect(h.exit).toHaveBeenCalledWith(0))
+    expect(written('stdout')).toMatch(/✓ Done\. Saved in/)
+    expect(written('stdout')).not.toMatch(/[а-я]/i)
+  })
+
+  it('says what is wrong with a command line in the language, with the usual code', async () => {
+    h.language = 'ru'
+    await runIt(['--no-such-flag'], true)
+    await vi.waitFor(() => expect(h.exit).toHaveBeenCalledWith(64))
+    expect(written('stderr')).toMatch(/uvd: Неизвестный параметр: --no-such-flag/)
+  })
+
+  it('prints the version the same, in any language', async () => {
+    h.language = 'ru'
+    await runIt(['--version'], true)
+    await vi.waitFor(() => expect(h.exit).toHaveBeenCalledWith(0))
+    expect(written('stdout')).toContain('uvd 0 (Universal Video Downloader)')
   })
 })

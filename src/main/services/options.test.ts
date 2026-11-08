@@ -10,7 +10,8 @@ import {
   withPostprocessHeading,
   stalledConnecting,
   proxyEnv,
-  refusesMidStreamInit
+  refusesMidStreamInit,
+  subtitleMissIn
 } from './options'
 
 function settings(overrides: Partial<AppSettings> = {}): AppSettings {
@@ -654,6 +655,17 @@ describe('classifyYtdlpError, when the engine refuses a setting', () => {
 
   it('does not retry it, since every attempt would fail the same way', () => {
     expect(isTransientError(USAGE + 'yt-dlp.exe: error: invalid rate limit "2MB" given')).toBe(false)
+  })
+})
+
+describe('subtitleMissIn', () => {
+  it('reads the language from the engine’s warning', () => {
+    expect(subtitleMissIn("WARNING: Unable to download video subtitles for 'pt-BR': HTTP Error 429: Too Many Requests")).toBe('pt-BR')
+  })
+
+  it('leaves every other line alone', () => {
+    expect(subtitleMissIn('[info] Writing video subtitles to: a.en.vtt')).toBeUndefined()
+    expect(subtitleMissIn('ERROR: unable to download video data: HTTP Error 404')).toBeUndefined()
   })
 })
 

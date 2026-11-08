@@ -18,6 +18,7 @@ import { stopEpisode } from './services/automation/pipeline'
 import { createSmbFolder, listSmbFolders, testTarget } from './services/automation/smb'
 import { shareForFolder } from './services/automation/share-folder'
 import { sendTest } from './services/automation/telegram'
+import { currentLanguage } from './services/locale'
 import { getSecretWhenReady, hasSecret, SECRET, secretsPersist, setSecret } from './services/secrets'
 import { log, logFilePath } from './services/log'
 import { getSettings } from './services/settings'
@@ -280,7 +281,7 @@ export function registerAutomationIpc(): void {
     IPC.autoTestTelegram,
     async (_e, token: string, chatId: string): Promise<string> => {
       const secret = token || (await getSecretWhenReady(SECRET.telegramToken())) || ''
-      return sendTest(secret, chatId || getSettings().telegramChatId)
+      return sendTest(secret, chatId || getSettings().telegramChatId, currentLanguage())
     }
   )
 

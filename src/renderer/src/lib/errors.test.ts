@@ -77,6 +77,17 @@ describe('errorText', () => {
     expect(errorText(ru, failure)).not.toContain('ERR_')
   })
 
+  it('does not blame the connection for an engine that is installed and will not start', () => {
+    const failure = {
+      error: 'The download engine was installed but failed to start on this system.',
+      errorCode: 'engineMissing' as const
+    }
+    expect(errorText(en, failure)).toBe(en('engine.startFailed'))
+    expect(errorText(ru, failure)).toBe(ru('engine.startFailed'))
+    expect(errorText(ru, failure)).toMatch(/антивирус/)
+    expect(errorText(ru, { ...failure, error: 'No download engine is published for this system.' })).toBe(ru('engine.noBuild'))
+  })
+
   it('falls back to the engine’s own words for a failure it has no code for', () => {
     expect(errorText(en, { error: '  Something odd happened.  ' })).toBe('Something odd happened.')
   })

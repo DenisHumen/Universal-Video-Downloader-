@@ -23,7 +23,8 @@ import { pageLinkOf } from '@shared/library'
 import { useStore } from '../store'
 import { formatBytes, formatEta, formatSpeed, splitPath } from '../lib/format'
 import { errorReport, errorText } from '../lib/errors'
-import { useT } from '../i18n'
+import { useI18n, useT } from '../i18n'
+import { languageName } from '../lib/languages'
 import { STATE_META } from '../lib/states'
 import { toast } from '../lib/toast'
 import { showFile } from '../lib/showFile'
@@ -60,6 +61,7 @@ interface Props {
  */
 function QueueRow({ item, index, animateIn = true, heading }: Props): JSX.Element {
   const t = useT()
+  const locale = useI18n((s) => s.language)
   const [logOpen, setLogOpen] = useState(false)
   // The engine output mounts only while open, so aria-controls is set only then.
   const logId = useId()
@@ -555,6 +557,14 @@ function QueueRow({ item, index, animateIn = true, heading }: Props): JSX.Elemen
           {item.filepath && item.remotePath && (
             <p className="selectable mono mt-1 truncate text-meta text-ink-3" title={item.remotePath}>
               {t('queue.onShare', { path: item.remotePath })}
+            </p>
+          )}
+          {/* Only on a finished row: on a failed one the video is the news, and a retry asks again. */}
+          {item.state === 'completed' && Boolean(item.subtitlesMissed?.length) && (
+            <p className="mt-1 line-clamp-2 break-words text-meta text-ink-2">
+              {t('queue.subtitlesMissed', {
+                languages: item.subtitlesMissed!.map((code) => languageName(code, locale, t)).join(', ')
+              })}
             </p>
           )}
           {item.log && (

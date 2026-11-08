@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { composeCheckFailure, composeFailure } from './telegram'
+import { composeCheckFailure, composeEpisodeNews, composeFailure } from './telegram'
 
 /** What the pretend Bot API answers, one entry per request: a reply, or a transport failure. */
 const h = vi.hoisted(() => ({ answers: [] as unknown[], urls: [] as string[] }))
@@ -65,7 +65,7 @@ describe('composeFailure', () => {
     const html = composeFailure('Show', 1, 4, 'Could not reach 192.168.1.10', 3)
     expect(html).toContain('S01E04')
     expect(html).toContain('Failed 3 times')
-    expect(html).toContain('watch screen')
+    expect(html).toContain('New Episodes screen')
   })
 
   it('says nothing about goes for a single one', () => {
@@ -187,5 +187,42 @@ describe('sending', () => {
     expect(err.message).toContain('ERR_CONNECTION_RESET')
     // The request's URL carries the token; the message must not.
     expect(err.message).not.toContain(TOKEN)
+  })
+})
+
+/* Nobody is at the window when these arrive, so they are the last place English should be left over. */
+describe('in Russian', () => {
+  const news = { series: 'Шоу', season: 1, episode: 4, remotePath: 'media/Шоу/S01E04.mp4', bytes: 1.5 * 1024 ** 3, seconds: 125 }
+
+  it('says an episode arrived, with Russian figures', () => {
+    const html = composeEpisodeNews(news, 'ru')
+    expect(html).toContain('Загружено в <code>media/Шоу/S01E04.mp4</code>')
+    expect(html).toContain('1,50 ГБ')
+    expect(html).toContain('2 мин 5 с')
+    expect(html).not.toMatch(/Uploaded|GB|min/)
+  })
+
+  it('leaves the English as it was', () => {
+    const html = composeEpisodeNews(news)
+    expect(html).toContain('Uploaded to <code>media/Шоу/S01E04.mp4</code>')
+    expect(html).toContain('1.50 GB')
+    expect(html).toContain('2 min 5 s')
+  })
+
+  it('counts the failed goes the way Russian counts', () => {
+    expect(composeFailure('Шоу', 1, 4, 'причина', 3, 'ru')).toContain('Не удалось 3 раза')
+    expect(composeFailure('Шоу', 1, 4, 'причина', 5, 'ru')).toContain('Не удалось 5 раз,')
+    expect(composeFailure('Шоу', 1, 4, 'причина', 3, 'ru')).toContain('«Новые серии»')
+    expect(composeFailure('Шоу', 1, 4, 'причина', 1, 'ru')).not.toContain('Не удалось')
+  })
+
+  it('counts the failed checks the way Russian counts', () => {
+    expect(composeCheckFailure('Шоу', 3, 'причина', 'ru')).toContain('Последние 3 проверки не удались')
+    expect(composeCheckFailure('Шоу', 5, 'причина', 'ru')).toContain('Последние 5 проверок не удались')
+  })
+
+  it('still escapes what goes in', () => {
+    expect(composeCheckFailure('A & B', 3, 'x < y', 'ru')).toContain('A &amp; B')
+    expect(composeCheckFailure('A & B', 3, 'x < y', 'ru')).toContain('x &lt; y')
   })
 })

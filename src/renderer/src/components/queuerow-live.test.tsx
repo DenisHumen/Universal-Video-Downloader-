@@ -242,3 +242,19 @@ describe('the menu items', () => {
     expect(await screen.findByText('Send to Share…')).toBeTruthy()
   })
 })
+
+/* With `--ignore-errors` a 429 on a caption is a line in a log, and the row read as if everything had come down. */
+describe('a finished row with subtitles the site would not give', () => {
+  it('says so, by language', () => {
+    show(row({ state: 'completed', filepath: '/downloads/a.mp4', subtitlesMissed: ['de', 'en'] }))
+    expect(screen.getByText(/Subtitles could not be fetched: German, English\. The video itself is fine/)).toBeTruthy()
+  })
+
+  it('says nothing when they all came, or when the row failed anyway', () => {
+    show(row({ state: 'completed', filepath: '/downloads/a.mp4' }))
+    expect(screen.queryByText(/Subtitles could not be fetched/)).toBeNull()
+    cleanup()
+    show(row({ state: 'error', error: 'gone', subtitlesMissed: ['de'] }))
+    expect(screen.queryByText(/Subtitles could not be fetched/)).toBeNull()
+  })
+})
