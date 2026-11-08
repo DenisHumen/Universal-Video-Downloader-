@@ -208,7 +208,7 @@ function PanelList({ route, query, onQuery, onOpen, wide, showToggle }: ListProp
             }}
             placeholder={t('settings.search')}
             aria-label={t('settings.search')}
-            className="no-drag min-w-0 flex-1 bg-transparent text-body text-ink outline-none placeholder:text-ink-3"
+            className="no-drag min-w-0 flex-1 bg-transparent text-body text-ink outline-none placeholder:text-ink/80"
             spellCheck={false}
           />
         </label>

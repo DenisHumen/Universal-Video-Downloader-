@@ -131,7 +131,9 @@ export default function PlaylistCard({ info, onDone, saveDir, onSaveDirChange }:
   return (
     <div className="panel overflow-hidden">
       <div className="border-b border-edge p-4">
-        <h2 className="h2 truncate">{info.title}</h2>
+        <h2 className="h2 truncate" title={info.title}>
+          {info.title}
+        </h2>
         <p className="mono mt-1 text-meta text-ink-2">
           {tp('playlist.videos', entries.length)} · {info.extractor}
         </p>
@@ -247,11 +249,11 @@ export default function PlaylistCard({ info, onDone, saveDir, onSaveDirChange }:
                       <button
                         onClick={() => toggle(e.url)}
                         aria-pressed={on}
-                        className="flex h-full w-full items-center gap-3 border-b border-edge px-1 text-left transition-colors duration-fast ease-ease hover:bg-sink"
+                        className="flex h-full w-full items-center gap-3 border-b border-edge px-1 text-left outline-offset-[-2px] transition-colors duration-fast ease-ease hover:bg-fill/[0.04]"
                       >
                         <span
-                          className={`flex h-4 w-4 shrink-0 items-center justify-center rounded-[4px] border transition-colors duration-fast ease-ease ${
-                            on ? 'border-accent bg-accent text-accent-fg' : 'border-edge-strong'
+                          className={`flex h-4 w-4 shrink-0 items-center justify-center rounded-1 border transition-colors duration-fast ease-ease ${
+                            on ? 'border-accent bg-accent text-accent-fg' : 'border-fill/[0.6]'
                           }`}
                         >
                           {on && <Check size={11} strokeWidth={3} />}
@@ -330,11 +332,11 @@ function LayoutOption({
       role="checkbox"
       aria-checked={on}
       onClick={() => onChange(!on)}
-      className="flex w-full items-start gap-3 rounded-1 px-1 py-1.5 text-left outline-offset-2 transition-colors duration-fast ease-ease hover:bg-sink focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
+      className="flex w-full items-start gap-3 rounded-1 px-1 py-1.5 text-left outline-offset-2 transition-colors duration-fast ease-ease hover:bg-fill/[0.04] focus-visible:outline focus-visible:outline-2 focus-visible:outline-focus"
     >
       <span
-        className={`mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-[4px] border transition-colors duration-fast ease-ease ${
-          on ? 'border-accent bg-accent text-accent-fg' : 'border-edge-strong'
+        className={`mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-1 border transition-colors duration-fast ease-ease ${
+          on ? 'border-accent bg-accent text-accent-fg' : 'border-fill/[0.6]'
         }`}
       >
         {on && <Check size={11} strokeWidth={3} />}

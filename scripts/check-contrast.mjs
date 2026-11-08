@@ -17,6 +17,10 @@
  * hue gap so a failure can never read as the (orange) accent. The blur
  * material is gone (A1), and so are its checks.
  *
+ * It also checks what is stacked rather than flat (selected and hovered rows on
+ * a card, placeholders on an entry, a solid button's hover) and the shapes held
+ * to 3:1: the focus ring in every accent and the empty check box.
+ *
  * Run: node scripts/check-contrast.mjs
  */
 import { readFileSync } from 'fs'
@@ -326,9 +330,146 @@ for (const { name, selector } of THEMES) {
   }
 }
 
+/*
+ * Everything above pairs a colour with one plane. The interface also stacks: a
+ * selected row is a .10 fill on a card, a hovered one .04, and a primary button
+ * under the pointer used to be see-through over the page. Each of those passed
+ * here and measured 3.57:1, 4.25:1 and 4.03:1 on screen, so what the stylesheet
+ * really stacks is listed here, once per plane it lands on.
+ */
+const CARD_PLANES = ['--card', '--surface-3']
+/** Dim text on the tints a row keeps it on: hover, and an expander's children. */
+const DIM_TINTS = [0.03, 0.04]
+/** Colours that stay on a selected row (.10): dim text goes to --text there. */
+const ON_SELECTED = ['--text', '--good', '--warn', '--bad']
+/** A placeholder: --text at this strength on an entry's .10 fill (`placeholder:text-ink/80`). */
+const PLACEHOLDER_ALPHA = 0.8
+/** What a solid button darkens to under the pointer and when pressed. */
+const SOLID_STATES = [0.95, 0.9]
+let stacked = 0
+let thinnestStack = { ratio: Infinity, what: '' }
+const stack = (what, ratio, min = AA_NORMAL) => {
+  stacked++
+  if (ratio < thinnestStack.ratio && min === AA_NORMAL) thinnestStack = { ratio, what }
+  if (ratio < min) fail(`${what} → ${ratio.toFixed(2)}:1 (needs ${min}:1)`)
+}
+/*
+ * A shape that says what a control is, or where the keyboard is (WCAG 1.4.11):
+ * 3:1, not 4.5. GTK's off switch (--fill/.15, 1.30:1) is the one left below it
+ * on purpose: it matches the desktop it sits on, and its white knob is what
+ * reads, at far more than 3:1 on any track.
+ */
+const NON_TEXT_MIN = 3
+/** The focus ring's token, and the only thing a focus rule may paint with. */
+const FOCUS_SOURCE = '--accent-ink'
+/* Where the ring is drawn: on the plane outside a control, or inside what fills its container. */
+const RING_FILLS = [0, 0.1, 0.15]
+const RING_OFFSETS = new Set(['2px', '-2px'])
+/* The swatch and the style tile wear a selected ring of their own, and the focus ring goes outside it. */
+const RING_OFFSET_EXCEPTIONS = /\.ui-swatch|\.ui-style-tile/
+const checkAlpha = css.match(/\.ui-check\s*\{[^}]*inset 0 0 0 2px rgb\(var\(--fill\) \/ ([\d.]+)\)/)
+if (!checkAlpha) fail('.ui-check no longer draws its border as inset --fill/alpha: teach this gate the new form')
+// An entry's fill took the dim tier to 3.57:1 on a card, and that is where the settings and dialogs put their entries.
+for (const m of css.matchAll(/placeholder:text-ink-[23]/g)) fail(`${m[0]} in index.css: dim text does not read on an entry; use placeholder:text-ink/${PLACEHOLDER_ALPHA * 100}`)
+let ringChecks = 0
+let faintestRing = { ratio: Infinity, what: '' }
+
+if (!new RegExp(`--focus:\\s*var\\(${FOCUS_SOURCE}\\)`).test(css)) {
+  fail(`--focus must be var(${FOCUS_SOURCE}): that is the cut this gate checks`)
+}
+for (const m of css.matchAll(/([^{}]*:focus(?:-visible|-within)?[^{}]*)\{([^}]*)\}/g)) {
+  const [selector, body] = [m[1].replace(/\/\*[\s\S]*?\*\//g, '').trim(), m[2]]
+  const outline = body.match(/outline:\s*([^;]+);/)
+  if (!outline) continue
+  if (outline[1].trim() !== '2px solid rgb(var(--focus))') {
+    fail(`${selector.replace(/\s+/g, ' ')}: the ring is "${outline[1].trim()}", not --focus at 2 px`)
+  }
+  const offset = body.match(/outline-offset:\s*([^;]+);/)?.[1].trim()
+  if (offset && !RING_OFFSETS.has(offset) && !RING_OFFSET_EXCEPTIONS.test(selector)) {
+    fail(`${selector.replace(/\s+/g, ' ')}: ring offset ${offset}; a control's is 2px, a row's -2px`)
+  }
+}
+// A translucent fill under a label is lighter on a light plane: that is what took the white to 4.03:1.
+for (const m of css.matchAll(/(?:hover|active):bg-(accent|destructive)\/\d+/g)) {
+  fail(`${m[0]} in index.css: a solid button darkens (hover:brightness-95), it does not go see-through`)
+}
+
+for (const { name, selector } of THEMES) {
+  const vars = readTheme(selector)
+  if (!vars) continue
+  for (const planeVar of CARD_PLANES) {
+    const plane = vars[planeVar]
+    if (!plane) continue
+    for (const alpha of DIM_TINTS) {
+      stack(`${name} · --text-2 on --fill/${alpha} over ${planeVar}`, contrast(vars['--text-2'], composite(vars['--fill'], plane, alpha)))
+    }
+    for (const tone of ON_SELECTED) {
+      stack(`${name} · ${tone} on a selected row (--fill/.1) over ${planeVar}`, contrast(vars[tone], composite(vars['--fill'], plane, 0.1)))
+    }
+  }
+  for (const planeVar of FILL_PLANES) {
+    const plane = vars[planeVar]
+    if (!plane) continue
+    const fill = composite(vars['--fill'], plane, 0.1)
+    stack(
+      `${name} · placeholder (--text/${PLACEHOLDER_ALPHA}) on an entry over ${planeVar}`,
+      contrast(composite(vars['--text'], fill, PLACEHOLDER_ALPHA), fill)
+    )
+  }
+  for (const [fillVar, labelVar] of [
+    ['--accent', '--accent-fg'],
+    ['--destructive', '--destructive-fg']
+  ]) {
+    for (const factor of SOLID_STATES) {
+      stack(
+        `${name} · ${labelVar} on ${fillVar} at brightness ${factor}`,
+        contrast(vars[labelVar], vars[fillVar].map((c) => c * factor))
+      )
+    }
+  }
+  if (checkAlpha) {
+    const alpha = Number(checkAlpha[1])
+    for (const planeVar of ['--surface', ...CARD_PLANES]) {
+      const plane = vars[planeVar]
+      if (!plane) continue
+      stack(`${name} · an empty check box (--fill/${alpha}) on ${planeVar}`, contrast(composite(vars['--fill'], plane, alpha), plane), NON_TEXT_MIN)
+    }
+  }
+
+  /* The ring, in every accent: plain accent-bright is not enough (purple on a night card is 1.5:1). */
+  for (const accent of ACCENTS) {
+    const merged = { ...vars }
+    if (accent !== DEFAULT_ACCENT) {
+      Object.assign(merged, readTheme(`\\[data-accent='${accent}'\\]`), name === 'day' ? readTheme(`\\[data-theme='day'\\]\\[data-accent='${accent}'\\]`) : {})
+    }
+    const ring = merged[FOCUS_SOURCE]
+    for (const planeVar of PLANE_VARS) {
+      const plane = merged[planeVar]
+      if (!plane || !ring) continue
+      for (const alpha of RING_FILLS) {
+        // --surface-2 is the opaque stand-in for a fill, never under one.
+        if (alpha && planeVar === '--surface-2') continue
+        const ratio = contrast(ring, composite(merged['--fill'], plane, alpha))
+        const what = `${name} · ${accent} · focus ring on ${alpha ? `--fill/${alpha} over ` : ''}${planeVar}`
+        ringChecks++
+        if (ratio < faintestRing.ratio) faintestRing = { ratio, what }
+        if (ratio < NON_TEXT_MIN) fail(`${what} → ${ratio.toFixed(2)}:1 (needs ${NON_TEXT_MIN}:1)`)
+      }
+    }
+  }
+}
+
 if (process.exitCode) {
-  console.error(`\n${checks + hairlines + planes + accentChecks} pairings checked — see failures above.`)
+  console.error(`\n${checks + hairlines + planes + accentChecks + stacked + ringChecks} pairings checked — see failures above.`)
 } else {
+  console.log(
+    `✓ ${stacked} stacked pairings clear their floor ` +
+      `(tightest text: ${thinnestStack.what} at ${thinnestStack.ratio.toFixed(2)}:1)`
+  )
+  console.log(
+    `✓ ${ringChecks} focus ring pairings clear ${NON_TEXT_MIN}:1 ` +
+      `(faintest: ${faintestRing.what} at ${faintestRing.ratio.toFixed(2)}:1)`
+  )
   console.log(
     `✓ ${checks} theme/text/plane pairings all clear ${AA_NORMAL}:1 ` +
       `(tightest: ${worst.what} at ${worst.ratio.toFixed(2)}:1)`
