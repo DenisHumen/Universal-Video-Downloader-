@@ -41,6 +41,43 @@ export function ffmpegProgressSeconds(line: string): number | undefined {
   return negative ? 0 : seconds
 }
 
+const SIZE_UNITS: Record<string, number> = { b: 1, kb: 1000, kib: 1024, mb: 1e6, mib: 1024 ** 2, gb: 1e9, gib: 1024 ** 3 }
+
+export interface FfmpegTransfer {
+  downloadedBytes?: number
+  /** Bytes per second. */
+  speed?: number
+  /** The whole file at the rate so far: an estimate, and it settles as the job goes on. */
+  totalBytes?: number
+  /** Seconds left. */
+  eta?: number
+}
+
+/**
+ * Size, speed and time left, from one status line.
+ *
+ * With ffmpeg fetching, none of the engine's progress lines arrive, so the row
+ * had a percentage and nothing else. ffmpeg does say how much it has written
+ * and how fast against the video's own clock (`speed=12x`), and with the
+ * video's duration those give the rest. `total` is that duration; without it
+ * only the size and the speed can be known.
+ */
+export function ffmpegTransfer(line: string, total?: number): FfmpegTransfer {
+  const seconds = ffmpegProgressSeconds(line)
+  if (seconds == null) return {}
+  const size = /\bsize=\s*(\d+(?:\.\d+)?)\s*([kKmMgG]i?[bB]|[bB])/.exec(line)
+  const factor = Number(/\bspeed=\s*(\d+(?:\.\d+)?)x/.exec(line)?.[1])
+  const pace = factor > 0 ? factor : undefined
+  const downloadedBytes = size ? Math.round(Number(size[1]) * (SIZE_UNITS[size[2].toLowerCase()] ?? 1)) : undefined
+  const perSecond = downloadedBytes && seconds > 0 ? downloadedBytes / seconds : undefined
+  return {
+    downloadedBytes,
+    speed: perSecond && pace ? perSecond * pace : undefined,
+    totalBytes: perSecond && total && total > 0 ? Math.max(downloadedBytes ?? 0, perSecond * total) : undefined,
+    eta: pace && total && total > 0 ? Math.max(0, total - seconds) / pace : undefined
+  }
+}
+
 /**
  * Lines worth keeping out of the log drawer.
  *

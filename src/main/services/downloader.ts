@@ -44,7 +44,7 @@ import { killTree } from './process'
 import { markInterrupted, shouldResume } from './resume'
 import { pendingOrder } from './schedule'
 import { acceptsPostprocess, overallProgress, postprocessorLabel } from './progress'
-import { ffmpegProgressSeconds, isFfmpegNoise, splitOutputLines } from './ffmpeg-output'
+import { ffmpegProgressSeconds, ffmpegTransfer, isFfmpegNoise, splitOutputLines } from './ffmpeg-output'
 import { lineReader } from './engine-output'
 import { markOf, shouldEmitProgress, type ProgressMark } from './throttle'
 import { recordDownloadFailure } from './report'
@@ -853,7 +853,7 @@ function expectedSeconds(item: DownloadItem): number | undefined {
  * sections and most live/HLS captures — in which case no `download:` template
  * line will ever arrive and this is the only thing that can move the bar.
  */
-function handleFfmpegProgress(seconds: number, item: DownloadItem): void {
+function handleFfmpegProgress(seconds: number, item: DownloadItem, line: string): void {
   if (item.state !== 'downloading') return
   /*
     Only the fetching half. The engine captures its post-processors' output
@@ -866,6 +866,12 @@ function handleFfmpegProgress(seconds: number, item: DownloadItem): void {
   const total = expectedSeconds(item)
   const percent = total && total > 0 ? Math.min(100, (seconds / total) * 100) : undefined
   applyProgress(item, { phase: 'download', phasePercent: percent })
+  // Each only when this line could tell, so `size=N/A` does not blank what the last one said.
+  const transfer = ffmpegTransfer(line, total)
+  if (transfer.speed != null) item.speed = transfer.speed
+  if (transfer.eta != null) item.eta = transfer.eta
+  if (transfer.downloadedBytes != null) item.downloadedBytes = transfer.downloadedBytes
+  if (transfer.totalBytes != null) item.totalBytes = transfer.totalBytes
 
   emitProgress({
     id: item.id,
@@ -1338,7 +1344,7 @@ async function runDownload(item: DownloadItem): Promise<void> {
     if (!line.trim()) return
     const seconds = ffmpegProgressSeconds(line)
     if (seconds != null) {
-      handleFfmpegProgress(seconds, item)
+      handleFfmpegProgress(seconds, item, line)
       return
     }
     parseFinalPath(line, item)

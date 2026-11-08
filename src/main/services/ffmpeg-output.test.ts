@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { ffmpegProgressSeconds, isFfmpegNoise, splitOutputLines } from './ffmpeg-output'
+import { ffmpegProgressSeconds, ffmpegTransfer, isFfmpegNoise, splitOutputLines } from './ffmpeg-output'
 
 describe('splitOutputLines', () => {
   it('breaks on carriage returns, which is all ffmpeg ever writes', () => {
@@ -14,6 +14,33 @@ describe('splitOutputLines', () => {
 
   it('still handles ordinary newlines and CRLF', () => {
     expect(splitOutputLines('a\nb\r\nc')).toEqual(['a', 'b', 'c'])
+  })
+})
+
+describe('ffmpegTransfer', () => {
+  const LINE = 'frame= 6000 fps=600 q=-1.0 size=  102400KiB time=00:01:40.00 bitrate=8388.6kbits/s speed=10x'
+
+  it('works out size, speed and time left from a status line and the duration', () => {
+    const t = ffmpegTransfer(LINE, 1000)
+    expect(t.downloadedBytes).toBe(102400 * 1024)
+    // 1 MiB of video per second of it, fetched ten times faster than it plays.
+    expect(t.speed).toBeCloseTo(10 * 1024 ** 2)
+    expect(t.totalBytes).toBeCloseTo(102400 * 1024 * 10, -3)
+    expect(t.eta).toBeCloseTo(90)
+  })
+
+  it('knows only the size and speed without a duration', () => {
+    const t = ffmpegTransfer(LINE)
+    expect(t.downloadedBytes).toBeGreaterThan(0)
+    expect(t.speed).toBeGreaterThan(0)
+    expect(t.totalBytes).toBeUndefined()
+    expect(t.eta).toBeUndefined()
+  })
+
+  it('says nothing it cannot read', () => {
+    expect(ffmpegTransfer('[hls @ 0x1] Opening segment')).toEqual({})
+    const early = ffmpegTransfer('frame=0 size=N/A time=00:00:00.00 bitrate=N/A speed=N/A', 100)
+    expect(early).toEqual({ downloadedBytes: undefined, speed: undefined, totalBytes: undefined, eta: undefined })
   })
 })
 
