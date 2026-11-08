@@ -4,6 +4,8 @@ import { backoffMinutes, settleFailedCheck } from './backoff'
 import { checkWatch } from './detect'
 import { alertChannel, recordOutcome, runEpisode } from './pipeline'
 import { findRun, getWatch, listWatches, updateWatch } from './store'
+import { currentLanguage } from '../locale'
+import { reasonIn } from '../words'
 import { composeCheckFailure, sendNotification } from './telegram'
 import {
   attemptsAt,
@@ -196,10 +198,11 @@ async function look(watch: Watch, manual: boolean, read: () => void): Promise<Fo
     if (failures === REPORT_AFTER_FAILURES && current?.enabled) {
       const channel = await alertChannel(current)
       if (channel) {
+        const language = currentLanguage()
         await sendNotification(
           channel.token,
           channel.chatId,
-          composeCheckFailure(current.title, failures, why)
+          composeCheckFailure(current.title, failures, reasonIn(language, why), language)
         ).catch(() => undefined)
       }
     }

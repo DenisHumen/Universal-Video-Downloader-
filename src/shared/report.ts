@@ -58,7 +58,7 @@ export const REPORT_TARGET = {
   failures with nothing in the app to change; offering a report for them would
   teach people to click "not now" on reflex, including on the ones that matter.
 */
-const REPORTABLE: Record<AppErrorCode, boolean> = {
+export const REPORTABLE: Record<AppErrorCode, boolean> = {
   // The user's machine or network.
   canceled: false,
   cookiesNotFound: false,

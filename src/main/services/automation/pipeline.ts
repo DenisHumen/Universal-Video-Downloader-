@@ -20,6 +20,8 @@ import { carryOver } from './carry-over'
 import { downloadUrlFor } from './detect'
 import { addRun, getWatch, lastRunFor, updateRun, updateWatch } from './store'
 import { uploadFile } from './smb'
+import { currentLanguage } from '../locale'
+import { reasonIn } from '../words'
 import { composeEpisodeNews, composeFailure, sendNotification, TelegramError } from './telegram'
 import {
   byStepOrder,
@@ -440,7 +442,7 @@ export async function runEpisode(
               remotePath,
               bytes,
               seconds
-            }),
+            }, currentLanguage()),
             watch.thumbnail
           )
           markStep(run, 'notify', { state: 'done', finishedAt: Date.now() })
@@ -524,10 +526,11 @@ export async function runEpisode(
     */
     const channel = options.final ? await alertChannel(watch) : undefined
     if (channel) {
+      const language = currentLanguage()
       await sendNotification(
         channel.token,
         channel.chatId,
-        composeFailure(seriesTitle, ref.season, ref.episode, why, options.attempt)
+        composeFailure(seriesTitle, ref.season, ref.episode, reasonIn(language, why, code), options.attempt, language)
       ).catch(() => undefined)
     }
     return 'failed'

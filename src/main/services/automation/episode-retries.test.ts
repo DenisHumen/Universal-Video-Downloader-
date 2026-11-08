@@ -11,6 +11,7 @@ import {
   type Watch
 } from '@shared/automation'
 import type { DownloadItem, DownloadRequest } from '@shared/types'
+import { translate } from '../../../renderer/src/i18n/translate'
 
 /*
   The watcher, the pipeline and the store as they are, with a pretend queue,
@@ -32,6 +33,7 @@ const h = vi.hoisted(() => {
   }
   return {
     dir: '',
+    locale: 'en-US',
     plan: [] as Plan[],
     started: [] as string[],
     items: new Map<string, unknown>(),
@@ -49,7 +51,7 @@ const h = vi.hoisted(() => {
 vi.mock('electron', () => {
   let next = 0
   return {
-    app: { getPath: () => h.dir },
+    app: { getPath: () => h.dir, getLocale: () => h.locale },
     net: { isOnline: () => true },
     powerMonitor: { on: vi.fn(), off: vi.fn() },
     powerSaveBlocker: {
@@ -208,6 +210,7 @@ describe('an episode that fails', () => {
 
   beforeEach(async () => {
     h.dir = mkdtempSync(join(tmpdir(), 'uvd-retries-'))
+    h.locale = 'en-US'
     h.plan = []
     h.started = []
     h.items.clear()
@@ -274,13 +277,23 @@ describe('an episode that fails', () => {
     expect(seen4(m.store.getWatch('w1'))).toBe(true)
     expect(m.store.getWatch('w1')?.attempts).toBeUndefined()
     expect(h.send).toHaveBeenCalledTimes(1)
-    expect(h.failures[0]).toEqual(['Series', 1, 4, 'HTTP 502 from the player', 3])
+    expect(h.failures[0]).toEqual(['Series', 1, 4, 'HTTP 502 from the player', 3, 'en'])
 
     // Given up on: the next check leaves it alone.
     await check()
     expect(h.started).toHaveLength(3)
     // One row for the episode, saying how it stands, rather than three.
     expect(runs().map((r) => r.state)).toEqual(['failed'])
+  })
+
+  // The message goes out with the window closed, so it says what the window would, in the app's language.
+  it('gives up in the app\'s language, with the sentence for the failure\'s code', async () => {
+    h.locale = 'ru-RU'
+    h.plan = ['failCoded', 'failCoded', 'failCoded']
+    await check()
+    await check()
+    await check()
+    expect(h.failures[0]).toEqual(['Series', 1, 4, translate('ru', 'err.diskFull'), 3, 'ru'])
   })
 
   it('is fetched by "try again" after it was given up on, in place of the failed run', async () => {

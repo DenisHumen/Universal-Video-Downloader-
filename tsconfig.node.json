@@ -20,6 +20,11 @@
     "src/main/**/*",
     "src/preload/**/*",
     "src/shared/**/*",
+    "src/renderer/src/i18n/en.ts",
+    "src/renderer/src/i18n/ru.ts",
+    "src/renderer/src/i18n/translate.ts",
+    "src/renderer/src/lib/mainText.ts",
+    "src/renderer/src/lib/engineError.ts",
     "electron.vite.config.ts",
     "scripts/**/*"
   ]

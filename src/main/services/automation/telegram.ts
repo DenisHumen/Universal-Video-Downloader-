@@ -1,7 +1,9 @@
 import { net } from 'electron'
 import { describeNetError } from '../../resolvers/neterror'
+import type { MainLanguage } from '../locale'
 import { log } from '../log'
 import { withProxyAuth } from '../proxy-auth'
+import { decimalIn, wordsIn } from '../words'
 
 /**
  * Telling the user an episode arrived.
@@ -240,14 +242,14 @@ export async function sendNotification(
 }
 
 /** Confirm a token and chat id, for the "send a test message" button. */
-export async function sendTest(token: string, chatId: string): Promise<string> {
+export async function sendTest(token: string, chatId: string, language: MainLanguage = 'en'): Promise<string> {
   const me = await call(token, 'getMe', {})
   check(me)
   const name = (me.result as { username?: string } | undefined)?.username
   await sendMessage(
     token,
     chatId,
-    '<b>Universal Video Downloader</b>\nNotifications are working.'
+    `<b>Universal Video Downloader</b>\n${esc(wordsIn(language).t('telegram.test'))}`
   )
   return name ? `Connected as @${name}.` : 'Connected.'
 }
@@ -267,27 +269,34 @@ export interface EpisodeNews {
 
 const pad = (n: number): string => String(n).padStart(2, '0')
 
-const size = (bytes?: number): string =>
-  bytes ? `${(bytes / 1024 / 1024 / 1024).toFixed(2)} GB` : ''
+const size = (language: MainLanguage, bytes?: number): string =>
+  bytes ? `${decimalIn(language, bytes / 1024 / 1024 / 1024, 2)} ${wordsIn(language).t('bytes.GB')}` : ''
 
-const took = (seconds?: number): string => {
+const took = (language: MainLanguage, seconds?: number): string => {
   if (!seconds) return ''
+  const { t } = wordsIn(language)
   const m = Math.floor(seconds / 60)
   const s = Math.round(seconds % 60)
-  return m ? `${m} min ${s} s` : `${s} s`
+  return m ? t('telegram.took', { m, s }) : t('telegram.tookSeconds', { s })
 }
 
+/*
+  These go out in the app's language, whoever reads them: a person with the
+  window closed is who they are for. The language is an argument, as the sending
+  is someone else's job and so is knowing what the setting says.
+*/
+
 /** What a "new episode" notification looks like. */
-export function composeEpisodeNews(news: EpisodeNews): string {
+export function composeEpisodeNews(news: EpisodeNews, language: MainLanguage = 'en'): string {
   const lines = [
     `🎬 <b>${esc(news.series)}</b> — S${pad(news.season)}E${pad(news.episode)}`
   ]
   const sub = [news.translator, news.quality].filter(Boolean).join(' · ')
   if (sub) lines.push(`<i>${esc(sub)}</i>`)
   if (news.remotePath) {
-    lines.push('', `Uploaded to <code>${esc(news.remotePath)}</code>`)
+    lines.push('', wordsIn(language).t('telegram.uploaded', { path: `<code>${esc(news.remotePath)}</code>` }))
   }
-  const facts = [size(news.bytes), took(news.seconds)].filter(Boolean).join(' · ')
+  const facts = [size(language, news.bytes), took(language, news.seconds)].filter(Boolean).join(' · ')
   if (facts) lines.push(esc(facts))
   return lines.join('\n')
 }
@@ -297,17 +306,19 @@ export function composeEpisodeNews(news: EpisodeNews): string {
  *
  * Sent once, for the go that gives up. After several goes it says so, and where
  * to pick it back up: nothing on the schedule will try that episode again.
+ * `why` is already in the language: see `reasonIn`.
  */
 export function composeFailure(
   series: string,
   season: number,
   episode: number,
   why: string,
-  attempts = 1
+  attempts = 1,
+  language: MainLanguage = 'en'
 ): string {
   const lines = [`⚠️ <b>${esc(series)}</b> — S${pad(season)}E${pad(episode)}`]
   if (attempts > 1) {
-    lines.push(`Failed ${attempts} times and will not be tried again on its own; retry it from the watch screen.`)
+    lines.push(wordsIn(language).tp('telegram.gaveUp', attempts))
   }
   lines.push('', esc(why))
   return lines.join('\n')
@@ -321,10 +332,15 @@ export function composeFailure(
  * is the absence of news. Says that it keeps trying, so nobody rushes to fix
  * what a site's own bad afternoon will fix by itself.
  */
-export function composeCheckFailure(series: string, failures: number, why: string): string {
+export function composeCheckFailure(
+  series: string,
+  failures: number,
+  why: string,
+  language: MainLanguage = 'en'
+): string {
   return [
     `⚠️ <b>${esc(series)}</b>`,
-    `The last ${failures} checks failed. It keeps trying, less often, until one works.`,
+    wordsIn(language).tp('telegram.checksFailed', failures),
     '',
     esc(why)
   ].join('\n')

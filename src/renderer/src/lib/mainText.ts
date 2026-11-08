@@ -1,5 +1,5 @@
 import { TELEGRAM_NO_TOKEN } from '@shared/automation'
-import type { TranslateFn, TranslationKey } from '../i18n'
+import type { TranslateFn, TranslationKey } from '../i18n/translate'
 
 /**
  * The main process's fixed sentences, in the user's language.
@@ -13,6 +13,9 @@ import type { TranslateFn, TranslationKey } from '../i18n'
  * Anything not in the table is shown as written, so a remote path, a file name
  * or the engine's own words pass straight through. `mainText.test.ts` reads the
  * main process's source and fails on a sentence that has no entry.
+ *
+ * Main reads this table too, for what it sends to Telegram and prints in a
+ * terminal, so it stays free of anything that needs a window.
  */
 
 const EXACT: Record<string, TranslationKey> = {

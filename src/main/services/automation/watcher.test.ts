@@ -19,6 +19,7 @@ const h = vi.hoisted(() => ({
 }))
 
 vi.mock('electron', () => ({
+  app: { getLocale: () => 'en-US' },
   net: { isOnline: () => h.online },
   powerMonitor: { on: vi.fn(), off: vi.fn() }
 }))
