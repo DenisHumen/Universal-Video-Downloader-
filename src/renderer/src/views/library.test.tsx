@@ -289,6 +289,27 @@ describe('Library (5.3)', () => {
     await act(async () => mock.missing([]))
   })
 
+  it('offers to fix the others found in the same folder, and says how many', async () => {
+    const mock = window.__uvdMock!
+    const row = (id: string): Parameters<typeof mock.queue>[0] => ({ id, title: id, state: 'completed', percent: 100, finishedAt: Date.now(), filepath: `/moved/${id}.mp4` })
+    mock.queue(row('m1'))
+    mock.queue(row('m2'))
+    mock.queue(row('m3'))
+    await app()
+    act(() => useStore.getState().setView('library'))
+    await screen.findByText('m1')
+    act(() => mock.missing(['/moved/m1.mp4', '/moved/m2.mp4', '/moved/m3.mp4']))
+    await screen.findAllByText('File Missing')
+    await act(async () => fireEvent.click(document.querySelector('[data-row="m1"] [aria-haspopup="menu"]')!))
+    await act(async () => fireEvent.click(screen.getByRole('menuitem', { name: 'Locate…' })))
+    const ask = await screen.findByRole('alertdialog', { name: 'Fix the Others Too?' })
+    expect(ask.textContent).toContain(': 2.')
+    expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Update Them' }))
+    await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Update Them' })))
+    await waitFor(() => expect(screen.queryByText('File Missing')).toBeNull())
+    await act(async () => mock.missing([]))
+  })
+
   it('forgets all missing files only after saying no file is touched', async () => {
     const mock = window.__uvdMock!
     mock.queue({ id: 'bye', title: 'Gone for good', state: 'completed', percent: 100, finishedAt: Date.now(), filepath: '/v/bye.mp4' })

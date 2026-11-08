@@ -31,6 +31,8 @@ export const IPC = {
   libraryForgetMissing: 'library:forget-missing',
   /** Find a missing entry's file: main asks the person where, the renderer only names the entry. */
   libraryLocate: 'library:locate',
+  /** After a find: the other lost files in that same folder. Main remembers which folder. */
+  libraryLocateRest: 'library:locate-rest',
   evtLibraryChanged: 'library:changed',
   mediaJobStart: 'media:job-start',
   mediaProbe: 'media:probe',

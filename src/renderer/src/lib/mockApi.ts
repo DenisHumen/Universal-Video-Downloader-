@@ -258,6 +258,7 @@ const mockRemoved = new Set<string>()
 /** Files the preview pretends are gone from disk: `__uvdMock.missing(['/v/old.mp4'])`. */
 let mockMissing = new Set<string>()
 let mockLocateFinds: 'found' | 'noMatch' = 'found'
+let mockMovedFrom = ''
 const isMockLost = (e: LibraryEntry): boolean => !e.remotePath && mockMissing.has(e.filepath)
 function syncMockLibrary(): void {
   for (const item of items) {
@@ -818,11 +819,26 @@ export function installMockApi(): void {
       const name = entry.filepath.split(/[\\/]/).pop() ?? ''
       if (how === 'folder' && mockLocateFinds === 'noMatch') return { status: 'noMatch', name }
       const path = `/found/${name}`
+      const folder = (p: string): string => p.slice(0, p.search(/[\\/][^\\/]*$/))
+      mockMovedFrom = folder(entry.filepath)
+      mockMissing.delete(entry.filepath)
       mockLibrary = rekeyEntry(mockLibrary, id, path)
       // Its queue row must not put the old path back on the next read.
       mockRemoved.add(id)
       libraryListeners.forEach((cb) => cb())
-      return { status: 'found', path }
+      const also = mockLibrary.entries.filter((e) => isMockLost(e) && folder(e.filepath) === mockMovedFrom).length
+      return { status: 'found', path, also }
+    },
+    locateRestOfFolder: async () => {
+      const folder = (p: string): string => p.slice(0, p.search(/[\\/][^\\/]*$/))
+      const rest = mockLibrary.entries.filter((e) => isMockLost(e) && folder(e.filepath) === mockMovedFrom)
+      for (const e of rest) {
+        mockMissing.delete(e.filepath)
+        mockLibrary = rekeyEntry(mockLibrary, e.id, `/found/${e.filepath.split(/[\\/]/).pop()}`)
+        mockRemoved.add(e.id)
+      }
+      libraryListeners.forEach((cb) => cb())
+      return rest.length
     },
     trashLibraryEntry: async (id) => {
       mockRemoved.add(id)

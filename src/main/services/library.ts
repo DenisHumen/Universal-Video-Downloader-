@@ -2,7 +2,7 @@ import { MAX_LISTING_DEPTH } from '@shared/playlist'
 import { app, shell } from 'electron'
 import { existsSync, readFileSync } from 'fs'
 import { access, readdir, stat } from 'fs/promises'
-import { join } from 'path'
+import { basename, dirname, join } from 'path'
 import {
   EMPTY_LIBRARY,
   entryFromItem,
@@ -392,6 +392,26 @@ export async function locateInFolder(id: string, folder: string): Promise<Locate
   const name = entry.filepath.split(/[\\/]/).pop() ?? ''
   const found = await findByName(folder, name)
   return found ? locateFile(id, found) : { status: 'noMatch', name }
+}
+
+/**
+ * The other entries a moved folder took with it: their file is gone from `from`,
+ * and one of that name is in `to`. Directly in it, unlike the search for the file
+ * asked about: this is a guess made for the person, and a same-named file deeper
+ * down is too likely to be something else.
+ */
+export async function movedAlong(from: string, to: string): Promise<LibraryEntry[]> {
+  const held = new Set(lib.entries.map((e) => e.filepath))
+  const found: LibraryEntry[] = []
+  for (const e of lib.entries) {
+    if (e.remotePath || !sameName(dirname(e.filepath), from)) continue
+    const there = join(to, basename(e.filepath))
+    if (held.has(there)) continue
+    const stillHere = await access(e.filepath).then(() => true, () => false)
+    const info = stillHere ? null : await stat(there).catch(() => null)
+    if (info?.isFile()) found.push(e)
+  }
+  return found
 }
 
 export function onLibraryChanged(cb: () => void): () => void {

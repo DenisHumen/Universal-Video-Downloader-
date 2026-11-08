@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { librarySite, listLibrary, siteNameOf, type LibraryEntry } from './library'
+import { keptLinkOf, librarySite, listLibrary, siteNameOf, type LibraryEntry } from './library'
 
 const entry = (id: string, overrides: Partial<LibraryEntry>): LibraryEntry => ({
   id,
@@ -17,6 +17,27 @@ afterEach(() => {
 describe('librarySite', () => {
   it('files a clip under the site of the video it was cut from', () => {
     expect(librarySite({ url: 'C:\\v\\a.mp4', originUrl: 'https://media.example/1' })).toBe('media.example')
+  })
+})
+
+describe('keptLinkOf', () => {
+  const link = 'https://media.example/1'
+
+  it('is the link, for a whole video', () => {
+    expect(keptLinkOf(entry('a', { filepath: '/d/Film [abc].mp4' }))).toBe(link)
+    // A title with brackets of its own is not a cut.
+    expect(keptLinkOf(entry('a', { filepath: '/d/Film [2024] [abc].mp4' }))).toBe(link)
+  })
+
+  it('has none for a cut, known or read off a name from before that was recorded', () => {
+    expect(keptLinkOf(entry('a', { partial: true }))).toBeUndefined()
+    expect(keptLinkOf(entry('a', { filepath: '/d/Film [abc] [0m05s-0m09s].mp4' }))).toBeUndefined()
+    expect(keptLinkOf(entry('a', { filepath: '/d/Film [abc] [1h02m05.5s-end] (audio) (2).m4a' }))).toBeUndefined()
+    expect(keptLinkOf(entry('a', { filepath: 'C:\\v\\Film [abc] [0m05s-end].mp4' }))).toBeUndefined()
+  })
+
+  it('reads only the file name: a folder called that is just a folder', () => {
+    expect(keptLinkOf(entry('a', { filepath: '/d [0m05s-end]/Film.mp4' }))).toBe(link)
   })
 })
 

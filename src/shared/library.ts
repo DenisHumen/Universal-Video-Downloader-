@@ -113,6 +113,13 @@ export function pageLinkOf(from: { originUrl?: string; sourceUrl?: string; url: 
   return isWebLink(link) ? link : undefined
 }
 
+/*
+  The section a trimmed download carries in its file name (naming.ts). Entries
+  written before `partial` existed say nothing else: their duration is the whole
+  video's, copied from the card, so it cannot give a cut away either.
+*/
+const NAMED_AS_CUT = / \[(?:\d+h)?\d+m\d+(?:\.\d)?s-(?:(?:\d+h)?\d+m\d+(?:\.\d)?s|end)\][^\\/]*$/
+
 /**
  * The link this entry means "you already have", in canonical form. A cut has
  * none: it is not the video. Neither has a clip made here, whose page is in
@@ -123,7 +130,7 @@ export function pageLinkOf(from: { originUrl?: string; sourceUrl?: string; url: 
  * episode in another voice is a different file, and rightly not "already had".
  */
 export function keptLinkOf(e: LibraryEntry): string | undefined {
-  return e.partial ? undefined : normalizeUrl(e.sourceUrl ?? e.url)
+  return e.partial || NAMED_AS_CUT.test(e.filepath) ? undefined : normalizeUrl(e.sourceUrl ?? e.url)
 }
 
 /** "You already have this": a link detection found, and the entry that holds it. */
@@ -242,7 +249,8 @@ export function rekeyEntry(lib: LibraryFile, id: string, filepath: string, sizeB
 
 /** How "Locate…" went. `noMatch` names the file looked for, so the view can offer to pick it by hand. */
 export type LocateResult =
-  | { status: 'found'; path: string }
+  /** `also`: how many more of the library's lost files are in that same folder. */
+  | { status: 'found'; path: string; also?: number }
   | { status: 'canceled' }
   | { status: 'noMatch'; name: string }
   | { status: 'taken' }

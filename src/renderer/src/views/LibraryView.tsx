@@ -81,6 +81,7 @@ export default function LibraryView(): JSX.Element {
   const [lost, setLost] = useState(0)
   const [confirmForget, setConfirmForget] = useState(false)
   const [noMatch, setNoMatch] = useState<{ entry: LibraryEntry; name: string } | null>(null)
+  const [movedAlong, setMovedAlong] = useState(0)
 
   const scrollRef = useRef<HTMLDivElement>(null)
   const sentinelRef = useRef<HTMLDivElement>(null)
@@ -205,10 +206,17 @@ export default function LibraryView(): JSX.Element {
   /** The renderer names the entry; main shows the dialog and validates what comes back. */
   const locate = async (entry: LibraryEntry, how: 'folder' | 'file'): Promise<void> => {
     const result = await window.api.locateLibraryEntry(entry.id, how)
-    if (result.status === 'found') toast(t('library.located'), 'success')
-    else if (result.status === 'noMatch') setNoMatch({ entry, name: result.name })
+    if (result.status === 'found') {
+      toast(t('library.located'), 'success')
+      if (result.also) setMovedAlong(result.also)
+    } else if (result.status === 'noMatch') setNoMatch({ entry, name: result.name })
     else if (result.status === 'taken') toast(t('library.locateTaken'), 'error')
     else if (result.status === 'failed') toast(t('library.locateFailed'), 'error')
+  }
+
+  const locateRest = async (): Promise<void> => {
+    setMovedAlong(0)
+    toast(t('library.locateRestDone', { n: await window.api.locateRestOfFolder() }), 'success')
   }
 
   const sections = useMemo(() => {
@@ -419,6 +427,24 @@ export default function LibraryView(): JSX.Element {
                 }}
               >
                 {t('library.locateChoose')}
+              </button>
+            </>
+          }
+        />
+      )}
+      {movedAlong > 0 && (
+        <Dialog
+          role="alertdialog"
+          title={t('library.locateRest')}
+          description={t('library.locateRestBody', { n: movedAlong })}
+          onClose={() => setMovedAlong(0)}
+          actions={
+            <>
+              <button className="btn-quiet" onClick={() => setMovedAlong(0)}>
+                {t('library.locateRestNo')}
+              </button>
+              <button className="btn-solid" data-autofocus onClick={() => void locateRest()}>
+                {t('library.locateRestYes')}
               </button>
             </>
           }

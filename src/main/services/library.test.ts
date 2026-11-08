@@ -325,6 +325,29 @@ describe('entries whose file is gone', () => {
     expect(lib.queryLibrary({}).entries[0]).toMatchObject({ filepath: join(moved, 'Film.MP4'), sizeBytes: 4, container: 'mp4' })
   })
 
+  it('finds what else a moved folder took with it, and only that', async () => {
+    const lib = await import('./library')
+    lib.loadLibrary()
+    const old = join(h.dir, 'old')
+    const moved = join(h.dir, 'moved')
+    mkdirSync(moved, { recursive: true })
+    mkdirSync(old, { recursive: true })
+    for (const name of ['One.mp4', 'Two.mp4', 'Three.mp4', 'Kept.mp4']) writeFileSync(join(moved, name), 'x')
+    writeFileSync(join(old, 'Kept.mp4'), 'still here')
+    lib.recordFinished(done('one', join(old, 'One.mp4'), 1))
+    lib.recordFinished(done('two', join(old, 'Two.mp4'), 2))
+    lib.recordFinished(done('three', join(old, 'Three.mp4'), 3))
+    // Its file never left: the one in the new folder is another file.
+    lib.recordFinished(done('kept', join(old, 'Kept.mp4'), 4))
+    // Not in the new folder.
+    lib.recordFinished(done('gone', join(old, 'Gone.mp4'), 5))
+    // Lost from another folder altogether.
+    lib.recordFinished(done('other', join(h.dir, 'elsewhere', 'One.mp4'), 6))
+    expect(await lib.locateFile('one', join(moved, 'One.mp4'))).toMatchObject({ status: 'found' })
+    const along = await lib.movedAlong(old, moved)
+    expect(along.map((e) => e.id).sort()).toEqual(['three', 'two'])
+  })
+
   it('reports no match by name, so the view can offer to pick the file by hand', async () => {
     const lib = await import('./library')
     lib.loadLibrary()
