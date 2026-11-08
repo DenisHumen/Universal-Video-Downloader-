@@ -1,9 +1,9 @@
-import { mkdtempSync, readFileSync, rmSync, writeFileSync, existsSync } from 'fs'
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync, existsSync } from 'fs'
 import { tmpdir } from 'os'
 import { join } from 'path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { DownloadItem } from '@shared/types'
-import { entryFromItem, listLibrary, normaliseLibrary, noteRemote, seedFromHistory, upsertEntry, EMPTY_LIBRARY } from '@shared/library'
+import { entryFromItem, listLibrary, normaliseLibrary, noteRemote, pageLinkOf, seedFromHistory, upsertEntry, EMPTY_LIBRARY } from '@shared/library'
 
 /*
   Plan 5.3 [v2] SE-4: the Library store lands first, with its migration and
@@ -173,6 +173,172 @@ describe('isolation (SE-4)', () => {
       const src = readFileSync(join(__dirname, file), 'utf-8')
       expect(src, file).not.toMatch(/from ['"]\.\/library['"]|shared\/library/)
     }
+  })
+})
+
+describe('you already have this', () => {
+  it('matches a link in any form, ignoring entries whose file is gone', async () => {
+    const lib = await import('./library')
+    lib.loadLibrary()
+    writeFileSync(join(h.dir, 'here.mp4'), 'x')
+    const here = join(h.dir, 'here.mp4')
+    lib.recordFinished(done('here', here, 2, { sourceUrl: 'https://www.youtube.com/watch?v=aaaaaaaaaaa' }))
+    lib.recordFinished(done('gone', join(h.dir, 'gone.mp4'), 1, { sourceUrl: 'https://www.youtube.com/watch?v=bbbbbbbbbbb' }))
+    const hits = await lib.lookupLinks([
+      'https://youtu.be/aaaaaaaaaaa?si=shared',
+      'https://www.youtube.com/watch?v=bbbbbbbbbbb',
+      'https://example.com/never'
+    ])
+    expect(hits.map((x) => [x.link, x.entry.id, x.onDisk])).toEqual([['https://youtu.be/aaaaaaaaaaa?si=shared', 'here', true]])
+  })
+
+  it('counts a file on a share, without a file to play', async () => {
+    const lib = await import('./library')
+    lib.loadLibrary()
+    lib.recordFinished(done('s', join(h.dir, 'sent.mp4'), 1, { sourceUrl: 'https://example.com/s', remotePath: 'anime/s.mp4' }))
+    const [hit] = await lib.lookupLinks(['https://example.com/s'])
+    expect(hit).toMatchObject({ onDisk: false, entry: { remotePath: 'anime/s.mp4' } })
+  })
+
+  it('prefers a copy still here to an older entry whose file went', async () => {
+    const lib = await import('./library')
+    lib.loadLibrary()
+    writeFileSync(join(h.dir, 'old.mp4'), 'x')
+    lib.recordFinished(done('old', join(h.dir, 'old.mp4'), 1, { sourceUrl: 'https://example.com/v' }))
+    lib.recordFinished(done('new', join(h.dir, 'new.mp4'), 2, { sourceUrl: 'https://example.com/v' }))
+    expect((await lib.lookupLinks(['https://example.com/v']))[0].entry.id).toBe('old')
+  })
+
+  it('does not take a cut, or a clip made from the file, for the video', async () => {
+    const lib = await import('./library')
+    lib.loadLibrary()
+    writeFileSync(join(h.dir, 'cut.mp4'), 'x')
+    writeFileSync(join(h.dir, 'clip.mp4'), 'x')
+    lib.recordFinished(done('cut', join(h.dir, 'cut.mp4'), 1, { sourceUrl: 'https://example.com/v', range: { start: 5, end: 9 } }))
+    lib.recordFinished(done('clip', join(h.dir, 'clip.mp4'), 2, { kind: 'trim', url: '/src.mp4', originUrl: 'https://example.com/v' }))
+    expect(await lib.lookupLinks(['https://example.com/v'])).toEqual([])
+    expect(lib.holdsLink('https://example.com/v')).toBe(false)
+  })
+
+  it('matches a streaming link only exactly: another dub or quality is another file', async () => {
+    const lib = await import('./library')
+    lib.loadLibrary()
+    writeFileSync(join(h.dir, 'ep.mp4'), 'x')
+    const link = 'uvd-rezka://show?season=1&episode=2&translator=56&quality=720p'
+    lib.recordFinished(done('ep', join(h.dir, 'ep.mp4'), 1, { url: link, sourceUrl: link }))
+    expect(await lib.lookupLinks([link])).toHaveLength(1)
+    expect(await lib.lookupLinks([link.replace('translator=56', 'translator=110')])).toEqual([])
+    expect(await lib.lookupLinks([link.replace('720p', '1080p')])).toEqual([])
+  })
+})
+
+describe('by series or channel', () => {
+  const place = { title: 'A Course', index: 1, count: 3, folder: true, numbered: true }
+
+  it('fills the group from the playlist, else the watch’s series, else the uploader', () => {
+    expect(entryFromItem(done('a', '/d/a.mp4', 1, { playlist: place, series: 'S', uploader: 'U' }))?.seriesId).toBe('A Course')
+    expect(entryFromItem(done('b', '/d/b.mp4', 1, { series: 'S', uploader: 'U' }))?.seriesId).toBe('S')
+    expect(entryFromItem(done('c', '/d/c.mp4', 1, { uploader: 'U' }))).toMatchObject({ seriesId: 'U', uploader: 'U' })
+    expect(entryFromItem(done('d', '/d/d.mp4', 1))?.seriesId).toBeUndefined()
+  })
+
+  it('sorts by series, newest first inside one, with old entries last', () => {
+    let lib = EMPTY_LIBRARY
+    lib = upsertEntry(lib, entryFromItem(done('old', '/d/old.mp4', 9))!)
+    lib = upsertEntry(lib, entryFromItem(done('b1', '/d/b1.mp4', 1, { uploader: 'Bravo' }))!)
+    lib = upsertEntry(lib, entryFromItem(done('b2', '/d/b2.mp4', 2, { uploader: 'Bravo' }))!)
+    lib = upsertEntry(lib, entryFromItem(done('a1', '/d/a1.mp4', 3, { uploader: 'Alpha' }))!)
+    expect(listLibrary(lib, { group: 'series' }).entries.map((e) => e.id)).toEqual(['a1', 'b2', 'b1', 'old'])
+  })
+
+  it('finds a video by its channel’s name, in any case, across words', () => {
+    const lib = upsertEntry(EMPTY_LIBRARY, entryFromItem(done('a', '/d/a.mp4', 1, { title: 'Rocket launch', uploader: 'Блендер Foundation' }))!)
+    expect(listLibrary(lib, { query: 'блендер' }).total).toBe(1)
+    expect(listLibrary(lib, { query: 'rocket foundation' }).total).toBe(1)
+    expect(listLibrary(lib, { query: 'nasa' }).total).toBe(0)
+  })
+
+  it('reads a damaged entry’s odd channel without failing the search', () => {
+    const lib = normaliseLibrary({ version: 1, entries: [{ id: 'x', filepath: '/x', url: 'u', title: 'T', finishedAt: 1, uploader: 5 as unknown as string }] })
+    expect(listLibrary(lib, { query: 't' }).total).toBe(1)
+  })
+})
+
+describe('deleting by file, from a queue row', () => {
+  it('moves a file the library holds to the trash, and says when it holds no such file', async () => {
+    const lib = await import('./library')
+    lib.loadLibrary()
+    lib.recordFinished(done('t', '/d/t.mp4', 1))
+    expect(await lib.trashFile('/d/stranger.mp4')).toBe('noEntry')
+    expect(h.trashed).toEqual([])
+    expect(await lib.trashFile('/d/t.mp4')).toBe('trashed')
+    expect(h.trashed).toEqual(['/d/t.mp4'])
+  })
+
+  it('goes back to the page through a clip’s origin, and has none for a local file', () => {
+    expect(pageLinkOf({ url: '/v/a.mp4', originUrl: 'https://example.com/a' })).toBe('https://example.com/a')
+    expect(pageLinkOf({ url: 'x', sourceUrl: 'https://example.com/b' })).toBe('https://example.com/b')
+    expect(pageLinkOf({ url: '/v/a.mp4' })).toBeUndefined()
+    expect(pageLinkOf({ url: 'uvd-rezka://1' })).toBeUndefined()
+  })
+})
+
+describe('entries whose file is gone', () => {
+  it('forgets every missing entry in the library, keeps what went to a share, and touches no file', async () => {
+    const lib = await import('./library')
+    lib.loadLibrary()
+    writeFileSync(join(h.dir, 'here.mp4'), 'x')
+    lib.recordFinished(done('here', join(h.dir, 'here.mp4'), 1))
+    lib.recordFinished(done('gone1', join(h.dir, 'gone1.mp4'), 2))
+    lib.recordFinished(done('gone2', join(h.dir, 'gone2.mp4'), 3))
+    lib.recordFinished(done('shared', join(h.dir, 'shared.mp4'), 4, { remotePath: 'anime/ep.mp4' }))
+    expect(await lib.countMissing()).toBe(2)
+    expect(await lib.forgetMissing()).toBe(2)
+    expect(lib.queryLibrary({}).entries.map((e) => e.id).sort()).toEqual(['here', 'shared'])
+    expect(existsSync(join(h.dir, 'here.mp4'))).toBe(true)
+    expect(h.trashed).toEqual([])
+    expect(await lib.forgetMissing()).toBe(0)
+  })
+
+  it('locates a file by name in a folder, nested too, and re-keys the entry with the file’s facts', async () => {
+    const lib = await import('./library')
+    lib.loadLibrary()
+    lib.recordFinished(done('a', join(h.dir, 'old', 'Film.MP4'), 1, { totalBytes: 1 }))
+    const moved = join(h.dir, 'moved', 'deep')
+    mkdirSync(moved, { recursive: true })
+    writeFileSync(join(moved, 'Film.MP4'), 'four')
+    expect(await lib.locateInFolder('a', join(h.dir, 'moved'))).toEqual({ status: 'found', path: join(moved, 'Film.MP4') })
+    expect(lib.queryLibrary({}).entries[0]).toMatchObject({ filepath: join(moved, 'Film.MP4'), sizeBytes: 4, container: 'mp4' })
+  })
+
+  it('reports no match by name, so the view can offer to pick the file by hand', async () => {
+    const lib = await import('./library')
+    lib.loadLibrary()
+    lib.recordFinished(done('a', join(h.dir, 'old', 'Film.mp4'), 1))
+    expect(await lib.locateInFolder('a', h.dir)).toEqual({ status: 'noMatch', name: 'Film.mp4' })
+    writeFileSync(join(h.dir, 'renamed.mp4'), 'x')
+    expect(await lib.locateFile('a', join(h.dir, 'renamed.mp4'))).toMatchObject({ status: 'found' })
+  })
+
+  it('refuses a file another entry holds, a path that is no file, and an entry it does not know', async () => {
+    const lib = await import('./library')
+    lib.loadLibrary()
+    writeFileSync(join(h.dir, 'b.mp4'), 'x')
+    lib.recordFinished(done('a', join(h.dir, 'a.mp4'), 1))
+    lib.recordFinished(done('b', join(h.dir, 'b.mp4'), 2))
+    expect(await lib.locateFile('a', join(h.dir, 'b.mp4'))).toEqual({ status: 'taken' })
+    expect(await lib.locateFile('a', h.dir)).toEqual({ status: 'failed' })
+    expect(await lib.locateFile('a', join(h.dir, 'nowhere.mp4'))).toEqual({ status: 'failed' })
+    expect(await lib.locateFile('stranger', join(h.dir, 'b.mp4'))).toEqual({ status: 'failed' })
+    expect(lib.libraryEntry('a')?.filepath).toBe(join(h.dir, 'a.mp4'))
+  })
+
+  // The trust boundary: the channel takes an entry id and a way of looking, never a path.
+  it('never takes a path from the renderer when locating', () => {
+    const preload = readFileSync(join(__dirname, '..', '..', 'preload', 'index.ts'), 'utf-8')
+    expect(preload).toMatch(/locateLibraryEntry: \(id: string, how: 'folder' \| 'file'\)/)
+    const ipc = readFileSync(join(__dirname, '..', 'ipc.ts'), 'utf-8')
+    expect(ipc).toMatch(/const path = picked\.filePaths\[0\]/)
   })
 })
 

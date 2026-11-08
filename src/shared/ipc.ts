@@ -19,7 +19,14 @@ export const IPC = {
   libraryList: 'library:list',
   libraryMissing: 'library:missing',
   libraryTrash: 'library:trash',
+  libraryTrashFile: 'library:trash-file',
   libraryForget: 'library:forget',
+  /** Which of these links are already kept, by canonical address. */
+  libraryLookup: 'library:lookup',
+  libraryCountMissing: 'library:count-missing',
+  libraryForgetMissing: 'library:forget-missing',
+  /** Find a missing entry's file: main asks the person where, the renderer only names the entry. */
+  libraryLocate: 'library:locate',
   evtLibraryChanged: 'library:changed',
   mediaJobStart: 'media:job-start',
   mediaProbe: 'media:probe',

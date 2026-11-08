@@ -1,7 +1,7 @@
 import { useMemo } from 'react'
 import { m } from 'framer-motion'
 import { enter } from '../../lib/motion'
-import { Folder, Loader2 } from '../../ui/icons'
+import { CheckCircle2, Folder, FolderOpen, Loader2, Play } from '../../ui/icons'
 import { hasTrim, type AppSettings, type DownloadMode, type MediaInfo, type QualityPreset, type TrimRange } from '@shared/types'
 import { formatBytes, formatCount, formatDuration } from '../../lib/format'
 import {
@@ -14,7 +14,9 @@ import {
   resolveSelection
 } from '../../lib/quality'
 import { toClock } from '../../lib/time'
-import { useT, useTp } from '../../i18n'
+import { useLibraryHits } from '../../lib/libraryHits'
+import { toast } from '../../lib/toast'
+import { useI18n, useT, useTp } from '../../i18n'
 import { ActionRow, ComboRow, ExpanderRow, PreferencesGroup, SegmentedControl, cx } from '../../ui'
 import Thumbnail from '../../components/Thumbnail'
 import TrimEditor from '../../components/TrimEditor'
@@ -49,6 +51,8 @@ export const isCutting = (c: ResultChoice): boolean => c.selection.mode === 'vid
 
 interface Props {
   info: MediaInfo
+  /** The link that was detected: a download keeps whichever of it, the page or the stream, it was started from. */
+  detectedUrl?: string
   settings: AppSettings
   choice: ResultChoice
   onChoice: (next: ResultChoice) => void
@@ -67,6 +71,7 @@ interface Props {
  */
 export default function VideoResult({
   info,
+  detectedUrl,
   settings,
   choice,
   onChoice,
@@ -78,6 +83,10 @@ export default function VideoResult({
 }: Props): JSX.Element {
   const t = useT()
   const tp = useTp()
+  const language = useI18n((s) => s.language)
+  const links = [info.downloadUrl, info.webpageUrl, detectedUrl].filter((l): l is string => Boolean(l))
+  const hits = useLibraryHits(links)
+  const held = links.map((l) => hits.get(l)).find(Boolean)
   const { selection } = choice
   const mode = selection.mode
   const videoFormats = info.formats.filter((f) => f.kind !== 'audio')
@@ -132,6 +141,8 @@ export default function VideoResult({
   const qualityValue = chosenFormat ? `fmt:${chosenFormat.id}` : (selection.quality ?? 'best')
 
   const cutting = isCutting(choice)
+  // A cut is a new file whatever is kept already, so it keeps its own button.
+  const again = Boolean(held) && !cutting
   const summary = outcomeSummary(resolveSelection(info.formats, selection, settings.audioFormat), (b) => formatBytes(b))
   const meta = [
     info.uploader,
@@ -190,6 +201,45 @@ export default function VideoResult({
           </div>
         </div>
       </div>
+
+      {/* Already kept: the file is one press away, and fetching it again is still a choice. */}
+      {held && (
+        <div className="panel flex flex-wrap items-center gap-3 p-3" data-uvd="already-have">
+          <CheckCircle2 size={18} className="shrink-0 text-accent-ink" />
+          <div className="min-w-0 flex-1">
+            <p className="text-body font-medium text-ink">{t('library.haveTitle')}</p>
+            <p className="numeric truncate text-meta text-ink-2" title={held.onDisk ? held.entry.filepath : held.entry.remotePath}>
+              {held.onDisk
+                ? [
+                    held.entry.container?.toUpperCase(),
+                    held.entry.sizeBytes ? formatBytes(held.entry.sizeBytes) : null,
+                    new Date(held.entry.finishedAt).toLocaleDateString(language, { day: 'numeric', month: 'short', year: 'numeric' })
+                  ]
+                    .filter(Boolean)
+                    .join(' · ')
+                : t('queue.onShare', { path: held.entry.remotePath ?? '' })}
+            </p>
+          </div>
+          {held.onDisk && (
+            <div className="flex shrink-0 items-center gap-2">
+              <button
+                type="button"
+                className="btn-solid"
+                onClick={() =>
+                  void window.api.openPath(held.entry.filepath).then((why) => {
+                    if (why) toast(t('queue.openFailed'), 'error')
+                  })
+                }
+              >
+                <Play size={14} /> {t('common.play')}
+              </button>
+              <button type="button" className="btn-quiet" onClick={() => void window.api.showInFolder(held.entry.filepath)}>
+                <FolderOpen size={14} /> {t('common.showInFolder')}
+              </button>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* The choices, as one boxed list. */}
       <PreferencesGroup footer={info.isLive ? t('home.liveHint') : undefined}>
@@ -335,7 +385,11 @@ export default function VideoResult({
       <div className="flex justify-center">
         <button
           type="button"
-          className="btn-solid h-11 min-w-[60%] max-w-full rounded-pill px-8 text-body"
+          className={cx(
+            // Play above is the suggested action then; this one is still there, not shouting.
+            again ? 'btn-quiet' : 'btn-solid',
+            'h-11 min-w-[60%] max-w-full rounded-pill px-8 text-body'
+          )}
           data-uvd="download"
           onClick={onDownload}
           disabled={starting}
@@ -344,7 +398,9 @@ export default function VideoResult({
           <span className="truncate">
             {cutting
               ? t('trim.apply')
-              : summary.length
+              : again
+                ? [t('library.downloadAnyway'), ...summary].join(' · ')
+                : summary.length
                 ? t('home.downloadSummary', { details: summary.join(' · ') })
                 : t('common.download')}
           </span>

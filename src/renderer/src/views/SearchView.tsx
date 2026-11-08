@@ -248,7 +248,8 @@ export default function SearchView({ settings, embedded = false }: Props): JSX.E
       // say which resolution "best" turned out to be instead of just "best".
       targetHeight: quality === 'best' && probe?.maxHeight ? probe.maxHeight : undefined,
       duration: r.duration,
-      extractor: r.service
+      extractor: r.service,
+      uploader: r.uploader
     })
     if (ok) setAdded((prev) => new Set(prev).add(r.url))
   }

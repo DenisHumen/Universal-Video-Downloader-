@@ -6,7 +6,7 @@ import { contextBridge, ipcRenderer } from 'electron'
 import { IPC } from '@shared/ipc'
 import { themeFromArgv } from '@shared/theme-boot'
 import type { ButtonLayout } from '@shared/desktop'
-import type { LibraryPage, LibraryQuery } from '@shared/library'
+import type { LibraryHit, LibraryPage, LibraryQuery, LocateResult } from '@shared/library'
 import type {
   AppSettings,
   BrowserLoginOffer,
@@ -83,7 +83,14 @@ const api = {
   listLibrary: (q: LibraryQuery): Promise<LibraryPage> => ipcRenderer.invoke(IPC.libraryList, q),
   libraryMissing: (paths: string[]): Promise<string[]> => ipcRenderer.invoke(IPC.libraryMissing, paths),
   trashLibraryEntry: (id: string): Promise<boolean> => ipcRenderer.invoke(IPC.libraryTrash, id),
+  trashLibraryFile: (filepath: string): Promise<'trashed' | 'failed' | 'noEntry'> =>
+    ipcRenderer.invoke(IPC.libraryTrashFile, filepath),
   forgetLibraryEntry: (id: string): Promise<void> => ipcRenderer.invoke(IPC.libraryForget, id),
+  libraryLookup: (links: string[]): Promise<LibraryHit[]> => ipcRenderer.invoke(IPC.libraryLookup, links),
+  libraryCountMissing: (): Promise<number> => ipcRenderer.invoke(IPC.libraryCountMissing),
+  forgetMissingEntries: (): Promise<number> => ipcRenderer.invoke(IPC.libraryForgetMissing),
+  locateLibraryEntry: (id: string, how: 'folder' | 'file'): Promise<LocateResult> =>
+    ipcRenderer.invoke(IPC.libraryLocate, id, how),
   onLibraryChanged: (cb: () => void) => on<null>(IPC.evtLibraryChanged, () => cb()),
   // Local media jobs (trim / convert)
   startMediaJob: (req: MediaJobRequest): Promise<DownloadItem> =>

@@ -3,6 +3,7 @@ import { Check, Loader2 } from '../ui/icons'
 import type { DownloadMode, MediaInfo, PlaylistEntry, QualityPreset } from '@shared/types'
 import Choice from './Choice'
 import SaveLocation from './SaveLocation'
+import { useLibraryHits } from '../lib/libraryHits'
 import { placeEntries } from '../lib/playlist'
 import { initialMode, initialQuality } from '../lib/quality'
 import { queueDownloads } from '../lib/queue'
@@ -46,6 +47,7 @@ export default function PlaylistCard({ info, onDone, saveDir, onSaveDirChange }:
   const [rangeTo, setRangeTo] = useState('')
 
   const entries = useMemo(() => info.entries || [], [info.entries])
+  const kept = useLibraryHits(useMemo(() => entries.map((e) => e.url), [entries]))
 
   /*
     Only the rows on screen are built.
@@ -115,6 +117,7 @@ export default function PlaylistCard({ info, onDone, saveDir, onSaveDirChange }:
             resolver's when they start.
           */
           extractor: e.extractor,
+          uploader: info.uploader,
           outputDir: saveDir || undefined,
           playlist
         }))
@@ -262,6 +265,7 @@ export default function PlaylistCard({ info, onDone, saveDir, onSaveDirChange }:
                         <span className="truncate text-control text-ink" title={e.title}>
                           {e.title}
                         </span>
+                        {kept.has(e.url) && <span className="tag ml-auto shrink-0">{t('library.haveMark')}</span>}
                       </button>
                     </li>
                   )

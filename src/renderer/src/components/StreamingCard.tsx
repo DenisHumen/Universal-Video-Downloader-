@@ -153,6 +153,7 @@ export default function StreamingCard({
           eps.map((ep) => ({
             url: buildEpisodeUrl(Number(seasonStr), ep),
             title: `${s.title} - S${pad2(Number(seasonStr))}E${pad2(ep)} (${translatorName})`,
+            series: s.title,
             thumbnail: s.thumbnail,
             mode: 'video' as const,
             quality,

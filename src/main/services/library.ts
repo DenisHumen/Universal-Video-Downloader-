@@ -1,22 +1,27 @@
 import { app, shell } from 'electron'
 import { existsSync, readFileSync } from 'fs'
-import { access } from 'fs/promises'
+import { access, readdir, stat } from 'fs/promises'
 import { join } from 'path'
 import {
   EMPTY_LIBRARY,
   entryFromItem,
   isLibraryFile,
   isNewerLibrary,
+  keptLinkOf,
   listLibrary,
   normaliseLibrary,
   noteRemote,
+  rekeyEntry,
   relocateEntry,
   removeEntry,
   seedFromHistory,
   upsertEntry,
+  type LibraryEntry,
   type LibraryFile,
+  type LibraryHit,
   type LibraryPage,
-  type LibraryQuery
+  type LibraryQuery,
+  type LocateResult
 } from '@shared/library'
 import type { DownloadItem } from '@shared/types'
 import { normalizeUrl } from '@shared/urls'
@@ -39,6 +44,9 @@ import { log } from './log'
 
 const FILE = (): string => join(app.getPath('userData'), 'library.json')
 const HISTORY = (): string => join(app.getPath('userData'), 'history.json')
+
+/** The most files checked at once: a whole big library must not fill the thread pool ahead of everything else. */
+const SCAN_WIDTH = 16
 
 let lib: LibraryFile = EMPTY_LIBRARY
 const unread = new ReadFailure()
@@ -179,11 +187,50 @@ export function followEntry(id: string, patch: { filepath?: string; remotePath?:
  * to a share. A link whose file was deleted can be fetched again.
  */
 export function holdsLink(link: string): boolean {
-  return lib.entries.some(
-    (e) =>
-      normalizeUrl(e.sourceUrl ?? e.url) === link &&
-      Boolean(e.remotePath || existsSync(e.filepath))
+  return lib.entries.some((e) => keptLinkOf(e) === link && Boolean(e.remotePath || existsSync(e.filepath)))
+}
+
+/** The most links asked about at once: as deep as a channel listing goes. */
+const MOST_LINKS = 5000
+
+/**
+ * Which of these links are already kept, for the result card and a playlist's
+ * rows. An entry whose file is gone does not count, so a deleted video reads as
+ * new; one that went to a share does. The disk is only asked about entries whose
+ * link matched, so a long playlist costs its matches and not its length.
+ */
+export async function lookupLinks(links: string[]): Promise<LibraryHit[]> {
+  const byLink = new Map<string, LibraryEntry[]>()
+  for (const e of lib.entries) {
+    const key = keptLinkOf(e)
+    if (!key) continue
+    const held = byLink.get(key)
+    if (held) held.push(e)
+    else byLink.set(key, [e])
+  }
+  const asked = links.slice(0, MOST_LINKS).flatMap((link) => {
+    const held = byLink.get(normalizeUrl(link))
+    return held ? [{ link, held }] : []
+  })
+  const hits: LibraryHit[] = []
+  let next = 0
+  await Promise.all(
+    Array.from({ length: SCAN_WIDTH }, async () => {
+      while (next < asked.length) {
+        const { link, held } = asked[next++]
+        let here: LibraryEntry | undefined
+        for (const e of held) {
+          if (await access(e.filepath).then(() => true, () => false)) {
+            here = e
+            break
+          }
+        }
+        const entry = here ?? held.find((e) => e.remotePath)
+        if (entry) hits.push({ link, entry, onDisk: Boolean(here) })
+      }
+    })
   )
+  return hits
 }
 
 export function queryLibrary(q: LibraryQuery): LibraryPage {
@@ -223,12 +270,122 @@ export async function trashEntry(id: string): Promise<boolean> {
   return true
 }
 
+/**
+ * "Delete File" from a queue row, which knows its file rather than its entry:
+ * a later run into the same path, or "Remove from Library", leaves the row with
+ * no entry of its own. The Library's rule stays whole - only a file it holds can
+ * be deleted through here - and the row can say why nothing happened.
+ */
+export async function trashFile(filepath: string): Promise<'trashed' | 'failed' | 'noEntry'> {
+  const entry = lib.entries.find((e) => e.filepath === filepath)
+  if (!entry) return 'noEntry'
+  return (await trashEntry(entry.id)) ? 'trashed' : 'failed'
+}
+
 /** Forget an entry whose file is gone (the file is not touched). */
 export function forgetEntry(id: string): void {
   const next = removeEntry(lib, id)
   if (next.entries.length === lib.entries.length) return
   lib = next
   changed()
+}
+
+/**
+ * Entries whose file is gone from here, across the whole library and not just
+ * the rows on screen. One sent to a share is not among them: it is elsewhere,
+ * not lost.
+ */
+async function lostPaths(): Promise<Set<string>> {
+  const queue = lib.entries.filter((e) => !e.remotePath).map((e) => e.filepath)
+  const lost = new Set<string>()
+  let next = 0
+  await Promise.all(
+    Array.from({ length: SCAN_WIDTH }, async () => {
+      while (next < queue.length) {
+        const path = queue[next++]
+        await access(path).catch(() => lost.add(path))
+      }
+    })
+  )
+  return lost
+}
+
+let counting: Promise<number> | null = null
+
+/** How many entries "Forget All Missing" would remove. Calls that overlap share one scan. */
+export function countMissing(): Promise<number> {
+  counting ??= lostPaths()
+    .then((lost) => lost.size)
+    .finally(() => {
+      counting = null
+    })
+  return counting
+}
+
+/** "Forget All Missing": looks again now, whatever the view last counted. No file is touched. Returns how many went. */
+export async function forgetMissing(): Promise<number> {
+  const lost = await lostPaths()
+  // By path and against the library as it is now: an entry located during the scan has a new path and stays.
+  const entries = lib.entries.filter((e) => e.remotePath || !lost.has(e.filepath))
+  const removed = lib.entries.length - entries.length
+  if (removed === 0) return 0
+  lib = { ...lib, entries }
+  changed()
+  return removed
+}
+
+export function libraryEntry(id: string): LibraryEntry | undefined {
+  return lib.entries.find((e) => e.id === id)
+}
+
+/** Windows and macOS take a file name in any case; Linux does not. */
+const sameName = (a: string, b: string): boolean =>
+  process.platform === 'linux' ? a === b : a.toLowerCase() === b.toLowerCase()
+
+/** The first file of this name in a folder, nearest first: people move a whole folder, sometimes into another. */
+async function findByName(folder: string, name: string): Promise<string | null> {
+  let level = [folder]
+  let looked = 0
+  for (let depth = 0; depth < 4 && level.length; depth++) {
+    const below: string[] = []
+    for (const dir of level) {
+      // Bounded: picking the root of a drive must not walk all of it.
+      if (looked > 20_000) return null
+      const found = await readdir(dir, { withFileTypes: true }).catch(() => [])
+      looked += found.length
+      const hit = found.find((f) => f.isFile() && sameName(f.name, name))
+      if (hit) return join(dir, hit.name)
+      for (const f of found) if (f.isDirectory()) below.push(join(dir, f.name))
+    }
+    level = below
+  }
+  return null
+}
+
+/**
+ * Point an entry at a file the person picked in main's own dialog (ipc.ts): the
+ * renderer only ever names the entry, never the path. Still checked here, since
+ * a dialog can return a path that is gone a moment later.
+ */
+export async function locateFile(id: string, path: string): Promise<LocateResult> {
+  if (!libraryEntry(id)) return { status: 'failed' }
+  const info = await stat(path).catch(() => null)
+  if (!info?.isFile()) return { status: 'failed' }
+  if (lib.entries.some((e) => e.id !== id && sameName(e.filepath, path))) return { status: 'taken' }
+  const next = rekeyEntry(lib, id, path, info.size)
+  if (next === lib) return { status: 'taken' }
+  lib = next
+  changed()
+  return { status: 'found', path }
+}
+
+/** Find an entry's file by its name in a folder the person picked. */
+export async function locateInFolder(id: string, folder: string): Promise<LocateResult> {
+  const entry = libraryEntry(id)
+  if (!entry) return { status: 'failed' }
+  const name = entry.filepath.split(/[\\/]/).pop() ?? ''
+  const found = await findByName(folder, name)
+  return found ? locateFile(id, found) : { status: 'noMatch', name }
 }
 
 export function onLibraryChanged(cb: () => void): () => void {

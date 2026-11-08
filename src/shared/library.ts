@@ -1,5 +1,6 @@
 import { knownSiteFor } from './auto-sources'
 import type { DownloadItem } from './types'
+import { isWebLink, normalizeUrl } from './urls'
 
 /**
  * The Library (plan 5.3, [v2] SE-4): every finished file, kept in its own
@@ -18,12 +19,23 @@ export interface LibraryEntry {
   remotePath?: string
   url: string
   sourceUrl?: string
+  /** A clip or conversion: the page its source file came from. See DownloadItem. */
+  originUrl?: string
   title: string
   extractor?: string
+  /** Who published it, when detection said. */
+  uploader?: string
+  /**
+   * What "By Series or Channel" groups on. A name, not a site's id, because a
+   * name is all that is known of a playlist, a watch or a channel across sites.
+   * Absent on entries from before it was filled in: those are "Other".
+   */
   seriesId?: string
   /** Seconds. */
   duration?: number
   sizeBytes?: number
+  /** Only a section of the video was fetched, so its link is not "already have it". */
+  partial?: boolean
   /** The file's extension, lower case. */
   container?: string
   /** A poster for it: the download's thumbnail address. */
@@ -68,14 +80,46 @@ export function entryFromItem(item: DownloadItem): LibraryEntry | null {
     remotePath: item.remotePath,
     url: item.url,
     sourceUrl: item.sourceUrl,
+    originUrl: item.originUrl,
     title: item.title,
     extractor: item.extractor,
+    uploader: item.uploader,
+    seriesId: item.playlist?.title || item.series || item.uploader || undefined,
     duration: item.duration,
     sizeBytes: item.totalBytes,
+    partial: item.range ? true : undefined,
     container: extOf(item.filepath),
     thumb: item.thumbnail,
     finishedAt: item.finishedAt ?? item.createdAt
   }
+}
+
+/** The page an entry or a queue row can go back to, or undefined when it has none (a local file, an internal link). */
+export function pageLinkOf(from: { originUrl?: string; sourceUrl?: string; url: string }): string | undefined {
+  const link = from.originUrl || from.sourceUrl || from.url
+  return isWebLink(link) ? link : undefined
+}
+
+/**
+ * The link this entry means "you already have", in canonical form. A cut has
+ * none: it is not the video. Neither has a clip made here, whose page is in
+ * `originUrl` and not in `sourceUrl`.
+ *
+ * `normalizeUrl` leaves the internal `uvd-*://` streaming links as they are, and
+ * those carry the dub and the quality, so one matches only exactly: the same
+ * episode in another voice is a different file, and rightly not "already had".
+ */
+export function keptLinkOf(e: LibraryEntry): string | undefined {
+  return e.partial ? undefined : normalizeUrl(e.sourceUrl ?? e.url)
+}
+
+/** "You already have this": a link detection found, and the entry that holds it. */
+export interface LibraryHit {
+  /** The link as it was asked about. */
+  link: string
+  entry: LibraryEntry
+  /** The file is here to play. If not, it went to a share (`entry.remotePath`). */
+  onDisk: boolean
 }
 
 /** Whether parsed JSON can be read as a library at all. */
@@ -166,6 +210,31 @@ export function relocateEntry(
   return { version: LIBRARY_VERSION, entries }
 }
 
+/**
+ * The file turned up somewhere else ("Locate…"): the entry moves to that path.
+ * One entry per file, so a path another entry holds is refused (the same object back).
+ */
+export function rekeyEntry(lib: LibraryFile, id: string, filepath: string, sizeBytes?: number): LibraryFile {
+  const at = lib.entries.findIndex((e) => e.id === id)
+  if (at < 0 || lib.entries.some((e, i) => i !== at && e.filepath === filepath)) return lib
+  const entries = lib.entries.slice()
+  entries[at] = {
+    ...entries[at],
+    filepath,
+    container: extOf(filepath),
+    sizeBytes: sizeBytes ?? entries[at].sizeBytes
+  }
+  return { version: LIBRARY_VERSION, entries }
+}
+
+/** How "Locate…" went. `noMatch` names the file looked for, so the view can offer to pick it by hand. */
+export type LocateResult =
+  | { status: 'found'; path: string }
+  | { status: 'canceled' }
+  | { status: 'noMatch'; name: string }
+  | { status: 'taken' }
+  | { status: 'failed' }
+
 export function removeEntry(lib: LibraryFile, id: string): LibraryFile {
   return { version: LIBRARY_VERSION, entries: lib.entries.filter((e) => e.id !== id) }
 }
@@ -199,12 +268,31 @@ export interface LibraryPage {
   total: number
 }
 
-/** A page of the library, newest first, filtered by title words. Grouping is the view's (it only orders). */
+// One collator: sorting a whole library for every page with `localeCompare` is measurably slower.
+const collator = new Intl.Collator()
+
+/**
+ * A page of the library, newest first, filtered by the words of its title and
+ * channel. Grouping is the view's (it only orders); what has no series or
+ * channel comes last, under "Other".
+ */
 export function listLibrary(lib: LibraryFile, q: LibraryQuery = {}): LibraryPage {
   const words = (q.query ?? '').toLowerCase().split(/\s+/).filter(Boolean)
-  let list = lib.entries.filter((e) => words.every((w) => e.title.toLowerCase().includes(w)))
-  if (q.group === 'site') list = [...list].sort((a, b) => (librarySite(a) ?? '').localeCompare(librarySite(b) ?? '') || b.finishedAt - a.finishedAt)
-  if (q.group === 'series') list = [...list].sort((a, b) => (a.seriesId ?? '').localeCompare(b.seriesId ?? '') || b.finishedAt - a.finishedAt)
+  let list = words.length
+    ? lib.entries.filter((e) => {
+        const text = `${e.title} ${e.uploader ?? ''} ${e.seriesId ?? ''}`.toLowerCase()
+        return words.every((w) => text.includes(w))
+      })
+    : lib.entries
+  if (q.group === 'site') list = [...list].sort((a, b) => collator.compare(librarySite(a) ?? '', librarySite(b) ?? '') || b.finishedAt - a.finishedAt)
+  if (q.group === 'series') {
+    list = [...list].sort(
+      (a, b) =>
+        Number(!a.seriesId) - Number(!b.seriesId) ||
+        collator.compare(a.seriesId ?? '', b.seriesId ?? '') ||
+        b.finishedAt - a.finishedAt
+    )
+  }
   const offset = Math.max(0, q.offset ?? 0)
   const limit = Math.min(500, Math.max(1, q.limit ?? 100))
   return { entries: list.slice(offset, offset + limit), total: list.length }

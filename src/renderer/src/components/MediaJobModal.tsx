@@ -8,6 +8,7 @@ import {
   type DownloadItem,
   type TrimRange
 } from '@shared/types'
+import { pageLinkOf } from '@shared/library'
 import { useT } from '../i18n'
 import { toast } from '../lib/toast'
 import { viewQueueAction } from '../lib/queue'
@@ -71,14 +72,22 @@ export default function MediaJobModal({ item, mode, onClose }: Props): JSX.Eleme
 
   const submit = async (): Promise<void> => {
     if (!item.filepath) return
+    const source = {
+      sourcePath: item.filepath,
+      title: item.title,
+      thumbnail: item.thumbnail,
+      // A clip of a clip still goes back to the page the first one came from.
+      originUrl: pageLinkOf(item),
+      extractor: item.extractor,
+      uploader: item.uploader,
+      series: item.playlist?.title || item.series
+    }
     setBusy(true)
     try {
       if (mode === 'trim') {
         await window.api.startMediaJob({
+          ...source,
           kind: 'trim',
-          sourcePath: item.filepath,
-          title: item.title,
-          thumbnail: item.thumbnail,
           range,
           precise
         })
@@ -89,10 +98,8 @@ export default function MediaJobModal({ item, mode, onClose }: Props): JSX.Eleme
           height: resolution === 'keep' ? undefined : Number(resolution)
         }
         await window.api.startMediaJob({
+          ...source,
           kind: 'convert',
-          sourcePath: item.filepath,
-          title: item.title,
-          thumbnail: item.thumbnail,
           target
         })
       }
