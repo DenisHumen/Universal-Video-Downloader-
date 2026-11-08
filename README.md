@@ -31,7 +31,7 @@ and finds the stream itself on pages nobody wrote an extractor for.
 
 - **It works on pages other downloaders give up on.** The yt-dlp engine handles 1800+ sites. When it doesn't know a site, the app reads the page, then plays it in a hidden browser and catches the stream as it loads, with the headers the server asks for.
 - **It tells you what you'll get before you click.** The quality buttons come from what the video really has, and "best" says what it means: `2160p60 · HDR · MP4 · ≈ 1.2 GB`.
-- **It can do the whole job for a series.** Watch a series and every new episode is downloaded, renamed, copied to a network share and announced in Telegram, without you opening the app.
+- **It can do the whole job for a series.** Add a series to *New Episodes* and every new episode is downloaded, renamed, copied to a network share and announced in Telegram, without you opening the app.
 - **It looks like it belongs on your desktop.** Version 4 is designed after GNOME: a sidebar and header bar, boxed lists, Settings laid out like GNOME Settings, Ubuntu Sans and the Yaru orange accent, in a day and a night theme. It looks the same on Windows and macOS.
 - **No account, no ads, no telemetry.** Everything runs on your computer. English and Russian interface.
 
@@ -44,7 +44,7 @@ and finds the stream itself on pages nobody wrote an extractor for.
 | **macOS 13+**, Intel | [`…-mac-x64.dmg`](https://github.com/DenisHumen/Universal-Video-Downloader-/releases/latest) | |
 | **Linux** | [apt or dnf](#linux) (recommended), or the [`.deb` / `.rpm` / `.AppImage`](https://github.com/DenisHumen/Universal-Video-Downloader-/releases/latest) | updates with the system |
 
-On first launch the app downloads the yt-dlp engine (about 30 MB) and keeps it up to date; ffmpeg is built in. A short first-run setup asks where to save and which theme and accent you like; every step can be skipped. Then paste a link, pick the quality and press **Download**. Files go to your *Downloads* folder.
+On first launch the app downloads the yt-dlp engine (about 30 MB) and keeps it up to date; ffmpeg is built in. A short first-run setup asks where to save and which theme and accent you like; every step can be skipped. Then paste a link, pick the quality and press **Download**. Files go to your *Downloads* folder. Lost? *Help* in the main menu answers the first questions in plain words, without the internet.
 
 ### Linux
 
@@ -99,28 +99,35 @@ uvd https://www.youtube.com/watch?v=jNQXAC9IVRw
 | --- | --- |
 | **Almost any page** | yt-dlp first; then the page's own player data; then a hidden browser that catches the stream as it loads. A link from the address bar is enough. |
 | **Honest quality** | Only the qualities the video really has, and the size before you download. |
-| **Activity and Library** | *Activity* has what is downloading, what failed and what finished today; a failed row offers the fix for its error (cookies, another folder, audio only, retry). *Library* keeps everything you downloaded, by date or site, searchable, with play and show-in-folder. |
+| **Choose on the card** | The audio language where a video has several, and subtitles in your language, automatic captions included. |
+| **My Downloads and Library** | *My Downloads* has what is downloading, what failed and what finished today; a failed row offers the fix for its error (sign in, another folder, audio only, retry). *Library* keeps everything you downloaded, by date, site or series, searchable, with play and show-in-folder. Moved a file? *Locate…* finds it again. Paste a link you already have and the app says so. |
 | **One progress bar** | Download and the work after it (merging, converting, cutting) in one bar, with the step named. Pause, resume, retry, cancel. |
+| **Live streams and premieres** | A broadcast records until you press *Stop and Save*, and you keep what came down. A premiere that has not started? *Wait and Download* starts by itself when it does. |
 | **Cut and convert** | Download only the part you need, re-cut finished files, convert to MP4 / MKV / WebM / MOV / GIF or extract MP3 / M4A / FLAC / OPUS. |
 | **Search by title** | YouTube, SoundCloud, Dailymotion, Bilibili, Niconico and the YummyAnime catalogue, one service or all at once. PornHub too, once switched on in Settings. |
 | **Built-in browser** | For the stubborn page: open it, press play, and every stream it loads appears in a side panel, one click from the queue. Sign in to a site there once and you stay signed in: across restarts, for downloads from that site, and with the password saved and filled in next time. |
 | **Series and playlists** | Voiceovers, seasons and episodes on HDrezka, YummyAnime and AniLiberty; playlists and channels as a pickable list; a whole list of links at once. |
-| **Watch a series** | New episodes downloaded, renamed, sent to an SMB share and announced in Telegram, on a schedule. |
+| **New Episodes** | Follow a series and each new episode is downloaded on a schedule, into the folder and quality you set for that series; it can be renamed, sent to an SMB share and announced in Telegram too. |
 | **Automatic downloads** | Optional: copy a link to a video and it starts downloading by itself, with a switch for each site (*Settings → Detection*). |
 | **Sign-in videos** | Age-gated and members-only videos: sign in once in the built-in browser (Google included), bring the sign-ins over from Firefox, Chrome or another browser in one click, or use cookies from your browser or a `cookies.txt`. |
+| **Help** | Plain answers and a button that goes there: how to download, where the file went, signing in, what to do when something fails. In the main menu and <kbd>Ctrl</kbd>+<kbd>K</kbd>; a failed row links to the right answer. |
 | **Keyboard first** | <kbd>Ctrl</kbd>+<kbd>K</kbd> opens a command palette for any section, action, setting or recent download; <kbd>Ctrl</kbd>+<kbd>1</kbd>…<kbd>5</kbd> switch sections, <kbd>Ctrl</kbd>+<kbd>,</kbd> opens Settings. |
-| **Extras** | Subtitles, thumbnails and chapters embedded, SponsorBlock, per-site folders, filename template, speed limit, proxy, day and night themes with nine accent colours, notifications that open the right row, and a backup file that carries settings and watched series to a new computer. |
+| **Extras** | Subtitles, thumbnails and chapters embedded, SponsorBlock, per-site folders, filename template, speed limit, proxy, *Send to Share…* for any finished file, day and night themes with nine accent colours, notifications that open the right row, and a backup file that carries settings and watched series to a new computer. |
 
 ## Screenshots
 
 <table>
   <tr>
-    <td width="50%"><img src="docs/screenshots/queue.png" alt="Activity: active, failed and finished downloads, with a fix button on the failed one" /><p align="center"><b>Activity</b> · one bar for download and post-processing, a fix for every failure</p></td>
-    <td width="50%"><img src="docs/screenshots/library.png" alt="The library of downloaded files, grouped by date" /><p align="center"><b>Library</b> · everything you downloaded, by date or site</p></td>
+    <td width="50%"><img src="docs/screenshots/detected.png" alt="A pasted link: the video, its quality, subtitles and the Download button" /><p align="center"><b>Download</b> · paste a link, see what you will get</p></td>
+    <td width="50%"><img src="docs/screenshots/queue.png" alt="My Downloads: active, failed and finished downloads, with a fix button on the failed one" /><p align="center"><b>My Downloads</b> · one bar for all the work, a fix for every failure</p></td>
   </tr>
   <tr>
+    <td><img src="docs/screenshots/library.png" alt="The library of downloaded files, grouped by date" /><p align="center"><b>Library</b> · everything you downloaded, by date, site or series</p></td>
     <td><img src="docs/screenshots/search.png" alt="Search results as poster cards with the quality each video has" /><p align="center"><b>Search</b> · by title, across services</p></td>
-    <td><img src="docs/screenshots/watch.png" alt="Watching a series: schedule and the steps for every new episode" /><p align="center"><b>Watching</b> · every new episode, handled</p></td>
+  </tr>
+  <tr>
+    <td><img src="docs/screenshots/watch.png" alt="New Episodes: a followed series with its schedule, quality, folder and steps" /><p align="center"><b>New Episodes</b> · every new episode, handled</p></td>
+    <td><img src="docs/screenshots/help.png" alt="Help: plain questions in a list, one open with three steps and a button" /><p align="center"><b>Help</b> · plain answers, with a button that goes there</p></td>
   </tr>
   <tr>
     <td><img src="docs/screenshots/settings-day.png" alt="Settings in the day theme, laid out like GNOME Settings" /><p align="center"><b>Settings</b> · laid out like GNOME Settings</p></td>
@@ -130,10 +137,10 @@ uvd https://www.youtube.com/watch?v=jNQXAC9IVRw
 
 ## A site doesn't work?
 
-1. **Switch on cookies.** *Settings → Access & Cookies*, then pick the browser you're signed in with. Age gates, login walls and "members only" go away. Close that browser while downloading; it locks its cookie database.
-2. **Use the built-in browser.** Open the page there and press play; every stream it requests appears in the side panel. A consent banner you dismiss or a login you complete is remembered, and downloads use that login whenever no other cookies are set.
+1. **Use the built-in browser.** Open the page there and press play; every stream it requests appears in the side panel. A consent banner you dismiss or a login you complete is remembered, and downloads use that login whenever no other cookies are set.
+2. **Switch on cookies.** *Settings → Access & Cookies*, then pick the browser you're signed in with. Age gates, login walls and "members only" go away. Close that browser while downloading; it locks its cookie database.
 3. **Send a report.** When a link fails, the app offers to send the developer the link, the error and the engine's output. Nothing is sent unless you click, and paths, passwords and tokens are removed first.
-4. **Or [open an issue](https://github.com/DenisHumen/Universal-Video-Downloader-/issues/new)** with the link and the *engine output* from the queue row.
+4. **Or [open an issue](https://github.com/DenisHumen/Universal-Video-Downloader-/issues/new)** with the link and the *Technical Details* from its row in *My Downloads*.
 
 ## More detail
 
@@ -153,11 +160,11 @@ Candidates are ranked (HLS ≫ DASH ≫ MP4 ≫ audio; trailers, ads and single 
 </details>
 
 <details>
-<summary><b>Watching a series</b></summary>
+<summary><b>New Episodes</b></summary>
 
 <br />
 
-Paste a link to a series page, choose the translation (dubs carry different episode counts, so this decides what counts as new) and how often to check. Every new episode runs the watch's steps:
+Paste a link to a series page, choose the translation (dubs carry different episode counts, so this decides what counts as new) and how often to check. Each series has its own quality and save folder, which can be changed later. Every new episode runs the steps you chose:
 
 | Step | What it does |
 | --- | --- |
@@ -166,7 +173,7 @@ Paste a link to a series page, choose the translation (dubs carry different epis
 | **send to a share** | Uploads to an SMB share and creates missing folders; can delete the local copy afterwards. The folder is picked with *Browse…* (a share the system has mounted) or *Browse Share…* (walked right in the app), no path to type. |
 | **notify in Telegram** | A message from your own bot when an episode arrives, or fails. |
 
-Checks run on a schedule with back-off on failures (15 minutes at the shortest); **check now** runs one at once. *Settings → Watching* keeps schedules running from the tray when the window is closed and can start the app with the system. The SMB password and the Telegram token are encrypted by the operating system's key store. Design notes: [`docs/automation.md`](docs/automation.md).
+Checks run on a schedule with back-off on failures (15 minutes at the shortest); **check now** runs one at once. *Settings → New Episodes* keeps schedules running from the tray when the window is closed and can start the app with the system. The SMB password and the Telegram token are encrypted by the operating system's key store. Design notes: [`docs/automation.md`](docs/automation.md).
 
 </details>
 
@@ -180,10 +187,10 @@ Settings follow GNOME Settings: eight panels in a list on the left, subpages tha
 | Panel | What's there |
 | --- | --- |
 | **Appearance** | Style (day, night, or follow the system), accent colour (nine GNOME colours, or the system's), language |
-| **Downloads** | Folder, per-site subfolders, default mode and quality, audio format, parallel downloads, resume on launch, finished rows to keep, speed limit, playlist depth |
+| **Downloading** | Folder, per-site subfolders, default mode and quality, audio format, parallel downloads, resume on launch, finished rows to keep, speed limit, playlist depth |
 | **Post-processing** | Embed thumbnail / metadata / chapters / subtitles, `.srt` files, subtitle languages, SponsorBlock, prefer H.264 + AAC, filename template |
-| **Watching** | Background watching; *Network Shares* (SMB) and *Telegram* as their own pages |
-| **Detection** | The hidden-browser pass for unknown sites, the search services |
+| **New Episodes** | Checking in the background; *Network Shares* (SMB) and *Telegram* as their own pages |
+| **Detection** | Automatic downloads with a switch for each site, the hidden-browser pass for unknown sites, the search services |
 | **Access & Cookies** | *Built-in Browser* (stay signed in, saved passwords, sign out of every site); cookies from Chrome, Firefox, Edge, Safari, Brave, Chromium, Opera, Vivaldi, or a *Cookies File*; error reports |
 | **Network** | A *Proxy* for the engine and for the app's own requests |
 | **System** | *Startup & Notifications* (start with the system, tray icon, clipboard watcher, notifications), *Updates* (checked every six hours: Windows and the AppImage install the new version, macOS and the `.deb` / `.rpm` open its download), *Backup*, *Logs & Command Line*, *About* |

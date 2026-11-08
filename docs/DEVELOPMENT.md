@@ -35,7 +35,7 @@ Extras worth knowing about:
 
 ```bash
 npm run preview          # the renderer alone, in a browser, against a mock IPC bridge
-npm run shots            # regenerate docs/screenshots (--theme=day|both, --scale=2, --out=<dir>)
+npm run shots            # regenerate docs/screenshots (--lang=ru, --theme=day|both, --scale=2, --out=<dir>, --offscreen with the display locked)
 npm run tour             # re-record docs/assets/tour.webp + tour.mp4 (needs ffmpeg)
 npm run make:icons       # rasterise the logo into app, tray and DMG artwork
 npm run fetch:ffmpeg     # replace ffmpeg-static's binary with the pinned ffmpeg 9.0.2 (as CI does)
