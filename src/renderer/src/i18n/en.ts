@@ -226,6 +226,10 @@ export const en = {
   'engine.setupTitle': 'Getting the App Ready for First Use',
   'engine.setupOnce': 'One time, about 30 MB',
   'engine.setupFailed': 'The app could not be prepared. Check your internet and try again',
+  'engine.startFailed': 'The download tool is installed but won’t start; antivirus has probably blocked it. Add the app’s folder to its exclusions and try again',
+  'engine.noBuild': 'There is no download tool for this system yet. Update the app and try again',
+  'engine.updateWaiting': 'The last update attempt failed, so the next one has to wait. Try again later',
+  'engine.updateNoConnection': 'The update could not be downloaded. Check your internet and try again',
 
   // ---- home ----
   'home.statusTitle': 'Paste a Video Link',
@@ -715,6 +719,7 @@ export const en = {
 
   // ---- errors ----
   'error.title': 'Something went wrong',
+  'error.crashHint': 'This window ran into a problem it could not get past. Reload it: your downloads carry on while it restarts.',
   'error.reload': 'Reload the app',
   'error.starting': 'Starting up…',
 

@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Loader2, RefreshCw } from '../ui/icons'
 import { useStore } from '../store'
 import { useT } from '../i18n'
+import { engineFailureText } from '../lib/engineError'
 
 /**
  * What is happening to the download engine, on the rare occasions it matters.
@@ -52,7 +53,7 @@ export default function EngineNotice(): JSX.Element | null {
         <div className="min-w-0 flex-1">
           {/* The system's own words stay on hover: they help a report, not the person reading this. */}
           <p className="text-body font-medium text-ink" title={failed ? ytdlp.message : undefined}>
-            {failed ? t('engine.setupFailed') : t('engine.setupTitle')}
+            {failed ? engineFailureText(t, ytdlp.message, 'setup') : t('engine.setupTitle')}
           </p>
           {failed ? null : (
             <div className="mt-1.5 flex items-center gap-3">

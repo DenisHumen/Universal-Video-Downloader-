@@ -3,7 +3,7 @@ import { collapse } from '../lib/motion'
 import { Download, ExternalLink, RefreshCw, X } from '../ui/icons'
 import { useStore } from '../store'
 import { useT } from '../i18n'
-import { updateErrorText } from '../lib/updateError'
+import { updateErrorDetail, updateErrorText } from '../lib/updateError'
 
 /**
  * A full-width strip under the chrome rather than a floating card.
@@ -84,7 +84,9 @@ export default function UpdateBanner(): JSX.Element {
                 </p>
               )}
               {update.state === 'error' && (
-                <p className="truncate text-body font-medium text-bad">{updateErrorText(t, update.message)}</p>
+                <p className="truncate text-body font-medium text-bad" title={updateErrorDetail(update.message)}>
+                  {updateErrorText(t, update.message)}
+                </p>
               )}
             </div>
 

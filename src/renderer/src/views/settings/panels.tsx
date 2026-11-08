@@ -18,7 +18,8 @@ import { useStore } from '../../store'
 import { useT, useTp, type TranslationKey } from '../../i18n'
 import { toast } from '../../lib/toast'
 import { describeCliCommand } from '../../lib/cliCommand'
-import { updateErrorText } from '../../lib/updateError'
+import { updateErrorDetail, updateErrorText } from '../../lib/updateError'
+import { engineFailureText } from '../../lib/engineError'
 import AutomationSettings from '../../components/AutomationSettings'
 import { useSecretState } from '../../components/AutomationForms'
 import ConfirmDialog from '../../components/ConfirmDialog'
@@ -819,7 +820,11 @@ export function UpdatesPage({ settings, set }: PanelProps): JSX.Element {
         <ActionRow
           id="check"
           title={t('prefs.row.checkUpdates')}
-          subtitle={<span className="numeric">{status}</span>}
+          subtitle={
+            <span className="numeric" title={update.state === 'error' ? updateErrorDetail(update.message) : undefined}>
+              {status}
+            </span>
+          }
           suffix={
             <button
               className="btn-quiet"
@@ -850,7 +855,16 @@ export function UpdatesPage({ settings, set }: PanelProps): JSX.Element {
         <ActionRow
           id="engine"
           title={t('settings.engine')}
-          subtitle={<span className="numeric">{ytdlp.version ? `yt-dlp ${ytdlp.version}` : ytdlp.message || 'yt-dlp'}</span>}
+          subtitle={
+            // Main's status is in English; while there is no version, only a failure is worth a line.
+            <span className="numeric" title={ytdlp.state === 'error' ? ytdlp.message : undefined}>
+              {ytdlp.version
+                ? `yt-dlp ${ytdlp.version}`
+                : ytdlp.state === 'error'
+                  ? engineFailureText(t, ytdlp.message, 'setup')
+                  : 'yt-dlp'}
+            </span>
+          }
           suffix={
             <button
               className="btn-quiet"
@@ -861,7 +875,7 @@ export function UpdatesPage({ settings, set }: PanelProps): JSX.Element {
                   const res = await window.api.updateYtdlp()
                   if (res.ok) toast(t('settings.engineUpdated'), 'success')
                   // Main refuses to swap the binary out from under a running transfer.
-                  else toast(res.code === 'engineBusy' ? t('err.engineBusy') : t('settings.engineFailed'), 'error')
+                  else toast(res.code === 'engineBusy' ? t('err.engineBusy') : engineFailureText(t, res.error, 'update'), 'error')
                 } catch {
                   toast(t('settings.engineFailed'), 'error')
                 } finally {

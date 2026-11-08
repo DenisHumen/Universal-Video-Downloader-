@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { updateErrorText } from './updateError'
+import { updateErrorDetail, updateErrorText } from './updateError'
 
 const t = ((key: string) => key) as never
 
@@ -14,13 +14,16 @@ describe('updateErrorText', () => {
     expect(updateErrorText(t, 'net::ERR_HTTP2_SERVER_REFUSED_STREAM')).toBe('update.notAnswering')
   })
 
-  it('keeps the first line of anything else, cut to a readable length', () => {
-    expect(updateErrorText(t, 'sha512 checksum mismatch\nexpected abc')).toBe('sha512 checksum mismatch')
-    expect(updateErrorText(t, 'x'.repeat(400))).toHaveLength(161)
+  it('says anything else in a plain line, and keeps the first line of it for the tooltip', () => {
+    expect(updateErrorText(t, 'sha512 checksum mismatch\nexpected abc')).toBe('update.failed')
+    expect(updateErrorDetail('sha512 checksum mismatch\nexpected abc')).toBe('sha512 checksum mismatch')
+    expect(updateErrorDetail('x'.repeat(400))).toHaveLength(161)
+    expect(updateErrorDetail('  ')).toBeUndefined()
+    expect(updateErrorDetail(undefined)).toBeUndefined()
   })
 
   it('does not take a number inside a checksum for an HTTP status', () => {
-    expect(updateErrorText(t, 'checksum a1502f mismatch')).toBe('checksum a1502f mismatch')
+    expect(updateErrorText(t, 'checksum a1502f mismatch')).toBe('update.failed')
   })
 
   it('falls back when there is no message', () => {
