@@ -824,6 +824,11 @@ export function allowedSearchServices<T extends SearchScope>(list: readonly T[],
   return showAdult ? [...list] : list.filter((s) => !ADULT_SEARCH_SERVICES.includes(s as SearchService))
 }
 
+/** The most results one service is asked for: what the site APIs and the engine's own searches take. */
+export const SEARCH_CAP = 30
+/** The same when every service is searched at once, per service, so the wait stays bearable. */
+export const SEARCH_CAP_PER_SERVICE = 12
+
 /** What the user searches: one service, or all of them in parallel. */
 export type SearchScope = SearchService | 'all'
 

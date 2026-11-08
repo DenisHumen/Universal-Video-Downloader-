@@ -395,6 +395,7 @@ export const en = {
   'search.audio': 'Audio',
   'search.openResult': 'Open in Download',
   'search.searching': 'Searching…',
+  'search.showMore': 'Show More',
 
   // ---- settings ----
   'settings.title': 'Settings',

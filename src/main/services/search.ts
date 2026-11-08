@@ -6,7 +6,13 @@ import { searchYummyani } from '../resolvers'
 import { unreachableCode } from '../resolvers/neterror'
 import { searchBilibili, searchDailymotion, searchNiconico } from './search-apis'
 import { getSettings } from './settings'
-import { ADULT_SEARCH_SERVICES, allowedSearchServices, SEARCH_ALL_SERVICES } from '@shared/types'
+import {
+  ADULT_SEARCH_SERVICES,
+  allowedSearchServices,
+  SEARCH_ALL_SERVICES,
+  SEARCH_CAP,
+  SEARCH_CAP_PER_SERVICE
+} from '@shared/types'
 import { isAbsoluteUrl } from '@shared/urls'
 import type { SearchResponse, SearchResult, SearchScope, SearchService } from '@shared/types'
 
@@ -76,7 +82,7 @@ function ytdlpSearch(target: string, service: SearchService, limit: number): Pro
   // The proxy arrives through the spawn environment; cookies are skipped -
   // extracting them per search would slow every roundtrip for no benefit.
   // The target is always prefixed today; `--` keeps it that way whatever changes.
-  args.push('--playlist-end', String(Math.max(1, Math.min(30, limit))), '--', target)
+  args.push('--playlist-end', String(Math.max(1, Math.min(SEARCH_CAP, limit))), '--', target)
 
   return new Promise((resolve) => {
     const child = spawn(ytdlpBinaryPath(), args, ytdlpSpawnOptions())
@@ -136,7 +142,7 @@ function ytdlpSearch(target: string, service: SearchService, limit: number): Pro
 
 /** Search one service by title. */
 async function searchOne(query: string, service: SearchService, limit: number): Promise<SearchResponse> {
-  const cap = Math.max(1, Math.min(30, limit))
+  const cap = Math.max(1, Math.min(SEARCH_CAP, limit))
   const api = API_SEARCH[service]
   if (api) {
     try {
@@ -207,7 +213,7 @@ export async function searchVideos(
   if (scope !== 'all') return searchOne(q, scope, limit)
 
   // In 'all' mode the limit applies per service, so the grid stays balanced.
-  const perService = Math.max(3, Math.min(12, limit))
+  const perService = Math.max(3, Math.min(SEARCH_CAP_PER_SERVICE, limit))
   const services = allowedSearchServices(SEARCH_ALL_SERVICES, showAdult)
   const settled = await Promise.all(services.map((s) => searchOne(q, s, perService)))
   const successes = settled.filter((r) => r.ok && r.results?.length).map((r) => r.results!)

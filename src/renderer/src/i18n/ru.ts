@@ -387,6 +387,7 @@ export const ru: Dictionary = {
   'search.audio': 'Звук',
   'search.openResult': 'Открыть в загрузке',
   'search.searching': 'Поиск…',
+  'search.showMore': 'Показать ещё',
 
   // ---- settings ----
   'settings.title': 'Настройки',

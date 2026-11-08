@@ -170,13 +170,14 @@ function fakeChannel(url: string, depth: number): MediaInfo {
   }
 }
 
-function fakeResults(query: string, scope: string): SearchResult[] {
+function fakeResults(query: string, scope: string, limit: number): SearchResult[] {
   // The same choice main makes, so the preview never shows what the setting hides.
   const services =
     scope === 'all'
       ? allowedSearchServices(SEARCH_ALL_SERVICES, settings.showAdultServices)
       : ([scope] as unknown as readonly SearchResult['service'][])
-  return Array.from({ length: scope === 'all' ? 12 : 9 }, (_, i) => {
+  // `limit` is per service when everything is searched, as it is in main.
+  return Array.from({ length: scope === 'all' ? limit * services.length : limit }, (_, i) => {
     const service = services[i % services.length]
     const isAnime = service === 'yummyani'
     return {
@@ -354,9 +355,9 @@ export function installMockApi(): void {
       return { ok: true, info: fakeInfo(url) }
     },
     cancelDetect: async () => undefined,
-    searchVideos: async (query, scope) => {
+    searchVideos: async (query, scope, limit = 12) => {
       await delay(800)
-      return { ok: true, results: fakeResults(query, scope) }
+      return { ok: true, results: fakeResults(query, scope, limit) }
     },
     openSearchWindow: async (query) => {
       window.location.hash = `/search?q=${encodeURIComponent(query)}`
