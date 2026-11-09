@@ -3,7 +3,16 @@ import { anilibStreamUrl } from '../../resolvers/sites/aniliberty'
 import { rezkaEpisodes, rezkaEpisodeUrl } from '../../resolvers/sites/rezka'
 import { NotReleasedError } from '../../resolvers/upcoming'
 import { log } from '../log'
-import { episodeKey, newEpisodes, type EpisodeRef, type Watch } from '@shared/automation'
+import { checkChannel, describeChannel, type ChannelOffer } from './channel'
+import {
+  CHANNEL_PROVIDER,
+  episodeKey,
+  isChannelWatch,
+  LIST_QUALITIES,
+  newEpisodes,
+  type EpisodeRef,
+  type Watch
+} from '@shared/automation'
 import type { StreamingInfo } from '@shared/types'
 
 /**
@@ -28,6 +37,8 @@ export interface SeriesDescription {
   episodesFor: (translatorId: string) => EpisodeRef[]
   /** Set when nothing is out yet: there are no dubs to offer, only a date. */
   upcoming?: { releaseAt?: number }
+  /** Set for a channel or a playlist: what is on it, instead of dubs. */
+  channel?: ChannelOffer
 }
 
 function flatten(seasons: { season: number; episodes: number[] }[]): EpisodeRef[] {
@@ -122,11 +133,31 @@ export async function describeSeries(url: string): Promise<SeriesDescription> {
     throw err
   }
   const info = resolved.streaming
+  /*
+    No site of ours claimed it, so it is the engine's to read: any channel or
+    playlist it can list can be followed.
+  */
   if (!info) {
-    throw new Error('That page is not a series this app can follow.')
+    const list = await describeChannel(url)
+    return {
+      url,
+      title: list.name,
+      thumbnail: list.thumbnail,
+      provider: CHANNEL_PROVIDER,
+      translators: [],
+      defaultTranslator: '',
+      qualities: [...LIST_QUALITIES],
+      episodesFor: () => list.entries,
+      channel: {
+        entries: list.entries,
+        waiting: list.waiting,
+        newestLast: list.newestLast,
+        count: list.count
+      }
+    }
   }
   if (!info.isSeries) {
-    throw new Error('That is a single video, not a series — there is nothing to wait for.')
+    throw new Error('That is a single video, not a series, channel or playlist — there is nothing to wait for.')
   }
   return {
     url,
@@ -155,6 +186,10 @@ export interface CheckResult {
    * once something is out, or the new id of a followed dub the site moved.
    */
   adopt?: { translatorId: string; translatorName?: string }
+  /** For a channel: what the listing changes on the watch besides its title. */
+  patch?: Partial<Watch>
+  /** For a channel: the listing was set aside as unrecognisable. Worth a word on the watch. */
+  listChanged?: boolean
 }
 
 /**
@@ -169,6 +204,17 @@ export interface CheckResult {
  * distinguishes them.
  */
 export async function checkWatch(watch: Watch): Promise<CheckResult> {
+  if (isChannelWatch(watch)) {
+    const list = await checkChannel(watch)
+    return {
+      fresh: list.fresh,
+      available: list.available,
+      title: list.name,
+      thumbnail: list.thumbnail,
+      patch: list.patch,
+      listChanged: list.changed
+    }
+  }
   let resolved
   try {
     resolved = await resolveUrl(watch.url)
@@ -274,6 +320,11 @@ export async function checkWatch(watch: Watch): Promise<CheckResult> {
  * Rezka names the season separately.
  */
 export function downloadUrlFor(watch: Watch, ref: EpisodeRef): string {
+  // The upload's own page: the queue reads it like any link somebody pasted.
+  if (isChannelWatch(watch)) {
+    if (!ref.videoUrl) throw new Error('This upload no longer says where it is. It will be found again at the next check.')
+    return ref.videoUrl
+  }
   const quality = encodeURIComponent(watch.quality || 'best')
   if (watch.provider === 'yummyani') {
     return `uvd-yummy://${watch.translatorId}/${ref.episode}/${quality}`

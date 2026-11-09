@@ -14,7 +14,9 @@ import type { ToastKind } from './toast'
 export function describeCheck(
   summary: CheckSummary,
   t: TranslateFn,
-  date: (at: number) => string
+  date: (at: number) => string,
+  /** A channel's or playlist's: what it found are videos, not episodes. */
+  videos = false
 ): { text: string; kind: ToastKind } {
   if ('busy' in summary) return { text: t('auto.checkBusy'), kind: 'info' }
   if ('error' in summary) return { text: localizeMainText(t, summary.error), kind: 'error' }
@@ -27,10 +29,18 @@ export function describeCheck(
     }
   }
   if (!summary.fresh) return { text: t('auto.checkNothing'), kind: 'info' }
-  if (summary.paused) return { text: t('auto.checkPaused', { n: summary.fresh }), kind: 'info' }
+  if (summary.paused) {
+    return { text: t(videos ? 'auto.checkVideosPaused' : 'auto.checkPaused', { n: summary.fresh }), kind: 'info' }
+  }
   if (summary.queued < summary.fresh) {
     return {
-      text: t('auto.checkQueuedSome', { n: summary.queued, fresh: summary.fresh }),
+      text: t(videos ? 'auto.checkVideosSome' : 'auto.checkQueuedSome', { n: summary.queued, fresh: summary.fresh }),
+      kind: 'success'
+    }
+  }
+  if (videos) {
+    return {
+      text: summary.queued === 1 ? t('auto.checkVideoOne') : t('auto.checkVideos', { n: summary.queued }),
       kind: 'success'
     }
   }

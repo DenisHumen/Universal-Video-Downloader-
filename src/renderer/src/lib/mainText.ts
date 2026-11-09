@@ -1,4 +1,5 @@
 import { TELEGRAM_NO_TOKEN } from '@shared/automation'
+import { LIST_CHANGED } from '@shared/channel'
 import type { TranslateFn, TranslationKey } from '../i18n/translate'
 
 /**
@@ -50,8 +51,15 @@ const EXACT: Record<string, TranslationKey> = {
 
   // What a watch finds on its page
   'The translation this watch follows is no longer listed on the page.': 'main.watch.dubGone',
+  'That page is not a series, channel or playlist this app can follow.': 'main.watch.notSeries',
+  // What the two sentences said before lists could be followed, for a watch or a run that has one stored.
   'That page is not a series this app can follow.': 'main.watch.notSeries',
+  'That is a single video, not a series, channel or playlist — there is nothing to wait for.': 'main.watch.singleVideo',
   'That is a single video, not a series — there is nothing to wait for.': 'main.watch.singleVideo',
+  [LIST_CHANGED]: 'main.watch.listChanged',
+  'This upload no longer says where it is. It will be found again at the next check.': 'main.watch.noUploadAddress',
+  'No videos found on this page.': 'err.emptyPage',
+  'This is not a link the app can open.': 'err.notALink',
   'The page no longer looks like a series.': 'main.watch.noLongerSeries',
   'The check stopped without an answer.': 'main.watch.noAnswer',
   'This series is no longer being watched.': 'main.watch.gone',
@@ -94,6 +102,20 @@ const EXACT: Record<string, TranslationKey> = {
   'This AniLiberty release has no episodes, so there is nothing to download.': 'main.site.noEpisodes',
   'This Kodik /uv/ player is not supported yet.': 'err.unsupportedPlayer',
   "This title isn't available on YummyAnime, where Shikimori links are downloaded from.": 'err.notOnYummyAnime',
+
+  // The engine's reasons as `classifyYtdlpError` words them, which is how a followed list's check meets them.
+  'YouTube is asking this computer to prove it is not a bot. That is about your network, not this video: cookies from a browser where you are signed in to YouTube get past it, or try again later or from another network.': 'err.botCheck',
+  'This video requires you to be signed in.': 'err.signIn',
+  'The site is rate-limiting us. Wait a minute and retry, or set a proxy in Settings → Network.': 'err.rateLimited',
+  'The site refused the request.': 'err.forbidden',
+  'Network problem reaching the site. Check your connection or proxy and try again.': 'err.network',
+  'The site took too long to answer. Check your connection or proxy and try again.': 'err.timeout',
+  'This video is private. If the author gave you access, sign in and retry.': 'err.privateVideo',
+  'This video is for channel members only. If you are one, sign in and retry.': 'err.membersOnly',
+  'This video is not available in your region.': 'err.geo',
+  "The site's server is having trouble; it isn't you. Try again later.": 'err.serverError',
+  'Could not connect to the site. Check your connection or proxy and try again.': 'err.network',
+  'Detection timed out. The site may be unsupported or unreachable.': 'err.timeout',
 
   // The request itself
   'Request timed out': 'err.timeout',

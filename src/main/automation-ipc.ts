@@ -4,6 +4,7 @@ import { guardedIpc as ipcMain } from './services/ipc-guard'
 import { randomUUID } from 'crypto'
 import { IPC } from '@shared/ipc'
 import { describeSeries } from './services/automation/detect'
+import type { ChannelOffer } from './services/automation/channel'
 import {
   addWatch,
   getWatch,
@@ -14,7 +15,7 @@ import {
   watchEvents
 } from './services/automation/store'
 import { rescheduledCheck } from './services/automation/backoff'
-import { checkNow, retryRun } from './services/automation/watcher'
+import { checkNow, nextDue, retryRun } from './services/automation/watcher'
 import { stopEpisode } from './services/automation/pipeline'
 import { createSmbFolder, listSmbFolders, testTarget } from './services/automation/smb'
 import { shareForFolder } from './services/automation/share-folder'
@@ -34,6 +35,7 @@ import {
   exactDuplicate,
   formatSmbPath,
   inheritedSeen,
+  isChannelWatch,
   normaliseSmbTarget,
   settleRunError,
   settleTokenSaved,
@@ -76,6 +78,8 @@ export interface SeriesOffer {
   translators: { id: string; name: string; premium?: boolean; episodes: number; list: EpisodeRef[] }[]
   /** Nothing is out yet. There are no dubs to list, only the date the site expects. */
   upcoming?: { releaseAt?: number }
+  /** A channel or playlist: no dubs, and this instead. */
+  channel?: ChannelOffer
 }
 
 function broadcast(): void {
@@ -126,7 +130,8 @@ export function registerAutomationIpc(): void {
         const list = d.episodesFor(t.id)
         return { ...t, episodes: list.length, list }
       }),
-      upcoming: d.upcoming
+      upcoming: d.upcoming,
+      channel: d.channel
     }
   })
 
@@ -148,8 +153,13 @@ export function registerAutomationIpc(): void {
       seen: inheritedSeen(watches, watch),
       id: randomUUID(),
       createdAt: Date.now(),
-      // Due straight away, so adding a series does something visible.
-      nextCheckAt: Date.now()
+      /*
+        Due straight away, so adding a series does something visible. A list the
+        dialog has just read, with nothing picked from it, has nothing to show
+        for a second look so soon, and a second look is a request to the site.
+      */
+      nextCheckAt:
+        isChannelWatch(watch) && !watch.owed?.length ? nextDue({ ...watch, failures: 0 }) : Date.now()
     })
     broadcast()
     return created

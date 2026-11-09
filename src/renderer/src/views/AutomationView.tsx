@@ -38,6 +38,7 @@ import {
   attemptsAt,
   byStepOrder,
   duplicateAfterEdit,
+  isChannelWatch,
   MAX_ATTEMPTS,
   STEP_ORDER,
   upcomingDelayMinutes,
@@ -48,6 +49,7 @@ import {
   type StepKind,
   type Watch
 } from '@shared/automation'
+import { CHANNEL_MIN_INTERVAL } from '@shared/channel'
 import type { DownloadItem } from '@shared/types'
 
 /**
@@ -267,7 +269,7 @@ export default function AutomationView(): JSX.Element {
     try {
       const summary = await window.api.autoCheckNow(id)
       await refresh()
-      const { text, kind } = describeCheck(summary, t, (at) => releaseDate(at, locale))
+      const { text, kind } = describeCheck(summary, t, (at) => releaseDate(at, locale), isChannelWatch(selected))
       toast(text, kind)
     } catch (err) {
       toast(describeError(err), 'error')
@@ -325,7 +327,8 @@ export default function AutomationView(): JSX.Element {
 
   /** "S01E05": the newest episode this watch has seen, i.e. the last new one. */
   const lastEpisode = (w: Watch): string | null => {
-    if (!w.seen.length) return null
+    // A channel's uploads have no numbers to rank, and most of its `seen` was never fetched.
+    if (!w.seen.length || isChannelWatch(w)) return null
     const top = w.seen.reduce((a, e) => (e.season > a.season || (e.season === a.season && e.episode > a.episode) ? e : a))
     return `S${String(top.season).padStart(2, '0')}E${String(top.episode).padStart(2, '0')}`
   }
@@ -440,11 +443,13 @@ export default function AutomationView(): JSX.Element {
                   }
                   value={String(selected.intervalMinutes)}
                   onChange={(v) => void patch({ intervalMinutes: Number(v) })}
-                  options={[15, 30, 60, 180, 360, 720, 1440].map((n) => ({ value: String(n), label: every(n, t) }))}
+                  options={[15, 30, 60, 180, 360, 720, 1440]
+                    .filter((n) => !isChannelWatch(selected) || n >= CHANNEL_MIN_INTERVAL)
+                    .map((n) => ({ value: String(n), label: every(n, t) }))}
                 />
                 <ComboRow
                   title={t('common.quality')}
-                  subtitle={t('auto.nextEpisodes')}
+                  subtitle={t(isChannelWatch(selected) ? 'auto.nextVideos' : 'auto.nextEpisodes')}
                   value={selected.quality}
                   onChange={(v) => void changeQuality(v)}
                   // A quality the site listed when the watch was made stays on offer until it is changed.
@@ -562,9 +567,15 @@ export default function AutomationView(): JSX.Element {
                   runs.map((run) => (
                     <div key={run.id} className="ui-row flex-col items-stretch gap-1">
                       <div className="flex items-center gap-2">
-                        <span className="numeric text-body text-ink">
-                          S{String(run.season).padStart(2, '0')}E{String(run.episode).padStart(2, '0')}
-                        </span>
+                        {run.videoId ? (
+                          <span className="min-w-0 truncate text-body text-ink" title={run.videoTitle}>
+                            {run.videoTitle ?? run.videoId}
+                          </span>
+                        ) : (
+                          <span className="numeric text-body text-ink">
+                            S{String(run.season).padStart(2, '0')}E{String(run.episode).padStart(2, '0')}
+                          </span>
+                        )}
                         <span className={`text-meta font-bold ${run.state === 'failed' ? 'text-bad' : run.state === 'done' ? 'text-good' : 'text-ink-2'}`}>
                           {t(RUN_LABEL[run.state])}
                         </span>
@@ -627,6 +638,7 @@ export default function AutomationView(): JSX.Element {
       {editing && selected && (
         <StepEditor
           step={editing}
+          video={isChannelWatch(selected)}
           onSave={saveStep}
           onRemove={removeStep}
           onClose={() => setEditing(null)}

@@ -72,7 +72,7 @@ describe('Watching (5.6)', () => {
   it('opens the add dialog of entry rows from the header "+"', async () => {
     render(<App />)
     await waitFor(() => expect(useStore.getState().ready).toBe(true))
-    await act(async () => fireEvent.click(await screen.findByRole('button', { name: 'Follow a Series…' })))
+    await act(async () => fireEvent.click(await screen.findByRole('button', { name: 'Follow a Series or Channel…' })))
     const dialog = screen.getByRole('dialog')
     expect(dialog.querySelector('.ui-entry-row input')).toBeTruthy()
   })

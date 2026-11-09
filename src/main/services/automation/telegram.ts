@@ -290,6 +290,8 @@ export interface EpisodeNews {
   bytes?: number
   seconds?: number
   posterUrl?: string
+  /** An upload's title, in place of the season and episode a channel does not have. */
+  video?: string
 }
 
 const pad = (n: number): string => String(n).padStart(2, '0')
@@ -314,7 +316,7 @@ const took = (language: MainLanguage, seconds?: number): string => {
 /** What a "new episode" notification looks like. */
 export function composeEpisodeNews(news: EpisodeNews, language: MainLanguage = 'en'): string {
   const lines = [
-    `🎬 <b>${escFit(news.series, FIT_NAME)}</b> — S${pad(news.season)}E${pad(news.episode)}`
+    `🎬 <b>${escFit(news.series, FIT_NAME)}</b> — ${news.video ? escFit(news.video, FIT_NAME) : `S${pad(news.season)}E${pad(news.episode)}`}`
   ]
   const sub = [news.translator, news.quality].filter(Boolean).join(' · ')
   if (sub) lines.push(`<i>${escFit(sub, FIT_LINE)}</i>`)
@@ -341,7 +343,22 @@ export function composeFailure(
   attempts = 1,
   language: MainLanguage = 'en'
 ): string {
-  const lines = [`⚠️ <b>${escFit(series, FIT_NAME)}</b> — S${pad(season)}E${pad(episode)}`]
+  return failureLines(`⚠️ <b>${escFit(series, FIT_NAME)}</b> — S${pad(season)}E${pad(episode)}`, why, attempts, language)
+}
+
+/** The same for an upload of a channel, which goes by its title. */
+export function composeVideoFailure(
+  series: string,
+  video: string,
+  why: string,
+  attempts = 1,
+  language: MainLanguage = 'en'
+): string {
+  return failureLines(`⚠️ <b>${escFit(series, FIT_NAME)}</b> — ${escFit(video, FIT_NAME)}`, why, attempts, language)
+}
+
+function failureLines(head: string, why: string, attempts: number, language: MainLanguage): string {
+  const lines = [head]
   if (attempts > 1) {
     lines.push(wordsIn(language).tp('telegram.gaveUp', attempts))
   }

@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   newEpisodes,
   settleTokenSaved,
+  videoRef,
   TELEGRAM_NO_TOKEN,
   type EpisodeRef,
   type Run,
@@ -36,6 +37,7 @@ const h = vi.hoisted(() => {
     locale: 'en-US',
     plan: [] as Plan[],
     started: [] as string[],
+    requests: [] as unknown[],
     items: new Map<string, unknown>(),
     events: null as unknown as import('events').EventEmitter,
     upload: vi.fn(),
@@ -86,6 +88,10 @@ vi.mock('./telegram', () => ({
     h.failures.push(args)
     return 'episode failed'
   },
+  composeVideoFailure: (...args: unknown[]) => {
+    h.failures.push(['video', ...args])
+    return 'video failed'
+  },
   sendNotification: h.send,
   TelegramError: h.TelegramError
 }))
@@ -96,7 +102,7 @@ vi.mock('./detect', () => ({
     const available: EpisodeRef[] = [1, 2, 3, 4].map((episode) => ({ season: 1, episode }))
     return { fresh: newEpisodes(w.seen, available), available, title: w.title }
   },
-  downloadUrlFor: (w: Watch, ref: EpisodeRef) => `uvd-yummy://${w.translatorId}/${ref.episode}/720p`
+  downloadUrlFor: (w: Watch, ref: EpisodeRef) => ref.videoUrl ?? `uvd-yummy://${w.translatorId}/${ref.episode}/720p`
 }))
 
 /** The queue: each download does what the next entry in `plan` says, a moment after it is queued. */
@@ -124,6 +130,7 @@ vi.mock('../downloader', async () => {
     startDownload: async (req: DownloadRequest): Promise<DownloadItem> => {
       const id = `d${h.started.length + 1}`
       h.started.push(req.url)
+      h.requests.push(req)
       const item: DownloadItem = {
         id,
         url: req.url,
@@ -213,6 +220,7 @@ describe('an episode that fails', () => {
     h.locale = 'en-US'
     h.plan = []
     h.started = []
+    h.requests = []
     h.items.clear()
     h.failures = []
     h.blockers.clear()
@@ -233,6 +241,83 @@ describe('an episode that fails', () => {
   afterEach(() => {
     m.store.flushWatches()
     rmSync(h.dir, { recursive: true, force: true })
+  })
+
+  describe('an upload of a channel', () => {
+    const upload = videoRef('abc', 'https://example.com/watch/abc', 'How sound works')
+    const channel = (over: Partial<Watch> = {}): Watch => ({
+      ...watch(),
+      id: 'c1',
+      url: 'https://example.com/@someone',
+      title: 'Some/One',
+      provider: 'channel',
+      translatorId: '',
+      quality: '720p',
+      seen: [videoRef('old')],
+      owed: [upload],
+      steps: [
+        { id: 'd', kind: 'download', enabled: true },
+        { id: 'r', kind: 'rename', enabled: true, template: '{title} - S{season2}E{episode2}', replacements: [] },
+        { id: 'u', kind: 'upload', enabled: true, targetId: 'nas', remotePath: '{channel}', createDirs: true, deleteLocalAfter: false },
+        { id: 'n', kind: 'notify', enabled: true }
+      ],
+      ...over
+    })
+    const go = async (w: Watch): Promise<void> => {
+      m.store.addWatch(w)
+      const outcome = await m.pipeline.runEpisode(w, upload, w.title)
+      m.pipeline.recordOutcome(w.id, upload, outcome)
+    }
+
+    it('is queued by its own address and title, at a height the engine reads, under the channel in the Library', async () => {
+      await go(channel())
+      expect(h.requests[0]).toMatchObject({
+        url: 'https://example.com/watch/abc',
+        title: 'How sound works',
+        series: 'Some/One',
+        quality: '720'
+      })
+    })
+
+    it('is renamed by its title, with a series template giving way, and filed under the channel', async () => {
+      await go(channel())
+      const run = m.store.listRuns('c1')[0]
+      expect(run.steps.find((s) => s.kind === 'rename')?.message).toBe('How sound works.mp4')
+      expect(h.upload.mock.calls[0][3]).toBe('Some One')
+      expect(run).toMatchObject({ videoId: 'abc', videoTitle: 'How sound works', state: 'done' })
+    })
+
+    it('reaches seen by its id alone, and is no longer owed', async () => {
+      await go(channel())
+      const w = m.store.getWatch('c1')
+      expect(w?.seen).toEqual([videoRef('old'), videoRef('abc')])
+      expect(w?.owed).toEqual([])
+    })
+
+    it('a failure counts against its id and leaves it owed', async () => {
+      h.plan = ['fail']
+      await go(channel())
+      const w = m.store.getWatch('c1')
+      expect(w?.attempts).toEqual({ 'v:abc': 1 })
+      expect(w?.owed).toEqual([upload])
+      expect(w?.seen).toEqual([videoRef('old')])
+    })
+
+    it('picks up where the last go stopped, because its run goes by the same key', async () => {
+      h.upload.mockRejectedValueOnce(new Error('The share could not be reached.'))
+      await go(channel())
+      const w = m.store.getWatch('c1') as Watch
+      await m.pipeline.runEpisode(w, upload, w.title)
+      expect(h.started).toHaveLength(1)
+      expect(m.store.listRuns('c1')[0]).toMatchObject({ state: 'done' })
+    })
+
+    it('tells Telegram which upload gave up, by its title', async () => {
+      h.plan = ['fail']
+      m.store.addWatch(channel())
+      await m.pipeline.runEpisode(channel(), upload, 'Some/One', { final: true, attempt: 3 })
+      expect(h.failures[0]).toEqual(['video', 'Some/One', 'How sound works', expect.any(String), 3, 'en'])
+    })
   })
 
   // A second watch at another quality wants the same name; it used to delete the first one's file.

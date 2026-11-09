@@ -12,6 +12,8 @@ import IconButton from '../ui/IconButton'
 import {
   DEFAULT_REMOTE_PATH,
   DEFAULT_RENAME_TEMPLATE,
+  DEFAULT_VIDEO_REMOTE_PATH,
+  DEFAULT_VIDEO_RENAME_TEMPLATE,
   remoteDirFor,
   renameFor,
   renameGap,
@@ -41,10 +43,10 @@ import {
 
 const NEW_SHARE = '__new__'
 
-const blank = (kind: StepKind): PipelineStep => {
+const blank = (kind: StepKind, video: boolean): PipelineStep => {
   const id = crypto.randomUUID()
   if (kind === 'rename') {
-    return { id, kind, enabled: true, template: DEFAULT_RENAME_TEMPLATE, replacements: [] }
+    return { id, kind, enabled: true, template: video ? DEFAULT_VIDEO_RENAME_TEMPLATE : DEFAULT_RENAME_TEMPLATE, replacements: [] }
   }
   if (kind === 'upload') {
     return {
@@ -52,7 +54,7 @@ const blank = (kind: StepKind): PipelineStep => {
       kind,
       enabled: true,
       targetId: '',
-      remotePath: DEFAULT_REMOTE_PATH,
+      remotePath: video ? DEFAULT_VIDEO_REMOTE_PATH : DEFAULT_REMOTE_PATH,
       createDirs: true,
       deleteLocalAfter: true
     }
@@ -61,14 +63,18 @@ const blank = (kind: StepKind): PipelineStep => {
 }
 
 const SAMPLE = { title: 'Табакошка', season: 1, episode: 9, quality: '720p', ext: 'mkv' }
+const SAMPLE_VIDEO = { title: 'Как устроен звук', channel: 'Табакошка', videoId: 'dQw4w9WgXcQ', season: 0, episode: 0, quality: '720p', ext: 'mp4' }
 
 export default function StepEditor({
   step: initial,
+  video = false,
   onSave,
   onRemove,
   onClose
 }: {
   step: PipelineStep | StepKind
+  /** For a channel or playlist, whose uploads have titles and no numbers. */
+  video?: boolean
   onSave: (step: PipelineStep) => void
   onRemove: (id: string) => void
   onClose: () => void
@@ -81,7 +87,7 @@ export default function StepEditor({
 
   const isNew = typeof initial === 'string'
   const [step, setStep] = useState<PipelineStep>(() =>
-    typeof initial === 'string' ? blank(initial) : { ...initial }
+    typeof initial === 'string' ? blank(initial, video) : { ...initial }
   )
 
   const firstTarget =
@@ -109,13 +115,14 @@ export default function StepEditor({
 
   const preview = useMemo(() => {
     try {
-      if (step.kind === 'rename') return renameFor(step, SAMPLE)
-      if (step.kind === 'upload') return remoteDirFor(step.remotePath, SAMPLE) || '/'
+      const sample = video ? SAMPLE_VIDEO : SAMPLE
+      if (step.kind === 'rename') return renameFor(step, sample)
+      if (step.kind === 'upload') return remoteDirFor(step.remotePath, sample) || '/'
     } catch {
       return ''
     }
     return ''
-  }, [step])
+  }, [step, video])
 
   const set = (patch: Partial<PipelineStep>): void =>
     setStep((s) => ({ ...s, ...patch }) as PipelineStep)
@@ -197,18 +204,28 @@ export default function StepEditor({
                 className="field mono w-full text-control"
                 spellCheck={false}
               />
-              <p className="hint mt-1">{t('auto.templateHint')}</p>
+              <p className="hint mt-1">{t(video ? 'auto.templateHintVideo' : 'auto.templateHint')}</p>
+              {renameGap(step.template, video) === 'videoNumbers' && (
+                <p className="mt-1 max-w-[62ch] text-meta leading-[1.5] text-warn">
+                  {t('auto.templateVideoNumbers')}
+                </p>
+              )}
+              {renameGap(step.template, video) === 'videoName' && (
+                <p className="mt-1 max-w-[62ch] text-meta leading-[1.5] text-warn">
+                  {t('auto.templateVideoName')}
+                </p>
+              )}
               {/*
                 Said, not enforced. A missing episode is put right by the
                 rename itself, and a missing season is harmless for a
                 series with only one.
               */}
-              {renameGap(step.template) === 'episode' && (
+              {renameGap(step.template, video) === 'episode' && (
                 <p className="mt-1 max-w-[62ch] text-meta leading-[1.5] text-warn">
                   {t('auto.templateNoEpisode')}
                 </p>
               )}
-              {renameGap(step.template) === 'season' && (
+              {renameGap(step.template, video) === 'season' && (
                 <p className="mt-1 max-w-[62ch] text-meta leading-[1.5] text-warn">
                   {t('auto.templateNoSeason')}
                 </p>

@@ -207,7 +207,7 @@ describe('the Help page', () => {
     act(() => useStore.getState().openHelp())
     fireEvent.change(screen.getByRole('searchbox', { name: 'Search Help' }), { target: { value: 'voiceover' } })
     expect(screen.queryByRole('button', { name: 'What Are Cookies?' })).toBeNull()
-    const row = screen.getByRole('button', { name: 'What New Episodes Does' })
+    const row = screen.getByRole('button', { name: 'What New Episodes and Videos Does' })
     expect(row.getAttribute('aria-expanded')).toBe('true')
     fireEvent.change(screen.getByRole('searchbox', { name: 'Search Help' }), { target: { value: 'zzzz' } })
     expect(screen.getByText('Nothing in Help matches')).toBeTruthy()

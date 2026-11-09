@@ -188,6 +188,31 @@ describe('buildBackup', () => {
     expect(backup.settings).not.toHaveProperty('telegramChatId')
   })
 
+  it('keeps what a followed channel knows, so restoring it cannot take the back catalogue for news', () => {
+    const owed = { season: 0, episode: 0, videoId: 'b', videoUrl: 'https://example.com/b', videoTitle: 'B' }
+    const backup = buildBackup({
+      settings: settings(),
+      watches: [
+        watch({
+          provider: 'channel',
+          seen: [{ season: 0, episode: 0, videoId: 'a' }],
+          owed: [owed],
+          newestLast: true,
+          listCount: 40
+        })
+      ],
+      app: '3.24.0',
+      now: new Date(NOW)
+    })
+    const parsed = parseBackup(JSON.stringify(backup))
+    expect(parsed.ok && parsed.backup.watches[0]).toMatchObject({
+      seen: [{ season: 0, episode: 0, videoId: 'a' }],
+      owed: [owed],
+      newestLast: true,
+      listCount: 40
+    })
+  })
+
   it('keeps what a watch has handled and drops the record of its last check', () => {
     const backup = buildBackup({
       settings: settings(),

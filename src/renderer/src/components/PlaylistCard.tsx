@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
-import { Check, Loader2 } from '../ui/icons'
+import { Check, Loader2, Radar } from '../ui/icons'
 import type { DetectResult, DownloadMode, MediaInfo, PlaylistEntry, QualityPreset } from '@shared/types'
 import { deeperListing } from '@shared/playlist'
 import { siteNameOf } from '@shared/library'
@@ -39,6 +39,7 @@ export default function PlaylistCard({ info: detected, onDone, saveDir, onSaveDi
   const tp = useTp()
   const settings = useStore((s) => s.settings)
   const saveSettings = useStore((s) => s.saveSettings)
+  const requestWatch = useStore((s) => s.requestWatch)
   /*
     How the files are laid out: numbered, and in a folder of their own. Both on
     by default - a course or a season that lands in the download root, unsorted
@@ -389,6 +390,12 @@ export default function PlaylistCard({ info: detected, onDone, saveDir, onSaveDi
           >
             {busy && !chosen.length ? <Loader2 size={15} className="animate-spin" /> : null}
             {t('playlist.downloadAll', { count: entries.length })}
+          </button>
+        </div>
+        {/* The list as a thing to keep up with, rather than to fetch once. The dialog asks what to do about what is on it now. */}
+        <div className="flex justify-center">
+          <button type="button" className="btn-quiet" data-uvd="follow-list" onClick={() => requestWatch({ url: info.webpageUrl })}>
+            <Radar size={14} /> {t('playlist.follow')}
           </button>
         </div>
       </div>
