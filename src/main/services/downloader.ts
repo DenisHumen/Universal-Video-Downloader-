@@ -22,6 +22,7 @@ import { log } from './log'
 import { failure, noteRefusedWrite, ReadFailure, readJsonStore, writeJsonAtomic } from './json-store'
 import { clearedBy, finishedBeyond, forHistory, isFinished, isHistoryEntry } from './history'
 import { knownSiteFor } from '@shared/auto-sources'
+import { siteNameOf } from '@shared/library'
 import { downloadFields } from './log-fields'
 import {
   accessArgs,
@@ -35,11 +36,14 @@ import {
 } from './options'
 import { IN_FLIGHT_STATES, isSameDownload } from './dedupe'
 import {
+  finishedBeforeAudioName,
   freeCopySuffix,
   isInsideFolder,
   isMediaName,
   isSidecarName,
   pickOutputStem,
+  restrictedSpaces,
+  stemBeforeAudioName,
   samePath,
   sectionSuffix,
   shouldTakeOwnName,
@@ -92,6 +96,7 @@ const AUTO_RETRIES = 2
 /** How soon a wait that lost the network looks again. */
 const WAIT_RETRY_MS = 60_000
 const LOG_TAIL_CHARS = 4000
+const DEFAULT_TEMPLATE = '%(title)s [%(id)s].%(ext)s'
 
 const items = new Map<string, DownloadItem>()
 const procs = new Map<string, ChildProcess>()
@@ -403,12 +408,12 @@ export function safeName(title: string): string {
 }
 
 /*
-  Extractor names that say how a video was found rather than where it lives:
-  the universal fallback, the engine's generic extractor, a pick from the
-  built-in browser. Filed under those, every site without a resolver of its own
+  What a row from before `siteNameOf` knew about HTML5MediaEmbed was filed under,
+  which a resume has to go on finding. New rows go by `siteNameOf`: filed under a
+  name that says how a video was found, every site without a resolver of its own
   - the long tail a folder per site is most useful for - shared one folder.
 */
-const NOT_A_SITE = /^(universal|generic|browser)$/i
+const NOT_A_SITE_BEFORE = /^(universal|generic|browser)$/i
 
 /** The site a download came from, for the per-site subfolder. */
 export function siteFolder(item: Pick<DownloadItem, 'extractor' | 'sourceUrl' | 'url'>): string {
@@ -431,7 +436,8 @@ export function siteFolder(item: Pick<DownloadItem, 'extractor' | 'sourceUrl' | 
   */
   const known = knownSiteFor(page)
   if (known) return safeName(known.name)
-  if (item.extractor && !NOT_A_SITE.test(item.extractor)) return safeName(item.extractor)
+  const named = siteNameOf(item.extractor)
+  if (named) return safeName(named)
   try {
     return safeName(new URL(page).hostname.replace(/^www\./, ''))
   } catch {
@@ -460,7 +466,7 @@ export function plannedDir(item: DownloadItem, settings: AppSettings): string {
  */
 function folderFromBefore(item: DownloadItem, settings: AppSettings): string | undefined {
   if (!settings.createSubfolders || item.log == null) return undefined
-  let site = item.extractor && !NOT_A_SITE.test(item.extractor) ? safeName(item.extractor) : ''
+  let site = item.extractor && !NOT_A_SITE_BEFORE.test(item.extractor) ? safeName(item.extractor) : ''
   if (!site) {
     try {
       site = safeName(new URL(pageUrlOf(item.sourceUrl || item.url)).hostname.replace(/^www\./, ''))
@@ -572,11 +578,10 @@ export function outputTarget(
     const stem = item.outputStem ?? base + sectionSuffix(item.range)
     return { path: join(dir, `${stem}.%(ext)s`), stem }
   }
-  const template = numberedName(settings.filenameTemplate || '%(title)s [%(id)s].%(ext)s', item.playlist)
+  const template = numberedName(settings.filenameTemplate || DEFAULT_TEMPLATE, item.playlist)
   const suffix = variantSuffix(item) + (item.copySuffix ?? '')
   const name = withNameSuffix(template, suffix)
-  // The engine's switch only reaches the fields; the spaces in the template itself are ours.
-  return { path: join(dir, settings.restrictFilenames ? name.replace(/ (?![^(]*\))/g, '_') : name) }
+  return { path: join(dir, settings.restrictFilenames ? restrictedSpaces(name) : name) }
 }
 
 /** An audio download into a container with no place for cover art. */
@@ -862,16 +867,26 @@ export function finalPathCandidate(
  * A batch, Download Now and the terminal queue a link with nothing known about
  * it, and the address stayed the row's title for good: in the queue, in the
  * Library, in the notification. The engine's own title is what the file is named
- * after, so it can be had from there; the default template's ` [id]` and a
- * `.f137` stream number are the only parts of the name that are not the title.
+ * after, so it can be had from there. What comes off is only what this app and
+ * the template put there, last first as they were added: a title really ending in
+ * `[Live]` keeps it unless the template says that place is the video's id.
  */
-export function titleFromFile(path: string): string | undefined {
-  const name = basename(path)
+export function titleFromFile(
+  path: string,
+  how: { template?: string; range?: DownloadItem['range']; audioLanguage?: string } = {}
+): string | undefined {
+  const template = how.template || DEFAULT_TEMPLATE
+  if (!template.includes('%(title)s')) return undefined
+  let name = basename(path)
     .replace(/\.[^.]+$/, '')
     .replace(/\.f\d[\w-]*$/, '')
     .replace(/ \(\d+\)$/, '')
     .replace(/ \(audio\)$/, '')
-  return name.replace(/(^| )\[[^\]]+\]$/, '').trim() || undefined
+  if (how.audioLanguage) name = name.replace(/ \[[\w-]{2,12}\]$/, '')
+  const section = sectionSuffix(how.range)
+  if (section && name.endsWith(section)) name = name.slice(0, -section.length)
+  if (/\[%\(id\)s\](?:\.%\(ext\)s)?$/.test(template)) name = name.replace(/(^| )\[[^\]]+\]$/, '')
+  return name.trim() || undefined
 }
 
 function parseFinalPath(line: string, item: DownloadItem, runDir: string): void {
@@ -879,7 +894,11 @@ function parseFinalPath(line: string, item: DownloadItem, runDir: string): void 
   if (!found) return
   // With restricted names the file holds what is left of the title, which for Cyrillic can be nothing.
   if (/^https?:\/\//i.test(item.title ?? '') && isMediaName(found.path) && !getSettings().restrictFilenames) {
-    const title = titleFromFile(found.path)
+    const title = titleFromFile(found.path, {
+      template: getSettings().filenameTemplate,
+      range: item.range,
+      audioLanguage: item.audioLanguage
+    })
     if (title) {
       item.title = title
       emitUpdated(item)
@@ -892,6 +911,7 @@ function parseFinalPath(line: string, item: DownloadItem, runDir: string): void 
     finalPaths.set(item.id, { path: found.path, priority: found.priority })
   }
   if (found.alreadyDownloaded) alreadyOnDisk.set(item.id, found.path)
+  if (item.mode === 'audio' && found.priority === DESTINATION_PRIORITY) clearPartialFromBeforeAudioName(item, found.path)
   if (item.live && found.priority === DESTINATION_PRIORITY && isMediaName(found.path)) {
     // Subtitles announce a destination too, and are nothing to save a recording from.
     const known = item.partialPaths ?? []
@@ -900,6 +920,22 @@ function parseFinalPath(line: string, item: DownloadItem, runDir: string): void 
       scheduleSave()
     }
   }
+}
+
+/**
+ * A row cut short before ` (audio)` existed left a partial under the old name,
+ * which this run will never continue and nothing would ever clear. The name is
+ * only known now the engine has said it, and only if no other row of this link
+ * is running, since a video download of it writes under that same name.
+ */
+function clearPartialFromBeforeAudioName(item: DownloadItem, destination: string): void {
+  const stem = stemBeforeAudioName(partialStem(destination))
+  if (!stem) return
+  const link = item.sourceUrl || item.url
+  const shared = [...items.values()].some(
+    (other) => other.id !== item.id && IN_FLIGHT_STATES.includes(other.state) && (other.sourceUrl || other.url) === link
+  )
+  if (!shared) cleanupPartialsAt(join(dirname(destination), `${stem}.x`))
 }
 
 /**
@@ -1491,6 +1527,17 @@ async function runDownload(item: DownloadItem): Promise<void> {
     processQueue()
     return
   }
+  const kept = finishedBeforeAudioName(item, [...items.values()])
+  if (kept && existsSync(kept)) {
+    item.state = 'completed'
+    finishProgress(item)
+    item.finishedAt = Date.now()
+    item.filepath = kept
+    log.info('download', 'Already here under the older name', downloadFields(item))
+    emitUpdated(item)
+    processQueue()
+    return
+  }
 
   item.state = item.waitForVideo ? 'waiting' : 'downloading'
   emitUpdated(item)
@@ -1793,7 +1840,7 @@ function retryUnderOwnName(item: DownloadItem, existing: string): void {
   } catch {
     /* gone already: any number is free */
   }
-  item.copySuffix = freeCopySuffix(partialStem(existing), names)
+  item.copySuffix = freeCopySuffix(partialStem(existing), names, getSettings().restrictFilenames)
   appendLog(item, `${basename(existing)} belongs to another download; fetching this as its own copy\n`)
   item.state = 'queued'
   item.speed = undefined
@@ -2083,7 +2130,7 @@ function setAsideRecording(item: DownloadItem): void {
     /* gone already: any number is free */
   }
   const bare = item.copySuffix && base.endsWith(item.copySuffix) ? base.slice(0, -item.copySuffix.length) : base
-  const suffix = freeCopySuffix(bare, names)
+  const suffix = freeCopySuffix(bare, names, !item.outputStem && getSettings().restrictFilenames)
   if (item.outputStem) item.outputStem = bare + suffix
   else item.copySuffix = suffix
   finalPaths.delete(item.id)

@@ -61,7 +61,7 @@ vi.mock('./log', () => {
   const quiet = (): void => undefined
   return { log: { info: quiet, warn: quiet, error: quiet, debug: quiet } }
 })
-vi.mock('./browser-logins', () => ({ browserCookiesFile: () => undefined }))
+vi.mock('./browser-logins', () => ({ browserCookiesFile: () => undefined, holdJarCopy: () => ({ release: () => undefined }) }))
 vi.mock('./report', () => ({ recordDownloadFailure: () => undefined }))
 vi.mock('./info-store', () => ({
   infoCache: {

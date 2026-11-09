@@ -16,7 +16,7 @@ const YTDLP = process.env.YTDLP_BIN
 const FFMPEG = process.env.FFMPEG_BIN
 const enabled = Boolean(process.env.UVD_REAL_TOOLS && YTDLP && FFMPEG)
 
-const h = vi.hoisted(() => ({ dir: '', ytdlp: '', ffmpegDir: '' }))
+const h = vi.hoisted(() => ({ dir: '', ytdlp: '', ffmpegDir: '', settings: {} as Record<string, unknown> }))
 
 vi.mock('electron', () => ({
   app: { getPath: () => h.dir, getName: () => 'test', getVersion: () => '0', isPackaged: false },
@@ -41,7 +41,8 @@ vi.mock('./settings', () => ({
     speedLimit: '',
     proxy: '',
     cookiesFromBrowser: '',
-    cookiesFile: ''
+    cookiesFile: '',
+    ...h.settings
   })
 }))
 vi.mock('./ffmpeg', async (original) => ({
@@ -52,7 +53,7 @@ vi.mock('./log', () => {
   const quiet = (): void => undefined
   return { log: { info: quiet, warn: quiet, error: quiet, debug: quiet } }
 })
-vi.mock('./browser-logins', () => ({ browserCookiesFile: () => undefined }))
+vi.mock('./browser-logins', () => ({ browserCookiesFile: () => undefined, holdJarCopy: () => ({ release: () => undefined }) }))
 vi.mock('./report', () => ({ recordDownloadFailure: () => undefined }))
 vi.mock('../resolvers', () => ({ resolveUrl: async (url: string) => ({ url }) }))
 
@@ -153,6 +154,30 @@ describe.runIf(enabled)('which file a row ends on, with the real engine', () => 
     const result = await run(`${base}/song.mp4`, { mode: 'audio', quality: 'audio' })
     expectTrueFile(result)
     expect(result.item.filepath).toMatch(/\.mp3$/)
+  })
+
+  it('three copies with restricted names on are three files', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'uvd-final-copies-'))
+    h.settings = { restrictFilenames: true }
+    try {
+      const paths: string[] = []
+      for (const quality of ['best', '720', '480']) {
+        const { id } = await downloader.startDownload({ url: `${base}/copies.mp4`, mode: 'video', quality, outputDir: dir })
+        await vi.waitFor(
+          () => {
+            if (!['completed', 'error'].includes(row(id).state)) throw new Error(row(id).state)
+          },
+          { timeout: 60_000, interval: 100 }
+        )
+        expect(row(id).state, row(id).error).toBe('completed')
+        paths.push(row(id).filepath!)
+      }
+      expect(new Set(paths).size).toBe(3)
+      for (const path of paths) expect(existsSync(path), path).toBe(true)
+      expect(readdirSync(dir).filter((name) => name.endsWith('.mp4'))).toHaveLength(3)
+    } finally {
+      h.settings = {}
+    }
   })
 
   it('a site that sends a drawing fails, and the drawing is gone', async () => {
