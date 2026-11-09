@@ -9,3 +9,5 @@ packaging/aur/PKGBUILD text eol=lf
 build/uvd text eol=lf
 # Double-clicked on a Mac and run by bash: a CR would break every line.
 *.command text eol=lf
+# yt-dlp's own signed files, compared byte for byte.
+src/main/services/fixtures/yt-dlp-*/* binary
