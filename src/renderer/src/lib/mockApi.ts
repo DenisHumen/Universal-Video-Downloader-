@@ -403,6 +403,8 @@ export function installMockApi(): void {
       if (/unsupported/i.test(url)) {
         return { ok: false, error: `Unsupported URL: ${url}`, reportId: 'mock-detect' }
       }
+      // A link with "mock-limited" in it comes the way YouTube answers with no runtime to solve its check.
+      if (/mock-limited/.test(url)) return { ok: true, info: { ...fakeInfo(url), qualityLimit: 'noRuntime' } }
       return { ok: true, info: fakeInfo(url) }
     },
     cancelDetect: async () => undefined,

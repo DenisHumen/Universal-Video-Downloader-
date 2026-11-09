@@ -1,4 +1,4 @@
-import type { AppErrorCode, AppSettings, DownloadMode, QualityPreset } from '@shared/types'
+import type { AppErrorCode, AppSettings, DownloadMode, QualityLimit, QualityPreset } from '@shared/types'
 
 /**
  * The command line's words: what it accepts, what it prints while it works,
@@ -291,6 +291,13 @@ const APP_MIGHT_MANAGE = new Set<AppErrorCode | undefined>([
   'corruptLink',
   'streamGone'
 ])
+
+/** Why YouTube may be giving less than it has, the line the window shows beside a result. */
+export function qualityLimitLine(limit: QualityLimit): string {
+  return limit === 'noRuntime'
+    ? "  ! YouTube may be holding back better quality: the helper that answers its check isn't installed yet. Check the connection and run this again."
+    : "  ! YouTube may be holding back better quality: its check couldn't be answered this time. Try again in a day or so."
+}
 
 /** The process exit code for a link that did not detect: distinct, so scripts can tell. */
 export const EXIT_NOT_DETECTED = 2

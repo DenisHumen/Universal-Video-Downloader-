@@ -246,6 +246,64 @@ describe('detect, keeping the answer for the download', () => {
   })
 })
 
+describe('detect, when YouTube holds formats back', () => {
+  function answering(json: object, warnings: string): EventEmitter {
+    const child = Object.assign(new EventEmitter(), { stdout: new PassThrough(), stderr: new PassThrough() })
+    child.stdout.write(JSON.stringify(json))
+    child.stderr.write(warnings)
+    setTimeout(() => child.emit('close', 0), 5)
+    return child
+  }
+  const low = { format_id: '18', ext: 'mp4', vcodec: 'avc1', acodec: 'mp4a', height: 360 }
+  const storyboard = { format_id: 'sb0', ext: 'mhtml', vcodec: 'none', acodec: 'none', protocol: 'mhtml' }
+
+  it('asks the engine for its warnings, with the runtime and without any config', async () => {
+    spawn.mockClear()
+    spawn.mockImplementationOnce(() => answering({ id: 'v', title: 'One', formats: [low] }, ''))
+    await detect('https://www.youtube.com/watch?v=abcdefghijk')
+    const args = spawn.mock.calls[0][1] as string[]
+    expect(args).not.toContain('--no-warnings')
+    expect(args).toContain('--ignore-config')
+    expect(args[0]).toBe('--no-js-runtimes')
+  })
+
+  it('says why a 360p list is what it is', async () => {
+    spawn.mockImplementationOnce(() =>
+      answering(
+        { id: 'v', title: 'One', formats: [low] },
+        'WARNING: [youtube] No supported JavaScript runtime could be found. Only deno is enabled by default\n'
+      )
+    )
+    const result = await detect('https://www.youtube.com/watch?v=abcdefghij1')
+    expect(result.info?.qualityLimit).toBe('noRuntime')
+  })
+
+  it('says nothing on an ordinary answer', async () => {
+    spawn.mockImplementationOnce(() => answering({ id: 'v', title: 'One', formats: [low] }, ''))
+    const result = await detect('https://www.youtube.com/watch?v=abcdefghij2')
+    expect(result.info?.qualityLimit).toBeUndefined()
+    expect(result.ok).toBe(true)
+  })
+
+  it('reports a list of only storyboards as YouTube holding the video back', async () => {
+    spawn.mockImplementationOnce(() =>
+      answering(
+        { id: 'v', title: 'One', extractor_key: 'Youtube', formats: [storyboard] },
+        'WARNING: Only images are available for download. use --list-formats to see them\n'
+      )
+    )
+    const result = await detect('https://www.youtube.com/watch?v=abcdefghij3')
+    expect(result.ok).toBe(false)
+    expect(result.errorCode).toBe('youtubeWithheld')
+  })
+
+  it('does not scrape the page for a video YouTube held back', () => {
+    for (const errorCode of ['jsRuntimeMissing', 'jsChallengeFailed', 'youtubeWithheld'] as const) {
+      expect(universalCanHelp({ errorCode, output: 'WARNING: x\nERROR: [youtube] x: No video formats found!' })).toBe(false)
+    }
+  })
+})
+
 describe('detect, listing a collection', () => {
   // What the settings mock at the top of this file says.
   const settingsLimit = 500

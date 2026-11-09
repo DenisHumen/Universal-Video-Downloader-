@@ -1,5 +1,6 @@
 import { spawn } from 'child_process'
 import { ytdlpBinaryPath, ytdlpSpawnOptions, engineUnavailable } from './ytdlp'
+import { withJsRuntime } from './js-runtime'
 import { killTree } from './process'
 import { classifyYtdlpError } from './options'
 import { searchYummyani } from '../resolvers'
@@ -85,7 +86,7 @@ function ytdlpSearch(target: string, service: SearchService, limit: number): Pro
   args.push('--playlist-end', String(Math.max(1, Math.min(SEARCH_CAP, limit))), '--', target)
 
   return new Promise((resolve) => {
-    const child = spawn(ytdlpBinaryPath(), args, ytdlpSpawnOptions())
+    const child = spawn(ytdlpBinaryPath(), withJsRuntime(args), ytdlpSpawnOptions())
     let stdout = ''
     let stderr = ''
     let settled = false

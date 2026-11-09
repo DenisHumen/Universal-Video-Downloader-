@@ -46,6 +46,9 @@ const BY_CODE: Partial<Record<AppErrorCode, FixKind>> = {
   engineProxy: 'proxy',
   rateLimited: 'retryLater',
   serverError: 'retryLater',
+  jsRuntimeMissing: 'retryLater',
+  jsChallengeFailed: 'retryLater',
+  youtubeWithheld: 'retryLater',
   upcoming: 'waitForVideo'
 }
 

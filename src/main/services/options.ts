@@ -1,4 +1,4 @@
-import type { AppErrorCode, AppSettings } from '@shared/types'
+import type { AppErrorCode, AppSettings, QualityLimit } from '@shared/types'
 
 /**
  * Engine arguments that control how restricted sites are accessed: cookies.
@@ -115,6 +115,48 @@ interface Rule {
   message: string
   /** Suggest cookies when they aren't configured yet. */
   cookies?: boolean
+}
+
+/*
+  YouTube held formats back, in the engine's words (yt-dlp 2026.10.26). All of
+  these are warnings, so they are never the line a run ends on: that is "Requested
+  format is not available" or "No video formats found!", which blames the video or
+  the quality picked. See `withheldCause`.
+*/
+const NO_JS_RUNTIME: Rule = {
+  re: /no supported javascript runtime could be found/,
+  code: 'jsRuntimeMissing',
+  message:
+    "YouTube held this video back because the helper program that answers its check isn't installed yet. " +
+    'The app fetches it by itself: check your connection, reopen the app and try again.'
+}
+const JS_CHALLENGE_FAILED: Rule = {
+  re: /(?:\bn challenge|\bsignature) solving failed/,
+  code: 'jsChallengeFailed',
+  message:
+    "YouTube held this video back because its check couldn't be answered. YouTube has probably changed its player; " +
+    'the app updates itself for that, so try again in a day or so.'
+}
+const YOUTUBE_WITHHELD: Rule = {
+  // The first capitalised by the engine as "Only images are available for download. use --list-formats ...".
+  re: /only images are available for download|formats have been skipped as they are missing a url|forcing sabr streaming/,
+  code: 'youtubeWithheld',
+  message:
+    "YouTube offered this video only as preview pictures, or in a way the app can't save yet. " +
+    'That is usually about this network or a change at YouTube, not the video. Try again later or from another network.'
+}
+
+/** The run ended with nothing to fetch, which a warning above it may explain. */
+const NOTHING_TO_FETCH = /requested format is not available|no video formats|nothing to download/
+
+/** The likeliest root cause first: with no runtime, the other two are only what that led to. */
+function withheldCause(raw: string): Rule | undefined {
+  const warnings = raw
+    .split('\n')
+    .filter((line) => /^\s*WARNING:/i.test(line))
+    .join('\n')
+    .toLowerCase()
+  return [NO_JS_RUNTIME, JS_CHALLENGE_FAILED, YOUTUBE_WITHHELD].find((rule) => rule.re.test(warnings))
 }
 
 const RULES: Rule[] = [
@@ -256,6 +298,9 @@ const RULES: Rule[] = [
       'YouTube is asking this computer to prove it is not a bot. That is about your network, not this video: ' +
       'cookies from a browser where you are signed in to YouTube get past it, or try again later or from another network.'
   },
+  NO_JS_RUNTIME,
+  JS_CHALLENGE_FAILED,
+  YOUTUBE_WITHHELD,
   /*
     The Russian sites' resolvers, in their own exact words. They arrive here
     with no engine in the way, and said nothing a rule could read: a queued
@@ -496,6 +541,9 @@ export function classifyYtdlpError(raw: string, cookiesEnabled: boolean): Classi
     .replace(/\b[a-z][a-z0-9+.-]*:\/\/\S+/g, ' ')
     .replace(/\[[\w:.-]+\]\s+[^\s:]+:\s/g, ' ')
 
+  const cause = NOTHING_TO_FETCH.test(lower) ? withheldCause(raw) : undefined
+  if (cause) return { code: cause.code, message: cause.message, cookieHint: false }
+
   for (const rule of RULES) {
     if (!rule.re.test(lower)) continue
     const cookieHint = Boolean(rule.cookies) && !cookiesEnabled
@@ -508,6 +556,45 @@ export function classifyYtdlpError(raw: string, cookiesEnabled: boolean): Classi
     }
   }
   return { message: line.replace(/^ERROR:\s*/i, ''), cookieHint: false }
+}
+
+/**
+ * The engine answered with a list that had nothing usable in it, because YouTube
+ * held the rest back. `probeWithEngine` has no failure line to classify there:
+ * `-J` exits 0.
+ */
+export function withheldFailure(stderr: string): ClassifiedError | undefined {
+  const cause = withheldCause(stderr)
+  return cause && { code: cause.code, message: cause.message, cookieHint: false }
+}
+
+/**
+ * Why this one engine line says the qualities on offer are fewer than they should
+ * be, if it does. SABR is not here for a finished download: the engine warns of it
+ * about clients it had no need of, so only a low result makes it mean anything.
+ */
+export function qualityLimitIn(line: string): QualityLimit | undefined {
+  if (!/^\s*WARNING:/i.test(line)) return undefined
+  const text = line.toLowerCase()
+  if (NO_JS_RUNTIME.re.test(text)) return 'noRuntime'
+  if (JS_CHALLENGE_FAILED.re.test(text)) return 'challenge'
+  return undefined
+}
+
+/** Below this, a SABR warning is the likely reason for the list being what it is. */
+const SABR_LOW_HEIGHT = 720
+
+/**
+ * The reason to give beside a format list, so a video that can only come at 360p
+ * says why. `tallest` is the list's tallest video, 0 when it has no heights.
+ */
+export function qualityLimitOf(stderr: string, tallest: number): QualityLimit | undefined {
+  const lines = stderr.split('\n')
+  const limits = lines.map(qualityLimitIn)
+  if (limits.includes('noRuntime')) return 'noRuntime'
+  if (limits.includes('challenge')) return 'challenge'
+  const sabr = lines.some((l) => /^\s*WARNING:/i.test(l) && YOUTUBE_WITHHELD.re.test(l.toLowerCase()))
+  return sabr && tallest > 0 && tallest < SABR_LOW_HEIGHT ? 'sabr' : undefined
 }
 
 /**

@@ -18,6 +18,7 @@ import { browsingSession } from '../resolvers/universal/capture'
 import { getSettings } from './settings'
 import { getSecret, openText, sealText, SECRET, setSecret } from './secrets'
 import { log } from './log'
+import { withJsRuntime } from './js-runtime'
 import { ytdlpBinaryPath, ytdlpSpawnOptions } from './ytdlp'
 import type { AppSettings, SignInImport } from '@shared/types'
 import {
@@ -324,7 +325,7 @@ export async function importSignIns(browser: string): Promise<SignInImport> {
     const stderr = await new Promise<string>((resolve) => {
       const child = spawn(
         ytdlpBinaryPath(),
-        ['--ignore-config', '--no-warnings', '--cookies-from-browser', browser, '--cookies', file, '--skip-download', 'uvd-cookie-export'],
+        withJsRuntime(['--ignore-config', '--no-warnings', '--cookies-from-browser', browser, '--cookies', file, '--skip-download', 'uvd-cookie-export']),
         ytdlpSpawnOptions()
       )
       let err = ''

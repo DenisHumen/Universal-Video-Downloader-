@@ -8,7 +8,8 @@ import { normalizeUrl } from '@shared/urls'
 import { getSettings } from '../services/settings'
 import { flushSecrets, initSecrets } from '../services/secrets'
 import { applyProxy } from '../services/proxy'
-import { ensureYtdlp, ytdlpBinaryPath, ytdlpSpawnOptions } from '../services/ytdlp'
+import { isYoutubeLink, withJsRuntime } from '../services/js-runtime'
+import { ensureJsRuntime, ensureYtdlp, ytdlpBinaryPath, ytdlpSpawnOptions } from '../services/ytdlp'
 import { ffmpegLocation } from '../services/ffmpeg'
 import {
   buildArgs,
@@ -17,7 +18,7 @@ import {
   POSTPROCESS_PREFIX,
   PROGRESS_PREFIX
 } from '../services/downloader'
-import { classifyYtdlpError, hasCookies, refusesMidStreamInit, subtitleMissIn, withPostprocessHeading } from '../services/options'
+import { classifyYtdlpError, hasCookies, qualityLimitIn, refusesMidStreamInit, subtitleMissIn, withPostprocessHeading } from '../services/options'
 import { siteOf } from '../services/log-fields'
 import { isMediaName, isSidecarName } from '../services/naming'
 import { killTree } from '../services/process'
@@ -35,6 +36,7 @@ import {
   parseProgress,
   postprocessLine,
   progressLine,
+  qualityLimitLine,
   subtitleMissLine,
   USAGE,
   type CliChoice,
@@ -159,6 +161,13 @@ async function run(options: CliOptions): Promise<number> {
     return 1
   }
 
+  /*
+    Nothing else is running to fetch it for a later try, and this run's formats
+    depend on it. A failure is not this command's failure: the engine goes on
+    without, and says below what that cost.
+  */
+  if (options.links.some((link) => isYoutubeLink(normalizeUrl(link)))) await settleJsRuntime()
+
   const outputDir = options.output ? resolve(options.output) : settings.downloadDir || app.getPath('downloads')
   const choice = downloadChoice(options, settings)
   let worst = 0
@@ -168,6 +177,18 @@ async function run(options: CliOptions): Promise<number> {
     worst = Math.max(worst, code)
   }
   return worst
+}
+
+const YOUTUBE_RUNTIME_WAIT_MS = 180_000
+
+/** At most this long, so a stalled connection costs only the better formats. */
+async function settleJsRuntime(): Promise<void> {
+  const quiet = setTimeout(() => say('Setting up what YouTube needs (first run only)…'), 1500)
+  await Promise.race([
+    ensureJsRuntime(),
+    new Promise((done) => setTimeout(done, YOUTUBE_RUNTIME_WAIT_MS).unref())
+  ])
+  clearTimeout(quiet)
 }
 
 async function download(link: string, outputDir: string, choice: CliChoice): Promise<number> {
@@ -239,11 +260,12 @@ interface EngineRun {
 function runEngine(item: DownloadItem, settings: AppSettings, dir: string): Promise<EngineRun> {
   return new Promise((done) => {
     const args = buildArgs(item, settings, dir, ffmpegLocation(), undefined, holdJarCopy(settings).file)
-    const child = spawn(ytdlpBinaryPath(), args, ytdlpSpawnOptions())
+    const child = spawn(ytdlpBinaryPath(), withJsRuntime(args), ytdlpSpawnOptions())
     live = child
     let finalPath: { path: string; priority: number; alreadyDownloaded: boolean } | undefined
     let announced = false
     const saidMissing = new Set<string>()
+    let saidLimit = false
     let stderrTail = ''
     // SponsorBlock's lookup is a post-processor too, and runs before anything is fetched.
     let fetched = false
@@ -281,6 +303,11 @@ function runEngine(item: DownloadItem, settings: AppSettings, dir: string): Prom
       if (missed && !saidMissing.has(missed)) {
         saidMissing.add(missed)
         say(subtitleMissLine(missed))
+      }
+      const limit = saidLimit ? undefined : qualityLimitIn(line)
+      if (limit) {
+        saidLimit = true
+        say(qualityLimitLine(limit))
       }
       stderrTail = (stderrTail + line + '\n').slice(-4000)
     })
