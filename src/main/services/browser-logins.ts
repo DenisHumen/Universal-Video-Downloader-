@@ -9,7 +9,6 @@ import {
   readFileSync,
   renameSync,
   rmSync,
-  statSync,
   writeFileSync
 } from 'fs'
 import { readdir, rm, stat } from 'fs/promises'
