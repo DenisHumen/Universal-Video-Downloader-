@@ -74,6 +74,40 @@ export function interruptTree(child: ChildProcess, onFailed: () => void): void {
   }
 }
 
+/*
+  The binary comes in through the environment, so no quoting has to survive a
+  path with spaces or Cyrillic in it, and the answer is only process ids.
+*/
+export const ORPHAN_SCRIPT = [
+  '$alive = @{}',
+  'Get-Process | ForEach-Object { $alive[[int]$_.Id] = $true }',
+  `Get-CimInstance Win32_Process -Filter "Name='ffmpeg.exe'" | ` +
+    'Where-Object { $_.ExecutablePath -eq $env:UVD_FFMPEG -and -not $alive[[int]$_.ParentProcessId] } | ' +
+    'ForEach-Object { Stop-Process -Id $_.ProcessId -Force; $_.ProcessId }'
+].join('; ')
+
+/**
+ * End the ffmpeg a crashed or killed session left running. Resolves with how many.
+ *
+ * Windows ties a child to nothing. When the app is killed outright the engine
+ * notices its pipes have gone and exits, but its ffmpeg is told nothing: on a
+ * live stream it goes on recording, unseen, for as long as the broadcast lasts,
+ * holding the partial that the next launch needs and the ffmpeg.exe an update
+ * has to replace. Only this copy's ffmpeg counts, and only with no parent left,
+ * so a `uvd` running beside the window keeps its own.
+ */
+export function reapOrphanedFfmpeg(ffmpeg: string | undefined): Promise<number> {
+  if (process.platform !== 'win32' || !ffmpeg) return Promise.resolve(0)
+  return new Promise((resolve) => {
+    execFile(
+      'powershell.exe',
+      ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-Command', ORPHAN_SCRIPT],
+      { windowsHide: true, timeout: 10_000, env: { ...process.env, UVD_FFMPEG: ffmpeg } },
+      (_err, stdout) => resolve(String(stdout).split(/\s+/).filter(Boolean).length)
+    )
+  })
+}
+
 /**
  * Terminate a child and everything it started.
  *

@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { ChildProcess } from 'child_process'
-import { groupSpawnOptions, killTree } from './process'
+import { groupSpawnOptions, killTree, ORPHAN_SCRIPT, reapOrphanedFfmpeg } from './process'
 
 const realPlatform = process.platform
 
@@ -29,8 +29,27 @@ describe('groupSpawnOptions', () => {
   })
 })
 
+describe('reapOrphanedFfmpeg', () => {
+  it('has nothing to do outside Windows, or without an ffmpeg', async () => {
+    asPlatform('linux')
+    await expect(reapOrphanedFfmpeg('/opt/ffmpeg')).resolves.toBe(0)
+    asPlatform('win32')
+    await expect(reapOrphanedFfmpeg(undefined)).resolves.toBe(0)
+  })
+
+  it('takes the path from the environment, so no folder name can break the script', () => {
+    expect(ORPHAN_SCRIPT).toContain('$env:UVD_FFMPEG')
+    expect(ORPHAN_SCRIPT).not.toMatch(/[\\]/)
+  })
+
+  // A `uvd` beside the window has a running engine above its ffmpeg, and another install another path.
+  it('only stops this copy of ffmpeg, and only with no parent left', () => {
+    expect(ORPHAN_SCRIPT).toContain('$_.ExecutablePath -eq $env:UVD_FFMPEG -and -not $alive[[int]$_.ParentProcessId]')
+  })
+})
+
 describe('killTree', () => {
-  const child = (pid: number | undefined): ChildProcess =>
+  const child =(pid: number | undefined): ChildProcess =>
     ({ pid, kill: vi.fn() }) as unknown as ChildProcess
 
   it('does nothing without a process', () => {
