@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { PROBE_SCRIPT, withoutFailedPages } from './sniffer'
+import { navigationLedger, PROBE_SCRIPT, withoutFailedPages } from './sniffer'
 import type { MediaCandidate } from './candidates'
 
 const candidate = (url: string): MediaCandidate => ({ url, kind: 'file', score: 82, source: 'network' })
@@ -14,6 +14,62 @@ describe('withoutFailedPages', () => {
     const failed = new Set(['https://site.test/watch/1'])
     const real = candidate('https://cdn.test/real.mp4')
     expect(withoutFailedPages([real], failed)).toEqual([real])
+  })
+})
+
+describe('navigationLedger', () => {
+  it('calls a page that refused dead', () => {
+    const failed = new Set<string>()
+    navigationLedger(failed).answered('https://site.test/a.mp4', 403)
+    expect(failed.has('https://site.test/a.mp4')).toBe(true)
+  })
+
+  it('takes it back when a challenge page reloads and answers 200', () => {
+    const failed = new Set<string>()
+    const ledger = navigationLedger(failed)
+    ledger.started('https://site.test/a.mp4')
+    ledger.answered('https://site.test/a.mp4', 403)
+    ledger.started('https://site.test/a.mp4')
+    ledger.answered('https://site.test/a.mp4', 200)
+    expect(failed.size).toBe(0)
+  })
+
+  it('drops a whole redirect chain that ends in a failure', () => {
+    const failed = new Set<string>()
+    const ledger = navigationLedger(failed)
+    ledger.started('https://site.test/old.mp4')
+    ledger.redirected('https://site.test/moved.mp4')
+    ledger.redirected('https://site.test/dead.mp4')
+    ledger.answered('https://site.test/dead.mp4', 404)
+    expect([...failed].sort()).toEqual(['https://site.test/dead.mp4', 'https://site.test/moved.mp4', 'https://site.test/old.mp4'])
+  })
+
+  it('counts one that never answered', () => {
+    const failed = new Set<string>()
+    const ledger = navigationLedger(failed)
+    ledger.started('https://site.test/old.mp4')
+    ledger.redirected('https://gone.test/x.mp4')
+    ledger.didNotLoad('https://gone.test/x.mp4')
+    expect(failed.has('https://site.test/old.mp4')).toBe(true)
+  })
+
+  it('leaves a chain that arrived alone', () => {
+    const failed = new Set<string>()
+    const ledger = navigationLedger(failed)
+    ledger.started('https://site.test/old.mp4')
+    ledger.redirected('https://site.test/new.mp4')
+    ledger.answered('https://site.test/new.mp4', 200)
+    expect(failed.size).toBe(0)
+  })
+
+  it('does not blame a new navigation for the one before it', () => {
+    const failed = new Set<string>()
+    const ledger = navigationLedger(failed)
+    ledger.started('https://site.test/first')
+    ledger.answered('https://site.test/first', 200)
+    ledger.started('https://site.test/second')
+    ledger.answered('https://site.test/second', 500)
+    expect([...failed]).toEqual(['https://site.test/second'])
   })
 })
 

@@ -162,6 +162,41 @@ export function withoutFailedPages(found: MediaCandidate[], failed: ReadonlySet<
   return found.filter((c) => !failed.has(c.url))
 }
 
+/**
+ * Which addresses the window failed to open, from what it reports as it goes.
+ *
+ * A failure counts for the whole chain. Capture sees a link that redirects before
+ * it sees where it goes, and the window reports the failure only under the last
+ * address, so `/old.mp4` going to a 404 went on being offered as a video. Answers
+ * can also change their mind: a challenge page says 403, sets a cookie, reloads
+ * and says 200, and that address is not dead.
+ */
+export function navigationLedger(failed: Set<string>): {
+  started: (url: string) => void
+  redirected: (url: string) => void
+  answered: (url: string, status: number) => void
+  didNotLoad: (url: string) => void
+} {
+  let chain: string[] = []
+  const settle = (url: string, dead: boolean): void => {
+    for (const link of new Set([...chain, url])) {
+      if (dead) failed.add(link)
+      else failed.delete(link)
+    }
+    chain = []
+  }
+  return {
+    started: (url) => {
+      chain = [url]
+    },
+    redirected: (url) => {
+      chain.push(url)
+    },
+    answered: (url, status) => settle(url, status >= 400),
+    didNotLoad: (url) => settle(url, true)
+  }
+}
+
 /** Sniffs are serialised: one hidden window at a time is plenty. */
 let queue: Promise<unknown> = Promise.resolve()
 
@@ -254,11 +289,16 @@ async function sniffOnce(
     sniffers.add(ownWebContentsId)
     win.webContents.setAudioMuted(true)
     win.webContents.setWindowOpenHandler(() => ({ action: 'deny' }))
-    win.webContents.on('did-navigate', (_event, url, status) => {
-      if (status >= 400) failedPages.add(url)
+    const ledger = navigationLedger(failedPages)
+    win.webContents.on('did-start-navigation', (_event, url, isInPlace, isMainFrame) => {
+      if (isMainFrame && !isInPlace) ledger.started(url)
     })
+    win.webContents.on('did-redirect-navigation', (_event, url, _isInPlace, isMainFrame) => {
+      if (isMainFrame) ledger.redirected(url)
+    })
+    win.webContents.on('did-navigate', (_event, url, status) => ledger.answered(url, status))
     win.webContents.on('did-fail-load', (_event, code, _description, url, isMainFrame) => {
-      if (isMainFrame && code !== ERR_ABORTED) failedPages.add(url)
+      if (isMainFrame && code !== ERR_ABORTED) ledger.didNotLoad(url)
     })
 
     /*
