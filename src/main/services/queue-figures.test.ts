@@ -124,7 +124,7 @@ describe('a resumed row', () => {
 describe('a file that is already on disk', () => {
   it('does not put a processing step on a row that is about to start over as a copy', async () => {
     const { id, engine } = await running('https://video.test/watch?v=copy')
-    await say(engine, '[download] D:\\out\\Film [x].mp4 has already been downloaded\n')
+    await say(engine, `[download] ${join(find(id)!.outputDir!, 'Film [x].mp4')} has already been downloaded\n`)
     await say(engine, `${PROGRESS_PREFIX}finished\t1000\t1000\tNA\tNA\tNA\tNA\tNA\n`)
     await say(engine, `${POSTPROCESS_PREFIX}started\tMoveFiles\n`)
     await say(engine, `${POSTPROCESS_PREFIX}finished\tMoveFiles\n`)
@@ -143,7 +143,7 @@ describe('a file that is already on disk', () => {
 
   it('still counts what is fetched after it: one stream was there, the other was not', async () => {
     const { id, engine } = await running('https://video.test/watch?v=half')
-    await say(engine, '[download] D:\\out\\Film [x].f137.mp4 has already been downloaded\n')
+    await say(engine, `[download] ${join(find(id)!.outputDir!, 'Film [x].f137.mp4')} has already been downloaded\n`)
     await say(engine, `${PROGRESS_PREFIX}finished\t1000\t1000\tNA\tNA\tNA\tNA\tNA\n`)
     await say(engine, fetched(100, 100))
     await say(engine, `${POSTPROCESS_PREFIX}started\tMerger\n`)
