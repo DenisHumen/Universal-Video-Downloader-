@@ -531,7 +531,13 @@ export async function runEpisode(
         channel.token,
         channel.chatId,
         composeFailure(seriesTitle, ref.season, ref.episode, reasonIn(language, why, code), options.attempt, language)
-      ).catch(() => undefined)
+      ).catch((err) => {
+        // Nobody will hear about this failure now, so the log at least has to.
+        log.warn('notify', 'The failure alert could not be sent', {
+          id: shortId,
+          why: err instanceof Error ? err.message : String(err)
+        })
+      })
     }
     return 'failed'
   } finally {

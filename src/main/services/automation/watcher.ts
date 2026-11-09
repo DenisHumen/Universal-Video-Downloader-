@@ -203,7 +203,12 @@ async function look(watch: Watch, manual: boolean, read: () => void): Promise<Fo
           channel.token,
           channel.chatId,
           composeCheckFailure(current.title, failures, reasonIn(language, why), language)
-        ).catch(() => undefined)
+        ).catch((err) => {
+          // Nobody will hear about this failure now, so the log at least has to.
+          log.warn('notify', 'The failure alert could not be sent', {
+            why: err instanceof Error ? err.message : String(err)
+          })
+        })
       }
     }
     return nothing({ error: why })
