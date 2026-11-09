@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Globe, Loader2, RefreshCw } from '../ui/icons'
+import { Globe, Loader2, RefreshCw, X } from '../ui/icons'
 import { useStore } from '../store'
 import { useT } from '../i18n'
 import { engineFailureText, proxyMayBeWhy } from '../lib/engineError'
@@ -14,7 +14,10 @@ import { engineFailureText, proxyMayBeWhy } from '../lib/engineError'
  * and it happens at the exact moment someone decides whether to keep the app.
  *
  * Silent once the engine is ready: a strip that is always on screen is chrome,
- * not information. Only the first-run download and an outright failure show.
+ * not information. Only the first-run download, an outright failure and an
+ * update that failed its authenticity check show. That last one comes with the
+ * engine still working, so it can be put away, and it offers no way to install
+ * the update regardless: nothing a site or a release does may lead to that.
  *
  * No exit animation, and no `AnimatePresence`. What makes this strip go away is
  * an external event — the engine finishing — rather than a click, which is
@@ -29,6 +32,7 @@ export default function EngineNotice(): JSX.Element | null {
   const proxy = useStore((s) => s.settings?.proxy)
   const openSettings = useStore((s) => s.openSettings)
   const [retrying, setRetrying] = useState(false)
+  const [dismissed, setDismissed] = useState(false)
 
   const downloading = ytdlp.state === 'downloading'
   const failed = ytdlp.state === 'error'
@@ -41,6 +45,29 @@ export default function EngineNotice(): JSX.Element | null {
     } finally {
       setRetrying(false)
     }
+  }
+
+  if (ytdlp.state === 'ready' && ytdlp.refused && !dismissed) {
+    return (
+      <div className="animate-rise shrink-0 overflow-hidden">
+        <div className="flex items-center gap-3 border-b border-edge bg-raise px-4 py-2.5">
+          <span className="label shrink-0 text-accent-ink">{t('engine.refusedLabel')}</span>
+          <p className="min-w-0 flex-1 text-body font-medium text-ink">{t('engine.updateRefused')}</p>
+          <button type="button" className="btn-quiet shrink-0" onClick={() => openSettings('system/updates')}>
+            {t('engine.checkAppUpdate')}
+          </button>
+          <button
+            type="button"
+            className="btn-quiet shrink-0 px-2"
+            aria-label={t('common.close')}
+            title={t('common.close')}
+            onClick={() => setDismissed(true)}
+          >
+            <X size={14} />
+          </button>
+        </div>
+      </div>
+    )
   }
 
   if (!downloading && !failed) return null

@@ -5,6 +5,7 @@ import { tmpdir } from 'os'
 import { join } from 'path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { crc32 } from './engine-dist'
+import { makeSigner, signDetached, type TestSigner } from './engine-signature.testkit'
 
 /*
   Moving to the onedir engine, with a pretend GitHub serving a real zip.
@@ -19,7 +20,8 @@ const h = vi.hoisted(() => ({
   /** What each release asset answers: a body, or an HTTP status. */
   assets: new Map<string, Buffer | number>(),
   requested: [] as string[],
-  spawned: [] as string[][]
+  spawned: [] as string[][],
+  signer: null as unknown as TestSigner
 }))
 
 vi.mock('electron', () => ({
@@ -27,7 +29,7 @@ vi.mock('electron', () => ({
   net: {
     isOnline: () => true,
     request: ({ url }: { url: string }) => {
-      const req = Object.assign(new EventEmitter(), { end: vi.fn() })
+      const req = Object.assign(new EventEmitter(), { end: vi.fn(), abort: vi.fn() })
       req.end.mockImplementation(() => {
         const name = url.split('/').pop() as string
         h.requested.push(name)
@@ -72,7 +74,17 @@ vi.mock('./engine-dist', async (importOriginal) => ({
   ...(await importOriginal<typeof import('./engine-dist')>()),
   engineAssets: () => ({ onedir: { zip: 'yt-dlp_linux.zip', exe: 'yt-dlp_linux' }, onefile: 'yt-dlp_linux' })
 }))
+vi.mock('./engine-keys', () => ({
+  get YT_DLP_KEYS() {
+    return [h.signer.pinned]
+  }
+}))
+// A mocked module outlives `vi.resetModules`, so the error class it throws has to as well.
+vi.mock('./engine-signature', async (importOriginal) => await importOriginal<typeof import('./engine-signature')>())
 vi.mock('./log', () => ({ log: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() } }))
+
+h.signer = makeSigner()
+const STRANGER = makeSigner()
 vi.mock('./settings', () => ({ getSettings: () => ({}) }))
 vi.mock('./proxy-auth', () => ({ proxyUrl: () => '', withProxyAuth: <T>(req: T) => req }))
 
@@ -124,6 +136,14 @@ function publish(overrides: Partial<Record<string, Buffer | number>> = {}): void
     ['SHA2-256SUMS', Buffer.from(`${sum(ZIP)}  yt-dlp_linux.zip\n${sum(ONEFILE)}  yt-dlp_linux\n`)]
   ])
   for (const [k, v] of Object.entries(overrides)) if (v !== undefined) h.assets.set(k, v)
+  // Signed as yt-dlp would have, unless the test says what the signature is.
+  if (!('SHA2-256SUMS.sig' in overrides)) h.assets.set('SHA2-256SUMS.sig', signDetached(h.assets.get('SHA2-256SUMS') as Buffer, h.signer))
+}
+
+/** The checksum list, signed by whom. */
+function listed(signer: TestSigner, assets: Record<string, Buffer>): Record<string, Buffer> {
+  const list = Buffer.from(Object.entries(assets).map(([name, body]) => `${sum(body)}  ${name}\n`).join(''))
+  return { ...assets, 'SHA2-256SUMS': list, 'SHA2-256SUMS.sig': signDetached(list, signer) }
 }
 
 async function fresh(): Promise<typeof import('./ytdlp')> {
@@ -261,7 +281,7 @@ describe('the onedir engine', () => {
     expect(readFileSync(onefile()).equals(ONEFILE)).toBe(true)
   })
 
-  it('updates a single file with -U while the onedir build is backing off, fetching nothing', async () => {
+  it('checks a single file against the signed list while the onedir build is backing off', async () => {
     mkdirSync(binDir(), { recursive: true })
     writeFileSync(onefile(), ONEFILE)
     writeFileSync(join(binDir(), 'migration-failed'), JSON.stringify({ at: Date.now(), count: 1 }))
@@ -269,8 +289,26 @@ describe('the onedir engine', () => {
     await m.ensureYtdlp()
     h.requested = []
     await m.updateYtdlp(() => false)
-    expect(h.spawned.some((args) => args.includes('-U'))).toBe(true)
-    expect(h.requested).toEqual([])
+    expect(h.spawned.some((args) => args.includes('-U'))).toBe(false)
+    expect(h.requested).toEqual(['SHA2-256SUMS', 'SHA2-256SUMS.sig'])
+
+    const newer = Buffer.from('newer single file '.repeat(80_000))
+    publish(listed(h.signer, { 'yt-dlp_linux': newer }))
+    await m.updateYtdlp(() => false)
+    expect(h.spawned.some((args) => args.includes('-U'))).toBe(false)
+    expect(readFileSync(onefile()).equals(newer)).toBe(true)
+  })
+
+  it('will not replace a single file with one the signed list does not vouch for', async () => {
+    mkdirSync(binDir(), { recursive: true })
+    writeFileSync(onefile(), ONEFILE)
+    writeFileSync(join(binDir(), 'migration-failed'), JSON.stringify({ at: Date.now(), count: 1 }))
+    const m = await fresh()
+    await m.ensureYtdlp()
+    const list = listed(h.signer, { 'yt-dlp_linux': Buffer.from('what the list vouches for') })
+    publish({ ...list, 'yt-dlp_linux': Buffer.from('what is actually served') })
+    await expect(m.updateYtdlp(() => false)).rejects.toThrow(/authenticity check failed/)
+    expect(readFileSync(onefile()).equals(ONEFILE)).toBe(true)
   })
 
   it('does not fetch a newer onedir build every day once one failed to start', async () => {
@@ -310,8 +348,8 @@ describe('the onedir engine', () => {
     await m.ensureYtdlp()
     h.requested = []
     await m.updateYtdlp(() => false)
-    // Already current: the checksum list is all that was fetched.
-    expect(h.requested).toEqual(['SHA2-256SUMS'])
+    // Already current: the checksum list and its signature are all that was fetched.
+    expect(h.requested).toEqual(['SHA2-256SUMS', 'SHA2-256SUMS.sig'])
 
     const next = zipOf({ 'yt-dlp_linux': 'newer onedir engine' })
     publish({
@@ -322,5 +360,116 @@ describe('the onedir engine', () => {
     await m.updateYtdlp(() => false)
     expect(m.ytdlpBinaryPath()).not.toBe(before)
     expect(readFileSync(m.ytdlpBinaryPath(), 'utf-8')).toBe('newer onedir engine')
+  })
+})
+
+describe('a release that cannot be shown to be yt-dlp’s', () => {
+  const EVIL = zipOf({ 'yt-dlp_linux': 'not from yt-dlp' })
+  const LIST = Buffer.from(`${sum(EVIL)}  yt-dlp_linux.zip\n${sum(EVIL)}  yt-dlp_linux\n`)
+  const GENUINE = signDetached(Buffer.from('the list yt-dlp really signed\n'), h.signer)
+
+  /** Everyone who could replace the engine, each with one way of getting it wrong. */
+  const WAYS: [string, Partial<Record<string, Buffer | number>>][] = [
+    ['a list changed after signing', { 'SHA2-256SUMS': LIST, 'SHA2-256SUMS.sig': GENUINE }],
+    ['a signature by another key', { 'SHA2-256SUMS': LIST, 'SHA2-256SUMS.sig': signDetached(LIST, STRANGER) }],
+    ['no signature', { 'SHA2-256SUMS': LIST, 'SHA2-256SUMS.sig': 404 }],
+    ['a page instead of a signature', { 'SHA2-256SUMS': LIST, 'SHA2-256SUMS.sig': Buffer.from('<html>Wi-Fi sign-in</html>') }]
+  ]
+
+  const nothingFetched = (): void => {
+    expect(h.requested).not.toContain('yt-dlp_linux.zip')
+    expect(h.requested).not.toContain('yt-dlp_linux')
+  }
+
+  it.each(WAYS)('refuses a first install over %s, runs nothing and leaves nothing to run', async (_name, release) => {
+    publish(release)
+    const m = await fresh()
+    await expect(m.ensureYtdlp()).rejects.toThrow(/authenticity check failed/)
+    nothingFetched()
+    expect(h.spawned).toEqual([])
+    expect(existsSync(onefile())).toBe(false)
+    expect(existsSync(join(binDir(), 'current.json'))).toBe(false)
+    expect(existsSync(join(binDir(), 'migration-failed'))).toBe(false)
+    expect(m.getYtdlpStatus()).toMatchObject({ state: 'error', message: expect.stringMatching(/authenticity/) })
+  })
+
+  it('offers nothing on a retry either, and installs once the release is good again', async () => {
+    publish(WAYS[0][1])
+    const m = await fresh()
+    await expect(m.ensureYtdlp()).rejects.toThrow(/authenticity/)
+    await expect(m.ensureYtdlp()).rejects.toThrow(/authenticity/)
+    expect(h.spawned).toEqual([])
+    publish()
+    await expect(m.ensureYtdlp()).resolves.toContain('yt-dlp-dist-')
+  })
+
+  it('refuses a zip that is not the one the signed list names, and does not unpack or try the single file', async () => {
+    publish({ 'yt-dlp_linux.zip': EVIL })
+    const m = await fresh()
+    await expect(m.ensureYtdlp()).rejects.toThrow(/authenticity check failed.*checksum/)
+    expect(h.requested).not.toContain('yt-dlp_linux')
+    expect(h.spawned).toEqual([])
+    expect(existsSync(join(binDir(), 'current.json'))).toBe(false)
+  })
+
+  it('stops reading a checksum list that goes on far too long', async () => {
+    publish({ 'SHA2-256SUMS': Buffer.alloc(2 * 1024 * 1024), 'SHA2-256SUMS.sig': GENUINE })
+    const m = await fresh()
+    await expect(m.ensureYtdlp()).rejects.toThrow(/far more than a checksum list/)
+    expect(existsSync(onefile())).toBe(false)
+  })
+
+  it('calls an unreachable signature a connection problem, not a forgery', async () => {
+    publish({ 'SHA2-256SUMS.sig': 503 })
+    const m = await fresh()
+    await expect(m.ensureYtdlp()).rejects.toThrow(/HTTP 503/)
+    expect(existsSync(onefile())).toBe(false)
+  })
+
+  it.each(WAYS)('keeps the working engine when the button meets %s, and says so', async (_name, release) => {
+    const m = await fresh()
+    const active = await m.ensureYtdlp()
+    publish(release)
+    h.requested = []
+    h.spawned = []
+
+    await expect(m.updateYtdlp(() => false)).rejects.toThrow(/authenticity check failed/)
+
+    nothingFetched()
+    expect(m.ytdlpBinaryPath()).toBe(active)
+    expect(readFileSync(active, 'utf-8')).toBe('onedir engine')
+    expect(m.getYtdlpStatus()).toMatchObject({ state: 'ready', version: 'onedir', refused: true })
+    // Not a build that fails here, so the next attempt is not put off for a month.
+    expect(existsSync(join(binDir(), 'migration-failed'))).toBe(false)
+  })
+
+  it('keeps the working engine on the daily refresh, remembers it over a restart, and clears it once a good update lands', async () => {
+    const m = await fresh()
+    const active = await m.ensureYtdlp()
+    publish(WAYS[1][1])
+
+    await m.refreshEngineIfDue(() => false)
+    expect(m.ytdlpBinaryPath()).toBe(active)
+    expect(m.getYtdlpStatus()).toMatchObject({ state: 'ready', refused: true })
+
+    const after = await fresh()
+    await after.ensureYtdlp()
+    expect(after.getYtdlpStatus()).toMatchObject({ state: 'ready', version: 'onedir', refused: true })
+
+    publish()
+    await after.updateYtdlp(() => false)
+    expect(after.getYtdlpStatus().refused).toBeUndefined()
+  })
+
+  it('leaves a working single file in use when its move to onedir is refused', async () => {
+    mkdirSync(binDir(), { recursive: true })
+    writeFileSync(onefile(), ONEFILE)
+    publish(WAYS[2][1])
+    const m = await fresh()
+    await expect(m.ensureYtdlp()).resolves.toBe(onefile())
+    await vi.waitFor(() => expect(m.getYtdlpStatus().refused).toBe(true), { timeout: 8000 })
+    expect(m.ytdlpBinaryPath()).toBe(onefile())
+    expect(readFileSync(onefile()).equals(ONEFILE)).toBe(true)
+    expect(existsSync(join(binDir(), 'migration-failed'))).toBe(false)
   })
 })

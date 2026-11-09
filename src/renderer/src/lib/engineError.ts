@@ -6,6 +6,8 @@ const NO_CONNECTION = /\bHTTP \d{3}\b|net::ERR_|ETIMEDOUT|ENOTFOUND|ECONN|EAI_AG
 /** An engine that is there and will not start: antivirus, and no connection could fix that. */
 const FAILED_TO_START = /failed to start|^spawn\b/i
 const NO_BUILD = /no download engine is published/i
+/** What `EngineTrustError` says: the release could not be shown to be yt-dlp's. No setting or retry here gets round that. */
+const UNTRUSTED = /authenticity check failed/i
 
 /**
  * The sentence for a detect or a search that found no engine to run.
@@ -15,6 +17,7 @@ const NO_BUILD = /no download engine is published/i
  */
 export function engineMissingText(t: TranslateFn, message: string | undefined): string {
   const raw = message ?? ''
+  if (UNTRUSTED.test(raw)) return t('engine.untrusted')
   if (FAILED_TO_START.test(raw)) return t('engine.startFailed')
   if (NO_BUILD.test(raw)) return t('engine.noBuild')
   return t('err.engineMissing')
@@ -23,7 +26,7 @@ export function engineMissingText(t: TranslateFn, message: string | undefined): 
 /** Whether a proxy could be behind this: the engine could not be fetched, rather than run or found for this system. */
 export function proxyMayBeWhy(message: string | undefined, proxy: string | undefined): boolean {
   const raw = message ?? ''
-  return Boolean(proxy?.trim()) && !FAILED_TO_START.test(raw) && !NO_BUILD.test(raw)
+  return Boolean(proxy?.trim()) && !FAILED_TO_START.test(raw) && !NO_BUILD.test(raw) && !UNTRUSTED.test(raw)
 }
 
 /**
@@ -41,6 +44,7 @@ export function engineFailureText(
   proxy?: string
 ): string {
   const raw = message ?? ''
+  if (UNTRUSTED.test(raw)) return t(doing === 'setup' ? 'engine.untrusted' : 'engine.updateRefused')
   if (FAILED_TO_START.test(raw)) return t('engine.startFailed')
   if (NO_BUILD.test(raw)) return t('engine.noBuild')
   if (/waiting after a failed attempt/i.test(raw)) return t('engine.updateWaiting')
