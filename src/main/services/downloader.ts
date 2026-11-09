@@ -39,10 +39,12 @@ import {
   isInsideFolder,
   isMediaName,
   isSidecarName,
+  isLoneEmbed,
   pickOutputStem,
   samePath,
   sectionSuffix,
   shouldTakeOwnName,
+  templateFor,
   variantSuffix,
   waitsForNamesake,
   withNameSuffix
@@ -356,7 +358,18 @@ function emitProgress(progress: DownloadProgress): void {
 
 function forgetProgress(id: string): void {
   progressMarks.delete(id)
+  resumedFigure.delete(id)
 }
+
+/**
+ * Rows showing the figure their last run reached, until this run says its own.
+ *
+ * A resume starts the engine again, so that figure must not act as a floor: a
+ * row paused during a merge would sit at 90% through all of a fresh download.
+ * Zeroing it was worse to look at, though. A row at 72% before a restart read 0%
+ * until the first progress line, which is seconds on a site that has to be asked.
+ */
+const resumedFigure = new Set<string>()
 
 /**
  * The ways to get one audio language at a height, for the front of a selector.
@@ -572,7 +585,7 @@ export function outputTarget(
     const stem = item.outputStem ?? base + sectionSuffix(item.range)
     return { path: join(dir, `${stem}.%(ext)s`), stem }
   }
-  const template = numberedName(settings.filenameTemplate || '%(title)s [%(id)s].%(ext)s', item.playlist)
+  const template = numberedName(templateFor(settings.filenameTemplate || '%(title)s [%(id)s].%(ext)s', item), item.playlist)
   const suffix = variantSuffix(item) + (item.copySuffix ?? '')
   const name = withNameSuffix(template, suffix)
   // The engine's switch only reaches the fields; the spaces in the template itself are ours.
@@ -581,7 +594,20 @@ export function outputTarget(
 
 /** An audio download into a container with no place for cover art. */
 function audioHasNoCover(item: DownloadItem, settings: AppSettings): boolean {
-  return item.mode === 'audio' && ['wav', 'aac'].includes(settings.audioFormat)
+  return item.mode === 'audio' && settings.audioFormat === 'wav'
+}
+
+/**
+ * What to ask the engine for, for a format picked in Settings.
+ *
+ * Its `aac` is a trap, checked on the real engine and ffmpeg: it writes bare ADTS
+ * audio and names the file `.m4a`, which is not what that name promises and which
+ * a good many players refuse. `--embed-metadata` happened to rewrap it properly
+ * when on; a cover on the bare file failed the whole download. Its `m4a` is the
+ * same sound, in the container the name says, so that is what "AAC" gets.
+ */
+export function engineAudioFormat(format: string): string {
+  return format === 'aac' ? 'm4a' : format
 }
 
 /**
@@ -661,6 +687,8 @@ export function buildArgs(
     sharing one name used to cost.
   */
   args.push('-o', outputTarget(item, settings, dir).path)
+  // The file and its tags say what the card said; see `isLoneEmbed`.
+  if (isLoneEmbed(item.extractor)) args.push('--replace-in-metadata', 'title', ' \\(1\\)$', '')
 
   // Progress as machine-readable lines
   args.push(
@@ -683,7 +711,7 @@ export function buildArgs(
   )
 
   if (item.mode === 'audio') {
-    args.push('-f', qualityFormat('audio', item.audioLanguage), '-x', '--audio-format', settings.audioFormat, '--audio-quality', '0')
+    args.push('-f', qualityFormat('audio', item.audioLanguage), '-x', '--audio-format', engineAudioFormat(settings.audioFormat), '--audio-quality', '0')
   } else {
     if (item.formatId && item.formatId !== 'auto') {
       const inLanguage = item.audioLanguage ? `${item.formatId}+ba[language=${item.audioLanguage}]/` : ''
@@ -714,7 +742,7 @@ export function buildArgs(
 
   /*
     Unlike the thumbnail step below, this one is safe on every audio format, wav
-    and aac included: the engine only copies the streams into a new file, and a
+    included: the engine only copies the streams into a new file, and a
     container with no room for a tag drops it. Checked against the real engine and
     both ffmpegs, with Cyrillic titles, long descriptions and chapters.
   */
@@ -723,8 +751,8 @@ export function buildArgs(
   /*
     The engine's thumbnail step takes mp3, mkv, mka, ogg, opus, flac, m4a, mp4, m4v
     and mov, and raises an error on anything else - after the file is finished,
-    so a good .wav or .aac read as a failed download. Those two have nowhere to
-    put a picture, so the step is not asked for.
+    so a good .wav read as a failed download. It has nowhere to put a picture,
+    so the step is not asked for.
   */
   if (settings.embedThumbnail && !audioHasNoCover(item, settings)) args.push('--embed-thumbnail')
   if (settings.embedChapters && item.mode === 'video') args.push('--embed-chapters')
@@ -869,6 +897,8 @@ export function titleFromFile(path: string): string | undefined {
     .replace(/\.f\d[\w-]*$/, '')
     .replace(/ \(\d+\)$/, '')
     .replace(/ \(audio\)$/, '')
+    // A video alone on its page; with nothing detected, its name is all there is to go on.
+    .replace(/ \(1\)( \[[^\]]*-1\])$/, '$1')
   return name.replace(/(^| )\[[^\]]+\]$/, '').trim() || undefined
 }
 
@@ -980,6 +1010,13 @@ function handleProgressLine(line: string, item: DownloadItem): void {
 
   const payload = line.slice(PROGRESS_PREFIX.length)
   const [status, downloaded, total, totalEst, speed, eta, fragIndex, fragCount] = payload.split('\t')
+  /*
+    The engine reports a file it found on disk as one it just fetched. Believed,
+    that started the phase, so the step that files it away put "Processing 90%"
+    on a row about to start over as a copy, for long enough to press Cancel at.
+    Anything really fetched after this still counts: it is only the first word.
+  */
+  if (status === 'finished' && !item.phase && alreadyOnDisk.has(item.id)) return
   const totalBytes = num(total) ?? num(totalEst)
   const downloadedBytes = num(downloaded)
   const fragmentIndex = num(fragIndex)
@@ -1096,6 +1133,7 @@ function handleFfmpegProgress(seconds: number, item: DownloadItem, line: string)
 
 /** The bar is full and no phase is running. */
 function finishProgress(item: DownloadItem): void {
+  resumedFigure.delete(item.id)
   item.percent = 100
   item.phase = undefined
   item.postprocess = undefined
@@ -1129,7 +1167,9 @@ function applyProgress(
   item: DownloadItem,
   input: { phase: 'download' | 'postprocess'; phasePercent?: number }
 ): void {
-  const view = overallProgress({ ...input, previous: item.percent })
+  // The new run's first real figure replaces the last run's: see `resumedFigure`.
+  const replaces = input.phasePercent != null && resumedFigure.delete(item.id)
+  const view = overallProgress({ ...input, previous: replaces ? 0 : item.percent })
   item.phase = input.phase
   item.percent = view.percent
   item.indeterminate = view.indeterminate
@@ -2278,13 +2318,10 @@ export function resumeDownload(id: string): void {
   item.interrupted = false
   // A fresh run decides its own output path; see retryDownload.
   finalPaths.delete(id)
-  /*
-    A resume re-runs the engine from the beginning, so the bar has to go with
-    it. Without this the never-backwards rule pinned it at the figure the
-    previous attempt reached — an item paused during a merge would sit at 90%
-    for the whole of its fresh download.
-  */
+  const figure = item.percent
   resetProgress(item)
+  item.percent = figure
+  if (figure > 0) resumedFigure.add(id)
   emitUpdated(item)
   processQueue()
 }

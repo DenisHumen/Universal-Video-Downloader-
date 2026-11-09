@@ -231,6 +231,26 @@ export function displayName(path: string): string {
 }
 
 /**
+ * Whether this line of the engine's names the file to tell the person about.
+ *
+ * An audio run first fetches a stream it is about to turn into something else,
+ * so "saving as x.mp4" was wrong about what they would get; only the extraction
+ * knows. Any run may also fetch subtitles first, and those are not what is saved.
+ */
+export function namesTheFile(path: string, priority: number, audio: boolean): boolean {
+  if (audio) return priority >= EXTRACTED_PRIORITY
+  return !/\.(vtt|srt|ass|ttml|srv\d|json3|lrc|webp|jpe?g|png)$/i.test(path)
+}
+
+/** What `finalPathCandidate` gives the line from the step that makes the finished file. */
+const EXTRACTED_PRIORITY = 6
+
+/** A subtitle track the engine gave up on: the video goes on without it, and so does the run. */
+export function subtitleMissLine(language: string): string {
+  return `  ! could not fetch the ${language} subtitles; the video itself is fine`
+}
+
+/**
  * Progress while ffmpeg fetches the stream. It reports how much of the video
  * it has, never bytes or a total, and the terminal knows no duration to set
  * that against - so it says the position, which still shows it is moving.

@@ -99,6 +99,7 @@ const api = {
   forgetMissingEntries: (): Promise<number> => ipcRenderer.invoke(IPC.libraryForgetMissing),
   locateLibraryEntry: (id: string, how: 'folder' | 'file'): Promise<LocateResult> =>
     ipcRenderer.invoke(IPC.libraryLocate, id, how),
+  locateRestOfFolder: (): Promise<number> => ipcRenderer.invoke(IPC.libraryLocateRest),
   onLibraryChanged: (cb: () => void) => on<null>(IPC.evtLibraryChanged, () => cb()),
   // Local media jobs (trim / convert)
   startMediaJob: (req: MediaJobRequest): Promise<DownloadItem> =>

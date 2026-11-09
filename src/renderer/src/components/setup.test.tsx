@@ -29,6 +29,8 @@ describe('first-run setup (6.3)', () => {
     // Every choice saves as it is made, so a Skip beside Next would do the same thing.
     expect(within(dialog).queryByRole('button', { name: 'Skip' })).toBeNull()
     expect(within(dialog).getByRole('button', { name: 'Skip Setup' })).toBeTruthy()
+    // Enter goes forward: it used to open a native folder dialog.
+    expect(document.activeElement).toBe(within(dialog).getByRole('button', { name: 'Next' }))
     await act(async () => fireEvent.click(within(dialog).getByRole('button', { name: /Change/ })))
     await waitFor(() => expect(useStore.getState().settings?.downloadDir).toBe('/home/me/Films'))
     await act(async () => fireEvent.click(within(dialog).getByRole('button', { name: 'Next' })))

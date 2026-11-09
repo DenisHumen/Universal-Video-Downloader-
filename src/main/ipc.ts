@@ -7,6 +7,7 @@ import {
   libraryFiles,
   locateFile,
   locateInFolder,
+  movedAlong,
   lookupLinks,
   missingFiles,
   onLibraryChanged,
@@ -25,7 +26,7 @@ import {
   type IpcMainInvokeEvent
 } from 'electron'
 import { access } from 'fs/promises'
-import { dirname } from 'path'
+import { basename, dirname, join } from 'path'
 import { IPC } from '@shared/ipc'
 import type {
   AppSettings,
@@ -241,6 +242,8 @@ export function registerIpc({ getWindow, openSearchWindow, onSettingsChanged }: 
     with it Play and Delete File - at a file the person did not pick.
   */
   let lastLocateFolder: string | undefined
+  /* Where the last find came from and went: what "the others in that folder" means, so the renderer names no path for that either. */
+  let lastMove: { from: string; to: string } | undefined
   ipcMain.handle(IPC.libraryLocate, async (event, id: unknown, how: unknown): Promise<LocateResult> => {
     requireRenderer(event, IPC.libraryLocate)
     const entry = libraryEntry(String(id))
@@ -259,7 +262,24 @@ export function registerIpc({ getWindow, openSearchWindow, onSettingsChanged }: 
     if (result.status === 'found' && getDownload(entry.id)?.filepath === entry.filepath) {
       relocateItem(entry.id, { filepath: result.path })
     }
-    return result
+    if (result.status !== 'found') return result
+    lastMove = { from: dirname(entry.filepath), to: dirname(result.path) }
+    return { ...result, also: (await movedAlong(lastMove.from, lastMove.to)).length }
+  })
+  ipcMain.handle(IPC.libraryLocateRest, async (event): Promise<number> => {
+    requireRenderer(event, IPC.libraryLocateRest)
+    if (!lastMove) return 0
+    const { from, to } = lastMove
+    lastMove = undefined
+    let fixed = 0
+    // Looked for again: the answer the person gave was to a question from a moment ago.
+    for (const entry of await movedAlong(from, to)) {
+      const result = await locateFile(entry.id, join(to, basename(entry.filepath)))
+      if (result.status !== 'found') continue
+      fixed++
+      if (getDownload(entry.id)?.filepath === entry.filepath) relocateItem(entry.id, { filepath: result.path })
+    }
+    return fixed
   })
   ipcMain.handle(IPC.mediaJobStart, (_e, req: MediaJobRequest) => startMediaJob(req))
   ipcMain.handle(IPC.mediaProbe, (_e, path: string) => probeMedia(path))

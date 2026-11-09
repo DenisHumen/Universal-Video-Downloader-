@@ -233,10 +233,17 @@ function item(overrides: Partial<DownloadItem> = {}): DownloadItem {
 }
 
 describe('buildArgs', () => {
-  // The engine's thumbnail step raises an error on these two, after the file is already good.
-  it.each(['wav', 'aac'])('does not ask for a cover on %s', (audioFormat) => {
-    const args = buildArgs(item({ mode: 'audio' }), settings({ audioFormat }), '/downloads')
+  // The engine's thumbnail step raises an error on this, after the file is already good.
+  it('does not ask for a cover on wav', () => {
+    const args = buildArgs(item({ mode: 'audio' }), settings({ audioFormat: 'wav' }), '/downloads')
     expect(args).not.toContain('--embed-thumbnail')
+  })
+
+  // Its "aac" is bare ADTS in a file named .m4a, and a cover on that fails the download. Checked on the real engine.
+  it('asks the engine for an m4a when the setting says AAC, cover and all', () => {
+    const args = buildArgs(item({ mode: 'audio' }), settings({ audioFormat: 'aac' }), '/downloads')
+    expect(args[args.indexOf('--audio-format') + 1]).toBe('m4a')
+    expect(args).toContain('--embed-thumbnail')
   })
 
   it.each(['mp3', 'm4a', 'opus', 'flac'])('asks for a cover on %s', (audioFormat) => {
@@ -425,6 +432,12 @@ describe('titleFromFile', () => {
   it('leaves off what the app itself put on the name', () => {
     expect(titleFromFile(join('d', 'Мой ролик [abc123] (audio).mp3'))).toBe('Мой ролик')
     expect(titleFromFile(join('d', 'Мой ролик [abc123] (2).mp4'))).toBe('Мой ролик')
+  })
+
+  it('leaves off the number the engine gives a video alone on its page', () => {
+    expect(titleFromFile(join('d', 'Страница с видео (1) [page-1].mp4'))).toBe('Страница с видео')
+    // Only that shape: here the title really does end like that.
+    expect(titleFromFile(join('d', 'Часть (1) [abc123].mp4'))).toBe('Часть (1)')
   })
 
   it('has nothing to offer when the name was only an id', () => {

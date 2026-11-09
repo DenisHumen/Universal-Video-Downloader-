@@ -154,7 +154,8 @@ export function resolveSelection(
 
   if (selection.mode === 'audio') {
     const audio = bestAudio(formats)
-    return { ext: audioFormat, bytes: sizeOf(audio) }
+    // The engine's AAC arrives in an .m4a: see `engineAudioFormat`.
+    return { ext: audioFormat === 'aac' ? 'm4a' : audioFormat, bytes: sizeOf(audio) }
   }
 
   const videos = videoFormats(formats)

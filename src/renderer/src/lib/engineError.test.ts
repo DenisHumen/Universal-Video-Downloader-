@@ -1,7 +1,28 @@
 import { describe, expect, it } from 'vitest'
-import { engineFailureText } from './engineError'
+import { engineFailureText, proxyMayBeWhy } from './engineError'
 
 const t = ((key: string) => key) as never
+
+describe('a failure with a proxy set', () => {
+  it('names the proxy when the engine could not be fetched', () => {
+    expect(engineFailureText(t, 'Failed to download yt-dlp (HTTP 407)', 'setup', 'http://192.168.1.10:3128')).toBe('engine.proxyFailed')
+    expect(engineFailureText(t, 'net::ERR_PROXY_CONNECTION_FAILED', 'update', 'http://192.168.1.10:3128')).toBe('engine.proxyFailed')
+    expect(proxyMayBeWhy('net::ERR_PROXY_CONNECTION_FAILED', 'http://192.168.1.10:3128')).toBe(true)
+  })
+
+  it('reads the system refusing to run the file as the engine not starting', () => {
+    expect(engineFailureText(t, 'spawn UNKNOWN', 'setup')).toBe('engine.startFailed')
+    expect(proxyMayBeWhy('spawn EPERM', 'http://192.168.1.10:3128')).toBe(false)
+  })
+
+  it('does not blame it for what no proxy could cause, or when there is none', () => {
+    expect(engineFailureText(t, 'yt-dlp failed to start', 'setup', 'http://192.168.1.10:3128')).toBe('engine.startFailed')
+    expect(proxyMayBeWhy('yt-dlp failed to start', 'http://192.168.1.10:3128')).toBe(false)
+    expect(proxyMayBeWhy('No download engine is published for this system.', 'http://192.168.1.10:3128')).toBe(false)
+    expect(proxyMayBeWhy('Failed to download yt-dlp (HTTP 407)', '  ')).toBe(false)
+    expect(engineFailureText(t, 'Failed to download yt-dlp (HTTP 407)', 'setup', '')).toBe('engine.setupFailed')
+  })
+})
 
 describe('engineFailureText', () => {
   // What ytdlp.ts throws, word for word.

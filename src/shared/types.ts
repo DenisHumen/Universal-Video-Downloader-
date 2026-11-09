@@ -184,6 +184,8 @@ export type AppErrorCode =
   | 'unsupportedPlayer'
   | 'notOnYummyAnime'
   | 'engineMissing'
+  /** The same, with a proxy set: that is the first thing to look at. */
+  | 'engineProxy'
   | 'adultHidden'
   /** A queued page that needs its stream picked on Home: a series player or a listing. */
   | 'needsPicker'

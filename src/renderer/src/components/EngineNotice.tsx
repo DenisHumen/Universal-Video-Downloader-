@@ -1,8 +1,8 @@
 import { useState } from 'react'
-import { Loader2, RefreshCw } from '../ui/icons'
+import { Globe, Loader2, RefreshCw } from '../ui/icons'
 import { useStore } from '../store'
 import { useT } from '../i18n'
-import { engineFailureText } from '../lib/engineError'
+import { engineFailureText, proxyMayBeWhy } from '../lib/engineError'
 
 /**
  * What is happening to the download engine, on the rare occasions it matters.
@@ -26,6 +26,8 @@ import { engineFailureText } from '../lib/engineError'
 export default function EngineNotice(): JSX.Element | null {
   const t = useT()
   const ytdlp = useStore((s) => s.ytdlp)
+  const proxy = useStore((s) => s.settings?.proxy)
+  const openSettings = useStore((s) => s.openSettings)
   const [retrying, setRetrying] = useState(false)
 
   const downloading = ytdlp.state === 'downloading'
@@ -53,7 +55,7 @@ export default function EngineNotice(): JSX.Element | null {
         <div className="min-w-0 flex-1">
           {/* The system's own words stay on hover: they help a report, not the person reading this. */}
           <p className="text-body font-medium text-ink" title={failed ? ytdlp.message : undefined}>
-            {failed ? engineFailureText(t, ytdlp.message, 'setup') : t('engine.setupTitle')}
+            {failed ? engineFailureText(t, ytdlp.message, 'setup', proxy) : t('engine.setupTitle')}
           </p>
           {failed ? null : (
             <div className="mt-1.5 flex items-center gap-3">
@@ -79,10 +81,17 @@ export default function EngineNotice(): JSX.Element | null {
         </div>
 
         {failed ? (
-          <button className="btn-solid shrink-0 px-3 py-2" onClick={retry} disabled={retrying}>
-            {retrying ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
-            {t('common.retry')}
-          </button>
+          <>
+            {proxyMayBeWhy(ytdlp.message, proxy) && (
+              <button type="button" className="btn-quiet shrink-0" onClick={() => openSettings('network')}>
+                <Globe size={14} /> {t('fix.proxy')}
+              </button>
+            )}
+            <button className="btn-solid shrink-0 px-3 py-2" onClick={retry} disabled={retrying}>
+              {retrying ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
+              {t('common.retry')}
+            </button>
+          </>
         ) : (
           <span className="mono hidden shrink-0 text-meta text-ink-3 sm:inline">
             {t('engine.setupOnce')}

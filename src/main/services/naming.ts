@@ -69,6 +69,52 @@ export function variantSuffix(item: Pick<DownloadItem, 'range' | 'audioLanguage'
   return sectionSuffix(item.range) + (item.audioLanguage ? LANGUAGE_FIELD : '') + (item.mode === 'audio' ? AUDIO_NAME : '')
 }
 
+/** The id as the default template writes it. */
+const ID_FIELD = ' [%(id)s]'
+
+/**
+ * Whether the engine's id for this link would only repeat the title.
+ *
+ * For a plain file on a site it knows nothing about, both are the file's own
+ * name, and the default template made that `big [big].mp4`. Decided from what
+ * the row knows: its title, or, for a link queued without a detect, that the
+ * address ends in a media file.
+ */
+export function idRepeatsTitle(item: Pick<DownloadItem, 'url' | 'title'>): boolean {
+  let file: string
+  try {
+    const { protocol, pathname } = new URL(item.url)
+    if (!/^https?:$/.test(protocol)) return false
+    file = decodeURIComponent(pathname.split('/').pop() ?? '')
+  } catch {
+    return false
+  }
+  const title = item.title?.trim()
+  if (title && !/^https?:\/\//i.test(title)) return file.replace(/\.[^.]+$/, '') === title
+  return /\.(mp4|m4v|webm|mkv|mov|mp3|m4a|ogg|opus|flac|wav)$/i.test(file)
+}
+
+/** The filename template for this row: the same, less an id that says nothing. */
+export function templateFor(template: string, item: Pick<DownloadItem, 'url' | 'title'>): string {
+  return idRepeatsTitle(item) ? template.replace(ID_FIELD, '') : template
+}
+
+/**
+ * A video alone on its page.
+ *
+ * The engine names it "Page title (1)", id `page-1`: its numbering for a page of
+ * several, applied to a page of one. A page of several comes back as a playlist
+ * under another extractor's name, so this one means a single video.
+ */
+export function isLoneEmbed(extractor: string | undefined): boolean {
+  return /^html5mediaembed$/i.test(extractor ?? '')
+}
+
+/** The title, without the number the engine gives a video alone on its page. */
+export function withoutEmbedNumber(title: string, extractor: string | undefined): string {
+  return isLoneEmbed(extractor) ? title.replace(/ \(1\)$/, '') : title
+}
+
 const EXT_FIELD = /\.%\(ext\)s$/
 
 /**

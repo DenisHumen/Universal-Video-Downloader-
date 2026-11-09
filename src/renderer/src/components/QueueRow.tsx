@@ -24,7 +24,7 @@ import { useStore } from '../store'
 import { formatBytes, formatEta, formatSpeed, splitPath } from '../lib/format'
 import { errorReport, errorText } from '../lib/errors'
 import { useI18n, useT } from '../i18n'
-import { languageName } from '../lib/languages'
+import { languageInSentence } from '../lib/languages'
 import { STATE_META } from '../lib/states'
 import { toast } from '../lib/toast'
 import { showFile } from '../lib/showFile'
@@ -568,7 +568,7 @@ function QueueRow({ item, index, animateIn = true, heading }: Props): JSX.Elemen
           {item.state === 'completed' && Boolean(item.subtitlesMissed?.length) && (
             <p className="mt-1 line-clamp-2 break-words text-meta text-ink-2">
               {t('queue.subtitlesMissed', {
-                languages: item.subtitlesMissed!.map((code) => languageName(code, locale, t)).join(', ')
+                languages: item.subtitlesMissed!.map((code) => languageInSentence(code, locale, t)).join(', ')
               })}
             </p>
           )}
@@ -626,9 +626,14 @@ function QueueRow({ item, index, animateIn = true, heading }: Props): JSX.Elemen
       {confirmCancel && (running || item.state === 'paused') && (
         <ConfirmDialog
           title={t('queue.cancelConfirm')}
-          body={t('queue.cancelBody', {
-            amount: item.percent > 0 ? `${Math.round(item.percent)}%` : formatBytes(item.downloadedBytes)
-          })}
+          body={
+            // The row can start over under an open dialog, and then there is no figure to name.
+            Math.round(item.percent) > 0 || item.downloadedBytes
+              ? t('queue.cancelBody', {
+                  amount: Math.round(item.percent) > 0 ? `${Math.round(item.percent)}%` : formatBytes(item.downloadedBytes)
+                })
+              : t('queue.cancelBodyNoFigure')
+          }
           confirmLabel={t('queue.cancelButton')}
           onConfirm={() => {
             setConfirmCancel(false)

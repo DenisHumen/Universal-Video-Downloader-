@@ -17,7 +17,7 @@ import {
   POSTPROCESS_PREFIX,
   PROGRESS_PREFIX
 } from '../services/downloader'
-import { classifyYtdlpError, hasCookies, refusesMidStreamInit, withPostprocessHeading } from '../services/options'
+import { classifyYtdlpError, hasCookies, refusesMidStreamInit, subtitleMissIn, withPostprocessHeading } from '../services/options'
 import { siteOf } from '../services/log-fields'
 import { isMediaName, isSidecarName } from '../services/naming'
 import { killTree } from '../services/process'
@@ -30,10 +30,12 @@ import {
   downloadChoice,
   ffmpegProgressLine,
   displayName,
+  namesTheFile,
   parseCliArgs,
   parseProgress,
   postprocessLine,
   progressLine,
+  subtitleMissLine,
   USAGE,
   type CliChoice,
   type CliOptions
@@ -149,7 +151,11 @@ async function run(options: CliOptions): Promise<number> {
     await ensureYtdlp()
   } catch (error) {
     say(`✗ Could not set up the download engine: ${error instanceof Error ? error.message : String(error)}`)
-    say('  Check the connection, or open Universal Video Downloader once and let it finish setting up.')
+    say(
+      settings.proxy.trim()
+        ? '  A proxy is set: check it, or turn it off in the app\'s settings, and try again.'
+        : '  Check the connection, or open Universal Video Downloader once and let it finish setting up.'
+    )
     return 1
   }
 
@@ -236,6 +242,7 @@ function runEngine(item: DownloadItem, settings: AppSettings, dir: string): Prom
     live = child
     let finalPath: { path: string; priority: number; alreadyDownloaded: boolean } | undefined
     let announced = false
+    const saidMissing = new Set<string>()
     let stderrTail = ''
     // SponsorBlock's lookup is a post-processor too, and runs before anything is fetched.
     let fetched = false
@@ -259,7 +266,7 @@ function runEngine(item: DownloadItem, settings: AppSettings, dir: string): Prom
         // A subtitle file never takes over from a video, as in the window's queue.
         const outranked = finalPath && isMediaName(finalPath.path) && found && !isMediaName(found.path)
         if (found && (!finalPath || (found.priority >= finalPath.priority && !outranked))) finalPath = found
-        if (found && !announced) {
+        if (found && !announced && namesTheFile(found.path, found.priority, item.mode === 'audio')) {
           announced = true
           say(`  saving as ${displayName(found.path)}`)
         }
@@ -269,6 +276,11 @@ function runEngine(item: DownloadItem, settings: AppSettings, dir: string): Prom
       // ffmpeg fetching an HLS stream says how far it has got here, and nowhere else.
       const seconds = ffmpegProgressSeconds(line)
       if (seconds != null) return status(ffmpegProgressLine(seconds))
+      const missed = subtitleMissIn(line)
+      if (missed && !saidMissing.has(missed)) {
+        saidMissing.add(missed)
+        say(subtitleMissLine(missed))
+      }
       stderrTail = (stderrTail + line + '\n').slice(-4000)
     })
     child.stdout?.on('data', (chunk: Buffer) => stdout.push(chunk))

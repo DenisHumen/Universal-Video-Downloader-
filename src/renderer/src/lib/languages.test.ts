@@ -1,10 +1,21 @@
 import { describe, expect, it } from 'vitest'
 import type { VideoFormat } from '@shared/types'
 import type { TranslateFn } from '../i18n'
-import { audioLanguages, languageName, subtitleChoices } from './languages'
+import { audioLanguages, languageInSentence, languageName, subtitleChoices } from './languages'
 
 const t = ((key: string, params?: { language?: string }) =>
   key === 'lang.original' ? `${params?.language} (original)` : `${params?.language} (described)`) as TranslateFn
+
+describe('languageInSentence', () => {
+  it('stays in lower case where the language does', () => {
+    expect(languageInSentence('de', 'ru', t)).toBe('немецкий')
+    expect(languageInSentence('en-orig', 'ru', t)).toBe('английский (original)')
+  })
+
+  it('keeps the capital English always gives a language', () => {
+    expect(languageInSentence('de', 'en', t)).toBe('German')
+  })
+})
 
 describe('languageName', () => {
   it('says a code the way a person would', () => {

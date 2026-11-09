@@ -57,6 +57,11 @@ export function formatSpeed(bytesPerSecond?: number, language: Language = active
   return `${formatBytes(bytesPerSecond, language)}${translate(language, 'speed.perSecond')}`
 }
 
+/** An audio format as Settings and the card offer it. AAC arrives in an .m4a, and a name should not promise otherwise. */
+export function audioFormatLabel(format: string): string {
+  return format === 'aac' ? 'AAC (.m4a)' : format.toUpperCase()
+}
+
 export function formatDuration(seconds?: number): string {
   if (seconds == null || !Number.isFinite(seconds) || seconds < 0) return ''
   const s = Math.floor(seconds % 60)

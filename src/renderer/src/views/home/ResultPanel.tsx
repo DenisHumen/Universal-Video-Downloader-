@@ -6,7 +6,7 @@ import { errorReport, errorText } from '../../lib/errors'
 import { fixFor } from '../../lib/fixes'
 import FixBar from '../../components/FixBar'
 import HelpLink from '../../components/HelpLink'
-import { errorCardLead } from '../../lib/emphasis'
+import { browserCanHelp, errorCardLead } from '../../lib/emphasis'
 import { toast } from '../../lib/toast'
 import { Menu, type MenuItem } from '../../ui'
 import { useT } from '../../i18n'
@@ -140,7 +140,7 @@ function ErrorCard({
   // Everything that is not the one button, so a beginner has one thing to press.
   const others: MenuItem[] = [
     ...(lead === 'retry' ? [] : [{ label: t('common.retry'), onSelect: onRetry }]),
-    ...(lead === 'browser' || fix === 'browser' ? [] : [{ label: t('browser.open'), onSelect: openBrowser }]),
+    ...(lead === 'browser' || fix === 'browser' || !browserCanHelp(errorCode) ? [] : [{ label: t('browser.open'), onSelect: openBrowser }]),
     ...(lead === 'retry' && fix === 'proxy' ? [{ label: t('fix.proxy'), onSelect: () => openSettings('network') }] : []),
     {
       label: t('fix.copyError'),

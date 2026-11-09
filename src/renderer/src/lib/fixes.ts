@@ -43,6 +43,7 @@ const BY_CODE: Partial<Record<AppErrorCode, FixKind>> = {
   geo: 'proxy',
   network: 'proxy',
   timeout: 'proxy',
+  engineProxy: 'proxy',
   rateLimited: 'retryLater',
   serverError: 'retryLater',
   upcoming: 'waitForVideo'

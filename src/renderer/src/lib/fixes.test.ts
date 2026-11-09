@@ -26,6 +26,8 @@ describe('fix buttons (6.2): the error code decides the fix', () => {
     ['rateLimited', 'retryLater'],
     ['network', 'proxy'],
     ['timeout', 'proxy'],
+    ['engineProxy', 'proxy'],
+    ['engineMissing', null],
     ['upcoming', 'waitForVideo'],
     ['drm', null]
   ]

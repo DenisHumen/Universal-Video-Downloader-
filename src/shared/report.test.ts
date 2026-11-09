@@ -82,7 +82,11 @@ describe('isReportable', () => {
     'sourceMissing',
     'siteBotCheck',
     'noStream',
-    'premiumOnly'
+    'premiumOnly',
+    'forbidden',
+    'noAudioTrack',
+    'damagedSource',
+    'engineProxy'
   ]
   const asks: AppErrorCode[] = [
     'playerChanged',
@@ -90,12 +94,9 @@ describe('isReportable', () => {
     'emptyPage',
     'postprocess',
     'cutFailed',
-    'damagedSource',
     'streamGone',
     'corruptLink',
-    'forbidden',
     'unknownEncoder',
-    'noAudioTrack',
     'ffmpegMissing'
   ]
 

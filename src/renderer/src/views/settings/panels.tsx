@@ -15,6 +15,7 @@ import {
 } from '@shared/types'
 import type { BackupError, ImportCounts } from '@shared/backup'
 import { useStore } from '../../store'
+import { audioFormatLabel } from '../../lib/format'
 import { useT, useTp, type TranslationKey } from '../../i18n'
 import { toast } from '../../lib/toast'
 import { describeCliCommand } from '../../lib/cliCommand'
@@ -198,7 +199,7 @@ export function DownloadsPanel({ settings, set }: PanelProps): JSX.Element {
           subtitle={t('settings.audioFormatHint')}
           value={settings.audioFormat}
           onChange={(v) => set('audioFormat', v)}
-          options={['mp3', 'm4a', 'opus', 'flac', 'wav', 'aac'].map((f) => ({ value: f, label: f.toUpperCase() }))}
+          options={['mp3', 'm4a', 'opus', 'flac', 'wav', 'aac'].map((f) => ({ value: f, label: audioFormatLabel(f) }))}
         />
       </PreferencesGroup>
 
@@ -805,6 +806,7 @@ export function UpdatesPage({ settings, set }: PanelProps): JSX.Element {
   const appInfo = useStore((s) => s.appInfo)
   const update = useStore((s) => s.update)
   const ytdlp = useStore((s) => s.ytdlp)
+  const proxy = useStore((s) => s.settings?.proxy)
   const [checking, setChecking] = useState(false)
   const [updatingEngine, setUpdatingEngine] = useState(false)
   const status =
@@ -869,7 +871,7 @@ export function UpdatesPage({ settings, set }: PanelProps): JSX.Element {
               {ytdlp.version
                 ? `yt-dlp ${ytdlp.version}`
                 : ytdlp.state === 'error'
-                  ? engineFailureText(t, ytdlp.message, 'setup')
+                  ? engineFailureText(t, ytdlp.message, 'setup', proxy)
                   : 'yt-dlp'}
             </span>
           }
@@ -883,7 +885,7 @@ export function UpdatesPage({ settings, set }: PanelProps): JSX.Element {
                   const res = await window.api.updateYtdlp()
                   if (res.ok) toast(t('settings.engineUpdated'), 'success')
                   // Main refuses to swap the binary out from under a running transfer.
-                  else toast(res.code === 'engineBusy' ? t('err.engineBusy') : engineFailureText(t, res.error, 'update'), 'error')
+                  else toast(res.code === 'engineBusy' ? t('err.engineBusy') : engineFailureText(t, res.error, 'update', proxy), 'error')
                 } catch {
                   toast(t('settings.engineFailed'), 'error')
                 } finally {
