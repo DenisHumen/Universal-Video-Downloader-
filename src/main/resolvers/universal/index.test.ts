@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { describeNetError, REQUEST_TIMED_OUT } from '../neterror'
-import { resolveUniversal } from './index'
+import { resolveSniffUrl, resolveUniversal, sniffUrlFor } from './index'
 
 /*
   Both strategies are stand-ins: the scrape so a test can say how the page
@@ -25,6 +25,23 @@ beforeEach(() => {
   loaded the same address over the same network and waited out its whole
   timeout to fail the same way - and then the user was told nothing useful.
 */
+describe('a queued uvd-sniff:// link', () => {
+  it.each(['file:///C:/Windows/win.ini', 'javascript:alert(1)', '-o', 'data:text/html,x', ''])(
+    'opens nothing for a page address of %s',
+    async (page) => {
+      await expect(resolveSniffUrl(sniffUrlFor(page))).rejects.toThrow(/corrupted/)
+      expect(scrapeStatic).not.toHaveBeenCalled()
+      expect(sniffPage).not.toHaveBeenCalled()
+    }
+  )
+
+  it('goes on to look at a web page', async () => {
+    scrapeStatic.mockResolvedValue({ candidates: [] })
+    await expect(resolveSniffUrl(sniffUrlFor(PAGE))).rejects.toThrow(/any more/)
+    expect(scrapeStatic).toHaveBeenCalled()
+  })
+})
+
 describe('resolveUniversal, when the page cannot be reached', () => {
   it('never opens the browser for a host that does not resolve', async () => {
     scrapeStatic.mockRejectedValue(describeNetError(new Error('net::ERR_NAME_NOT_RESOLVED'), PAGE))

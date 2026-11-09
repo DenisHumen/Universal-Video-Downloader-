@@ -237,6 +237,8 @@ export async function kodikGetM3u8(
   referer: string
 ): Promise<string> {
   const url = playerUrl.startsWith('//') ? 'https:' + playerUrl : playerUrl
+  // From a `uvd-kodik://` or `uvd-yummy://` payload, which anyone can write.
+  if (!/^https?:\/\//i.test(url)) throw new Error('This download link is corrupted — pick the video again.')
   const html = await fetchText(url, { Referer: referer })
   return (await streamFrom(url, html, episode, requested)).url
 }

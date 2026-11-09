@@ -150,6 +150,12 @@ export async function resolveSniffUrl(
   options: ResolveOptions = {}
 ): Promise<ResolvedUrl> {
   const pageUrl = pageUrlFromSniffUrl(uvdUrl)
+  /*
+    Decoded, and nothing says this app wrote it: as with `uvd-direct://`, a link is
+    only base64 anyone can produce, and the hidden browser would open a `file://`
+    page from it with the site's cookies beside it.
+  */
+  if (!/^https?:\/\//i.test(pageUrl)) throw new Error('This download link is corrupted — pick the video again.')
   const resolved = await resolveUniversal(pageUrl, { ...options, needStream: true })
   if (!resolved) {
     throw new Error('Could not find a video stream on this page any more.')

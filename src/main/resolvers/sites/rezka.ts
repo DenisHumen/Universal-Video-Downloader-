@@ -309,6 +309,8 @@ export function rezkaEpisodeUrl(
 export async function resolveRezkaStream(uvdUrl: string): Promise<ResolvedUrl> {
   const rest = uvdUrl.replace(/^uvd-rezka:\/\//, '')
   const [host, id, translatorId, season, episode, quality] = rest.split('/')
+  // Goes straight after `https://`, and anyone can write this address: `user@elsewhere` is another host.
+  if (!/^[\w.-]+(?::\d+)?$/.test(host ?? '')) throw new Error('This download link is corrupted — pick the video again.')
   const isMovie = season === 'movie'
   const streams = await getStreams(host, id, translatorId, isMovie ? '' : season, isMovie ? '' : episode)
   const chosen = pickQuality(streams, decodeURIComponent(quality || 'best'))
