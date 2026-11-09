@@ -47,8 +47,8 @@ const MAIN_MUST_SAY = [
 /** Only React's runtime has these. The dictionaries are plain data and must stay that way. */
 const REACT_RUNTIME = /react\.(transitional\.)?element|__SECRET_INTERNALS_DO_NOT_USE|__CLIENT_INTERNALS_DO_NOT_USE/
 
-/** Today's size plus a little: 10 MB. Growing past this is worth a look and a change here. */
-export const ASAR_BUDGET = 14 * 1024 * 1024
+/** 5.8 MB in 4.5.0, plus room. Growing past this is worth a look and a change here. */
+export const ASAR_BUDGET = 8 * 1024 * 1024
 
 /**
  * @param {string[]} entries the archive's files, with forward slashes and no leading slash
