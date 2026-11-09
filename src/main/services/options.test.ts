@@ -712,6 +712,8 @@ describe('classifyYtdlpError, reading the engine and not the file name', () => {
     expect(code('ERROR: unable to download video data: HTTP Error 503: Service Unavailable')).toBe('serverError')
     expect(code('spawn UNKNOWN')).toBe('engineBlocked')
     expect(code('spawn EPERM')).toBe('engineBlocked')
+    // No file to run: the install failed, and antivirus is the wrong thing to blame.
+    expect(code('spawn C:\\Temp\\yt-dlp.exe ENOENT')).toBe('engineMissing')
     expect(code('yt-dlp exited with code 3221225781')).toBe('engineBlocked')
   })
 

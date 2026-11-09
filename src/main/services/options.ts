@@ -140,6 +140,16 @@ const RULES: Rule[] = [
     Ahead of the permission rule, which took `spawn EPERM` for the download
     folder and offered another folder, which could not help.
   */
+  /*
+    No file to run. The app tries to install the engine before every run, so what
+    this means is that the install failed, and the row told people to look at their
+    antivirus while GitHub was answering 504.
+  */
+  {
+    re: /^spawn\b.*\benoent\b/,
+    code: 'engineMissing',
+    message: 'The download engine could not be installed. Check your connection and try again.'
+  },
   {
     re: /^spawn\b|failed to load python dll|\[pyi-|yt-dlp exited with code (?:32|42)\d{8}/,
     code: 'engineBlocked',

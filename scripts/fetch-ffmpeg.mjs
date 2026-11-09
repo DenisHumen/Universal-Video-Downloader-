@@ -35,7 +35,7 @@ import {
   rmSync,
   writeFileSync
 } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { homedir, tmpdir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { inflateRawSync } from 'node:zlib'
@@ -163,6 +163,55 @@ function arg(name) {
   return hit?.slice(name.length + 3)
 }
 
+/** The kept copy of this exact archive, if a run left one that still matches its pin. */
+function keptArchive(pin) {
+  const file = join(homedir(), '.cache', 'uvd-ffmpeg', pin.sha256)
+  try {
+    const bytes = readFileSync(file)
+    return createHash('sha256').update(bytes).digest('hex') === pin.sha256 ? bytes : undefined
+  } catch {
+    return undefined
+  }
+}
+
+/**
+ * Fetch with room for a bad few minutes: GitHub's release files answer 504 for
+ * no reason of ours, and one such answer used to fail the whole job. The pin's
+ * checksum is what makes a kept copy as good as a new one.
+ */
+async function pinnedArchive(pin) {
+  const kept = keptArchive(pin)
+  if (kept) {
+    console.log('  using the copy kept from an earlier run')
+    return kept
+  }
+  let last
+  for (let attempt = 1; attempt <= 6; attempt++) {
+    try {
+      const response = await fetch(pin.url, { redirect: 'follow' })
+      if (response.ok) {
+        const bytes = Buffer.from(await response.arrayBuffer())
+        if (createHash('sha256').update(bytes).digest('hex') === pin.sha256) {
+          const dir = join(homedir(), '.cache', 'uvd-ffmpeg')
+          mkdirSync(dir, { recursive: true })
+          writeFileSync(join(dir, pin.sha256), bytes)
+        }
+        return bytes
+      }
+      last = `HTTP ${response.status}`
+      // Only a server having trouble is worth waiting for: a 404 is a wrong pin.
+      if (response.status < 500 && response.status !== 429) break
+    } catch (err) {
+      last = String(err)
+    }
+    if (attempt < 6) {
+      console.log(`  ${last}; trying again in ${attempt * 20} s`)
+      await new Promise((r) => setTimeout(r, attempt * 20_000))
+    }
+  }
+  throw new Error(`download failed: ${last}`)
+}
+
 async function main() {
   const target = arg('target') ?? `${process.platform}-${process.arch}`
   const pin = PINNED[target]
@@ -177,9 +226,7 @@ async function main() {
   const dest = join(outDir, pin.bin)
 
   console.log(`ffmpeg ${VERSION} for ${target}: ${pin.url}`)
-  const response = await fetch(pin.url, { redirect: 'follow' })
-  if (!response.ok) throw new Error(`download failed: HTTP ${response.status}`)
-  const archive = Buffer.from(await response.arrayBuffer())
+  const archive = await pinnedArchive(pin)
 
   const digest = createHash('sha256').update(archive).digest('hex')
   if (digest !== pin.sha256) {

@@ -148,6 +148,20 @@ jobs:
       - name: Install dependencies
         run: npm ci --ignore-scripts && npm rebuild esbuild sharp
 
+      # GitHub serves its release files from a service that fails on its own
+      # (hours of 504s while the status page says all is well). Tests pass and the
+      # release stops, for files that have not changed: so both are kept here.
+      - name: Keep the Electron and ffmpeg downloads between runs
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/electron
+            ~/Library/Caches/electron
+            ~/AppData/Local/electron/Cache
+            ~/.cache/uvd-ffmpeg
+          key: release-files-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('package-lock.json', 'scripts/ffmpeg-pins.mjs') }}
+          restore-keys: release-files-${{ runner.os }}-${{ runner.arch }}-
+
       # ffmpeg-static stops at 6.1.1, which cannot seek into fragmented-MP4 HLS
       # (every trimmed Twitch VOD came out empty). Pinned by URL and SHA-256,
       # refused if FFmpeg marks the build nonfree, and written with the README
