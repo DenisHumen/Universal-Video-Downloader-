@@ -934,6 +934,7 @@ export const en = {
   'main.smb.fileOpen': 'That file is open on the server, so it cannot be replaced right now.',
   'main.smb.deleting': 'The server is still deleting an earlier copy of that file.',
   'main.smb.unreachable': 'The share could not be reached.',
+  'main.smb.otherServer': 'Enter the password again to use it with another server.',
   'main.smb.noServer': 'Could not reach {host}. Is it on, and on this network?',
   'main.smb.refused': 'The server refused the request (0x{code}).',
   'main.smb.connectedNew': 'Connected. {folder} does not exist yet, and will be created.',

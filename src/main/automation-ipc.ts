@@ -1,5 +1,6 @@
 import { existsSync } from 'fs'
-import { dialog, ipcMain, BrowserWindow } from 'electron'
+import { dialog, BrowserWindow } from 'electron'
+import { guardedIpc as ipcMain } from './services/ipc-guard'
 import { randomUUID } from 'crypto'
 import { IPC } from '@shared/ipc'
 import { describeSeries } from './services/automation/detect'
@@ -81,6 +82,25 @@ function broadcast(): void {
   for (const win of BrowserWindow.getAllWindows()) {
     if (!win.isDestroyed()) win.webContents.send(IPC.evtAutoChanged)
   }
+}
+
+/**
+ * Which server may be sent which password, for the buttons that try a share.
+ *
+ * A password typed in the form goes where the form says. The stored one goes only
+ * to the server it was stored for: the window names the target, and "this id, on
+ * that host" handed the saved password to whatever host it named. Everything else
+ * in the form stays as typed, so a changed folder can be tried before it is saved.
+ */
+async function shareLogin(target: SmbTarget, password: string): Promise<{ to: SmbTarget; secret: string }> {
+  if (password) return { to: target, secret: password }
+  const stored = getSettings().smbTargets.find((t) => t.id === target?.id)
+  if (!stored) return { to: target, secret: '' }
+  const server = (t: SmbTarget): string => normaliseSmbTarget(t).host.toLowerCase()
+  if (server(target) !== server(stored)) {
+    throw new Error('Enter the password again to use it with another server.')
+  }
+  return { to: { ...target, host: stored.host }, secret: (await getSecretWhenReady(SECRET.smbPassword(stored.id))) ?? '' }
 }
 
 export function registerAutomationIpc(): void {
@@ -189,8 +209,8 @@ export function registerAutomationIpc(): void {
   ipcMain.handle(
     IPC.autoTestSmb,
     async (_e, target: SmbTarget, password: string): Promise<string> => {
-      const secret = password || (await getSecretWhenReady(SECRET.smbPassword(target.id))) || ''
-      return testTarget(target, secret)
+      const { to, secret } = await shareLogin(target, password)
+      return testTarget(to, secret)
     }
   )
 
@@ -201,8 +221,8 @@ export function registerAutomationIpc(): void {
   ipcMain.handle(
     IPC.autoListShareFolders,
     async (_e, target: SmbTarget, password: string, folder: string): Promise<string[]> => {
-      const secret = password || (await getSecretWhenReady(SECRET.smbPassword(target.id))) || ''
-      return listSmbFolders(target, secret, String(folder ?? ''))
+      const { to, secret } = await shareLogin(target, password)
+      return listSmbFolders(to, secret, String(folder ?? ''))
     }
   )
 
@@ -242,8 +262,8 @@ export function registerAutomationIpc(): void {
   ipcMain.handle(
     IPC.autoCreateShareFolder,
     async (_e, target: SmbTarget, password: string, parent: string, name: string): Promise<string> => {
-      const secret = password || (await getSecretWhenReady(SECRET.smbPassword(target.id))) || ''
-      return createSmbFolder(target, secret, String(parent ?? ''), String(name ?? ''))
+      const { to, secret } = await shareLogin(target, password)
+      return createSmbFolder(to, secret, String(parent ?? ''), String(name ?? ''))
     }
   )
 
