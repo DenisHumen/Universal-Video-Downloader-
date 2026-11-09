@@ -152,6 +152,10 @@ export function desktopEntryProblems(text, executable) {
     problems.push(`Icon is "${entry.get('Icon') ?? ''}", not "${executable}"`)
   if (entry.get('StartupWMClass') !== executable)
     problems.push(`StartupWMClass is "${entry.get('StartupWMClass') ?? ''}", not "${executable}"`)
+  // What sends a link from the browser here: the scheme it answers to, and where the link goes.
+  if (!(entry.get('MimeType') ?? '').split(';').includes('x-scheme-handler/uvd'))
+    problems.push('MimeType leaves out x-scheme-handler/uvd, so uvd: links do not reach the app')
+  if (!/ %U$/.test(entry.get('Exec') ?? '')) problems.push('Exec does not end in %U, so a link never arrives')
   const categories = entry.get('Categories') ?? ''
   if (!categories.endsWith(';')) problems.push('Categories does not end with ";"')
   if (!categories.split(';').includes('AudioVideo'))

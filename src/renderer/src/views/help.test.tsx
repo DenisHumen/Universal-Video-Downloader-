@@ -9,6 +9,7 @@ import { ru } from '../i18n/ru'
 import { useI18n, type TranslationKey } from '../i18n'
 import { helpForError, helpPlain, helpReferences, HELP_TOPICS } from '../lib/help'
 import { installMockApi } from '../lib/mockApi'
+import { BOOKMARKLET } from '@shared/sent-link'
 import { NAV_ALL } from '../shell/nav'
 import { useStore } from '../store'
 import { formatRoute, parseRoute, PANELS, SUBPAGES } from './settings/router'
@@ -74,8 +75,8 @@ describe('what help names', () => {
 describe('where help sends you', () => {
   const actions = HELP_TOPICS.flatMap((h) => h.actions.map((a) => [h.id, a] as const))
 
-  it('has the eight topics, each with a way to go there', () => {
-    expect(HELP_TOPICS.map((h) => h.id)).toEqual(['download', 'whereFile', 'signIn', 'newEpisodes', 'browser', 'cookies', 'failed', 'report'])
+  it('has the nine topics, each with a way to go there', () => {
+    expect(HELP_TOPICS.map((h) => h.id)).toEqual(['download', 'whereFile', 'signIn', 'newEpisodes', 'browser', 'cookies', 'send', 'failed', 'report'])
     for (const h of HELP_TOPICS) expect(h.actions.length, h.id).toBeGreaterThan(0)
   })
 
@@ -200,6 +201,24 @@ describe('the Help page', () => {
     const [button] = within(document.getElementById('help-failed')!).getAllByRole('button', { name: 'How to Send a Report' })
     fireEvent.click(button)
     expect(useStore.getState().helpTopic).toBe('report')
+  })
+
+  it('explains sending from a browser, with buttons that do what they say, in either language', async () => {
+    await app()
+    act(() => useStore.getState().openHelp('send'))
+    const external = vi.spyOn(window.api, 'openExternal').mockResolvedValue(undefined)
+    fireEvent.click(screen.getByRole('button', { name: 'How to Add the Extension' }))
+    expect(external).toHaveBeenCalledWith(expect.stringContaining('/browser-extension'))
+
+    const writeText = vi.fn(async () => undefined)
+    Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true })
+    fireEvent.click(screen.getByRole('button', { name: 'Copy Bookmark Address' }))
+    expect(writeText).toHaveBeenCalledWith(BOOKMARKLET)
+    expect(await screen.findByText('Copied')).toBeTruthy()
+
+    act(() => useI18n.getState().setLanguage('ru'))
+    expect(screen.getByRole('button', { name: 'Отправка из браузера' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Скопировать адрес закладки' })).toBeTruthy()
   })
 
   it('searches its own answers, opened, and says so when there is nothing', async () => {

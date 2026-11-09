@@ -1,0 +1,10 @@
+{
+  "extensionName": { "message": "Send to Universal Video Downloader" },
+  "extensionDescription": { "message": "Sends the current page or a link to the Universal Video Downloader app with one click. Reads nothing else." },
+  "actionTitle": { "message": "Send this page to Universal Video Downloader" },
+  "menuSendLink": { "message": "Send link to Universal Video Downloader" },
+  "popupSent": { "message": "Sent to the app" },
+  "popupNotAPage": { "message": "This page has no web address to send" },
+  "popupFailed": { "message": "Could not send this page" },
+  "popupNoApp": { "message": "If nothing opens or the browser shows an error, the app is not installed, or has never been opened. Install it, open it once and try again." }
+}

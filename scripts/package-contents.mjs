@@ -26,7 +26,7 @@ export const REQUIRED = [
 ]
 
 const FORBIDDEN = [
-  [/^(tests?|src|scripts|docs|design-system|packaging|assets|build|release)\//, 'a repository folder'],
+  [/^(tests?|src|scripts|docs|design-system|packaging|browser-extension|assets|build|release)\//, 'a repository folder'],
   [/^[^/]*\.(md|ya?ml|mjs|ts)$/, 'a repository file'],
   [/^\.[^/]+$/, 'a repository dotfile'],
   [/\.test\.[cm]?[jt]sx?$/, 'a test'],

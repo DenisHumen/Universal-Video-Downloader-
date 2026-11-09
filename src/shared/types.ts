@@ -232,6 +232,8 @@ export type DownloadState =
 export interface PendingDelivery {
   /** A URL from the command line, a second launch, or the clipboard watcher. */
   link?: string
+  /** A link from `uvd://` or a second launch: anybody's, so nothing runs until somebody chooses it. */
+  sentLink?: string
   /** A view the application menu asked for. */
   view?: string
 }

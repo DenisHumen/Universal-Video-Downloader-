@@ -3,7 +3,9 @@ import HelpText from '../components/HelpText'
 import { useT } from '../i18n'
 import { HELP_TOPICS, helpPlain, helpSearchText, type HelpAction, type HelpTopic } from '../lib/help'
 import { matchesQuery } from '../lib/settingsSearch'
+import { toast } from '../lib/toast'
 import { useStore } from '../store'
+import { BOOKMARKLET } from '@shared/sent-link'
 import { ExpanderRow, PreferencesGroup, PreferencesPage } from '../ui'
 import { Search } from '../ui/icons'
 
@@ -110,6 +112,9 @@ function Answer({ topic }: { topic: HelpTopic }): JSX.Element {
   )
 }
 
+/** The steps for the extension, in the repository: it is not on any store, and that page can say so when it is. */
+const EXTENSION_GUIDE = 'https://github.com/DenisHumen/Universal-Video-Downloader-/tree/main/browser-extension#readme'
+
 function ActionButton({ action }: { action: HelpAction }): JSX.Element {
   const t = useT()
   const s = useStore.getState()
@@ -135,6 +140,17 @@ function ActionButton({ action }: { action: HelpAction }): JSX.Element {
         const topic = HELP_TOPICS.find((h) => h.id === action.topic)!
         return [helpPlain(t(topic.title), t), () => s.openHelp(action.topic)]
       }
+      case 'extensionGuide':
+        return [t('help.send.guide'), () => void window.api.openExternal(EXTENSION_GUIDE)]
+      case 'copyBookmarklet':
+        return [
+          t('help.send.copyBookmarklet'),
+          () =>
+            void navigator.clipboard.writeText(BOOKMARKLET).then(
+              () => toast(t('common.copied'), 'success'),
+              () => undefined
+            )
+        ]
     }
   })()
   return (

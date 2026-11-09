@@ -34,6 +34,13 @@ describe('cliArgvFrom', () => {
     // Development: electron.exe, the entry script, then the switch.
     expect(cliArgvFrom(['electron', '.', '--cli', '--help'])).toEqual(['--help'])
   })
+
+  it('is never a terminal run with a uvd: link beside it, which is what a web page can send', () => {
+    const sent = 'uvd://open?url=https%3A%2F%2Fa.example%2Fv'
+    expect(cliArgvFrom(['app', sent, '--cli', 'https://a.example/v'])).toBeNull()
+    expect(cliArgvFrom(['app', '--cli', sent])).toBeNull()
+    expect(cliArgvFrom(['app', '--cli', 'UVD://open', 'https://a.example/v'])).toBeNull()
+  })
 })
 
 /*

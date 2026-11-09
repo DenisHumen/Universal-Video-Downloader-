@@ -1,0 +1,10 @@
+{
+  "extensionName": { "message": "Отправить в Universal Video Downloader" },
+  "extensionDescription": { "message": "Одним щелчком отправляет текущую страницу или ссылку в приложение Universal Video Downloader. Больше ничего не читает." },
+  "actionTitle": { "message": "Отправить эту страницу в Universal Video Downloader" },
+  "menuSendLink": { "message": "Отправить ссылку в Universal Video Downloader" },
+  "popupSent": { "message": "Отправлено в приложение" },
+  "popupNotAPage": { "message": "У этой страницы нет веб-адреса, отправлять нечего" },
+  "popupFailed": { "message": "Не удалось отправить страницу" },
+  "popupNoApp": { "message": "Если ничего не открылось или браузер показал ошибку, приложение не установлено или ни разу не запускалось. Установите его, откройте один раз и попробуйте снова." }
+}
