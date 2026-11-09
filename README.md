@@ -65,6 +65,8 @@ sudo dnf install universal-video-downloader
 
 Both repositories are signed, and updates arrive with the rest of the system (`sudo apt upgrade`, `sudo dnf upgrade`).
 
+On a Wayland session the app runs through XWayland, because native Wayland throws the window aside when you drag it. If the window looks blurry at a fractional display scale (125%, 150%), start it with `--ozone-platform=wayland`; the blur goes, and the drag problem comes back after the window has been hidden to the tray.
+
 ### macOS: “the app is damaged and can’t be opened”
 
 **It isn’t.** The builds are not signed with a paid Apple certificate, and macOS shows that sentence for any unsigned app it has quarantined. Copy the app into **Applications** and run this once:
