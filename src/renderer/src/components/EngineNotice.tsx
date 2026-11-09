@@ -42,6 +42,7 @@ export default function EngineNotice(): JSX.Element | null {
   }
 
   if (!downloading && !failed) return null
+  const title = t(ytdlp.moving ? 'engine.movingTitle' : 'engine.setupTitle')
 
   return (
     <div className="animate-rise shrink-0 overflow-hidden">
@@ -53,7 +54,7 @@ export default function EngineNotice(): JSX.Element | null {
         <div className="min-w-0 flex-1">
           {/* The system's own words stay on hover: they help a report, not the person reading this. */}
           <p className="text-body font-medium text-ink" title={failed ? ytdlp.message : undefined}>
-            {failed ? engineFailureText(t, ytdlp.message, 'setup') : t('engine.setupTitle')}
+            {failed ? engineFailureText(t, ytdlp.message, 'setup') : title}
           </p>
           {failed ? null : (
             <div className="mt-1.5 flex items-center gap-3">
@@ -63,7 +64,7 @@ export default function EngineNotice(): JSX.Element | null {
                 aria-valuenow={percent}
                 aria-valuemin={0}
                 aria-valuemax={100}
-                aria-label={t('engine.setupTitle')}
+                aria-label={title}
               >
                 {/* A plain style, like every other bar in the app. This one runs
                     before the window has even been touched, which is when the

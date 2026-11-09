@@ -694,6 +694,8 @@ export interface YtDlpStatus {
   version?: string
   percent?: number
   message?: string
+  /** This install replaces a copy from the folder all the PC's users share. */
+  moving?: boolean
 }
 
 /**

@@ -290,6 +290,7 @@ export const en = {
   'window.close': 'Close',
   'engine.setupLabel': 'Setup',
   'engine.setupTitle': 'Getting the App Ready for First Use',
+  'engine.movingTitle': 'Moving the Download Tool to a Folder Only You Can Change',
   'engine.setupOnce': 'One time, about 30 MB',
   'engine.setupFailed': 'The app could not be prepared. Check your internet and try again',
   'engine.startFailed': 'The download tool is installed but won’t start; antivirus has probably blocked it. Add the app’s folder to its exclusions and try again',

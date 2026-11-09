@@ -14,6 +14,7 @@ import {
 } from 'fs'
 import { readFile, rm } from 'fs/promises'
 import { createHash } from 'crypto'
+import { homedir } from 'os'
 import { join } from 'path'
 import type { YtDlpStatus } from '@shared/types'
 import {
@@ -53,8 +54,11 @@ export const ytdlpEvents = new EventEmitter()
 
 let currentStatus: YtDlpStatus = { state: 'idle' }
 let ensurePromise: Promise<string> | null = null
+/** This install is the move out of the shared folder, which the window says in its own words. */
+let movingFromShared = false
 
-function emit(status: YtDlpStatus): void {
+function emit(given: YtDlpStatus): void {
+  const status = movingFromShared ? { ...given, moving: true } : given
   currentStatus = status
   ytdlpEvents.emit('status', status)
 }
@@ -63,24 +67,36 @@ export function getYtdlpStatus(): YtDlpStatus {
   return currentStatus
 }
 
-function isAscii(s: string): boolean {
-  return !/[^\x20-\x7E]/.test(s)
-}
-
 /**
- * Base directory for the engine binary and its scratch space. On Windows the
- * yt-dlp.exe is a PyInstaller one-file bundle whose bootloader fails to extract
- * (`[PYI...] Failed to extract entry`) when the binary OR the temp path contains
- * non-ASCII characters — which happens whenever the Windows account name is
- * non-Latin (e.g. Cyrillic). So on Windows we keep everything under the
- * guaranteed-ASCII %PUBLIC% directory instead of the per-user %APPDATA%.
+ * Base directory for the engine binary and its scratch space.
+ *
+ * On Windows this was %PUBLIC%, because the one-file yt-dlp.exe would not unpack
+ * under a non-Latin account name (`[PYI...] Failed to extract entry`). But every
+ * local user can modify anything in there, so on a shared PC any one of them could
+ * replace the program every other account then ran. The engine has been a onedir
+ * copy for a while now, with nothing to unpack: checked with the real build, it
+ * starts and downloads from a folder and a TEMP in Cyrillic, Chinese, Hebrew and
+ * accented Latin. %LOCALAPPDATA% is the one account's alone.
  */
 function engineBaseDir(): string {
   if (process.platform === 'win32') {
-    const pub = process.env.PUBLIC && isAscii(process.env.PUBLIC) ? process.env.PUBLIC : 'C:\\Users\\Public'
-    return join(pub, 'UniversalVideoDownloader')
+    return join(process.env.LOCALAPPDATA || join(homedir(), 'AppData', 'Local'), 'UniversalVideoDownloader')
   }
   return app.getPath('userData')
+}
+
+/**
+ * Whether this account was using the old folder, going by what is in it.
+ *
+ * Only ever looked at. What is in there cannot be vouched for, since anybody on
+ * the machine could have changed it, so it is neither run nor copied, and a
+ * fresh copy is fetched instead. It is not deleted either: another account on an
+ * older build may be running from it this minute.
+ */
+function hadSharedEngine(): boolean {
+  if (process.platform !== 'win32') return false
+  const shared = process.env.PUBLIC || 'C:\\Users\\Public'
+  return existsSync(join(shared, 'UniversalVideoDownloader', 'bin'))
 }
 
 function binDir(): string {
@@ -502,6 +518,8 @@ export function ensureYtdlp(): Promise<string> {
       // Nothing that runs (a first launch, a broken download): install.
       if (onedir || existsSync(onefile)) log.warn('engine', 'The installed engine does not start; fetching it again')
       if (readPointer(dir) && !onedirVersion) rmSync(join(dir, 'current.json'), { force: true })
+      movingFromShared = !onedir && !existsSync(onefile) && hadSharedEngine()
+      if (movingFromShared) log.info('engine', 'Fetching a private copy; the shared folder is left as it is')
       emit({ state: 'checking', message: 'Preparing download engine…' })
       // No engine runs, so the single file is a fallback worth having.
       await downloadBinary('onefile')
@@ -515,6 +533,7 @@ export function ensureYtdlp(): Promise<string> {
       if (!version) {
         throw new Error('The download engine was installed but failed to start on this system.')
       }
+      movingFromShared = false
       emit({ state: 'ready', version, message: 'Ready' })
       log.info('engine', 'Installed', { version })
       return path

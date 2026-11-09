@@ -133,13 +133,15 @@ async function fresh(): Promise<typeof import('./ytdlp')> {
 
 const settle = (): Promise<void> => new Promise((resolve) => setTimeout(resolve, 300))
 const realPublic = process.env.PUBLIC
+const realLocal = process.env.LOCALAPPDATA
 const bin = (): string => join(h.dir, 'UniversalVideoDownloader', 'bin')
 const binDir = (): string => (process.platform === 'win32' ? bin() : join(h.dir, 'bin'))
 const onefile = (): string => join(binDir(), process.platform === 'win32' ? 'yt-dlp.exe' : 'yt-dlp')
 
 beforeEach(() => {
   h.dir = mkdtempSync(join(tmpdir(), 'uvd-onedir-'))
-  process.env.PUBLIC = h.dir
+  process.env.LOCALAPPDATA = h.dir
+  process.env.PUBLIC = join(h.dir, 'public')
   h.requested = []
   h.spawned = []
   publish()
@@ -149,6 +151,49 @@ afterEach(() => {
   rmSync(h.dir, { recursive: true, force: true })
   if (realPublic === undefined) delete process.env.PUBLIC
   else process.env.PUBLIC = realPublic
+  if (realLocal === undefined) delete process.env.LOCALAPPDATA
+  else process.env.LOCALAPPDATA = realLocal
+})
+
+describe.runIf(process.platform === 'win32')('leaving the folder every user can change', () => {
+  const shared = (): string => join(process.env.PUBLIC as string, 'UniversalVideoDownloader', 'bin')
+
+  it('runs nothing from there, fetches its own copy and leaves the old one for whoever else uses it', async () => {
+    mkdirSync(join(shared(), 'yt-dlp-dist-old'), { recursive: true })
+    const planted = join(shared(), 'yt-dlp-dist-old', 'yt-dlp_linux')
+    writeFileSync(planted, 'somebody else put this here')
+    writeFileSync(join(shared(), 'current.json'), JSON.stringify({ dir: 'yt-dlp-dist-old', exe: 'yt-dlp_linux', sha256: 'x' }))
+    const m = await fresh()
+    const seen: { moving?: boolean; state: string }[] = []
+    m.ytdlpEvents.on('status', (status: { moving?: boolean; state: string }) => seen.push(status))
+
+    const path = await m.ensureYtdlp()
+
+    expect(path.startsWith(bin())).toBe(true)
+    expect(path.startsWith(process.env.PUBLIC as string)).toBe(false)
+    expect(h.requested).toContain('yt-dlp_linux.zip')
+    expect(seen.some((status) => status.state === 'downloading' && status.moving)).toBe(true)
+    expect(m.getYtdlpStatus()).toMatchObject({ state: 'ready' })
+    expect(m.getYtdlpStatus().moving).toBeUndefined()
+    expect(readFileSync(planted, 'utf-8')).toBe('somebody else put this here')
+    expect(existsSync(join(shared(), 'current.json'))).toBe(true)
+  })
+
+  it('says nothing about moving on a machine that never used the old folder', async () => {
+    const m = await fresh()
+    const seen: { moving?: boolean }[] = []
+    m.ytdlpEvents.on('status', (status: { moving?: boolean }) => seen.push(status))
+    await m.ensureYtdlp()
+    expect(seen.some((status) => status.moving)).toBe(false)
+  })
+
+  it('does not fetch again once its own copy is there', async () => {
+    mkdirSync(shared(), { recursive: true })
+    await (await fresh()).ensureYtdlp()
+    h.requested = []
+    await expect((await fresh()).ensureYtdlp()).resolves.toContain('yt-dlp-dist-')
+    expect(h.requested).toEqual([])
+  })
 })
 
 describe('the onedir engine', () => {
