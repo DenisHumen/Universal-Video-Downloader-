@@ -1,4 +1,5 @@
 import type { AppSettings, DownloadMode, QualityPreset, VideoFormat } from '@shared/types'
+import type { SizeEstimate } from '@shared/disk'
 
 /** Resolution ladder offered when a site doesn't tell us its real heights. */
 export const QUALITY_HEIGHTS = [2160, 1440, 1080, 720, 480, 360] as const
@@ -188,6 +189,53 @@ export function resolveSelection(
         ? chosen.dynamicRange
         : undefined
   }
+}
+
+/** The stated size of a stream, or what its length and bitrate come to. */
+function streamBytes(f: VideoFormat | undefined, duration: number | undefined): { bytes: number; exact: boolean } | undefined {
+  if (!f) return undefined
+  if (f.filesize) return { bytes: f.filesize, exact: true }
+  if (f.filesizeApprox) return { bytes: f.filesizeApprox, exact: false }
+  const kbps = f.tbr || (f.vbr || f.abr ? (f.vbr ?? 0) + (f.abr ?? 0) : 0)
+  // kbit/s, so a thousand bits a second, eight of them to the byte.
+  return kbps && duration ? { bytes: (kbps * 1000 * duration) / 8, exact: false } : undefined
+}
+
+/**
+ * What this choice should weigh, for asking the disk about it.
+ *
+ * The same streams `resolveSelection` picks. A cut has no size to speak of: it is a
+ * part of the file, of a length only the engine will find out. Nothing is said for
+ * a stream with no figure at all, nor when one of two to be merged has none, since
+ * half a figure would read as room to spare.
+ */
+export function estimateSize(
+  formats: VideoFormat[],
+  selection: { mode: DownloadMode; quality?: QualityPreset; formatId?: string },
+  duration?: number
+): SizeEstimate | undefined {
+  if (!formats.length) return undefined
+  if (selection.mode === 'audio') {
+    const audio = streamBytes(bestAudio(formats), duration)
+    // Converted to what was asked for, which can come out bigger: never more than a guess.
+    return audio && { bytes: audio.bytes, exact: false, merging: false }
+  }
+  const videos = videoFormats(formats)
+  let chosen: VideoFormat | undefined
+  if (selection.formatId) {
+    chosen = formats.find((f) => f.id === selection.formatId)
+  } else {
+    const cap = Number(selection.quality)
+    const ranked = [...videos].sort(byQuality)
+    chosen = (Number.isFinite(cap) && cap > 0 ? ranked.find((f) => (f.height ?? 0) <= cap) : undefined) ?? ranked[0]
+  }
+  const video = streamBytes(chosen, duration)
+  if (!video) return undefined
+  const separate = chosen?.kind === 'video' ? bestAudio(formats) : undefined
+  if (!separate) return { ...video, merging: false }
+  const audio = streamBytes(separate, duration)
+  if (!audio) return undefined
+  return { bytes: video.bytes + audio.bytes, exact: video.exact && audio.exact, merging: true }
 }
 
 /** `1080p60`, `4K`, or nothing when the site never said. */

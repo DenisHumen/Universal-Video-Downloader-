@@ -1,3 +1,5 @@
+import { cleanEstimate, diskVerdict } from '@shared/disk'
+import { freeSpace } from './disk'
 import { app } from 'electron'
 import { EventEmitter } from 'events'
 import { spawn, ChildProcess, type ChildProcessWithoutNullStreams } from 'child_process'
@@ -1579,6 +1581,28 @@ async function runDownload(item: DownloadItem): Promise<void> {
     return
   }
 
+  /*
+    Won't fit, by the sizes the site states: said now, in the sentence a full disk
+    would get an hour from now, with the same button for another folder. A guess
+    is only worth a line in the log, since a guess can be wrong by half.
+  */
+  if (item.sizeEstimate && !item.waitForVideo && !item.live) {
+    const settings = getSettings()
+    const free = await freeSpace(item.runDir ?? plannedDir(item, settings))
+    if (stale() || !items.has(item.id) || item.state !== 'detecting') {
+      processQueue()
+      return
+    }
+    const verdict = diskVerdict(item.sizeEstimate, free, item.downloadedBytes)
+    if (verdict === 'wontFit') {
+      failWith(item, 'diskFull', 'Your disk is full — free some space and try again.')
+      return
+    }
+    if (verdict === 'mayNotFit') {
+      log.warn('download', 'This may not fit on the disk', { ...downloadFields(item), free: free?.bytes })
+    }
+  }
+
   item.state = item.waitForVideo ? 'waiting' : 'downloading'
   emitUpdated(item)
   /*
@@ -2029,6 +2053,7 @@ export async function startDownload(request: DownloadRequest): Promise<DownloadI
     playlist: normalisePlaylist(req.playlist),
     uploader: req.uploader,
     series: req.series,
+    sizeEstimate: hasTrim(req.section) ? undefined : cleanEstimate(req.sizeEstimate),
     subtitles: cleanLanguages(req.subtitles),
     audioLanguage: cleanLanguage(req.audioLanguage),
     waitForVideo: req.waitForVideo === true ? true : undefined,

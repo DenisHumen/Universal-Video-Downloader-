@@ -17,6 +17,8 @@ beforeAll(() => {
   q({ id: 'limit', title: 'Rate limited one', state: 'error', errorCode: 'rateLimited', error: 'HTTP 429', url: 'https://www.youtube.com/watch?v=limit' })
   q({ id: 'soon', title: 'A premiere', state: 'error', errorCode: 'upcoming', error: 'Premieres in 3 days', url: 'https://www.youtube.com/watch?v=soon' })
   q({ id: 'held', title: 'Waiting premiere', state: 'waiting', waitForVideo: true, url: 'https://www.youtube.com/watch?v=held' })
+  q({ id: 'blocked', title: 'Blocked here', state: 'error', errorCode: 'geo', error: 'Not in your region', url: 'https://example.com/b' })
+  q({ id: 'changed', title: 'A site that moved', state: 'error', errorCode: 'playerChanged', error: 'Player params not found', url: 'https://example.com/a' })
   q({ id: 'nofmt', title: 'Podcast with no video', state: 'error', errorCode: 'noSuchFormat', error: 'Requested format is not available', url: 'https://www.youtube.com/watch?v=nofmt' })
 })
 beforeEach(() => useStore.setState({ view: 'downloads' }))
@@ -86,5 +88,21 @@ describe('fix buttons on failed rows (6.2)', () => {
     await act(async () => fireEvent.click(later))
     expect(within(r).getByRole('button', { name: /^Retrying at/ })).toBeTruthy()
     expect(within(r).getByRole('button', { name: 'Copy Error' })).toBeTruthy()
+  })
+
+  it('a site that moved, with a newer engine out: updates the engine, then retries the row', async () => {
+    const update = vi.spyOn(window.api, 'updateYtdlp')
+    const retry = vi.spyOn(window.api, 'retryDownload')
+    const card = await row('A site that moved')
+    const button = await within(card).findByRole('button', { name: 'Update and Retry' })
+    await act(async () => fireEvent.click(button))
+    await waitFor(() => expect(retry).toHaveBeenCalledWith('changed'))
+    expect(update).toHaveBeenCalledTimes(1)
+  })
+
+  it('offers no update for a failure a newer engine would not help', async () => {
+    const card = await row('Blocked here')
+    await act(async () => undefined)
+    expect(within(card).queryByRole('button', { name: 'Update and Retry' })).toBeNull()
   })
 })

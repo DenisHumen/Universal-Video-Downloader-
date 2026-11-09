@@ -171,9 +171,17 @@ function httpKey(status: number): TranslationKey {
   return status >= 500 ? 'main.http.server' : 'main.http.other'
 }
 
+const COOKIE_ADVICE = ' Try enabling browser cookies in Settings → Access.'
+
 /** One of main's sentences in the interface language, or the text as it came. */
 export function localizeMainText(t: TranslateFn, text: string): string {
   const said = text.trim()
+  // What `classifyYtdlpError` adds when no cookies are set up: the sentence is the one in the table, and so is its advice.
+  if (said.endsWith(COOKIE_ADVICE)) {
+    const reason = said.slice(0, -COOKIE_ADVICE.length)
+    const translated = localizeMainText(t, reason)
+    return translated === reason ? text : `${translated} ${t('err.cookieHint')}`
+  }
   const exact = Object.prototype.hasOwnProperty.call(EXACT, said) ? EXACT[said] : undefined
   if (exact) return t(exact)
 

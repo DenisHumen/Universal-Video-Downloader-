@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { m } from 'framer-motion'
 import { enter } from '../../lib/motion'
 import { CheckCircle2, Folder, FolderOpen, Loader2, Play } from '../../ui/icons'
@@ -6,6 +6,7 @@ import { hasTrim, type AppSettings, type DownloadMode, type MediaInfo, type Qual
 import { audioFormatLabel, formatBytes, formatCount, formatDuration } from '../../lib/format'
 import {
   availableHeights,
+  estimateSize,
   heightLabel,
   maxHeightOf,
   outcomeResolution,
@@ -20,6 +21,7 @@ import { audioLanguages, languageName } from '../../lib/languages'
 import { resolveLanguage, useI18n, useT, useTp } from '../../i18n'
 import { useStore } from '../../store'
 import { siteNameOf } from '@shared/library'
+import { diskVerdict, roomNeeded, type FreeSpace } from '@shared/disk'
 import { ActionRow, ComboRow, ExpanderRow, PreferencesGroup, SegmentedControl, cx } from '../../ui'
 import Thumbnail from '../../components/Thumbnail'
 import TrimEditor from '../../components/TrimEditor'
@@ -123,6 +125,28 @@ export default function VideoResult({
   }, [info.formats, t])
 
   const outcome = resolveSelection(info.formats, selection, settings.audioFormat)
+
+  /*
+    Said before the click, against the folder this would really go to. Live and
+    cut downloads have no size to compare, and a disk that will not answer says
+    nothing: the button stays on either way, as the person may be about to free
+    the space, and the row is what refuses.
+  */
+  const folder = saveDir || settings.downloadDir
+  const [free, setFree] = useState<{ dir: string; space?: FreeSpace }>()
+  useEffect(() => {
+    let live = true
+    void window.api
+      .freeSpace(folder)
+      .then((space) => live && setFree({ dir: folder, space }))
+      .catch(() => undefined)
+    return () => {
+      live = false
+    }
+  }, [folder, selection.mode, selection.quality, selection.formatId])
+  const estimate = info.isLive || isCutting(choice) ? undefined : estimateSize(info.formats, selection, info.duration)
+  const space = free?.dir === folder ? free.space : undefined
+  const room = diskVerdict(estimate, space)
   const facts = [
     outcomeResolution(outcome),
     outcome?.dynamicRange,
@@ -416,6 +440,15 @@ export default function VideoResult({
             </>
           }
         />
+        {room !== 'fits' && estimate && space && (
+          <ActionRow
+            data-uvd="disk-room"
+            title={
+              <span className="text-warn">{t(room === 'wontFit' ? 'disk.wontFit' : 'disk.mayNotFit')}</span>
+            }
+            subtitle={t('disk.figures', { need: formatBytes(roomNeeded(estimate)), free: formatBytes(space.bytes) })}
+          />
+        )}
       </PreferencesGroup>
 
       {/*

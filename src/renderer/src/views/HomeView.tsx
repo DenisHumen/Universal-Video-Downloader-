@@ -6,7 +6,7 @@ import type { DetectStage, MediaInfo, SearchResult } from '@shared/types'
 import { engineKnowsHost, looksLikeCollection, youtubeIdOf } from '@shared/urls'
 import { useStore } from '../store'
 import { isProbablyUrl } from '../lib/format'
-import { availableHeights, initialMode, initialQuality, resolveSelection, selectionForLanguage } from '../lib/quality'
+import { availableHeights, estimateSize, initialMode, initialQuality, resolveSelection, selectionForLanguage } from '../lib/quality'
 import { detectIsDone } from '../lib/emphasis'
 import { queueDownload } from '../lib/queue'
 import { escapeClearsHome, isDownloadNowChord } from '../lib/shortcuts'
@@ -197,6 +197,7 @@ export default function HomeView(): JSX.Element {
         // What `best` came out as, and the length that turns a cut's progress into a percentage.
         targetHeight: selection.targetHeight,
         duration: info.duration,
+        sizeEstimate: cutting || info.isLive ? undefined : estimateSize(info.formats, selection, info.duration),
         live: info.isLive || undefined,
         // Names the per-site subfolder.
         extractor: info.extractor,

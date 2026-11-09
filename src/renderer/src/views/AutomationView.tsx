@@ -49,7 +49,7 @@ import {
   type StepKind,
   type Watch
 } from '@shared/automation'
-import { CHANNEL_MIN_INTERVAL } from '@shared/channel'
+import { CHANNEL_MIN_INTERVAL, LIST_CHANGED } from '@shared/channel'
 import type { DownloadItem } from '@shared/types'
 
 /**
@@ -333,12 +333,16 @@ export default function AutomationView(): JSX.Element {
     return `S${String(top.season).padStart(2, '0')}E${String(top.episode).padStart(2, '0')}`
   }
 
+  /* A list set aside is not an episode that failed; a channel's failures are not episodes. */
+  const runTrouble = (w: Watch): string =>
+    t(w.lastRunError === LIST_CHANGED ? 'auto.listChangedTitle' : isChannelWatch(w) ? 'auto.runFailingVideo' : 'auto.runFailing')
+
   const statusLine = (w: Watch): string =>
     w.enabled
       ? w.lastError
         ? t('auto.failing')
         : w.lastRunError
-          ? t('auto.runFailing')
+          ? runTrouble(w)
           : w.pending
             ? releaseText(w.releaseAt, t)
             : `${t('auto.nextCheck')} ${relative(w.nextCheckAt, t)}`
@@ -488,7 +492,11 @@ export default function AutomationView(): JSX.Element {
                 */}
                 {selected.lastRunError && (
                   <ActionRow
-                    title={selected.lastRunFailedAt ? t('auto.runFailedAt', { when: ago(selected.lastRunFailedAt, t) }) : t('auto.runFailing')}
+                    title={
+                      selected.lastRunFailedAt && !isChannelWatch(selected)
+                        ? t('auto.runFailedAt', { when: ago(selected.lastRunFailedAt, t) })
+                        : runTrouble(selected)
+                    }
                     subtitle={
                       <span className="text-bad" title={selected.lastRunError}>
                         {errorText(t, { error: selected.lastRunError, errorCode: selected.lastRunErrorCode })}

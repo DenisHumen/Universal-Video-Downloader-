@@ -1,3 +1,5 @@
+import { freeSpace } from './services/disk'
+import { engineFreshness } from './services/engine-latest'
 import { buttonLayout, systemAccent } from './services/desktop'
 import {
   countMissing,
@@ -400,6 +402,9 @@ export function registerIpc({ getWindow, openSearchWindow, onSettingsChanged }: 
   })
   ipcMain.handle(IPC.clipboardRead, () => readClipboardText())
 
+  // Asked by the card before the click; an unknown answer says nothing.
+  ipcMain.handle(IPC.freeSpace, (_e, dir: string) => freeSpace(String(dir ?? '')))
+
   // ---- yt-dlp engine ----
   ipcMain.handle(IPC.ytdlpEnsure, async () => {
     try {
@@ -424,6 +429,9 @@ export function registerIpc({ getWindow, openSearchWindow, onSettingsChanged }: 
       return { ok: false, error: err instanceof Error ? err.message : String(err) }
     }
   })
+
+  // For "Update and Retry": only offered when there is something newer to update to.
+  ipcMain.handle(IPC.engineFreshness, () => engineFreshness())
 
   // Whatever main tried to hand the window before it was listening.
   ipcMain.handle(IPC.takePending, () => takePending())
