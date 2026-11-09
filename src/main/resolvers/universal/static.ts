@@ -292,9 +292,21 @@ const defaultFetcher: Fetcher = (url, headers) => fetchText(url, headers, { time
  * Referer pointing at itself. That is precisely the shape a hotlink check
  * rejects, and the reply is a 403 or an error page with no video in it: the
  * scrape found nothing and the app said the page had no video on it.
+ *
+ * Across origins only the parent's origin goes, which is also all a browser sends
+ * by default. Electron's `net.request` kills a request whose Referer has more than
+ * that, with ERR_BLOCKED_BY_CLIENT and nothing reaching the server, so every player
+ * on a domain of its own died unseen. The same happens to an https page's Referer
+ * on an http frame, which gets none at all, as it would in a browser.
  */
-export function refererFor(url: string, parent?: string): string {
-  if (parent) return parent
+export function refererFor(url: string, parent?: string): string | undefined {
+  if (parent) {
+    const from = new URL(parent)
+    const to = new URL(url)
+    if (from.origin === to.origin) return parent
+    if (from.protocol === 'https:' && to.protocol === 'http:') return undefined
+    return `${from.origin}/`
+  }
   /*
     The page's own scheme, not always https. An https Referer on a plain http
     request is a downgrade Chromium will not send: the request died at once with
@@ -312,7 +324,8 @@ async function scrapeOne(
 ): Promise<StaticScrape> {
   let html: string
   try {
-    html = await fetcher(url, { Referer: refererFor(url, parent) })
+    const referer = refererFor(url, parent)
+    html = await fetcher(url, referer ? { Referer: referer } : {})
   } catch (err) {
     // The page itself failing is the caller's to judge (it may mean the host
     // is unreachable); a player iframe failing is one less place to look.

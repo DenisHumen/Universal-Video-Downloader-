@@ -162,14 +162,25 @@ describe('scrapeStatic referer', () => {
     }
   }
 
-  it('sends the embedding page as the referer for an iframe', async () => {
+  it('sends the embedding site as the referer for an iframe, as far as Electron will let it', async () => {
     const { fetcher, seen } = recorder({
       [PAGE]: `<iframe src="${FRAME}"></iframe>`,
       [FRAME]: '<video src="https://cdn.test/film.mp4"></video>'
     })
     await scrapeStatic(PAGE, fetcher)
 
-    expect(seen.get(FRAME)?.Referer).toBe(PAGE)
+    expect(seen.get(FRAME)?.Referer).toBe(`${new URL(PAGE).origin}/`)
+  })
+
+  it('sends no referer at all from https to an http frame', async () => {
+    const plain = 'http://player.cdn.test/embed/1'
+    const { fetcher, seen } = recorder({
+      [PAGE]: `<iframe src="${plain}"></iframe>`,
+      [plain]: '<video src="https://cdn.test/film.mp4"></video>'
+    })
+    await scrapeStatic(PAGE, fetcher)
+
+    expect(seen.get(plain)).toEqual({})
   })
 
   it('still sends the site root for the page the user actually gave us', async () => {
@@ -270,10 +281,18 @@ describe('scrapeStatic and an embedded Kodik player', () => {
 })
 
 describe('refererFor', () => {
-  it('prefers the page that pointed at the URL', () => {
-    expect(refererFor('https://player.cdn.test/embed/1', 'https://site.test/watch/42')).toBe(
-      'https://site.test/watch/42'
-    )
+  it('sends only the parent’s origin to a player on another origin, the most Electron lets through', () => {
+    expect(refererFor('https://player.cdn.test/embed/1', 'https://site.test/watch/42?x=1')).toBe('https://site.test/')
+    expect(refererFor('http://site.test:8081/embed', 'http://site.test:8080/watch/42')).toBe('http://site.test:8080/')
+  })
+
+  it('sends the whole page within one origin', () => {
+    expect(refererFor('https://site.test/embed/1', 'https://site.test/watch/42?x=1')).toBe('https://site.test/watch/42?x=1')
+  })
+
+  it('sends nothing from https to http', () => {
+    expect(refererFor('http://player.cdn.test/embed/1', 'https://site.test/watch/42')).toBeUndefined()
+    expect(refererFor('http://site.test/embed/1', 'https://site.test/watch/42')).toBeUndefined()
   })
 
   it('falls back to the site root of the URL itself when there is no parent', () => {
