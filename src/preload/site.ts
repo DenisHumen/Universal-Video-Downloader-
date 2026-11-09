@@ -1,4 +1,5 @@
 import { contextBridge, ipcRenderer } from 'electron'
+import { watchForFill, type PendingLogin } from './site-fill'
 
 /**
  * Preload for the *site* view inside the built-in browser.
@@ -241,8 +242,8 @@ window.addEventListener('DOMContentLoaded', () => {
   on the button beside it - the login is reported so the browser can offer to
   keep it. The main process decides whether to ask, and takes the site from
   the frame that sent this, never from anything the page says. When main has a
-  login for the site it sends it back, and it is typed into the first password
-  form that appears, without submitting anything.
+  login for the site it sends it back, and it is typed in when the person goes to
+  the field, without submitting anything.
 */
 const CHANNEL_LOGIN = 'browser-site:login'
 const CHANNEL_FILL = 'browser-site:fill'
@@ -318,45 +319,14 @@ function typeInto(field: HTMLInputElement, value: string): void {
   field.dispatchEvent(new Event('change', { bubbles: true }))
 }
 
-let pendingFill: { username: string; password: string } | null = null
-let fillObserver: MutationObserver | null = null
-
-function tryFill(): boolean {
-  if (!pendingFill) return true
-  const password = passwordFields().find((p) => !p.value && p.autocomplete !== 'new-password')
-  const user = password ? usernameFor(password) : undefined
-  // A two-step sign-in shows the username first, on its own.
-  const loneUser =
-    !password &&
-    document.querySelector<HTMLInputElement>('input[autocomplete="username"], input[type="email"]')
-  if (password) {
-    if (user && !user.value && pendingFill.username) typeInto(user, pendingFill.username)
-    typeInto(password, pendingFill.password)
-    lastSent = (pendingFill.username || '') + '\u0000' + pendingFill.password
-    pendingFill = null
-    return true
+// Held in this isolated world until the person goes to a field; see site-fill.ts.
+const holdForFill = watchForFill(document, {
+  passwordFields,
+  usernameFor,
+  typeInto,
+  filled: (login) => {
+    lastSent = (login.username || '') + '\u0000' + login.password
   }
-  if (loneUser && visible(loneUser) && !loneUser.value && pendingFill.username) {
-    typeInto(loneUser, pendingFill.username)
-  }
-  return false
-}
-
-ipcRenderer.on(CHANNEL_FILL, (_e, login: { username: string; password: string }) => {
-  pendingFill = login
-  if (tryFill()) return
-  fillObserver?.disconnect()
-  fillObserver = new MutationObserver(() => {
-    if (tryFill()) {
-      fillObserver?.disconnect()
-      fillObserver = null
-    }
-  })
-  fillObserver.observe(document.documentElement, { childList: true, subtree: true })
-  // Not forever: a page with no sign-in form has no use for the password.
-  setTimeout(() => {
-    fillObserver?.disconnect()
-    fillObserver = null
-    pendingFill = null
-  }, 60_000)
 })
+
+ipcRenderer.on(CHANNEL_FILL, (_e, login: PendingLogin) => holdForFill(login))
