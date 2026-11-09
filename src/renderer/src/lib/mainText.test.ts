@@ -5,6 +5,7 @@ import { TELEGRAM_NO_TOKEN } from '@shared/automation'
 import { translate, useI18n, type TranslateFn } from '../i18n'
 import { describeError, errorText } from './errors'
 import { localizeMainText } from './mainText'
+import { classifyYtdlpError } from '../../../main/services/options'
 
 afterEach(() => useI18n.setState({ language: 'en' }))
 
@@ -153,6 +154,26 @@ describe('localizeMainText', () => {
   it('leaves an unknown network reason whole rather than half translated', () => {
     const said = 'Could not reach a.example: something new. Check your connection or proxy. (ERR_FAILED)'
     expect(localizeMainText(ru, said)).toBe(said)
+  })
+})
+
+describe('why a followed list could not be read', () => {
+  // These reach a watch as the engine's classified English, with no code beside them.
+  it.each([
+    ['ERROR: [youtube:tab] x: Sign in to confirm you’re not a bot', 'err.botCheck'],
+    ['ERROR: HTTP Error 429: Too Many Requests', 'err.rateLimited']
+  ] as const)('%s reads in Russian', (raw, key) => {
+    const { message } = classifyYtdlpError(raw, false)
+    expect(localizeMainText((k, v) => translate('ru', k, v), message)).toBe(translate('ru', key))
+  })
+
+  it('a sign-in wall too, with the advice about cookies when none are set up', () => {
+    const ru: TranslateFn = (k, v) => translate('ru', k, v)
+    const raw = 'ERROR: [site] x: Sign in to continue'
+    expect(localizeMainText(ru, classifyYtdlpError(raw, true).message)).toBe(translate('ru', 'err.signIn'))
+    expect(localizeMainText(ru, classifyYtdlpError(raw, false).message)).toBe(
+      `${translate('ru', 'err.signIn')} ${translate('ru', 'err.cookieHint')}`
+    )
   })
 })
 

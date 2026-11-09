@@ -320,10 +320,13 @@ declare global {
 }
 
 import {
+  CHANNEL_PROVIDER,
   duplicateAfterEdit,
   exactDuplicate,
   inheritedSeen,
+  LIST_QUALITIES,
   settleRunError,
+  videoRef,
   type EpisodeRef,
   type Watch
 } from '@shared/automation'
@@ -612,6 +615,8 @@ export function installMockApi(): void {
       return { ok: true, counts: plan.counts, settings: { ...settings } }
     },
     chooseDirectory: async () => null,
+    // A folder with "small" in its name is short of room, to see the card's warning.
+    freeSpace: async (dir) => ({ bytes: /small/i.test(dir) ? 50_000_000 : 500_000_000_000, reliable: true }),
     chooseCookiesFile: async () => null,
     openPath: async () => '',
     showInFolder: async () => true,
@@ -621,6 +626,8 @@ export function installMockApi(): void {
     readClipboard: async () => '',
     ensureYtdlp: async () => appInfo.ytdlp,
     updateYtdlp: async () => ({ ok: true, version: 'mock' }),
+    // Older, so the offer on a row whose site changed can be looked at.
+    engineFreshness: async () => ({ current: '2026.01.01', latest: '2026.03.17', older: true }),
     checkForUpdates: async () => appInfo.update,
     downloadUpdate: async () => undefined,
     installUpdate: async () => undefined,
@@ -710,7 +717,26 @@ export function installMockApi(): void {
       waiting state can be looked at without waiting for a real one.
     */
     autoDescribe: async (url: string) =>
-      /upcoming/i.test(url)
+      /channel|playlist/i.test(url)
+        ? {
+            url,
+            title: 'A channel',
+            thumbnail: undefined,
+            provider: CHANNEL_PROVIDER,
+            defaultTranslator: '',
+            qualities: [...LIST_QUALITIES],
+            translators: [],
+            channel: {
+              entries: Array.from({ length: 12 }, (_, i) =>
+                videoRef(`v${12 - i}`, `https://example.com/watch/v${12 - i}`, `Upload number ${12 - i}`)
+              ),
+              // One link with "live" in it shows the line about what is on air.
+              waiting: /live/i.test(url) ? [videoRef('live', 'https://example.com/watch/live', 'On air now')] : [],
+              newestLast: false,
+              count: 240
+            }
+          }
+        : /upcoming/i.test(url)
         ? {
             url,
             title: 'A film that is not out yet',

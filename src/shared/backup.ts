@@ -29,6 +29,7 @@ import {
   episodeKey,
   exactDuplicate,
   inheritedSeen,
+  videoRef,
   migrateWatches,
   normaliseSmbTarget,
   sameDub,
@@ -279,6 +280,16 @@ function isEpisodeRef(v: unknown): v is EpisodeRef {
   )
 }
 
+/** A ref with only what a ref has. An upload keeps its id, and where to fetch it from when that is owed. */
+function cleanRef(ref: EpisodeRef): EpisodeRef {
+  if (!ref.videoId || typeof ref.videoId !== 'string') return { season: ref.season, episode: ref.episode }
+  return videoRef(
+    ref.videoId,
+    typeof ref.videoUrl === 'string' ? ref.videoUrl : undefined,
+    typeof ref.videoTitle === 'string' ? ref.videoTitle : undefined
+  )
+}
+
 function cleanReplacements(raw: unknown): Replacement[] {
   if (!Array.isArray(raw)) return []
   return raw
@@ -342,7 +353,7 @@ function cleanWatch(raw: Watch): Watch {
     const key = episodeKey(ref)
     if (keys.has(key)) continue
     keys.add(key)
-    seen.push({ season: ref.season, episode: ref.episode })
+    seen.push(cleanRef(ref))
   }
   const steps = raw.steps
     .map(cleanStep)
@@ -365,7 +376,13 @@ function cleanWatch(raw: Watch): Watch {
     steps,
     createdAt: raw.createdAt,
     ...(raw.pending === true ? { pending: true } : {}),
-    ...(isNumber(raw.releaseAt) ? { releaseAt: raw.releaseAt } : {})
+    ...(isNumber(raw.releaseAt) ? { releaseAt: raw.releaseAt } : {}),
+    // Without these a followed list would, on its next look, take its place in the list for news.
+    ...(raw.newestLast === true ? { newestLast: true } : {}),
+    ...(isNumber(raw.listCount) ? { listCount: raw.listCount } : {}),
+    ...(Array.isArray(raw.owed)
+      ? { owed: raw.owed.filter(isEpisodeRef).map(cleanRef).filter((ref) => ref.videoUrl) }
+      : {})
   }
 }
 

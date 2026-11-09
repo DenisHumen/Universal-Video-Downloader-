@@ -83,7 +83,7 @@ describe('composeFailure', () => {
     const html = composeFailure('Show', 1, 4, 'Could not reach 192.168.1.10', 3)
     expect(html).toContain('S01E04')
     expect(html).toContain('Failed 3 times')
-    expect(html).toContain('New Episodes screen')
+    expect(html).toContain('New Episodes and Videos screen')
   })
 
   it('says nothing about goes for a single one', () => {
@@ -230,7 +230,7 @@ describe('in Russian', () => {
   it('counts the failed goes the way Russian counts', () => {
     expect(composeFailure('Шоу', 1, 4, 'причина', 3, 'ru')).toContain('Не удалось 3 раза')
     expect(composeFailure('Шоу', 1, 4, 'причина', 5, 'ru')).toContain('Не удалось 5 раз,')
-    expect(composeFailure('Шоу', 1, 4, 'причина', 3, 'ru')).toContain('«Новые серии»')
+    expect(composeFailure('Шоу', 1, 4, 'причина', 3, 'ru')).toContain('«Новые серии и видео»')
     expect(composeFailure('Шоу', 1, 4, 'причина', 1, 'ru')).not.toContain('Не удалось')
   })
 

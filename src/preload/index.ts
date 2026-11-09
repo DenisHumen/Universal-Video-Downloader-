@@ -1,3 +1,5 @@
+import type { FreeSpace } from '@shared/disk'
+import type { EngineFreshness } from '@shared/engine-version'
 import type { AddedWatch, CheckSummary, RetryAnswer, Run, ShareFolderPick, SmbTarget, Watch } from '@shared/automation'
 import type { ReportPreview, SendOutcome } from '@shared/report'
 import type { ExportOutcome, ImportOutcome } from '@shared/backup'
@@ -155,6 +157,7 @@ const api = {
 
   // Shell / dialogs
   chooseDirectory: (): Promise<string | null> => ipcRenderer.invoke(IPC.chooseDirectory),
+  freeSpace: (dir: string): Promise<FreeSpace | undefined> => ipcRenderer.invoke(IPC.freeSpace, dir),
   chooseCookiesFile: (): Promise<string | null> => ipcRenderer.invoke(IPC.chooseCookiesFile),
   openPath: (path: string): Promise<string> => ipcRenderer.invoke(IPC.openPath, path),
   showInFolder: (path: string): Promise<boolean> => ipcRenderer.invoke(IPC.showInFolder, path),
@@ -164,6 +167,7 @@ const api = {
   // Engine
   ensureYtdlp: (): Promise<YtDlpStatus> => ipcRenderer.invoke(IPC.ytdlpEnsure),
   updateYtdlp: (): Promise<EngineUpdateResult> => ipcRenderer.invoke(IPC.ytdlpUpdate),
+  engineFreshness: (): Promise<EngineFreshness> => ipcRenderer.invoke(IPC.engineFreshness),
   takePending: (): Promise<PendingDelivery> => ipcRenderer.invoke(IPC.takePending),
 
   // Error reports — by id; null when main no longer holds that failure.

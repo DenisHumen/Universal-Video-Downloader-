@@ -15,6 +15,7 @@ const h = vi.hoisted(() => ({
   checkWatch: vi.fn(),
   runEpisode: vi.fn(),
   recordOutcome: vi.fn(),
+  stillGoingOn: vi.fn(),
   runs: new Map<string, Run>()
 }))
 
@@ -25,6 +26,7 @@ vi.mock('electron', () => ({
 }))
 vi.mock('../log', () => ({ log: { info: vi.fn(), warn: vi.fn(), error: vi.fn() } }))
 vi.mock('./detect', () => ({ checkWatch: h.checkWatch }))
+vi.mock('./channel', () => ({ stillGoingOn: h.stillGoingOn }))
 vi.mock('./pipeline', () => ({
   alertChannel: () => undefined,
   recordOutcome: h.recordOutcome,
@@ -108,6 +110,8 @@ describe('watcher', () => {
     h.checkWatch.mockReset()
     h.runEpisode.mockReset()
     h.recordOutcome.mockReset()
+    h.stillGoingOn.mockReset()
+    h.stillGoingOn.mockResolvedValue(false)
     h.runs.clear()
     // A fresh module each time: the slots and the in-flight set are module state.
     vi.resetModules()
@@ -318,6 +322,113 @@ describe('watcher', () => {
     expect(watcher.retryRun('r2')).toMatchObject({ error: expect.any(String) })
     expect(watcher.retryRun('missing')).toMatchObject({ error: expect.any(String) })
     expect(h.runEpisode).not.toHaveBeenCalled()
+  })
+
+  describe('a channel', () => {
+    const upload = (id: string): EpisodeRef => ({
+      season: 0,
+      episode: 0,
+      videoId: id,
+      videoUrl: `https://example.com/watch/${id}`,
+      videoTitle: id
+    })
+
+    it('writes down what the listing changes, and fetches what is new', async () => {
+      watch('a', { provider: 'channel' })
+      h.checkWatch.mockResolvedValue(found([upload('v1')], { patch: { listCount: 12, owed: [upload('v1')] } }))
+      h.runEpisode.mockResolvedValue('done')
+      await watcher.checkNow('a')
+      await settle()
+      expect(h.watches.get('a')).toMatchObject({ listCount: 12, owed: [upload('v1')] })
+      expect(h.runEpisode.mock.calls[0][1]).toEqual(upload('v1'))
+    })
+
+    it('leaves an upload that is still going on, and does not mark it handled', async () => {
+      watch('a', { provider: 'channel' })
+      h.checkWatch.mockResolvedValue(found([upload('live'), upload('v2')]))
+      h.stillGoingOn.mockImplementation(async (url: string) => url.endsWith('live'))
+      h.runEpisode.mockResolvedValue('done')
+      await watcher.checkNow('a')
+      await settle()
+      expect(h.runEpisode).toHaveBeenCalledTimes(1)
+      expect(h.runEpisode.mock.calls[0][1]).toEqual(upload('v2'))
+      expect(h.recordOutcome).toHaveBeenCalledTimes(1)
+    })
+
+    it('does not ask about an episode of a series', async () => {
+      watch('a')
+      h.checkWatch.mockResolvedValue(found([ep(1)]))
+      h.runEpisode.mockResolvedValue('done')
+      await watcher.checkNow('a')
+      await settle()
+      expect(h.stillGoingOn).not.toHaveBeenCalled()
+    })
+
+    it('says so on the watch when a list was set aside, without calling the check a failure', async () => {
+      watch('a', { provider: 'channel', failures: 2 })
+      h.checkWatch.mockResolvedValue(found([], { listChanged: true }))
+      await watcher.checkNow('a')
+      await settle()
+      expect(h.watches.get('a')).toMatchObject({ lastRunError: expect.stringContaining('list changed'), failures: 0 })
+      expect(h.watches.get('a')?.lastError).toBeUndefined()
+    })
+
+    it('counts a bot check as a failed check and backs off', async () => {
+      watch('a', { provider: 'channel', intervalMinutes: 360 })
+      const why = 'YouTube is asking this computer to prove it is not a bot.'
+      h.checkWatch.mockRejectedValue(new Error(why))
+      watcher.tick()
+      await settle()
+      const after = h.watches.get('a')
+      expect(after).toMatchObject({ lastError: why, failures: 1 })
+      expect(after!.nextCheckAt).toBeGreaterThanOrEqual(NOW + 720 * MIN)
+    })
+
+    it('never looks at one more often than the floor, whatever the watch says', () => {
+      watch('a', { provider: 'channel', intervalMinutes: 15 })
+      const at = watcher.nextDue(h.watches.get('a')!, NOW)
+      expect(at).toBeGreaterThanOrEqual(NOW + 30 * MIN)
+    })
+
+    it('spreads its jitter with its pace', () => {
+      const w = watch('a', { provider: 'channel', intervalMinutes: 1440 })
+      const spread = new Set(Array.from({ length: 40 }, () => watcher.nextDue(w, NOW)))
+      expect(Math.max(...spread) - Math.min(...spread)).toBeGreaterThan(5 * MIN)
+    })
+
+    it('leaves a gap between looks at lists, so fifty do not arrive at a site together', async () => {
+      watch('a', { provider: 'channel' })
+      watch('b', { provider: 'channel' })
+      h.checkWatch.mockResolvedValue(found([]))
+      watcher.tick()
+      await settle()
+      expect(h.checkWatch).toHaveBeenCalledTimes(1)
+      await vi.advanceTimersByTimeAsync(21_000)
+      watcher.tick()
+      await settle()
+      expect(h.checkWatch).toHaveBeenCalledTimes(2)
+    })
+
+    it('tries a failed upload again from what its run kept', async () => {
+      watch('a', { provider: 'channel' })
+      h.runEpisode.mockResolvedValue('done')
+      h.runs.set('r9', {
+        id: 'r9',
+        watchId: 'a',
+        season: 0,
+        episode: 0,
+        videoId: 'v1',
+        videoUrl: 'https://example.com/watch/v1',
+        videoTitle: 'v1',
+        title: 'a',
+        state: 'failed',
+        steps: [],
+        startedAt: 1
+      })
+      expect(watcher.retryRun('r9')).toEqual({ started: true })
+      await settle()
+      expect(h.runEpisode.mock.calls[0][1]).toEqual(upload('v1'))
+    })
   })
 
   it('starts nothing while the machine says it is offline', async () => {

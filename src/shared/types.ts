@@ -1,3 +1,4 @@
+import type { SizeEstimate } from './disk'
 import type { AccentChoice } from './accent'
 import type { SmbTarget } from './automation'
 // Shared types used by the main process, preload bridge and renderer.
@@ -339,6 +340,8 @@ export interface DownloadRequest {
   waitForVideo?: boolean
   /** A live broadcast: it runs until somebody stops it, and stopping it keeps what was recorded. */
   live?: boolean
+  /** What it should weigh, when the card could tell: the queue checks there is room for it. */
+  sizeEstimate?: SizeEstimate
 }
 
 /** Send a finished file to a configured share. The file is looked up from `id`, never taken from the window. */
@@ -398,6 +401,8 @@ export interface MediaJobRequest {
 export interface DownloadItem {
   id: string
   url: string
+  /** What the card expected it to weigh, kept so a retry is checked as well. */
+  sizeEstimate?: SizeEstimate
   /** Downloading a video, or reworking a local file. Absent means 'download'. */
   kind?: QueueKind
   /** For trim/convert jobs: the file being reworked. */

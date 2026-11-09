@@ -6,6 +6,7 @@ import { useT } from '../i18n'
 import { useStore } from '../store'
 import { toast } from '../lib/toast'
 import HelpLink from './HelpLink'
+import UpdateRetryButton from './UpdateRetryButton'
 import { FIX_LABEL, fixFor, retryAt, scheduleRetry, subscribeRetries } from '../lib/fixes'
 
 export interface FixBarProps {
@@ -169,6 +170,7 @@ export default function FixBar({
   return (
     <div className="mt-2">
       <div className="flex flex-wrap items-center gap-2">
+        <UpdateRetryButton errorCode={errorCode} said={copyText} onRetry={onRetry} />
         {fixButton()}
         {report && (
           <button type="button" className="btn-quiet" aria-expanded={report.open} onClick={report.onToggle}>

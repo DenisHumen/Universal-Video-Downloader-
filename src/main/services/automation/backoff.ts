@@ -1,4 +1,5 @@
-import { upcomingDelayMinutes, type Watch } from '@shared/automation'
+import { isChannelWatch, upcomingDelayMinutes, type Watch } from '@shared/automation'
+import { CHANNEL_MIN_INTERVAL } from '@shared/channel'
 
 /**
  * How a watch's schedule answers a check that failed, or a change of pace.
@@ -12,6 +13,11 @@ export const MIN_INTERVAL_MINUTES = 15
 
 /** How much a failing watch backs off, in multiples of its own interval. */
 const BACKOFF = [1, 2, 4, 8, 12]
+
+/** A watch's pace, with its kind's floor: a channel is asked less often than a series can be. */
+export function paceOf(watch: Pick<Watch, 'provider' | 'intervalMinutes'>): number {
+  return isChannelWatch(watch) ? Math.max(CHANNEL_MIN_INTERVAL, watch.intervalMinutes) : watch.intervalMinutes
+}
 
 /** Never back off past a day, unless the watch's own pace is slower than that. */
 const CAP_MINUTES = 24 * 60
@@ -50,7 +56,7 @@ export function rescheduledCheck(
 ): number | undefined {
   const minutes = watch.pending
     ? upcomingDelayMinutes(watch.releaseAt, intervalMinutes, now)
-    : backoffMinutes(intervalMinutes, watch.failures)
+    : backoffMinutes(paceOf({ provider: watch.provider, intervalMinutes }), watch.failures)
   const sooner = now + minutes * 60_000
   return watch.nextCheckAt > sooner ? sooner : undefined
 }
@@ -120,7 +126,7 @@ export function settleFailedCheck(
       lastError: check.why,
       failures,
       nextCheckAt:
-        check.now + backoffMinutes(watch.intervalMinutes, failures) * 60_000 + check.jitter
+        check.now + backoffMinutes(paceOf(watch), failures) * 60_000 + check.jitter
     }
   }
 }

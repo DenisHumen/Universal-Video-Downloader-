@@ -22,10 +22,11 @@ import { addRun, getWatch, lastRunFor, updateRun, updateWatch } from './store'
 import { uploadFile } from './smb'
 import { currentLanguage } from '../locale'
 import { reasonIn } from '../words'
-import { composeEpisodeNews, composeFailure, sendNotification, TelegramError } from './telegram'
+import { composeEpisodeNews, composeFailure, composeVideoFailure, sendNotification, TelegramError } from './telegram'
 import {
   byStepOrder,
   episodeKey,
+  isChannelWatch,
   remoteDirFor,
   renameFor,
   settleEpisode,
@@ -189,6 +190,7 @@ export async function runEpisode(
     watchId: watch.id,
     season: ref.season,
     episode: ref.episode,
+    ...(ref.videoId ? { videoId: ref.videoId, videoUrl: ref.videoUrl, videoTitle: ref.videoTitle } : {}),
     title: seriesTitle,
     state: 'running',
     steps: kinds.map((kind) => ({ kind, state: 'pending' })),
@@ -219,7 +221,9 @@ export async function runEpisode(
   const awake = `delivery:${run.id}`
 
   const values = (): TemplateValues => ({
-    title: seriesTitle,
+    // On a channel, `{title}` is the upload's and `{channel}` is who published it.
+    title: ref.videoTitle ?? seriesTitle,
+    ...(ref.videoId ? { videoId: ref.videoId, channel: seriesTitle } : {}),
     season: ref.season,
     episode: ref.episode,
     quality: watch.quality,
@@ -259,11 +263,12 @@ export async function runEpisode(
   const download = async (): Promise<string> => {
     const item = await startDownload({
       url: downloadUrlFor(watch, ref),
-      title: `${seriesTitle} ${episodeKey(ref)}`,
+      title: ref.videoTitle ?? `${seriesTitle} ${episodeKey(ref)}`,
       series: seriesTitle,
       thumbnail: watch.thumbnail,
       mode: 'video',
-      quality: watch.quality as never,
+      // The engine takes a height where a site's resolver takes a site's own label.
+      quality: (isChannelWatch(watch) ? watch.quality.replace(/p$/i, '') : watch.quality) as never,
       outputDir: watch.outputDir
     })
     updateRun(run.id, { downloadId: item.id })
@@ -437,6 +442,7 @@ export async function runEpisode(
               series: seriesTitle,
               season: ref.season,
               episode: ref.episode,
+              video: ref.videoTitle ?? ref.videoId,
               translator: watch.translatorName,
               quality: watch.quality,
               remotePath,
@@ -530,7 +536,9 @@ export async function runEpisode(
       await sendNotification(
         channel.token,
         channel.chatId,
-        composeFailure(seriesTitle, ref.season, ref.episode, reasonIn(language, why, code), options.attempt, language)
+        ref.videoId
+          ? composeVideoFailure(seriesTitle, ref.videoTitle ?? ref.videoId, reasonIn(language, why, code), options.attempt, language)
+          : composeFailure(seriesTitle, ref.season, ref.episode, reasonIn(language, why, code), options.attempt, language)
       ).catch((err) => {
         // Nobody will hear about this failure now, so the log at least has to.
         log.warn('notify', 'The failure alert could not be sent', {

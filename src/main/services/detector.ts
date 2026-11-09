@@ -58,7 +58,7 @@ export interface RawFormat {
   language_preference?: number | null
 }
 
-interface RawInfo {
+export interface RawInfo {
   _type?: string
   id?: string
   title?: string
@@ -69,6 +69,7 @@ interface RawInfo {
   duration_string?: string
   uploader?: string
   channel?: string
+  channel_id?: string
   webpage_url?: string
   original_url?: string
   url?: string
@@ -77,6 +78,9 @@ interface RawInfo {
   /** On a flat-playlist entry: the extractor that will handle it. */
   ie_key?: string
   is_live?: boolean
+  live_status?: string
+  timestamp?: number
+  upload_date?: string
   view_count?: number
   formats?: RawFormat[]
   entries?: RawInfo[]
@@ -190,7 +194,7 @@ export function mapFormats(formats: RawFormat[] = []): VideoFormat[] {
     })
 }
 
-function pickThumbnail(info: RawInfo): string | undefined {
+export function pickThumbnail(info: RawInfo): string | undefined {
   if (info.thumbnail) return info.thumbnail
   if (info.thumbnails && info.thumbnails.length) {
     return info.thumbnails[info.thumbnails.length - 1].url
@@ -539,13 +543,13 @@ function syntheticInfo(pageUrl: string, resolved: ResolvedUrl): MediaInfo {
   }
 }
 
-type JsonProbe =
+export type JsonProbe =
   /** `text` is the engine's JSON as printed, for `--load-info-json`. */
   | { ok: true; raw: RawInfo; text: string; stderr: string }
   /** `output` is what the engine printed, kept for the error report. */
   | { ok: false; error: string; errorCode?: AppErrorCode; cookieHint?: boolean; output?: string }
 
-function spawnJson(args: string[], signal: AbortSignal | undefined, timeoutMs: number): Promise<JsonProbe> {
+export function spawnJson(args: string[], signal: AbortSignal | undefined, timeoutMs: number): Promise<JsonProbe> {
   return new Promise((resolve) => {
     /*
       Before spawning, because an abort that has already happened will never
@@ -668,7 +672,7 @@ export function flattenEntries(raw: RawInfo[], depth = 0): RawInfo[] {
   out, may be unsupported" instead of the engine's own "connection timed out".
   At 10 s a blocked host fails in about 40 s, inside the cap, with its reason.
 */
-const PROBE_SOCKET_TIMEOUT = ['--socket-timeout', '10']
+export const PROBE_SOCKET_TIMEOUT = ['--socket-timeout', '10']
 
 /*
   How long a YouTube probe waits for a runtime fetch already under way: a first

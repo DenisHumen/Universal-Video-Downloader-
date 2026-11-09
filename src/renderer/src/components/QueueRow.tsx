@@ -223,6 +223,8 @@ function QueueRow({ item, index, animateIn = true, heading }: Props): JSX.Elemen
       formatId: change.mode === 'audio' ? undefined : item.formatId,
       targetHeight: change.mode === 'audio' ? undefined : item.targetHeight,
       duration: item.duration,
+      // Audio instead is another file altogether, and it is the new folder's room that gets asked about.
+      sizeEstimate: change.mode === 'audio' ? undefined : item.sizeEstimate,
       extractor: item.extractor,
       uploader: item.uploader,
       series: item.series,

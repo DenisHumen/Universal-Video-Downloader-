@@ -7,7 +7,9 @@ import { describeError } from '../lib/errors'
 import { releaseDate, releaseText } from '../lib/release'
 import { useStore } from '../store'
 import Thumbnail from './Thumbnail'
+import { CHANNEL_PICKS, firstFollow } from '@shared/channel'
 import {
+  episodeKey,
   exactDuplicate,
   inheritedSeen,
   MAX_PER_CHECK,
@@ -50,6 +52,8 @@ export default function AddWatchDialog({
   const [saving, setSaving] = useState(false)
   /** Whether the episodes already out are fetched too. On by default: it is what every watch did before it was asked. */
   const [backfill, setBackfill] = useState(true)
+  /** How many of the newest uploads of a channel to fetch on following it. None unless somebody asks. */
+  const [latest, setLatest] = useState(0)
   /** What is watched already, read alongside the series so a duplicate can be pointed out before it is made. */
   const [watches, setWatches] = useState<Watch[]>([])
 
@@ -107,10 +111,26 @@ export default function AddWatchDialog({
   const backlog =
     series && dub ? newEpisodes(inheritedSeen(watches, { ...series, seen: [] }), dub.list) : []
 
+  /*
+    A channel or playlist has no dubs and, usually, far more on it than anybody
+    wants at once, so the question is the other way round from a series': nothing
+    is fetched unless somebody says so. What another watch of this list has
+    handled is not on offer, for the same reason as above.
+  */
+  const list = offer?.channel
+  const handled = new Set(series && list ? inheritedSeen(watches, { ...series, seen: [] }).map(episodeKey) : [])
+  const unhandled = list ? list.entries.filter((ref) => !handled.has(episodeKey(ref))) : []
+  const pickOptions = CHANNEL_PICKS.filter((n) => n <= unhandled.length).map((n) => ({
+    value: String(n),
+    label: n === 0 ? t('auto.pickNone') : n === 1 ? t('auto.pickOne') : t('auto.pickLatest', { n })
+  }))
+  const qualityName = (q: string): string => (q === 'best' ? t('common.best') : q)
+
   const add = async (): Promise<void> => {
     if (!offer) return
     setSaving(true)
     try {
+      const first = list ? firstFollow(unhandled, list.waiting, latest, list.newestLast) : undefined
       const created = await window.api.autoAdd({
         url: offer.url,
         title: offer.title,
@@ -138,7 +158,14 @@ export default function AddWatchDialog({
           season may well have the rest. Nothing is out for an upcoming title,
           so there is nothing to mark.
         */
-        seen: offer.upcoming || backfill ? [] : dub?.list ?? [],
+        seen: first ? first.seen : offer.upcoming || backfill ? [] : dub?.list ?? [],
+        ...(list && first
+          ? {
+              owed: first.owed.length ? first.owed : undefined,
+              newestLast: list.newestLast || undefined,
+              listCount: list.count
+            }
+          : {}),
         steps: [{ id: crypto.randomUUID(), kind: 'download', enabled: true }]
       })
       // Only when the list read with the series was out of date; the button is off for a known copy.
@@ -192,7 +219,13 @@ export default function AddWatchDialog({
             <PreferencesGroup>
               <ActionRow
                 title={offer.title}
-                subtitle={offer.upcoming ? releaseText(offer.upcoming.releaseAt, t) : tp('auto.dubCount', offer.translators.length)}
+                subtitle={
+                  offer.upcoming
+                    ? releaseText(offer.upcoming.releaseAt, t)
+                    : list
+                      ? tp('auto.nVideos', list.count ?? list.entries.length)
+                      : tp('auto.dubCount', offer.translators.length)
+                }
                 prefix={<Poster src={offer.thumbnail} />}
               />
               {/*
@@ -221,8 +254,8 @@ export default function AddWatchDialog({
               )}
             </PreferencesGroup>
 
-            <PreferencesGroup footer={offer.upcoming ? undefined : t('auto.dubHint')}>
-              {!offer.upcoming && (
+            <PreferencesGroup footer={offer.upcoming || list ? undefined : t('auto.dubHint')}>
+              {!offer.upcoming && !list && (
                 <ComboRow
                   title={t('auto.dub')}
                   value={translatorId}
@@ -237,9 +270,21 @@ export default function AddWatchDialog({
                 title={t('common.quality')}
                 value={quality}
                 onChange={setQuality}
-                options={offer.qualities.map((q) => ({ value: q, label: q }))}
+                options={offer.qualities.map((q) => ({ value: q, label: qualityName(q) }))}
               />
-              {!offer.upcoming && backlog.length > 0 && (
+              {list && pickOptions.length > 1 && (
+                <ComboRow
+                  title={t('auto.pickTitle')}
+                  subtitle={t('auto.pickHint')}
+                  value={String(latest)}
+                  onChange={(v) => setLatest(Number(v))}
+                  options={pickOptions}
+                />
+              )}
+              {list && list.waiting.length > 0 && (
+                <ActionRow title={t('auto.listLive', { n: list.waiting.length })} prefix={<CalendarClock size={16} />} />
+              )}
+              {!offer.upcoming && !list && backlog.length > 0 && (
                 <SwitchRow
                   title={t('auto.backfill', { n: String(backlog.length) })}
                   subtitle={

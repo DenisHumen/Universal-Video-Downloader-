@@ -99,10 +99,37 @@ export interface SmbTarget {
   username: string
 }
 
-/** One episode, as a watch knows it. */
+/**
+ * One episode, as a watch knows it - or one upload of a channel or playlist.
+ *
+ * An upload has no numbers, and 0/0 stands in for them so that everything which
+ * only passes a ref along, or stores one, need not know the difference. What
+ * tells uploads apart is the site's id; see `episodeKey`.
+ */
 export interface EpisodeRef {
   season: number
   episode: number
+  /** The site's id for an upload. Survives a renamed channel and a reshuffled list. */
+  videoId?: string
+  /** Where to fetch it from. Absent in `seen`, which only needs the id. */
+  videoUrl?: string
+  videoTitle?: string
+}
+
+/** Which provider a channel or playlist the engine lists goes by. */
+export const CHANNEL_PROVIDER = 'channel'
+
+export const isChannelWatch = (watch: Pick<Watch, 'provider'>): boolean => watch.provider === CHANNEL_PROVIDER
+
+/** An upload as a ref. */
+export function videoRef(videoId: string, videoUrl?: string, videoTitle?: string): EpisodeRef {
+  return {
+    season: 0,
+    episode: 0,
+    videoId,
+    ...(videoUrl ? { videoUrl } : {}),
+    ...(videoTitle ? { videoTitle } : {})
+  }
 }
 
 /**
@@ -169,6 +196,17 @@ export interface Watch {
    * episode has never failed, or has been settled since.
    */
   attempts?: Record<string, number>
+  /**
+   * A channel's uploads that are to be fetched but have not been handled yet: the
+   * "latest N" picked when following, what a check found, what is live until it
+   * ends. With their addresses, so a go can start whether or not the next listing
+   * still shows them. An upload leaves when it reaches `seen`.
+   */
+  owed?: EpisodeRef[]
+  /** A channel's list keeps its newest at the end, as a playlist usually does. Decided once; see `keepsNewestLast`. */
+  newestLast?: boolean
+  /** How long the list said it was at the last look, so a long one has its far end read only when it has grown. */
+  listCount?: number
 }
 
 export interface RunStep {
@@ -187,6 +225,10 @@ export interface Run {
   watchId: string
   season: number
   episode: number
+  /** For an upload of a channel: what `EpisodeRef` carries, kept so "try again" can find it. */
+  videoId?: string
+  videoUrl?: string
+  videoTitle?: string
   /** The series title at the time, so history stays readable if it is renamed. */
   title: string
   state: RunState
@@ -243,11 +285,17 @@ export interface TemplateValues {
   episode: number
   quality?: string
   ext?: string
+  /** An upload's id: its presence is what makes these an upload's values, with no season or episode to name. */
+  videoId?: string
+  /** Who published it, for `{channel}`. A series has none, and its title stands in. */
+  channel?: string
 }
 
 /** Every token a template understands, for the UI to offer. */
 export const TEMPLATE_TOKENS = [
   'title',
+  'channel',
+  'id',
   'season',
   'episode',
   'season2',
@@ -294,12 +342,16 @@ export function fillTemplate(
   values: TemplateValues,
   now: Date = new Date()
 ): string {
+  // An upload's 0 is not a number anybody should read: "S00E00" on every file of a channel.
+  const numbered = values.videoId === undefined
   const table: Record<string, string> = {
     title: values.title,
-    season: String(values.season),
-    episode: String(values.episode),
-    season2: pad2(values.season),
-    episode2: pad2(values.episode),
+    channel: values.channel ?? values.title,
+    id: values.videoId ?? '',
+    season: numbered ? String(values.season) : '',
+    episode: numbered ? String(values.episode) : '',
+    season2: numbered ? pad2(values.season) : '',
+    episode2: numbered ? pad2(values.episode) : '',
     quality: values.quality ?? '',
     ext: values.ext ?? '',
     year: String(now.getFullYear()),
@@ -329,6 +381,9 @@ export function safeSegment(name: string): string {
 /** What a new rename step starts with, and what one that fills to nothing falls back to. */
 export const DEFAULT_RENAME_TEMPLATE = '{title} - S{season2}E{episode2}'
 
+/** The same for a channel's uploads, which have a name of their own and no numbers. */
+export const DEFAULT_VIDEO_RENAME_TEMPLATE = '{title}'
+
 /** Put after a template that does not name the episode. */
 const EPISODE_SUFFIX = ' - S{season2}E{episode2}'
 
@@ -339,6 +394,22 @@ const EPISODE_SUFFIX = ' - S{season2}E{episode2}'
 */
 const EPISODE_TOKEN = /\{episode2?\}/
 const SEASON_TOKEN = /\{season2?\}/
+const VIDEO_NAME_TOKEN = /\{(?:title|id)\}/
+
+/**
+ * The template a channel's uploads are named by, whatever the step holds.
+ *
+ * One written for a series - a chain copied across, a default kept from before -
+ * would name every upload `Channel - SE`, so a season or an episode in it gives
+ * way to the default. One that names nothing that differs from upload to upload
+ * gets the title on the end, for the reason `renameFor` gives.
+ */
+function videoTemplate(template: string): string {
+  if (!template.trim() || EPISODE_TOKEN.test(template) || SEASON_TOKEN.test(template)) {
+    return DEFAULT_VIDEO_RENAME_TEMPLATE
+  }
+  return VIDEO_NAME_TOKEN.test(template) ? template : `${template} - {title}`
+}
 
 /**
  * Build the filename for one episode, ready to use.
@@ -355,7 +426,11 @@ export function renameFor(
   values: TemplateValues,
   now?: Date
 ): string {
+  const video = values.videoId !== undefined
   const title = applyReplacements(values.title, step.replacements)
+  const shared: TemplateValues = values.channel
+    ? { ...values, channel: applyReplacements(values.channel, step.replacements) }
+    : values
   const fill = (template: string): string => {
     /*
       The title gives way, not the episode. Cutting the finished name at the
@@ -365,12 +440,12 @@ export function renameFor(
       name that fits before it fits after.
     */
     const uses = template.split('{title}').length - 1
-    const rest = fillTemplate(template, { ...values, title: '' }, now).length
+    const rest = fillTemplate(template, { ...shared, title: '' }, now).length
     const room = uses ? Math.max(0, Math.floor((NAME_LIMIT - rest) / uses)) : title.length
-    return safeSegment(fillTemplate(template, { ...values, title: title.slice(0, room) }, now))
+    return safeSegment(fillTemplate(template, { ...shared, title: title.slice(0, room) }, now))
   }
-  let stem = fill(step.template)
-  if (!EPISODE_TOKEN.test(step.template)) {
+  let stem = fill(video ? videoTemplate(step.template) : step.template)
+  if (!video && !EPISODE_TOKEN.test(step.template)) {
     // Cut the stem, not the number, when the whole name would be too long.
     const suffix = fillTemplate(EPISODE_SUFFIX, values, now)
     stem = stem
@@ -378,7 +453,7 @@ export function renameFor(
       : fill(DEFAULT_RENAME_TEMPLATE)
   }
   const ext = values.ext ? `.${values.ext.replace(/^\./, '')}` : ''
-  return `${stem || 'episode'}${ext}`
+  return `${stem || (video ? values.videoId : 'episode')}${ext}`
 }
 
 /**
@@ -388,8 +463,12 @@ export function renameFor(
  * several, E01 of the second season lands on E01 of the first. A blank
  * template has nothing to say - it uses the default, and the preview shows it.
  */
-export function renameGap(template: string): 'episode' | 'season' | undefined {
+export function renameGap(template: string, video = false): 'episode' | 'season' | 'videoNumbers' | 'videoName' | undefined {
   if (!template.trim()) return undefined
+  if (video) {
+    if (EPISODE_TOKEN.test(template) || SEASON_TOKEN.test(template)) return 'videoNumbers'
+    return VIDEO_NAME_TOKEN.test(template) ? undefined : 'videoName'
+  }
   if (!EPISODE_TOKEN.test(template)) return 'episode'
   if (!SEASON_TOKEN.test(template)) return 'season'
   return undefined
@@ -413,16 +492,21 @@ export function remoteDirFor(
     called `a/b` would quietly create a level of its own inside the share.
   */
   const title = safeSegment(applyReplacements(values.title, replacements))
-  return fillTemplate(template, { ...values, title }, now)
+  const channel = values.channel && safeSegment(applyReplacements(values.channel, replacements))
+  return fillTemplate(template, { ...values, title, channel }, now)
     .split(/[\\/]+/)
     .map((segment) => safeSegment(segment))
     .filter(Boolean)
     .join('/')
 }
 
-/** Stable key for "have I handled this episode already". */
+/**
+ * Stable key for "have I handled this episode already". An upload goes by its
+ * id alone, so neither a new channel name nor a new place in the list makes it
+ * a different upload.
+ */
 export function episodeKey(ref: EpisodeRef): string {
-  return `s${ref.season}e${ref.episode}`
+  return ref.videoId ? `v:${ref.videoId}` : `s${ref.season}e${ref.episode}`
 }
 
 /** Episodes present now that the watch has not handled yet, in order. */
@@ -480,6 +564,9 @@ export function watchingAlready(watches: Watch[], series: WatchIdentity): Watch 
  * take the best stream at or below the height they are given.
  */
 export const WATCH_QUALITIES: readonly string[] = ['best', '1080p', '720p', '480p', '360p']
+
+/** The same for a list, whose videos each have their own. Lowest first, as sites list theirs: the dialog starts on the last. */
+export const LIST_QUALITIES: readonly string[] = ['360p', '480p', '720p', '1080p', 'best']
 
 /** `720` and `720p` are one quality: sites spell their lists both ways. */
 const sameQuality = (a: string, b: string): boolean =>
@@ -612,8 +699,10 @@ export function settleEpisode(
     return { attempts: { ...others, [key]: count + 1 } }
   }
   return {
-    seen: isSeen(watch, ref) ? watch.seen : [...watch.seen, ref],
-    attempts: rest
+    // By id only: the address is of no more use, and a channel's list is kept for as long as the watch lives.
+    seen: isSeen(watch, ref) ? watch.seen : [...watch.seen, ref.videoId ? videoRef(ref.videoId) : ref],
+    attempts: rest,
+    ...(watch.owed ? { owed: watch.owed.filter((r) => episodeKey(r) !== key) } : {})
   }
 }
 
@@ -653,6 +742,9 @@ function usable(raw: unknown): raw is Watch {
  */
 /** Where an upload files its episodes when nobody has said otherwise. */
 export const DEFAULT_REMOTE_PATH = '{title}'
+
+/** The same for a channel: `{title}` is one upload there, and would make a folder for each. */
+export const DEFAULT_VIDEO_REMOTE_PATH = '{channel}'
 
 /**
  * The default this replaced.

@@ -9,6 +9,7 @@ import {
   maxHeightOf,
   outcomeResolution,
   resolveSelection,
+  estimateSize,
   selectionForLanguage
 } from './quality'
 
@@ -224,5 +225,49 @@ describe('selectionForLanguage', () => {
     expect(selectionForLanguage(formats, { formatId: '134' }, 'de').formatId).toBe('134')
     expect(selectionForLanguage(formats, { formatId: '18' }).formatId).toBe('18')
     expect(selectionForLanguage(formats, { quality: '720' }, 'de')).toEqual({ quality: '720' })
+  })
+})
+
+describe('estimateSize', () => {
+  const formats: VideoFormat[] = [
+    { id: '299', ext: 'mp4', kind: 'video', resolution: '1080p', height: 1080, filesize: 300_000_000 },
+    { id: '22', ext: 'mp4', kind: 'video+audio', resolution: '720p', height: 720, filesize: 100_000_000 },
+    { id: '140', ext: 'm4a', kind: 'audio', resolution: 'audio', abr: 128, filesize: 6_000_000 }
+  ]
+
+  it('adds the audio to a stream that needs merging, and says it does', () => {
+    expect(estimateSize(formats, { mode: 'video', quality: 'best' })).toEqual({ bytes: 306_000_000, exact: true, merging: true })
+  })
+
+  it('takes one stream with its sound as it is', () => {
+    expect(estimateSize(formats, { mode: 'video', quality: '720' })).toEqual({ bytes: 100_000_000, exact: true, merging: false })
+    expect(estimateSize(formats, { mode: 'video', formatId: '22' })).toEqual({ bytes: 100_000_000, exact: true, merging: false })
+  })
+
+  it('calls an approximate size what it is', () => {
+    const approx: VideoFormat[] = [{ id: 'a', ext: 'mp4', kind: 'video+audio', resolution: '720p', height: 720, filesizeApprox: 5_000 }]
+    expect(estimateSize(approx, { mode: 'video', quality: 'best' })).toEqual({ bytes: 5_000, exact: false, merging: false })
+  })
+
+  it('works one out from length and bitrate, as a guess', () => {
+    const rated: VideoFormat[] = [{ id: 'a', ext: 'mp4', kind: 'video+audio', resolution: '720p', height: 720, tbr: 800 }]
+    expect(estimateSize(rated, { mode: 'video', quality: 'best' }, 100)).toEqual({ bytes: 10_000_000, exact: false, merging: false })
+    expect(estimateSize(rated, { mode: 'video', quality: 'best' })).toBeUndefined()
+  })
+
+  it('says nothing when one of two streams has no figure: half a figure reads as room to spare', () => {
+    const half: VideoFormat[] = [
+      { id: 'v', ext: 'mp4', kind: 'video', resolution: '1080p', height: 1080, filesize: 300 },
+      { id: 'a', ext: 'm4a', kind: 'audio', resolution: 'audio' }
+    ]
+    expect(estimateSize(half, { mode: 'video', quality: 'best' })).toBeUndefined()
+  })
+
+  it('never takes a converted audio file for an exact size', () => {
+    expect(estimateSize(formats, { mode: 'audio' })).toEqual({ bytes: 6_000_000, exact: false, merging: false })
+  })
+
+  it('has nothing to say with no formats', () => {
+    expect(estimateSize([], { mode: 'video' })).toBeUndefined()
   })
 })

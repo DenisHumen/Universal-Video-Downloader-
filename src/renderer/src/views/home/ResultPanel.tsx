@@ -6,6 +6,7 @@ import { errorReport, errorText } from '../../lib/errors'
 import { fixFor } from '../../lib/fixes'
 import FixBar from '../../components/FixBar'
 import HelpLink from '../../components/HelpLink'
+import UpdateRetryButton from '../../components/UpdateRetryButton'
 import { browserCanHelp, errorCardLead } from '../../lib/emphasis'
 import { toast } from '../../lib/toast'
 import { Menu, type MenuItem } from '../../ui'
@@ -160,6 +161,7 @@ function ErrorCard({
       <div className="p-4">
         <p className="selectable break-words text-body leading-relaxed text-ink">{errorText(t, { error, errorCode, cookieHint })}</p>
         <div className="mt-4 flex flex-wrap items-center gap-2">
+          <UpdateRetryButton errorCode={errorCode} said={error} onRetry={onRetry} />
           {lead === 'fix' && (
             <FixBar
               leadOnly

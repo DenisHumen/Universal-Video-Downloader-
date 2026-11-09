@@ -1,6 +1,7 @@
 import { net, powerMonitor } from 'electron'
 import { log } from '../log'
-import { backoffMinutes, settleFailedCheck } from './backoff'
+import { backoffMinutes, paceOf, settleFailedCheck } from './backoff'
+import { stillGoingOn } from './channel'
 import { checkWatch } from './detect'
 import { alertChannel, recordOutcome, runEpisode } from './pipeline'
 import { findRun, getWatch, listWatches, updateWatch } from './store'
@@ -10,6 +11,7 @@ import { composeCheckFailure, sendNotification } from './telegram'
 import {
   attemptsAt,
   episodeKey,
+  isChannelWatch,
   isFinalAttempt,
   MAX_ATTEMPTS,
   MAX_PER_CHECK,
@@ -20,6 +22,7 @@ import {
   type Run,
   type Watch
 } from '@shared/automation'
+import { LIST_CHANGED } from '@shared/channel'
 
 /**
  * Deciding when to look, and looking.
@@ -65,7 +68,17 @@ const LAUNCH_DELAY_MS = 30_000
  */
 const REPORT_AFTER_FAILURES = 3
 
+/**
+ * The least time between two looks at channels or playlists.
+ *
+ * They mostly live on one site, and a site that sees fifty listings in a row from
+ * one address is how a bot check starts. Series do not need this: each is on a
+ * site of its own kind, and few people follow fifty.
+ */
+const LIST_GAP_MS = 20_000
+
 let timer: NodeJS.Timeout | null = null
+let lastListAt = 0
 let running = 0
 /** Watches being checked, or still working through what their check found. */
 const inFlight = new Set<string>()
@@ -75,9 +88,14 @@ function jitter(): number {
   return Math.floor(Math.random() * 120_000)
 }
 
+/** A channel's is a tenth of its pace on top: it should not be seen arriving on the hour, every six hours, for ever. */
+function jitterFor(watch: Pick<Watch, 'provider' | 'intervalMinutes'>): number {
+  return jitter() + (isChannelWatch(watch) ? Math.floor(Math.random() * paceOf(watch) * 6_000) : 0)
+}
+
 /** When this watch should next be looked at. */
-export function nextDue(watch: Watch, at = Date.now()): number {
-  return at + backoffMinutes(watch.intervalMinutes, watch.failures) * 60_000 + jitter()
+export function nextDue(watch: Pick<Watch, 'provider' | 'intervalMinutes' | 'failures'>, at = Date.now()): number {
+  return at + backoffMinutes(paceOf(watch), watch.failures) * 60_000 + jitterFor(watch)
 }
 
 /** What reading a page left to do. */
@@ -143,7 +161,15 @@ async function look(watch: Watch, manual: boolean, read: () => void): Promise<Fo
       lastCheckedAt: Date.now(),
       lastError: undefined,
       failures: 0,
-      nextCheckAt: nextDue({ ...watch, failures: 0 })
+      nextCheckAt: nextDue({ ...watch, failures: 0 }),
+      ...result.patch,
+      /*
+        Beside the failures of episodes, where it can be read and dismissed. It is
+        not one of the check's: the list was read perfectly well.
+      */
+      ...(result.listChanged
+        ? { lastRunError: LIST_CHANGED, lastRunErrorCode: undefined, lastRunFailedAt: Date.now() }
+        : {})
     })
 
     const todo = result.fresh.slice(0, MAX_PER_CHECK)
@@ -227,6 +253,17 @@ async function drain(watchId: string, todo: EpisodeRef[], title: string): Promis
     // Re-read: the user may have disabled or deleted the watch mid-run.
     const live = getWatch(watchId)
     if (!live || !live.enabled) break
+    /*
+      Asked now and not when the list was read: the backlog may have taken hours.
+      It stays owed, so the next check that finds it over fetches it.
+    */
+    if (ref.videoUrl && (await stillGoingOn(ref.videoUrl).catch(() => false))) {
+      log.info('watcher', 'Leaving an upload that is live or scheduled until it ends', {
+        id: watchId.slice(0, 8),
+        series: title
+      })
+      continue
+    }
     await attempt(live, ref, title)
   }
 }
@@ -324,6 +361,10 @@ export function tick(): void {
 
   for (const watch of due) {
     if (running >= CONCURRENCY) break
+    if (isChannelWatch(watch)) {
+      if (now - lastListAt < LIST_GAP_MS) continue
+      lastListAt = now
+    }
     void checkOne(watch).done
   }
 }
@@ -371,7 +412,11 @@ export function retryRun(runId: string): RetryAnswer {
   if (!watch.enabled) return { paused: true }
 
   inFlight.add(watch.id)
-  const ref: EpisodeRef = { season: run.season, episode: run.episode }
+  const ref: EpisodeRef = {
+    season: run.season,
+    episode: run.episode,
+    ...(run.videoId ? { videoId: run.videoId, videoUrl: run.videoUrl, videoTitle: run.videoTitle } : {})
+  }
   void attempt(watch, ref, watch.title || run.title, run)
     .catch((err) => {
       log.warn('watcher', `Trying ${episodeKey(ref)} again stopped part-way: ${String(err)}`, {
