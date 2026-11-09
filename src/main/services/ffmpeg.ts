@@ -2,6 +2,7 @@ import { spawn, type ChildProcess } from 'child_process'
 import { dirname, extname, join } from 'path'
 import { existsSync } from 'fs'
 import type { AppErrorCode, ConvertTarget, TrimRange } from '@shared/types'
+import { LOCAL_INPUT } from './ffmpeg-output'
 import { groupSpawnOptions, killTree } from './process'
 
 /**
@@ -129,7 +130,7 @@ export function probeMedia(path: string): Promise<MediaProbe> {
   const bin = ffmpegPath()
   if (!bin) return Promise.resolve({ hasVideo: false, hasAudio: false })
   return new Promise((resolve) => {
-    const child = spawn(bin, ['-hide_banner', '-i', path], { windowsHide: true })
+    const child = spawn(bin, ['-hide_banner', ...LOCAL_INPUT, '-i', path], { windowsHide: true })
     let stderr = ''
     const finish = (): void => {
       clearTimeout(timer)
@@ -190,7 +191,8 @@ const FFMPEG_RULES: { re: RegExp; code: AppErrorCode; message: string }[] = [
     message: 'The bundled ffmpeg can’t encode this format. Pick another one.'
   },
   {
-    re: /invalid data found|moov atom not found/,
+    // Not on the whitelist: not a video at all, whatever it is called. See LOCAL_INPUT.
+    re: /invalid data found|moov atom not found|not on whitelist/,
     code: 'damagedSource',
     message: 'The source file looks damaged or incomplete.'
   }
@@ -315,7 +317,7 @@ export function buildTrimArgs(
 ): string[] {
   const args: string[] = []
   if (range.start && range.start > 0) args.push('-ss', toTimestamp(range.start))
-  args.push('-i', input)
+  args.push(...LOCAL_INPUT, '-i', input)
   const duration = rangeDuration(range)
   if (duration != null) args.push('-t', toTimestamp(duration))
 
@@ -378,7 +380,7 @@ export function buildConvertArgs(
   target: ConvertTarget,
   streams?: Pick<MediaProbe, 'videoCodec' | 'audioCodec'>
 ): string[] {
-  const args: string[] = ['-i', input]
+  const args: string[] = [...LOCAL_INPUT, '-i', input]
 
   if (target.mode === 'audio') {
     args.push('-vn', ...(AUDIO_CODEC[target.container] ?? AUDIO_CODEC.mp3))

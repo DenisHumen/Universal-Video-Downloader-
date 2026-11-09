@@ -138,6 +138,11 @@ afterEach(() => {
 })
 
 describe('refreshEngineIfDue', () => {
+  it('reads no yt-dlp.conf for the self-update', async () => {
+    await refreshEngineIfDue(() => false)
+    expect(h.spawned.find((args) => args.includes('-U'))).toContain('--ignore-config')
+  })
+
   it('records a refresh when the self-update succeeds', async () => {
     const before = Date.now()
     await refreshEngineIfDue(() => false)

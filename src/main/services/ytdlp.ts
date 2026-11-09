@@ -433,7 +433,12 @@ function spawnYtdlp(
   bin: string = ytdlpBinaryPath()
 ): Promise<{ code: number; stdout: string; stderr: string }> {
   return new Promise((resolve) => {
-    const child = spawn(bin, ['--encoding', 'utf-8', ...args], ytdlpSpawnOptions())
+    /*
+      `--ignore-config`, as on every other engine command line. The engine reads a
+      yt-dlp.conf from the folder it was started in, and this one includes `-U`:
+      checked on the real engine, a file left in that folder changes what it does.
+    */
+    const child = spawn(bin, ['--ignore-config', '--encoding', 'utf-8', ...args], ytdlpSpawnOptions())
     let stdout = ''
     let stderr = ''
     child.stdout.setEncoding('utf8')
