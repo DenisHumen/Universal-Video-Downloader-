@@ -31,6 +31,8 @@ jobs:
       - run: npm run typecheck
       - run: npm test
       - run: npm run check:contrast
+      # The browser extension's permissions and files. Node's own modules, so nothing to install.
+      - run: node scripts/package-extension.mjs --check
 
   # Packaging, on every platform that ships.
   #
