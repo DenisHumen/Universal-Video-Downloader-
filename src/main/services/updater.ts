@@ -152,7 +152,15 @@ function wire(): void {
   autoUpdater.logger = {
     info: (message?: unknown) => log.info('updater', firstLine(message)),
     warn: (message?: unknown) => log.warn('updater', firstLine(message)),
-    error: (message?: unknown) => log.error('updater', firstLine(message)),
+    error: (message?: unknown) => {
+      /*
+        "Error: ..." is its echo of its own `error` event, and every one of those
+        is logged once already: by `emit` when somebody asked, by `backgroundCheck`
+        when nobody did. One failed feed read as two failures in the log.
+      */
+      const line = firstLine(message)
+      if (!line.startsWith('Error: ')) log.error('updater', line)
+    },
     debug: () => undefined
   }
 
