@@ -56,8 +56,6 @@ const JAR = (): string => join(app.getPath('userData'), 'browser-cookies.txt')
 const SEALED_JAR = (): string => join(app.getPath('userData'), 'browser-cookies.dat')
 /** One folder per engine run. All of it left over at a launch is from a crash. */
 const COPIES = (): string => join(app.getPath('userData'), 'cookie-copies')
-/** A terminal run's copy left this long has been lost to a kill, not still in use. */
-const TERMINAL_COPY_MAX_AGE = 7 * 24 * 3_600_000
 
 /** Cookies in the last jar written; zero means the engine is not given it. */
 let jarCount = 0
@@ -208,19 +206,6 @@ async function savedJarText(): Promise<string> {
   return (await openText(sealed)) ?? ''
 }
 
-/** Terminal runs killed outright leave their copy, and no later run can tell whose it is but by its age. */
-function clearLostTerminalCopies(now: number): void {
-  try {
-    for (const name of readdirSync(tmpdir())) {
-      if (!name.startsWith('uvd-cookies-')) continue
-      const folder = join(tmpdir(), name)
-      if (now - statSync(folder).mtimeMs > TERMINAL_COPY_MAX_AGE) removeQuietly(folder)
-    }
-  } catch {
-    /* whatever is there can wait for another run */
-  }
-}
-
 /**
  * Use the jar the app wrote, without starting anything that writes one.
  *
@@ -236,7 +221,6 @@ export async function readSavedBrowserJar(): Promise<void> {
   reading = true
   jarCount = 0
   void sweepAbandonedJars()
-  clearLostTerminalCopies(Date.now())
   try {
     const text = await savedJarText()
     const count = netscapeCount(text)

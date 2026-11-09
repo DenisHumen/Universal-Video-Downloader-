@@ -198,7 +198,7 @@ describe('the terminal reading the app’s jar', () => {
     it('puts its own process id on the copy it makes', async () => {
       jar(`${HEADER}${ENTRY}\n`)
       const { browserCookiesFile, dropSavedBrowserJar, readSavedBrowserJar } = await logins()
-      readSavedBrowserJar()
+      await readSavedBrowserJar()
       expect(basename(dirname(browserCookiesFile()!))).toMatch(new RegExp(`^uvd-cookies-${process.pid}-`))
       dropSavedBrowserJar()
     })
