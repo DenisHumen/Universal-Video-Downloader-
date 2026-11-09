@@ -1,14 +1,25 @@
 import { app, type Cookie } from 'electron'
 import { spawn } from 'child_process'
-import { chmodSync, mkdtempSync, readFileSync, renameSync, rmSync, writeFileSync } from 'fs'
+import { randomBytes } from 'crypto'
+import {
+  chmodSync,
+  mkdirSync,
+  mkdtempSync,
+  readdirSync,
+  readFileSync,
+  renameSync,
+  rmSync,
+  statSync,
+  writeFileSync
+} from 'fs'
 import { tmpdir } from 'os'
 import { dirname, join } from 'path'
 import { browsingSession } from '../resolvers/universal/capture'
 import { getSettings } from './settings'
-import { getSecret, SECRET, setSecret } from './secrets'
+import { getSecret, openText, sealText, SECRET, setSecret } from './secrets'
 import { log } from './log'
 import { ytdlpBinaryPath, ytdlpSpawnOptions } from './ytdlp'
-import type { SignInImport } from '@shared/types'
+import type { AppSettings, SignInImport } from '@shared/types'
 import {
   fromNetscape,
   importFailure,
@@ -32,28 +43,37 @@ import {
  *    month here, as "remember me" would.
  *  - The engine never saw the browser's cookies at all. Signed in here, a
  *    download from the same site still went out as a stranger. The jar is now
- *    kept as a cookies.txt the engine is given whenever nothing else is set.
+ *    kept as a cookies.txt the engine is given a copy of whenever nothing else
+ *    is set.
  *  - Nothing remembered a password. The browser now offers to, keeps them in
  *    the encrypted secret store, and fills them in on the same site later.
  */
 
+/** The jar in the clear: as older builds left it, and as a machine with no key still keeps it. */
 const JAR = (): string => join(app.getPath('userData'), 'browser-cookies.txt')
+/** The jar on a machine with a key. Only the terminal reads this: the window has `jarText`. */
+const SEALED_JAR = (): string => join(app.getPath('userData'), 'browser-cookies.dat')
+/** One folder per engine run. All of it left over at a launch is from a crash. */
+const COPIES = (): string => join(app.getPath('userData'), 'cookie-copies')
+/** A terminal run's copy left this long has been lost to a kill, not still in use. */
+const TERMINAL_COPY_MAX_AGE = 7 * 24 * 3_600_000
 
 /** Cookies in the last jar written; zero means the engine is not given it. */
 let jarCount = 0
+/** The jar as of the last change, which each run of the engine gets a copy of. */
+let jarText = ''
 let jarTimer: NodeJS.Timeout | null = null
 let started = false
 /** Reading the jar the app left, for the terminal. */
 let reading = false
 /** The terminal's own copy of that jar. See `readSavedBrowserJar`. */
 let privateJar: string | undefined
+/** One disk write at a time, so an older jar can never land on a newer one. */
+let saving: Promise<unknown> = Promise.resolve()
 
-function writeJar(cookies: Cookie[]): void {
-  const text = toNetscape(cookies)
-  jarCount = netscapeCount(text)
-  const file = JAR()
+// Owner only: these cookies are as good as the passwords that made them.
+function writeOwnerOnly(file: string, text: string): void {
   const temp = `${file}.tmp`
-  // Owner only: these cookies are as good as the passwords that made them.
   writeFileSync(temp, text, { mode: 0o600 })
   try {
     chmodSync(temp, 0o600)
@@ -61,6 +81,33 @@ function writeJar(cookies: Cookie[]): void {
     /* Windows: the profile folder is the user's already */
   }
   renameSync(temp, file)
+}
+
+/**
+ * Chromium keeps these cookies encrypted, and a cookies.txt beside them undid
+ * that for anything able to read the profile. Sealed with the same key as the
+ * saved passwords, the clear copy goes as soon as a sealed one is down. A machine
+ * with no key (a Linux desktop with no keyring) keeps the clear file, because the
+ * terminal has no other way to the sign-ins.
+ */
+async function saveJar(text: string): Promise<void> {
+  const sealed = await sealText(text)
+  if (sealed === null) {
+    writeOwnerOnly(JAR(), text)
+    rmSync(SEALED_JAR(), { force: true })
+    return
+  }
+  writeOwnerOnly(SEALED_JAR(), sealed)
+  rmSync(JAR(), { force: true })
+}
+
+function writeJar(cookies: Cookie[]): void {
+  const text = toNetscape(cookies)
+  jarText = text
+  jarCount = netscapeCount(text)
+  saving = saving
+    .then(() => saveJar(text))
+    .catch((err) => log.warn('browser', 'Could not write the browser cookie jar', { why: String(err) }))
 }
 
 /** Write the jar soon: sign-ins set a burst of cookies, and one write covers them. */
@@ -76,10 +123,27 @@ function scheduleJar(): void {
   jarTimer.unref?.()
 }
 
+function removeQuietly(path: string): void {
+  try {
+    rmSync(path, { recursive: true, force: true, maxRetries: 3, retryDelay: 100 })
+  } catch (err) {
+    log.warn('browser', 'Could not remove a copy of the cookie jar', { why: String(err) })
+  }
+}
+
 /** Called once the app is ready. */
 export function initBrowserLogins(): void {
   if (started) return
   started = true
+  // A crash leaves the copies its runs were using, and a sign-in import's file.
+  removeQuietly(COPIES())
+  try {
+    for (const name of readdirSync(app.getPath('userData'))) {
+      if (/^import-\d+-\d+\.txt$/.test(name)) removeQuietly(join(app.getPath('userData'), name))
+    }
+  } catch {
+    /* nothing there yet */
+  }
   const ses = browsingSession()
   ses.cookies.on('changed', (_e, cookie, _cause, removed) => {
     scheduleJar()
@@ -90,10 +154,69 @@ export function initBrowserLogins(): void {
   scheduleJar()
 }
 
-/** The jar for the engine's `--cookies`, when there is one worth passing. */
+/** Whether the engine would be given a jar. A name to test, not a file to pass: see `holdJarCopy`. */
 export function browserCookiesFile(): string | undefined {
   if ((!started && !reading) || !getSettings().browserStaySignedIn || jarCount === 0) return undefined
   return privateJar ?? JAR()
+}
+
+/** The jar for one run of the engine. `release` when that run is over; more than once is fine. */
+export interface JarCopy {
+  file?: string
+  release: () => void
+}
+
+const NO_JAR: JarCopy = { release: () => undefined }
+
+/**
+ * A copy of the jar for one run of the engine, which is the only way it gets one.
+ *
+ * The engine rewrites its `--cookies` file as it exits, with whatever it read at
+ * the start. Handed one shared jar, a download that outlasted "sign out of every
+ * site" put every cookie back, and until the next change in the browser the jar on
+ * disk said the person was signed in. Its own folder, owner only, gone when the run
+ * is; a crash's are cleared at the next launch. Nothing when the settings name
+ * cookies of their own, which is what `accessArgs` would use.
+ */
+export function holdJarCopy(settings: Pick<AppSettings, 'cookiesFile' | 'cookiesFromBrowser'>): JarCopy {
+  if (settings.cookiesFile || settings.cookiesFromBrowser || !browserCookiesFile()) return NO_JAR
+  // The terminal's own copy is already private to its one process.
+  if (privateJar) return { file: privateJar, release: () => undefined }
+  const folder = join(COPIES(), randomBytes(8).toString('hex'))
+  try {
+    mkdirSync(folder, { recursive: true, mode: 0o700 })
+    const file = join(folder, 'cookies.txt')
+    writeFileSync(file, jarText, { mode: 0o600, flag: 'wx' })
+    return { file, release: () => removeQuietly(folder) }
+  } catch (err) {
+    log.warn('browser', 'Could not copy the cookie jar for the engine', { why: String(err) })
+    removeQuietly(folder)
+    return NO_JAR
+  }
+}
+
+/** What the app last left on disk, sealed or from before it sealed anything. */
+async function savedJarText(): Promise<string> {
+  let sealed: string | undefined
+  try {
+    sealed = readFileSync(SEALED_JAR(), 'utf8')
+  } catch {
+    return readFileSync(JAR(), 'utf8')
+  }
+  return (await openText(sealed)) ?? ''
+}
+
+/** Terminal runs killed outright leave their copy, and no later run can tell whose it is but by its age. */
+function clearLostTerminalCopies(now: number): void {
+  try {
+    for (const name of readdirSync(tmpdir())) {
+      if (!name.startsWith('uvd-cookies-')) continue
+      const folder = join(tmpdir(), name)
+      if (now - statSync(folder).mtimeMs > TERMINAL_COPY_MAX_AGE) removeQuietly(folder)
+    }
+  } catch {
+    /* whatever is there can wait for another run */
+  }
 }
 
 /**
@@ -104,16 +227,15 @@ export function browserCookiesFile(): string | undefined {
  * app's jar with an empty one, and without either the terminal went out as a
  * stranger on a site the person had signed in to.
  *
- * A copy, because the engine rewrites its `--cookies` file when it exits, with
- * whatever it read at the start. Handed the app's own jar, a run that outlasted
- * "sign out of every site" put every cookie back. The copy is as secret as the
- * jar: its own folder, owner only, and gone again through `dropSavedBrowserJar`.
+ * A copy, for the reason in `holdJarCopy`. It is as secret as the jar: its own
+ * folder, owner only, and gone again through `dropSavedBrowserJar`.
  */
-export function readSavedBrowserJar(): void {
+export async function readSavedBrowserJar(): Promise<void> {
   reading = true
   jarCount = 0
+  clearLostTerminalCopies(Date.now())
   try {
-    const text = readFileSync(JAR(), 'utf8')
+    const text = await savedJarText()
     const count = netscapeCount(text)
     if (!count) return
     const file = join(mkdtempSync(join(tmpdir(), 'uvd-cookies-')), 'cookies.txt')
@@ -153,6 +275,9 @@ export async function signOutOfSites(): Promise<void> {
   const ses = browsingSession()
   await ses.clearStorageData()
   await ses.clearCache()
+  // Gone from disk now, and not when a locked keyring next lets a write through.
+  rmSync(JAR(), { force: true })
+  rmSync(SEALED_JAR(), { force: true })
   writeJar([])
   log.info('browser', 'Signed out of every site in the built-in browser')
 }

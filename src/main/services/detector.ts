@@ -11,7 +11,7 @@ import { cleanListingDepth } from '@shared/playlist'
 import { reportDetectFailure, type DetectVerdict } from './report'
 import { infoKey, infoReusable } from './info-cache'
 import { infoCache } from './info-store'
-import { browserCookiesFile } from './browser-logins'
+import { browserCookiesFile, holdJarCopy } from './browser-logins'
 import type { DetectTrace } from '@shared/report'
 import type {
   AppErrorCode,
@@ -663,6 +663,7 @@ const PROBE_SOCKET_TIMEOUT = ['--socket-timeout', '10']
 async function probeCollection(url: string, signal?: AbortSignal, depth?: number): Promise<MediaInfo | null> {
   const settings = getSettings()
   const limit = depth ?? settings.playlistLimit
+  const jar = holdJarCopy(settings)
   const args = [
     '-J',
     '--flat-playlist',
@@ -674,12 +675,12 @@ async function probeCollection(url: string, signal?: AbortSignal, depth?: number
     ...PROBE_SOCKET_TIMEOUT,
     '--playlist-end',
     String(limit),
-    ...accessArgs(settings, browserCookiesFile()),
+    ...accessArgs(settings, jar.file),
     '--',
     url
   ]
   // Listing a big channel is cheap but not instant — give it room, and more the deeper it is asked to go.
-  const result = await spawnJson(args, signal, Math.min(600_000, Math.max(120_000, limit * 120)))
+  const result = await spawnJson(args, signal, Math.min(600_000, Math.max(120_000, limit * 120))).finally(jar.release)
   if (!result.ok) return null
   const raw = result.raw
   // The count is checked after flattening: a channel with one tab is one entry deep.
@@ -711,6 +712,7 @@ async function probeWithEngine(
   signal?: AbortSignal
 ): Promise<DetectVerdict & { json?: string }> {
   const settings = getSettings()
+  const jar = holdJarCopy(settings)
   const args = [
     '-J',
     '--no-warnings',
@@ -720,14 +722,14 @@ async function probeWithEngine(
     '--encoding',
     'utf-8',
     ...PROBE_SOCKET_TIMEOUT,
-    ...accessArgs(settings, browserCookiesFile()),
+    ...accessArgs(settings, jar.file),
     ...headerArgs(resolved.headers)
   ]
   if (resolved.referer) args.push('--referer', resolved.referer)
   // Behind `--`, so it can only be read as a URL; see buildArgs in downloader.ts.
   args.push('--', resolved.url)
 
-  const result = await spawnJson(args, signal, 75_000)
+  const result = await spawnJson(args, signal, 75_000).finally(jar.release)
   if (!result.ok) {
     return {
       ok: false,

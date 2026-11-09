@@ -64,7 +64,7 @@ import { infoCache } from './info-store'
 import { numberedName } from '@shared/playlist'
 import { pageUrlOf } from '@shared/page-url'
 import { cleanLanguage, cleanLanguages } from '@shared/languages'
-import { browserCookiesFile } from './browser-logins'
+import { browserCookiesFile, holdJarCopy, type JarCopy } from './browser-logins'
 import { hasTrim } from '@shared/types'
 import type {
   AppErrorCode,
@@ -594,7 +594,9 @@ export function buildArgs(
   dir: string,
   ffmpeg?: string,
   /** The detect's JSON for this link, read instead of extracting it again. */
-  infoJson?: string
+  infoJson?: string,
+  /** This run's own copy of the built-in browser's cookies. See `holdJarCopy`. */
+  cookieJar?: string
 ): string[] {
   const args: string[] = [
     '--ignore-config',
@@ -647,7 +649,7 @@ export function buildArgs(
     fix-up by hand; it looks at the file and leaves anything else alone.
   */
   if (item.live) args.push('--hls-use-mpegts', '--use-postprocessor', 'FFmpegFixupM3u8')
-  args.push(...accessArgs(settings, browserCookiesFile()))
+  args.push(...accessArgs(settings, cookieJar))
   args.push(...headerArgs(item.headers))
   if (item.referer) args.push('--referer', item.referer)
   if (settings.restrictFilenames) args.push('--restrict-filenames')
@@ -1516,6 +1518,7 @@ async function runDownload(item: DownloadItem): Promise<void> {
   let child: ChildProcessWithoutNullStreams
   let infoFile: string | null = null
   let dir: string
+  let jar: JarCopy | undefined
   try {
     const settings = getSettings()
     dir = outputDirFor(item, settings)
@@ -1538,9 +1541,11 @@ async function runDownload(item: DownloadItem): Promise<void> {
       !skip && !item.waitForVideo && item.url === source && !item.headers && !item.referer
         ? infoCache.take(infoKey(source, settings))
         : null
-    const args = buildArgs(item, settings, dir, ffmpegLocation(), infoFile ?? undefined)
+    jar = holdJarCopy(settings)
+    const args = buildArgs(item, settings, dir, ffmpegLocation(), infoFile ?? undefined, jar.file)
     child = spawn(ytdlpBinaryPath(), args, ytdlpSpawnOptions())
   } catch (err) {
+    jar?.release()
     if (infoFile) infoCache.release(infoFile)
     expectedNames.delete(item.id)
     fail(item, err instanceof Error ? err.message : String(err))
@@ -1616,6 +1621,7 @@ async function runDownload(item: DownloadItem): Promise<void> {
     if (settled) return
     settled = true
     procs.delete(item.id)
+    jar?.release()
     if (infoFile) infoCache.release(infoFile)
     fail(item, err.message)
   })
@@ -1624,6 +1630,7 @@ async function runDownload(item: DownloadItem): Promise<void> {
     if (settled) return
     settled = true
     procs.delete(item.id)
+    jar?.release()
     /*
       Whatever is still in either buffer, before anything reads what they said.
 

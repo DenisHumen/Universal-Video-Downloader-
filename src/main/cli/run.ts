@@ -23,7 +23,7 @@ import { isMediaName, isSidecarName } from '../services/naming'
 import { killTree } from '../services/process'
 import { lineReader } from '../services/engine-output'
 import { ffmpegProgressSeconds, splitOutputLines } from '../services/ffmpeg-output'
-import { browserCookiesFile, dropSavedBrowserJar, readSavedBrowserJar } from '../services/browser-logins'
+import { browserCookiesFile, dropSavedBrowserJar, holdJarCopy, readSavedBrowserJar } from '../services/browser-logins'
 import { flushLog, initLog, log } from '../services/log'
 import {
   describeFailure,
@@ -142,7 +142,7 @@ async function run(options: CliOptions): Promise<number> {
   initLog(settings.logVerbose ? 'debug' : 'info')
   log.info('cli', 'Started', { links: options.links.length })
   await applyProxy(settings)
-  readSavedBrowserJar()
+  await readSavedBrowserJar()
 
   if (!existsSync(ytdlpBinaryPath())) say('Setting up the download engine (first run only)…')
   try {
@@ -232,7 +232,8 @@ interface EngineRun {
 /** One run of the engine for one item, with its progress drawn as it goes. */
 function runEngine(item: DownloadItem, settings: AppSettings, dir: string): Promise<EngineRun> {
   return new Promise((done) => {
-    const child = spawn(ytdlpBinaryPath(), buildArgs(item, settings, dir, ffmpegLocation()), ytdlpSpawnOptions())
+    const args = buildArgs(item, settings, dir, ffmpegLocation(), undefined, holdJarCopy(settings).file)
+    const child = spawn(ytdlpBinaryPath(), args, ytdlpSpawnOptions())
     live = child
     let finalPath: { path: string; priority: number; alreadyDownloaded: boolean } | undefined
     let announced = false
