@@ -12,7 +12,7 @@ Everything a contributor needs that a user does not: the stack, the commands, ho
 | Animation | Framer Motion |
 | State | Zustand |
 | Tests | Vitest |
-| Engine | yt-dlp (downloaded and refreshed at runtime) + ffmpeg (bundled; release builds pin ffmpeg 9.0.2) |
+| Engine | yt-dlp (downloaded and refreshed at runtime) + ffmpeg (bundled; release builds pin ffmpeg 9.0.2) + Deno for YouTube's challenges (downloaded at runtime, pinned by version and SHA-256 in `src/main/services/js-runtime.ts`) |
 | SMB uploads | node-smb2 |
 | Updates | electron-updater (GitHub provider) |
 

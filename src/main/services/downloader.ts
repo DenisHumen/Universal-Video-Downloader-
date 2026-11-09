@@ -4,6 +4,7 @@ import { spawn, ChildProcess, type ChildProcessWithoutNullStreams } from 'child_
 import { existsSync, mkdirSync, readdirSync, renameSync, rmSync, statSync } from 'fs'
 import { basename, dirname, join } from 'path'
 import { randomUUID } from 'crypto'
+import { withJsRuntime } from './js-runtime'
 import { ytdlpBinaryPath, ensureYtdlp, ytdlpSpawnOptions } from './ytdlp'
 import {
   buildConvertArgs,
@@ -30,6 +31,7 @@ import {
   hasCookies,
   headerArgs,
   isTransientError,
+  qualityLimitIn,
   refusesMidStreamInit,
   subtitleMissIn,
   withPostprocessHeading
@@ -1630,7 +1632,7 @@ async function runDownload(item: DownloadItem): Promise<void> {
         : null
     jar = holdJarCopy(settings)
     const args = buildArgs(item, settings, dir, ffmpegLocation(), infoFile ?? undefined, jar.file)
-    child = spawn(ytdlpBinaryPath(), args, ytdlpSpawnOptions())
+    child = spawn(ytdlpBinaryPath(), withJsRuntime(args), ytdlpSpawnOptions())
   } catch (err) {
     jar?.release()
     if (infoFile) infoCache.release(infoFile)
@@ -1644,6 +1646,7 @@ async function runDownload(item: DownloadItem): Promise<void> {
   const shortId = item.id.slice(0, 8)
   // This run's answer: a retry may well get the track the last one was refused.
   item.subtitlesMissed = undefined
+  item.qualityLimit = undefined
 
   /*
     The engine's own words go to the log only when "detailed log" is on. They
@@ -1676,6 +1679,7 @@ async function runDownload(item: DownloadItem): Promise<void> {
     if (missed && !item.subtitlesMissed?.includes(missed)) {
       item.subtitlesMissed = [...(item.subtitlesMissed ?? []), missed]
     }
+    item.qualityLimit ??= qualityLimitIn(line)
     stderrTail = (stderrTail + line + '\n').slice(-4000)
     appendLog(item, line + '\n')
     log.debug('engine', line, { id: shortId })

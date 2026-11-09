@@ -22,7 +22,7 @@ import type { DownloadItem } from '@shared/types'
 import { pageLinkOf } from '@shared/library'
 import { useStore } from '../store'
 import { formatBytes, formatEta, formatSpeed, splitPath } from '../lib/format'
-import { errorReport, errorText } from '../lib/errors'
+import { errorReport, errorText, QUALITY_LIMIT_KEYS } from '../lib/errors'
 import { useI18n, useT } from '../i18n'
 import { languageInSentence } from '../lib/languages'
 import { STATE_META } from '../lib/states'
@@ -582,6 +582,9 @@ function QueueRow({ item, index, animateIn = true, heading }: Props): JSX.Elemen
                 languages: item.subtitlesMissed!.map((code) => languageInSentence(code, locale, t)).join(', ')
               })}
             </p>
+          )}
+          {item.state === 'completed' && item.qualityLimit && (
+            <p className="mt-1 line-clamp-3 break-words text-meta text-ink-2">{t(QUALITY_LIMIT_KEYS[item.qualityLimit])}</p>
           )}
           {item.log && (
             <>

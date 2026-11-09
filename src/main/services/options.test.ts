@@ -6,6 +6,9 @@ import {
   hasCookies,
   headerArgs,
   humanizeYtdlpError,
+  qualityLimitIn,
+  qualityLimitOf,
+  withheldFailure,
   isTransientError,
   withPostprocessHeading,
   stalledConnecting,
@@ -448,6 +451,92 @@ describe('classifyYtdlpError', () => {
     expect(classifyYtdlpError('ERROR: [youtube] x: Join this channel to get access to members-only content', false).code).toBe(
       'membersOnly'
     )
+  })
+
+  /*
+    The engine's own sentences, from yt-dlp 2026.10.26: jsc/_builtin, YoutubeDL.py and
+    extractor/youtube/_video.py. All warnings, and none is the line the run ends on.
+  */
+  describe('YouTube holding formats back', () => {
+    const NO_RUNTIME =
+      'WARNING: [youtube] No supported JavaScript runtime could be found. Only deno is enabled by default; ' +
+      'to use another runtime add  --js-runtimes RUNTIME[:PATH]  to your command/config. YouTube extraction without a ' +
+      'JS runtime has been deprecated, and some formats may be missing. See  https://github.com/yt-dlp/yt-dlp/wiki/EJS  for details on installing one'
+    const N_FAILED =
+      'WARNING: [youtube] abc: n challenge solving failed: Some formats may be missing. Ensure you have a supported ' +
+      'JavaScript runtime and challenge solver script distribution installed. Review any warnings presented before this message.'
+    const SIG_FAILED = 'WARNING: [youtube] abc: Signature solving failed: Some formats may be missing. Ensure you have a supported JavaScript runtime'
+    const IMAGES = 'WARNING: Only images are available for download. use --list-formats to see them'
+    const SABR =
+      'WARNING: [youtube] abc: Some tv client https formats have been skipped as they are missing a URL. YouTube may have ' +
+      'enabled the SABR-only streaming experiment for the current session. See  https://github.com/yt-dlp/yt-dlp/issues/12482  for more details'
+    const NOT_AVAILABLE = 'ERROR: [youtube] abc: Requested format is not available. Use --list-formats for a list of available formats'
+    const NO_FORMATS = 'ERROR: [youtube] abc: No video formats found!'
+
+    it.each([
+      [NO_RUNTIME, 'jsRuntimeMissing'],
+      [N_FAILED, 'jsChallengeFailed'],
+      [SIG_FAILED, 'jsChallengeFailed'],
+      [IMAGES, 'youtubeWithheld'],
+      [SABR, 'youtubeWithheld']
+    ])('names the cause above a run that ended with nothing to fetch: %s', (warning, expected) => {
+      for (const end of [NOT_AVAILABLE, NO_FORMATS]) {
+        const result = classifyYtdlpError(`${warning}\n${end}`, false)
+        expect(result.code).toBe(expected)
+        expect(result.cookieHint).toBe(false)
+      }
+    })
+
+    it('puts the root cause first when the engine says several', () => {
+      expect(classifyYtdlpError(`${IMAGES}\n${N_FAILED}\n${NO_RUNTIME}\n${NOT_AVAILABLE}`, false).code).toBe('jsRuntimeMissing')
+      expect(classifyYtdlpError(`${SABR}\n${N_FAILED}\n${NOT_AVAILABLE}`, false).code).toBe('jsChallengeFailed')
+    })
+
+    it('keeps the plain reading when no warning explains it', () => {
+      expect(classifyYtdlpError(NOT_AVAILABLE, false).code).toBe('noSuchFormat')
+      expect(classifyYtdlpError(NO_FORMATS, false).code).toBe('noFormats')
+    })
+
+    it('does not let a warning take a failure that has its own reason', () => {
+      const bot = 'ERROR: [youtube] abc: Sign in to confirm you\u2019re not a bot.'
+      expect(classifyYtdlpError(`${NO_RUNTIME}\n${bot}`, false).code).toBe('botCheck')
+      expect(classifyYtdlpError(`${NO_RUNTIME}\nERROR: [youtube] abc: Private video`, false).code).toBe('privateVideo')
+    })
+
+    it('is not fooled by the words in a title', () => {
+      expect(classifyYtdlpError(`[download] Only images are available for download.mp4\n${NOT_AVAILABLE}`, false).code).toBe('noSuchFormat')
+    })
+
+    it('reads a warning as the only thing said', () => {
+      expect(classifyYtdlpError(IMAGES, false).code).toBe('youtubeWithheld')
+    })
+
+    it('does not retry by itself: nothing changes in twelve seconds', () => {
+      expect(isTransientError(`${NO_RUNTIME}\n${NOT_AVAILABLE}`)).toBe(false)
+    })
+
+    it('gives a list with nothing usable in it its reason', () => {
+      expect(withheldFailure(IMAGES)?.code).toBe('youtubeWithheld')
+      expect(withheldFailure(`${NO_RUNTIME}\n${IMAGES}`)?.code).toBe('jsRuntimeMissing')
+      expect(withheldFailure('WARNING: something else')).toBeUndefined()
+    })
+
+    it('finds the reason for a short list, line by line', () => {
+      expect(qualityLimitIn(NO_RUNTIME)).toBe('noRuntime')
+      expect(qualityLimitIn(N_FAILED)).toBe('challenge')
+      expect(qualityLimitIn(SIG_FAILED)).toBe('challenge')
+      expect(qualityLimitIn(SABR)).toBeUndefined()
+      expect(qualityLimitIn('[info] n challenge solving failed in a title')).toBeUndefined()
+    })
+
+    it('says so beside a format list, with SABR only where the list really is low', () => {
+      expect(qualityLimitOf(NO_RUNTIME, 1080)).toBe('noRuntime')
+      expect(qualityLimitOf(`${SABR}\n${N_FAILED}`, 360)).toBe('challenge')
+      expect(qualityLimitOf(SABR, 360)).toBe('sabr')
+      expect(qualityLimitOf(SABR, 1080)).toBeUndefined()
+      expect(qualityLimitOf(SABR, 0)).toBeUndefined()
+      expect(qualityLimitOf('', 360)).toBeUndefined()
+    })
   })
 
   // "Use cookies" was the advice for a cookies setting that had just failed.

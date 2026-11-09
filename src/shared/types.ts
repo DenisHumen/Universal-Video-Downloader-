@@ -61,6 +61,8 @@ export interface MediaInfo {
    * counts what was listed.
    */
   listingCut?: number
+  /** YouTube held qualities back, and the engine said why. */
+  qualityLimit?: QualityLimit
   // For streaming sites needing translator/episode/quality selection
   streaming?: StreamingInfo
   /**
@@ -121,6 +123,12 @@ export interface StreamingInfo {
  * language. A code is what crosses between them — the English sentence travels
  * alongside it as a fallback for failures no rule has learned to recognise.
  */
+/**
+ * Why YouTube's list came out short: no runtime to answer its check, the check
+ * going unanswered, or a way of sending video the engine cannot read (SABR).
+ */
+export type QualityLimit = 'noRuntime' | 'challenge' | 'sabr'
+
 export type AppErrorCode =
   | 'unavailable'
   | 'ageRestricted'
@@ -128,6 +136,12 @@ export type AppErrorCode =
   | 'signIn'
   /** YouTube asking this network to prove it is not a bot - not about the video. */
   | 'botCheck'
+  /** No video from YouTube because the helper that answers its check isn't there. */
+  | 'jsRuntimeMissing'
+  /** No video from YouTube because its check went unanswered. */
+  | 'jsChallengeFailed'
+  /** YouTube offered preview pictures, or only a way of sending video the engine can't read. */
+  | 'youtubeWithheld'
   /** A site's own bot check, in front of its player: a person passes it in the built-in browser. */
   | 'siteBotCheck'
   /** The site has no video for this dub and episode. */
@@ -502,6 +516,8 @@ export interface DownloadItem {
   errorCode?: AppErrorCode
   /** Subtitle languages the site would not give, by code. The video came down without them. */
   subtitlesMissed?: string[]
+  /** The run came down with YouTube holding qualities back, and the engine said why. */
+  qualityLimit?: QualityLimit
   /** The failure looks like an access gate and cookies aren't set up yet. */
   cookieHint?: boolean
   /**

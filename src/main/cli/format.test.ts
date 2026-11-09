@@ -18,6 +18,7 @@ import {
   ffmpegProgressLine,
   postprocessLine,
   progressLine,
+  qualityLimitLine,
   subtitleMissLine,
   USAGE
 } from './format'
@@ -191,6 +192,11 @@ describe('progress', () => {
     expect(namesTheFile('/d/Film [x].f137.mp4', DESTINATION, false)).toBe(true)
     // Captions come down before the video does.
     expect(namesTheFile('/d/Film [x].en.vtt', DESTINATION, false)).toBe(false)
+  })
+
+  it('says why YouTube may have given less, in a line that tells the two reasons apart', () => {
+    expect(qualityLimitLine('noRuntime')).toMatch(/^ {2}! .*isn't installed yet/)
+    expect(qualityLimitLine('challenge')).toMatch(/^ {2}! .*couldn't be answered/)
   })
 
   it('says when a subtitle was skipped, in English like the rest', () => {

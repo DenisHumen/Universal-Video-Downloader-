@@ -44,7 +44,7 @@ and finds the stream itself on pages nobody wrote an extractor for.
 | **macOS 13+**, Intel | [`…-mac-x64.dmg`](https://github.com/DenisHumen/Universal-Video-Downloader-/releases/latest) | |
 | **Linux** | [apt or dnf](#linux) (recommended), or the [`.deb` / `.rpm` / `.AppImage`](https://github.com/DenisHumen/Universal-Video-Downloader-/releases/latest) | updates with the system |
 
-On first launch the app downloads the yt-dlp engine (about 30 MB) and keeps it up to date; ffmpeg is built in. A short first-run setup asks where to save and which theme and accent you like; every step can be skipped. Then paste a link, pick the quality and press **Download**. Files go to your *Downloads* folder. Lost? *Help* in the main menu answers the first questions in plain words, without the internet.
+On first launch the app downloads the yt-dlp engine (about 30 MB) and keeps it up to date, then in the background the sandboxed Deno runtime (about 40 MB, 100 MB unpacked) that yt-dlp needs for YouTube's full choice of qualities; ffmpeg is built in. A short first-run setup asks where to save and which theme and accent you like; every step can be skipped. Then paste a link, pick the quality and press **Download**. Files go to your *Downloads* folder. Lost? *Help* in the main menu answers the first questions in plain words, without the internet.
 
 ### Linux
 

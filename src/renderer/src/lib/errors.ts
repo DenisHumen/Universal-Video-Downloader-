@@ -1,4 +1,4 @@
-import type { AppErrorCode } from '@shared/types'
+import type { AppErrorCode, QualityLimit } from '@shared/types'
 import { t as tNow, type TranslateFn, type TranslationKey } from '../i18n'
 import { engineMissingText } from './engineError'
 import { fixFor } from './fixes'
@@ -15,12 +15,22 @@ import { localizeMainText } from './mainText'
  * translated line. Anything it doesn't recognise falls back to the sentence,
  * which is still better than nothing at all.
  */
+/** Why YouTube's list came out short, for the result card and the finished row. */
+export const QUALITY_LIMIT_KEYS: Record<QualityLimit, TranslationKey> = {
+  noRuntime: 'quality.limit.noRuntime',
+  challenge: 'quality.limit.challenge',
+  sabr: 'quality.limit.sabr'
+}
+
 const KEYS: Record<AppErrorCode, TranslationKey> = {
   unavailable: 'err.unavailable',
   ageRestricted: 'err.ageRestricted',
   rateLimited: 'err.rateLimited',
   signIn: 'err.signIn',
   botCheck: 'err.botCheck',
+  jsRuntimeMissing: 'err.jsRuntimeMissing',
+  jsChallengeFailed: 'err.jsChallengeFailed',
+  youtubeWithheld: 'err.youtubeWithheld',
   siteBotCheck: 'err.siteBotCheck',
   noStream: 'err.noStream',
   premiumOnly: 'err.premiumOnly',

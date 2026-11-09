@@ -17,6 +17,7 @@ import { toClock } from '../../lib/time'
 import { useLibraryHits } from '../../lib/libraryHits'
 import { toast } from '../../lib/toast'
 import { audioLanguages, languageName } from '../../lib/languages'
+import { QUALITY_LIMIT_KEYS } from '../../lib/errors'
 import { resolveLanguage, useI18n, useT, useTp } from '../../i18n'
 import { useStore } from '../../store'
 import { siteNameOf } from '@shared/library'
@@ -211,6 +212,9 @@ export default function VideoResult({
               </span>
             )}
           </div>
+          {info.qualityLimit && (
+            <p className="mt-2 break-words text-meta text-ink-2">{t(QUALITY_LIMIT_KEYS[info.qualityLimit])}</p>
+          )}
         </div>
       </div>
 

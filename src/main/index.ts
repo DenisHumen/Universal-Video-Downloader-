@@ -20,7 +20,7 @@ import { flushLibrary, loadLibrary, followEntry, recordFinished } from './servic
 import { handleCopiedLink } from './services/auto-download'
 import { applyProxy } from './services/proxy'
 import { answerProxyLoginsForPages } from './services/proxy-auth'
-import { ensureYtdlp, scheduleEngineRefresh } from './services/ytdlp'
+import { ensureYtdlp, scheduleEngineRefresh, scheduleJsRuntime } from './services/ytdlp'
 import { scheduleUpdateChecks } from './services/updater'
 import { flushLog, initLog, log, setLogLevel } from './services/log'
 import { flushWatches, listWatches } from './services/automation/store'
@@ -803,6 +803,8 @@ if (movedToX11) {
 
     // Prepare the download engine in the background.
     ensureYtdlp().catch((err) => log.error('engine', 'Setup failed', { error: String(err) }))
+    // Fetched behind everything else: YouTube is only limited without it, and only it minds.
+    scheduleJsRuntime()
 
     // An update renames an AppImage; the `uvd` written for the old name follows it here.
     // A package install deletes that script instead, since it would hide the package's own.

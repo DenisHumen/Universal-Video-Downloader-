@@ -91,6 +91,11 @@ export const REPORTABLE: Record<AppErrorCode, boolean> = {
   ageRestricted: false,
   signIn: false,
   botCheck: false,
+  // A fetch that failed, nearly always the network; or YouTube's own choice about this connection.
+  jsRuntimeMissing: false,
+  youtubeWithheld: false,
+  // The solver or the runtime no longer fits YouTube's player, which the next release has to fix.
+  jsChallengeFailed: true,
   siteBotCheck: false,
   premiumOnly: false,
   noStream: false,

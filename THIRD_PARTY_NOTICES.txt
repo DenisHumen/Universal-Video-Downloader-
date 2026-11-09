@@ -93,6 +93,15 @@ and keeps it up to date from there. yt-dlp is published there under its own
 terms.
 
 
+Deno - MIT
+----------
+
+Not part of this package. After yt-dlp, the app downloads one fixed version of
+the deno program, checked against its SHA-256, from the project's own releases,
+https://github.com/denoland/deno/releases, for yt-dlp to answer YouTube's checks
+with. Deno is published there under the MIT licence, with its source code.
+
+
 Compiled into the app's interface
 ---------------------------------
 

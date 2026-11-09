@@ -13,12 +13,26 @@ import {
   rmSync,
   writeFileSync
 } from 'fs'
-import { readFile, rm } from 'fs/promises'
-import { createHash } from 'crypto'
+import { mkdir, readFile, readdir, rename, rm } from 'fs/promises'
+import { createHash, randomBytes } from 'crypto'
 import { homedir } from 'os'
 import { join } from 'path'
 import { pipeline } from 'stream/promises'
 import type { YtDlpStatus } from '@shared/types'
+import {
+  denoDirName,
+  denoExeName,
+  denoOnPath,
+  denoPin,
+  denoUrl,
+  isPinnedBanner,
+  runtimeFetchBlocked,
+  staleRuntimeEntries,
+  trackRuntimeInstall,
+  useJsRuntime,
+  withJsRuntime,
+  type DenoPin
+} from './js-runtime'
 import {
   activate,
   cleanEngineDir,
@@ -30,6 +44,7 @@ import {
   planEngine,
   readPointer,
   stageOnedir,
+  unpackZip,
   verifyHash,
   type EngineAssets,
   type MigrationFailure
@@ -112,6 +127,11 @@ function binDir(): string {
   return dir
 }
 
+/** Deno and its cache, apart from `bin`, whose clean-up knows only the engine's own files. */
+function jsRuntimeDir(): string {
+  return join(engineBaseDir(), 'js-runtime')
+}
+
 /** ASCII-safe scratch dir used as TEMP/TMP for the engine on Windows. */
 function engineTmpDir(): string {
   const dir = join(engineBaseDir(), 'tmp')
@@ -145,6 +165,12 @@ export function ytdlpSpawnOptions(): {
   */
   env.PYTHONIOENCODING = 'utf-8'
   env.PYTHONUTF8 = '1'
+  /*
+    The one thing Deno writes however it is run, its analysis cache, goes in the
+    private folder rather than a shared %LOCALAPPDATA%\deno or ~/.cache/deno.
+  */
+  env.DENO_DIR = join(jsRuntimeDir(), 'cache')
+  env.DENO_NO_UPDATE_CHECK = '1'
   if (process.platform === 'win32') {
     const tmp = engineTmpDir()
     env.TMP = tmp
@@ -217,7 +243,7 @@ function headerValue(value: string | string[] | undefined): string {
  * fetch (which can hang there) and transparently honours system proxies and
  * GitHub's redirect to the release asset.
  */
-function fetchToFile(url: string, tmp: string): Promise<string> {
+function fetchToFile(url: string, tmp: string, quietly = false): Promise<string> {
   return new Promise((resolve, reject) => {
     // Hashed as it arrives, so verifying a 60 MB zip never reads it whole on the main thread.
     const hash = createHash('sha256')
@@ -236,7 +262,7 @@ function fetchToFile(url: string, tmp: string): Promise<string> {
         received += chunk.length
         hash.update(chunk)
         out.write(chunk)
-        if (total) {
+        if (total && !quietly) {
           emit({
             state: 'downloading',
             percent: Math.min(99, Math.round((received / total) * 100)),
@@ -505,7 +531,7 @@ function spawnYtdlp(
       yt-dlp.conf from the folder it was started in, and this one includes `-U`:
       checked on the real engine, a file left in that folder changes what it does.
     */
-    const child = spawn(bin, ['--ignore-config', '--encoding', 'utf-8', ...args], ytdlpSpawnOptions())
+    const child = spawn(bin, withJsRuntime(['--ignore-config', '--encoding', 'utf-8', ...args]), ytdlpSpawnOptions())
     let stdout = ''
     let stderr = ''
     child.stdout.setEncoding('utf8')
@@ -558,6 +584,7 @@ export function ensureYtdlp(): Promise<string> {
   if (ensurePromise) return ensurePromise
   ensurePromise = (async () => {
     try {
+      selectJsRuntime()
       const dir = binDir()
       // Half-finished downloads and unpacks. What they replace goes only once a onedir copy is proven.
       cleanEngineDir(dir, onefileName(), { onedirVerified: false, keepPartials: downloading !== null })
@@ -624,6 +651,171 @@ export function ensureYtdlp(): Promise<string> {
     }
   })()
   return ensurePromise
+}
+
+// ---- The JavaScript runtime; see js-runtime.ts for why this one ------------
+
+const DENO_PIN: DenoPin | undefined = denoPin(process.platform, process.arch)
+
+function pinnedDeno(pin: DenoPin): string {
+  return join(jsRuntimeDir(), denoDirName(pin), denoExeName())
+}
+
+/** The pinned copy once it is on disk (renamed into place whole), or else one the person has. */
+function selectJsRuntime(): void {
+  const pinned = DENO_PIN ? pinnedDeno(DENO_PIN) : null
+  useJsRuntime(pinned && existsSync(pinned) ? pinned : denoOnPath())
+}
+
+/** Whether this file starts, and is the version it was fetched as. */
+function denoStarts(exe: string): Promise<boolean> {
+  return new Promise((resolve) => {
+    const child = spawn(exe, ['--version'], { windowsHide: true, env: { ...process.env, DENO_NO_UPDATE_CHECK: '1' } })
+    const timer = setTimeout(() => {
+      child.kill()
+      resolve(false)
+    }, 20_000)
+    let stdout = ''
+    child.stdout?.setEncoding('utf8')
+    child.stdout?.on('data', (d: string) => (stdout += d))
+    child.on('error', () => {
+      clearTimeout(timer)
+      resolve(false)
+    })
+    child.on('close', (code) => {
+      clearTimeout(timer)
+      resolve(code === 0 && isPinnedBanner(stdout))
+    })
+  })
+}
+
+/** Fetch, verify, unpack and start the pinned copy; only then does anything use it. */
+async function installDeno(pin: DenoPin): Promise<void> {
+  const root = jsRuntimeDir()
+  const exe = denoExeName()
+  await mkdir(root, { recursive: true })
+  const tmp = join(root, `${pin.asset}.download`)
+  const scratch = join(root, `.unpack-${randomBytes(6).toString('hex')}`)
+  const final = join(root, denoDirName(pin))
+  try {
+    const hash = await fetchToFile(denoUrl(pin), tmp, true)
+    if (hash !== pin.sha256) throw new Error(`The downloaded ${pin.asset} does not match its pinned checksum.`)
+    await mkdir(scratch)
+    await unpackZip(await readFile(tmp), scratch, exe)
+    if (!existsSync(join(scratch, exe))) throw new Error(`${pin.asset} has no ${exe} in it.`)
+    if (process.platform === 'darwin') {
+      try {
+        execFileSync('/usr/bin/xattr', ['-dr', 'com.apple.quarantine', scratch], { stdio: 'ignore' })
+      } catch {
+        /* nothing to strip */
+      }
+    }
+    let started = await denoStarts(join(scratch, exe))
+    if (!started) {
+      repairMacSignature(join(scratch, exe))
+      started = await denoStarts(join(scratch, exe))
+    }
+    if (!started) throw new Error(`Deno was unpacked but failed to start on this system.`)
+    await rm(final, { recursive: true, force: true })
+    await rename(scratch, final)
+  } finally {
+    await rm(tmp, { force: true })
+    await rm(scratch, { recursive: true, force: true })
+  }
+}
+
+function jsRuntimeFailureFile(): string {
+  return join(jsRuntimeDir(), 'fetch-failed')
+}
+
+function lastJsRuntimeFailure(): MigrationFailure | undefined {
+  try {
+    return parseMigrationFailure(readFileSync(jsRuntimeFailureFile(), 'utf-8'))
+  } catch {
+    return undefined
+  }
+}
+
+async function setUpJsRuntime(pin: DenoPin): Promise<void> {
+  const exe = pinnedDeno(pin)
+  if (existsSync(exe)) {
+    if (await denoStarts(exe)) {
+      useJsRuntime(exe)
+      denoProven = true
+    } else {
+      // Damaged, or removed by antivirus in part. Not a failed fetch: nothing was tried yet.
+      log.warn('engine', 'The JavaScript runtime does not start; fetching it again')
+      useJsRuntime(denoOnPath())
+      await rm(join(jsRuntimeDir(), denoDirName(pin)), { recursive: true, force: true })
+    }
+  }
+  if (!existsSync(exe)) {
+    if (!net.isOnline() || runtimeFetchBlocked(lastJsRuntimeFailure(), Date.now())) return
+    try {
+      await installDeno(pin)
+      useJsRuntime(exe)
+      denoProven = true
+      rmSync(jsRuntimeFailureFile(), { force: true })
+      log.info('engine', 'JavaScript runtime ready', { asset: pin.asset })
+    } catch (err) {
+      const count = (lastJsRuntimeFailure()?.count ?? 0) + 1
+      try {
+        writeFileSync(jsRuntimeFailureFile(), JSON.stringify({ at: Date.now(), count }), 'utf-8')
+      } catch {
+        /* the back-off is an optimisation */
+      }
+      log.warn('engine', 'The JavaScript runtime could not be installed', {
+        error: err instanceof Error ? err.message : String(err)
+      })
+      return
+    }
+  }
+  const root = jsRuntimeDir()
+  for (const name of staleRuntimeEntries(await readdir(root), denoDirName(pin))) {
+    // An older copy a running engine still has open on Windows goes at the next launch.
+    await rm(join(root, name), { recursive: true, force: true }).catch(() => undefined)
+  }
+}
+
+let jsRuntimeWork: Promise<void> | null = null
+/** The pinned copy has been seen to start this session, so the hourly look can stop. */
+let denoProven = false
+
+/**
+ * Get the pinned Deno in place, if this machine has one and it is not there yet.
+ *
+ * Never rejects, and nothing on the way depends on it: without a runtime the
+ * engine still works, and YouTube's answer says for itself what that cost (see
+ * `qualityLimitIn` in options.ts). No build for this system is not a failure either.
+ */
+export function ensureJsRuntime(): Promise<void> {
+  if (jsRuntimeWork) return jsRuntimeWork
+  const pin = DENO_PIN
+  if (!pin) {
+    useJsRuntime(denoOnPath())
+    return Promise.resolve()
+  }
+  if (denoProven) return Promise.resolve()
+  const work = setUpJsRuntime(pin)
+    .catch((err) => log.warn('engine', 'JavaScript runtime setup failed', { error: String(err) }))
+    .finally(() => {
+      jsRuntimeWork = null
+    })
+  jsRuntimeWork = work
+  trackRuntimeInstall(work)
+  return work
+}
+
+let jsRuntimeScheduled = false
+
+/** Once the engine is in place, and again while the runtime is missing: a dead network comes back. */
+export function scheduleJsRuntime(): void {
+  if (jsRuntimeScheduled) return
+  jsRuntimeScheduled = true
+  const tick = (): void => void ensureJsRuntime()
+  ensureYtdlp().then(tick, () => undefined)
+  setInterval(tick, REFRESH_TICK)
+  powerMonitor.on('resume', () => setTimeout(tick, REFRESH_RESUME_DELAY))
 }
 
 export interface EngineFailure {

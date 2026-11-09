@@ -1,8 +1,17 @@
 import { spawn } from 'child_process'
+import { isYoutubeLink, jsRuntimeSettled, withJsRuntime } from './js-runtime'
 import { ytdlpBinaryPath, ytdlpSpawnOptions } from './ytdlp'
 import { getSettings } from './settings'
 import { killTree } from './process'
-import { accessArgs, classifyYtdlpError, hasCookies, headerArgs, stalledConnecting } from './options'
+import {
+  accessArgs,
+  classifyYtdlpError,
+  hasCookies,
+  headerArgs,
+  qualityLimitOf,
+  stalledConnecting,
+  withheldFailure
+} from './options'
 import { resolveUniversal, resolveUrl, scrapeStatic, type ResolvedUrl, type StaticScrape } from '../resolvers'
 import { withSignal } from '../resolvers/http'
 import { unreachableCode } from '../resolvers/neterror'
@@ -446,6 +455,9 @@ const DEFINITIVE: ReadonlySet<AppErrorCode> = new Set<AppErrorCode>([
   'rateLimited',
   'signIn',
   'botCheck',
+  'jsRuntimeMissing',
+  'jsChallengeFailed',
+  'youtubeWithheld',
   'cookiesLocked',
   'geo',
   'drm',
@@ -456,11 +468,7 @@ const DEFINITIVE: ReadonlySet<AppErrorCode> = new Set<AppErrorCode>([
 /** Whether the failure is YouTube's, by the engine's extractor name or by the link's host. */
 function isYoutube(probe: { output?: string; error?: string }, url?: string): boolean {
   if (/ERROR: \[youtube[\w:]*\]/i.test(probe.output ?? probe.error ?? '')) return true
-  try {
-    return url ? /(^|\.)(youtube\.com|youtu\.be|youtube-nocookie\.com)$/i.test(new URL(url).hostname) : false
-  } catch {
-    return false
-  }
+  return url ? isYoutubeLink(url) : false
 }
 
 /** An engine error that comes from a named site extractor, and says why. */
@@ -533,7 +541,7 @@ function syntheticInfo(pageUrl: string, resolved: ResolvedUrl): MediaInfo {
 
 type JsonProbe =
   /** `text` is the engine's JSON as printed, for `--load-info-json`. */
-  | { ok: true; raw: RawInfo; text: string }
+  | { ok: true; raw: RawInfo; text: string; stderr: string }
   /** `output` is what the engine printed, kept for the error report. */
   | { ok: false; error: string; errorCode?: AppErrorCode; cookieHint?: boolean; output?: string }
 
@@ -549,7 +557,7 @@ function spawnJson(args: string[], signal: AbortSignal | undefined, timeoutMs: n
       return
     }
     const settings = getSettings()
-    const child = spawn(ytdlpBinaryPath(), args, ytdlpSpawnOptions())
+    const child = spawn(ytdlpBinaryPath(), withJsRuntime(args), ytdlpSpawnOptions())
     let stdout = ''
     let stderr = ''
     let settled = false
@@ -599,7 +607,7 @@ function spawnJson(args: string[], signal: AbortSignal | undefined, timeoutMs: n
         return
       }
       try {
-        done({ ok: true, raw: JSON.parse(stdout) as RawInfo, text: stdout })
+        done({ ok: true, raw: JSON.parse(stdout) as RawInfo, text: stdout, stderr })
       } catch (err) {
         done({ ok: false, error: err instanceof Error ? err.message : 'Failed to parse media info.' })
       }
@@ -662,6 +670,13 @@ export function flattenEntries(raw: RawInfo[], depth = 0): RawInfo[] {
 */
 const PROBE_SOCKET_TIMEOUT = ['--socket-timeout', '10']
 
+/*
+  How long a YouTube probe waits for a runtime fetch already under way: a first
+  launch's link is pasted within seconds of it starting, and without the runtime
+  that link's answer is the short one. It leaves the probe's own 75 s untouched.
+*/
+const YOUTUBE_RUNTIME_WAIT_MS = 45_000
+
 /** Expand a playlist/channel URL into its entries without extracting each one. */
 async function probeCollection(url: string, signal?: AbortSignal, depth?: number): Promise<MediaInfo | null> {
   const settings = getSettings()
@@ -714,11 +729,16 @@ async function probeWithEngine(
   resolved: ResolvedUrl,
   signal?: AbortSignal
 ): Promise<DetectVerdict & { json?: string }> {
+  if (isYoutubeLink(resolved.url)) await jsRuntimeSettled(YOUTUBE_RUNTIME_WAIT_MS, signal)
   const settings = getSettings()
   const jar = holdJarCopy(settings)
+  /*
+    Warnings on, unlike the listings: this answer is what the person picks a quality
+    from, and they are how the engine says it is short. They go to stderr, away from
+    the JSON, and a failure's reason is read from the last line that is not one.
+  */
   const args = [
     '-J',
-    '--no-warnings',
     '--no-playlist',
     '--no-progress',
     '--ignore-config',
@@ -750,10 +770,12 @@ async function probeWithEngine(
   if (!formats.length) {
     // The engine did answer, so the interesting part is what it offered instead.
     const offered = (primary.formats ?? []).map((f) => `${f.format_id} ${f.ext ?? '?'} ${f.protocol ?? ''}`)
+    // Exits 0 with only storyboards in the list, so nothing else would say that YouTube did this.
+    const withheld = withheldFailure(result.stderr)
     return {
       ok: false,
-      error: 'No downloadable formats were found at this link.',
-      errorCode: 'noFormats',
+      error: withheld?.message ?? 'No downloadable formats were found at this link.',
+      errorCode: withheld?.code ?? 'noFormats',
       extractor: raw.extractor_key || raw.extractor,
       title: raw.title || primary.title,
       output: offered.length
@@ -782,6 +804,8 @@ async function probeWithEngine(
     isPlaylist,
     playlistCount: isPlaylist ? raw.playlist_count || raw.entries?.length : undefined
   }
+  const limit = qualityLimitOf(result.stderr, formats.reduce((tallest, f) => Math.max(tallest, f.height ?? 0), 0))
+  if (limit) info.qualityLimit = limit
   /*
     One video, not live: the only answer a download can be started from as it
     stands. A playlist's JSON describes its first entry, and a live stream's

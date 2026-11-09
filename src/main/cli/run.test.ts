@@ -55,6 +55,7 @@ vi.mock('../services/secrets', () => ({
 }))
 vi.mock('../services/proxy', () => ({ applyProxy: async () => undefined }))
 vi.mock('../services/ytdlp', () => ({
+  ensureJsRuntime: async () => undefined,
   ensureYtdlp: async () => 'yt-dlp',
   ytdlpBinaryPath: () => 'yt-dlp',
   ytdlpSpawnOptions: () => ({})
