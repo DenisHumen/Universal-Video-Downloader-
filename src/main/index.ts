@@ -8,6 +8,7 @@ import {
   Tray,
   type MenuItemConstructorOptions
 } from 'electron'
+import { spawn } from 'child_process'
 import { existsSync, mkdirSync, rmSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { IPC } from '@shared/ipc'
@@ -65,6 +66,7 @@ import { coalesce } from './services/coalesce'
 import { infoCache } from './services/info-store'
 import { flushBrowserCookies, initBrowserLogins } from './services/browser-logins'
 import { closeHidesWindow, trayStatusLine } from './services/tray-menu'
+import { x11Relaunch, X11_RELAUNCH_GUARD } from './services/display-server'
 import { ffmpegPath } from './services/ffmpeg'
 import { reapOrphanedFfmpeg } from './services/process'
 import { shouldResume } from './services/resume'
@@ -679,6 +681,30 @@ function linkFromArgv(argv: string[]): string | undefined {
   return argv.find((arg) => /^https?:\/\//i.test(arg))
 }
 
+/** Start again on X11 if this session calls for it (display-server.ts); true if that is under way. */
+function startOnX11Instead(): boolean {
+  const next = x11Relaunch({
+    platform: process.platform,
+    packaged: app.isPackaged,
+    execPath: process.execPath,
+    argv: process.argv,
+    env: process.env,
+    socketExists: existsSync
+  })
+  // This run's own business: a later update or restart decides afresh.
+  delete process.env[X11_RELAUNCH_GUARD]
+  if (!next) return false
+  const child = spawn(next.command, next.args, {
+    detached: true,
+    stdio: 'ignore',
+    env: { ...process.env, [X11_RELAUNCH_GUARD]: '1' }
+  })
+  // No pid: nothing started, and a window on Wayland beats none. Node still reports that as an event.
+  child.on('error', () => undefined)
+  child.unref()
+  return child.pid !== undefined
+}
+
 /*
   `uvd <link>` in a terminal starts this same binary with `--cli`. That run
   has no window, and must not take the single-instance lock: holding it would
@@ -686,8 +712,15 @@ function linkFromArgv(argv: string[]): string | undefined {
   window instead of downloading it here.
 */
 const cliArgs = cliArgvFrom(process.argv)
-const gotLock = cliArgs ? false : app.requestSingleInstanceLock()
-if (cliArgs) {
+/*
+  Before the lock, and instead of taking it: the next process has to find it
+  free, and a second launch with a link hands the link over from there.
+*/
+const movedToX11 = startOnX11Instead()
+const gotLock = cliArgs || movedToX11 ? false : app.requestSingleInstanceLock()
+if (movedToX11) {
+  app.exit(0)
+} else if (cliArgs) {
   startCli(cliArgs)
 } else if (!gotLock) {
   app.quit()
