@@ -3,27 +3,33 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync
 import { tmpdir } from 'os'
 import { dirname, join } from 'path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { makeSigner, signDetached, type TestSigner } from './engine-signature.testkit'
 
 /*
   The scheduled engine refresh as it is, with a pretend yt-dlp and a pretend
   GitHub around it. The bug this guards against: engine.json was stamped
-  "refreshed" whatever `yt-dlp -U` answered, so an attempt refused by GitHub or
+  "refreshed" whatever the update answered, so an attempt refused by GitHub or
   made with no network counted as the day's refresh.
 */
 
 /** SHA-256 of `fresh!\n`, the body the pretend GitHub serves. */
 const FRESH_SUM = 'e812e784bc0c8a6990a960e2e507369f4f048e382197696585f071197a2d10a5'
+/** SHA-256 of `old\n`, the engine each test starts with. */
+const OLD_SUM = '01d09d19c2139a46aebfb577780d123d7396e97201bc7ead210a2ebff8239dee'
 
 const h = vi.hoisted(() => ({
   dir: '',
   online: true,
-  /** Exit code of `yt-dlp -U`. */
-  selfUpdate: 0,
+  signer: null as unknown as TestSigner,
+  /** What the signed list answers about the engine in place: 0 lists it as current, anything else lists a newer one. */
+  checkCurrent: 0,
   /** HTTP status of the fresh download. */
   download: 200,
-  /** Called between `-U` finishing and the fallback deciding. */
-  afterSelfUpdate: () => undefined as void,
+  /** Called when the signed list has been served, before the code decides what to do about it. */
+  afterCheck: () => undefined as void,
   spawned: [] as string[][],
+  /** How many times the checksum list has been asked for. */
+  lists: 0,
   /** Binary downloads requested so far. */
   requests: 0,
   /** While set, every download waits for it before GitHub answers. */
@@ -37,13 +43,17 @@ vi.mock('electron', () => ({
     request: ({ url }: { url: string }) => {
       const req = Object.assign(new EventEmitter(), { end: vi.fn() })
       req.end.mockImplementation(() => {
-        // The checksum list answers at once, and lists the one body this GitHub serves.
-        if (url.endsWith('/SHA2-256SUMS')) {
+        // The checksum list and its signature answer at once, and list the one body this GitHub serves.
+        if (url.endsWith('/SHA2-256SUMS') || url.endsWith('/SHA2-256SUMS.sig')) {
+          const isList = url.endsWith('/SHA2-256SUMS')
+          if (isList) h.lists++
+          const listed = Buffer.from(`${h.checkCurrent === 0 ? OLD_SUM : FRESH_SUM}  yt-dlp_linux\n`)
           const sums = Object.assign(new EventEmitter(), { statusCode: 200, headers: {} })
           queueMicrotask(() => {
             req.emit('response', sums)
-            sums.emit('data', Buffer.from(`${FRESH_SUM}  yt-dlp_linux\n`))
+            sums.emit('data', isList ? listed : signDetached(listed, h.signer))
             sums.emit('end')
+            if (isList) h.afterCheck()
           })
           return
         }
@@ -77,13 +87,8 @@ vi.mock('child_process', async (importOriginal) => {
         Object.assign(new EventEmitter(), { setEncoding: () => undefined })
       const child = Object.assign(new EventEmitter(), { stdout: stream(), stderr: stream() })
       queueMicrotask(() => {
-        if (args.includes('-U')) {
-          h.afterSelfUpdate()
-          child.emit('close', h.selfUpdate)
-        } else {
-          child.stdout.emit('data', '2026.10.01\n')
-          child.emit('close', 0)
-        }
+        child.stdout.emit('data', '2026.10.01\n')
+        child.emit('close', 0)
       })
       return child
     })
@@ -97,11 +102,20 @@ vi.mock('./engine-dist', async (importOriginal) => ({
   ...(await importOriginal<typeof import('./engine-dist')>()),
   engineAssets: () => ({ onefile: 'yt-dlp_linux' })
 }))
+vi.mock('./engine-keys', () => ({
+  get YT_DLP_KEYS() {
+    return [h.signer.pinned]
+  }
+}))
+// A mocked module outlives `vi.resetModules`, so the error class it throws has to as well.
+vi.mock('./engine-signature', async (importOriginal) => await importOriginal<typeof import('./engine-signature')>())
 vi.mock('./log', () => ({ log: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() } }))
 vi.mock('./settings', () => ({ getSettings: () => ({}) }))
 vi.mock('./proxy-auth', () => ({ proxyUrl: () => '', withProxyAuth: <T>(req: T) => req }))
 
 import { getYtdlpStatus, refreshEngineIfDue, ytdlpBinaryPath } from './ytdlp'
+
+h.signer = makeSigner()
 
 const HOUR = 60 * 60 * 1000
 const realLocal = process.env.LOCALAPPDATA
@@ -111,19 +125,16 @@ function engineJson(): { lastRefresh?: number; lastFailure?: number; failures?: 
   return existsSync(file) ? JSON.parse(readFileSync(file, 'utf-8')) : {}
 }
 
-function selfUpdates(): number {
-  return h.spawned.filter((args) => args.includes('-U')).length
-}
-
 beforeEach(() => {
   h.dir = mkdtempSync(join(tmpdir(), 'uvd-engine-'))
   // On Windows the engine lives under %LOCALAPPDATA%, elsewhere under userData.
   process.env.LOCALAPPDATA = h.dir
   h.online = true
-  h.selfUpdate = 0
+  h.checkCurrent = 0
   h.download = 200
-  h.afterSelfUpdate = () => undefined
+  h.afterCheck = () => undefined
   h.spawned = []
+  h.lists = 0
   h.requests = 0
   h.gate = null
   const bin = ytdlpBinaryPath()
@@ -138,21 +149,24 @@ afterEach(() => {
 })
 
 describe('refreshEngineIfDue', () => {
-  it('reads no yt-dlp.conf for the self-update', async () => {
+  it('never asks the engine to replace itself, since its own updater does not check the signature', async () => {
     await refreshEngineIfDue(() => false)
-    expect(h.spawned.find((args) => args.includes('-U'))).toContain('--ignore-config')
+    h.checkCurrent = 100
+    writeFileSync(join(h.dir, 'engine.json'), '{}')
+    await refreshEngineIfDue(() => false)
+    expect(h.spawned.flat().filter((arg) => arg === '-U' || arg.startsWith('--update'))).toEqual([])
   })
 
-  it('records a refresh when the self-update succeeds', async () => {
+  it('records a refresh when the signed list says the engine is current, and downloads nothing', async () => {
     const before = Date.now()
     await refreshEngineIfDue(() => false)
-    expect(selfUpdates()).toBe(1)
+    expect(h.requests).toBe(0)
     expect(engineJson().lastRefresh).toBeGreaterThanOrEqual(before)
     expect(engineJson().failures).toBe(0)
   })
 
-  it('records a refresh after a failed self-update only once the fresh download worked', async () => {
-    h.selfUpdate = 100
+  it('records a refresh after finding a newer release only once the fresh download worked', async () => {
+    h.checkCurrent = 100
     await refreshEngineIfDue(() => false)
     expect(readFileSync(ytdlpBinaryPath(), 'utf-8')).toBe('fresh!\n')
     expect(engineJson().lastRefresh).toBeGreaterThan(0)
@@ -163,7 +177,7 @@ describe('refreshEngineIfDue', () => {
     const old = Date.now() - 3 * 24 * HOUR
     writeFileSync(join(h.dir, 'engine.json'), JSON.stringify({ lastRefresh: old }))
     const status = getYtdlpStatus()
-    h.selfUpdate = 100
+    h.checkCurrent = 100
     h.download = 403
 
     await refreshEngineIfDue(() => false)
@@ -173,14 +187,15 @@ describe('refreshEngineIfDue', () => {
     expect(getYtdlpStatus()).toEqual(status)
 
     // The next hourly tick leaves it alone; the backoff decides when to try again.
+    const lists = h.lists
     await refreshEngineIfDue(() => false)
-    expect(selfUpdates()).toBe(1)
+    expect(h.lists).toBe(lists)
   })
 
-  it('does not replace the file when a download started while the self-update ran', async () => {
+  it('does not replace the file when a download started while the check ran', async () => {
     let busy = false
-    h.selfUpdate = 1
-    h.afterSelfUpdate = () => {
+    h.checkCurrent = 1
+    h.afterCheck = () => {
       busy = true
     }
     await refreshEngineIfDue(() => busy)
@@ -204,7 +219,7 @@ describe('refreshEngineIfDue', () => {
 
   it('runs one refresh at a time', async () => {
     await Promise.all([refreshEngineIfDue(() => false), refreshEngineIfDue(() => false)])
-    expect(selfUpdates()).toBe(1)
+    expect(h.lists).toBe(1)
   })
 })
 
@@ -233,14 +248,15 @@ describe('replacing the engine from more than one place', () => {
   it('the scheduled refresh waits while ensureYtdlp replaces an engine that will not start', async () => {
     const m = await fresh()
     const release = holdDownloads()
-    // `-U` on the broken file fails, and its fallback used to download over ensureYtdlp's copy.
-    h.selfUpdate = 100
+    // A check on the broken file finds it stale, and its fallback used to download over ensureYtdlp's copy.
+    h.checkCurrent = 100
 
     // The file on disk is too small to be an engine, so ensureYtdlp downloads a new one.
     const ensured = m.ensureYtdlp()
     const refreshed = m.refreshEngineIfDue(() => false)
     await settle()
-    expect(selfUpdates()).toBe(0)
+    // Only ensureYtdlp's own look at the list: the refresh has not started.
+    expect(h.lists).toBe(1)
     expect(h.requests).toBe(1)
 
     release()
@@ -253,13 +269,12 @@ describe('replacing the engine from more than one place', () => {
   it('a second download waits for the one already on its way instead of writing the same file', async () => {
     const m = await fresh()
     const release = holdDownloads()
-    h.selfUpdate = 100
+    h.checkCurrent = 100
 
     const ensured = m.ensureYtdlp()
     // The button does not wait for ensureYtdlp; its fallback must not start a download of its own.
     const updated = m.updateYtdlp(() => false)
     await settle()
-    expect(selfUpdates()).toBe(1)
     expect(h.requests).toBe(1)
 
     release()
@@ -273,13 +288,13 @@ describe('replacing the engine from more than one place', () => {
     const m = await fresh()
     const release = holdDownloads()
     let busy = false
-    h.selfUpdate = 100
+    h.checkCurrent = 100
     h.download = 403
 
     const refreshed = m.refreshEngineIfDue(() => busy)
     await settle()
-    // `-U` failed and the fallback download is waiting on GitHub.
-    expect(selfUpdates()).toBe(1)
+    // The check found a newer release and the fallback download is waiting on GitHub.
+    expect(h.requests).toBe(1)
 
     // Nothing is running when the button is pressed; a download starts while it waits.
     const refused = expect(m.updateYtdlp(() => busy)).rejects.toMatchObject({ code: 'engineBusy' })
@@ -288,7 +303,7 @@ describe('replacing the engine from more than one place', () => {
     await refreshed
 
     await refused
-    expect(selfUpdates()).toBe(1)
+    expect(h.requests).toBe(1)
     expect(readFileSync(m.ytdlpBinaryPath(), 'utf-8')).toBe('old\n')
   })
 })

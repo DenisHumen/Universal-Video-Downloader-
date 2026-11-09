@@ -698,6 +698,8 @@ export interface YtDlpStatus {
   message?: string
   /** This install replaces a copy from the folder all the PC's users share. */
   moving?: boolean
+  /** The engine works, and the newest release failed its authenticity check, so it was not installed. */
+  refused?: boolean
 }
 
 /**

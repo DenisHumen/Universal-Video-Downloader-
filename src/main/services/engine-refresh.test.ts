@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest'
 import {
   afterFailure,
   afterSuccess,
+  afterRefusal,
   parseRefreshState,
   REFRESH_INTERVAL,
   refreshDue,
@@ -9,6 +10,7 @@ import {
   runRefresh,
   type RefreshState
 } from './engine-refresh'
+import { EngineTrustError } from './engine-signature'
 
 const HOUR = 60 * 60 * 1000
 const NOW = Date.UTC(2026, 9, 6, 12, 0, 0)
@@ -16,6 +18,28 @@ const NOW = Date.UTC(2026, 9, 6, 12, 0, 0)
 function state(extra: Partial<RefreshState> = {}): RefreshState {
   return { lastRefresh: 0, lastFailure: 0, failures: 0, ...extra }
 }
+
+describe('a refused update', () => {
+  it('counts as a failure, is remembered, and goes with the next good refresh', () => {
+    const refused = afterRefusal(state({ lastRefresh: 5 }), NOW)
+    expect(refused).toEqual(state({ lastRefresh: 5, lastFailure: NOW, failures: 1, refusedAt: NOW }))
+    expect(parseRefreshState(JSON.parse(JSON.stringify(refused)))).toEqual(refused)
+    expect(afterFailure(refused, NOW + 1, true).refusedAt).toBe(NOW)
+    expect(afterSuccess(NOW + 2).refusedAt).toBeUndefined()
+  })
+
+  it('comes back from a refresh as its own outcome, not as a failure to fetch', async () => {
+    const error = new EngineTrustError('unknown-key', 'signed by a key this version does not know.')
+    const outcome = await runRefresh({
+      checkCurrent: async () => 1,
+      download: async () => {
+        throw error
+      },
+      isBusy: () => false
+    })
+    expect(outcome).toEqual({ kind: 'refused', error })
+  })
+})
 
 describe('parseRefreshState', () => {
   it('reads what older builds wrote, which had no failures', () => {
@@ -91,7 +115,7 @@ describe('afterSuccess and afterFailure', () => {
 describe('runRefresh', () => {
   function steps(code: number, opts: { busy?: boolean; download?: () => Promise<void> } = {}) {
     return {
-      selfUpdate: vi.fn(async () => code),
+      checkCurrent: vi.fn(async () => code),
       download: vi.fn(opts.download ?? (async () => undefined)),
       isBusy: vi.fn(() => opts.busy ?? false)
     }
@@ -99,7 +123,7 @@ describe('runRefresh', () => {
 
   it('is done when the self-update exits 0, without downloading anything', async () => {
     const s = steps(0)
-    expect(await runRefresh(s)).toEqual({ kind: 'done', via: 'self-update' })
+    expect(await runRefresh(s)).toEqual({ kind: 'done', via: 'already current' })
     expect(s.download).not.toHaveBeenCalled()
   })
 
@@ -125,7 +149,7 @@ describe('runRefresh', () => {
   it('never replaces the file once a download has started using it', async () => {
     const s = steps(1)
     // The download starts while `-U` runs, after the first look found the engine free.
-    s.selfUpdate.mockImplementation(async () => {
+    s.checkCurrent.mockImplementation(async () => {
       s.isBusy.mockReturnValue(true)
       return 1
     })
@@ -136,7 +160,7 @@ describe('runRefresh', () => {
   it('does not even run the self-update while a download is using the engine', async () => {
     const s = steps(0, { busy: true })
     expect(await runRefresh(s)).toEqual({ kind: 'busy' })
-    expect(s.selfUpdate).not.toHaveBeenCalled()
+    expect(s.checkCurrent).not.toHaveBeenCalled()
     expect(s.download).not.toHaveBeenCalled()
   })
 })

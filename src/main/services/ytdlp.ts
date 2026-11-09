@@ -2,6 +2,7 @@ import { app, net, powerMonitor } from 'electron'
 import { EventEmitter } from 'events'
 import { spawn, execFileSync } from 'child_process'
 import {
+  createReadStream,
   createWriteStream,
   existsSync,
   mkdirSync,
@@ -16,6 +17,7 @@ import { readFile, rm } from 'fs/promises'
 import { createHash } from 'crypto'
 import { homedir } from 'os'
 import { join } from 'path'
+import { pipeline } from 'stream/promises'
 import type { YtDlpStatus } from '@shared/types'
 import {
   activate,
@@ -32,6 +34,7 @@ import {
   type EngineAssets,
   type MigrationFailure
 } from './engine-dist'
+import { EngineTrustError, verifyDetached } from './engine-signature'
 import { groupSpawnOptions } from './process'
 import { log } from './log'
 import { proxyEnv } from './options'
@@ -40,6 +43,7 @@ import { proxyMayBeWhy } from '../../renderer/src/lib/engineError'
 import { proxyUrl, withProxyAuth } from './proxy-auth'
 import {
   afterFailure,
+  afterRefusal,
   afterSuccess,
   parseRefreshState,
   refreshDue,
@@ -59,7 +63,9 @@ let ensurePromise: Promise<string> | null = null
 let movingFromShared = false
 
 function emit(given: YtDlpStatus): void {
-  const status = movingFromShared ? { ...given, moving: true } : given
+  const status: YtDlpStatus = movingFromShared ? { ...given, moving: true } : { ...given }
+  // Whatever says "ready" also carries a refused update, so nothing has to remember to.
+  if (status.state === 'ready' && readRefreshState().refusedAt) status.refused = true
   currentStatus = status
   ytdlpEvents.emit('status', status)
 }
@@ -116,7 +122,7 @@ function engineTmpDir(): string {
 /**
  * Spawn options shared by every yt-dlp invocation. On Windows we redirect the
  * child's TEMP/TMP to an ASCII path so the PyInstaller bootloader can extract.
- * The proxy travels here too, so it reaches every invocation - the self-update
+ * The proxy travels here too, so it reaches every invocation - the version check
  * included, which never had it - and never the command line.
  */
 export function ytdlpSpawnOptions(): {
@@ -246,18 +252,36 @@ function fetchToFile(url: string, tmp: string): Promise<string> {
   })
 }
 
-/** A small text file from the release - the checksum list. */
-function fetchText(url: string): Promise<string> {
+/** Far more than the checksum list or its signature will ever be. */
+const SMALL_FILE_LIMIT = 1024 * 1024
+
+class HttpStatusError extends Error {
+  constructor(readonly status: number) {
+    super(`Failed to download the engine's checksums (HTTP ${status})`)
+  }
+}
+
+/** A small file from the release, as bytes: a signature is over bytes, not over what they decode to. */
+function fetchSmallFile(url: string): Promise<Buffer> {
   return new Promise((resolve, reject) => {
     const request = withProxyAuth(net.request({ url, redirect: 'follow' }), url)
     request.on('response', (response) => {
       if (response.statusCode >= 400) {
-        reject(new Error(`Failed to download the engine's checksums (HTTP ${response.statusCode})`))
+        reject(new HttpStatusError(response.statusCode))
         return
       }
       const chunks: Buffer[] = []
-      response.on('data', (chunk: Buffer) => chunks.push(chunk))
-      response.on('end', () => resolve(Buffer.concat(chunks).toString('utf-8')))
+      let received = 0
+      response.on('data', (chunk: Buffer) => {
+        received += chunk.length
+        if (received > SMALL_FILE_LIMIT) {
+          request.abort()
+          reject(new Error('The engine release sent far more than a checksum list.'))
+          return
+        }
+        chunks.push(chunk)
+      })
+      response.on('end', () => resolve(Buffer.concat(chunks)))
       response.on('error', reject)
     })
     request.on('error', reject)
@@ -266,14 +290,50 @@ function fetchText(url: string): Promise<string> {
 }
 
 /**
- * The release's published SHA-256 of every asset.
+ * The release's SHA-256 of every asset, once yt-dlp's signature on the list has been checked.
  *
- * Nothing used to check what came down: a truncated download, a captive
- * portal's HTML page or a tampered proxy all landed as the engine, and only
- * `--version` - which runs it - noticed some of them.
+ * Every route that replaces the engine starts here, before a byte of it is
+ * downloaded. A release with no signature is refused rather than excused: taking
+ * it away is the first thing someone replacing the files would do. Only a clear
+ * 404 means that, though; a 503 or a dropped connection is an ordinary failure to
+ * fetch, and is reported as one.
  */
 async function releaseSums(): Promise<Map<string, string>> {
-  return parseSums(await fetchText(`${RELEASE_BASE}/SHA2-256SUMS`))
+  const [list, signature] = await Promise.all([
+    fetchSmallFile(`${RELEASE_BASE}/SHA2-256SUMS`),
+    fetchSmallFile(`${RELEASE_BASE}/SHA2-256SUMS.sig`).catch((err: unknown) => {
+      if (err instanceof HttpStatusError && err.status === 404) {
+        throw new EngineTrustError('no-signature', 'the release has no signature.')
+      }
+      throw err
+    })
+  ])
+  const signed = verifyDetached(list, signature)
+  log.info('engine', 'Checksum list signature is good', {
+    signer: signed.fingerprint,
+    signedAt: signed.signedAt.toISOString()
+  })
+  return parseSums(list.toString('utf-8'))
+}
+
+/**
+ * Write down that an update failed its authenticity check, and why.
+ *
+ * The engine in use is not touched and is not the thing in doubt, so downloads
+ * carry on. There is deliberately no way to accept the update anyway: an answer
+ * to "install it regardless" is what someone who controls the release would most
+ * like a person to give.
+ */
+function noteRefusal(err: EngineTrustError): void {
+  log.warn('engine', 'Refused an engine update', { reason: err.reason, error: err.message })
+  writeRefreshState(afterRefusal(readRefreshState(), Date.now()))
+}
+
+/** SHA-256 of a file on disk, read without holding the main thread. */
+async function hashFile(path: string): Promise<string> {
+  const hash = createHash('sha256')
+  await pipeline(createReadStream(path), hash)
+  return hash.digest('hex')
 }
 
 /** The binary download in flight, shared by everyone who asks for one meanwhile. */
@@ -283,7 +343,7 @@ let downloading: Promise<void> | null = null
  * A fresh copy of the engine over the old one, one at a time.
  *
  * Three paths can ask for this: `ensureYtdlp` replacing a binary that will not
- * start, the scheduled refresh falling back after a failed `-U`, and the button
+ * start, the scheduled refresh finding a newer release, and the button
  * in Settings doing the same. All of them write the same `.download` file and
  * rename it over the same binary, so two at once truncated each other's half
  * of the file and whichever finished first moved the other's still-growing copy
@@ -320,6 +380,12 @@ async function fetchBinary(fallback: 'onefile' | 'none'): Promise<void> {
       await installOnedir(ASSETS.onedir)
       return
     } catch (err) {
+      /*
+        Not a build that fails here, so no back-off, which would stop the next
+        attempt from finding the problem gone. And no fallback: the single file
+        is vouched for by the same list.
+      */
+      if (err instanceof EngineTrustError) throw err
       recordMigrationFailure()
       log.warn('engine', 'The onedir engine could not be installed', {
         error: err instanceof Error ? err.message : String(err)
@@ -477,7 +543,11 @@ function migrateInBackground(): void {
       const version = await getVersion()
       if (version && onedirExe(binDir())) emit({ state: 'ready', version, message: 'Ready' })
     })
-    .catch(() => undefined)
+    .catch(async (err: unknown) => {
+      if (!(err instanceof EngineTrustError)) return
+      noteRefusal(err)
+      emit({ state: 'ready', version: await getVersion(), message: 'Ready' })
+    })
 }
 
 /**
@@ -545,6 +615,9 @@ export function ensureYtdlp(): Promise<string> {
       return path
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err)
+      if (err instanceof EngineTrustError) {
+        log.warn('engine', 'Refused to install an engine', { reason: err.reason, error: message })
+      }
       emit({ state: 'error', message })
       ensurePromise = null // allow retry
       throw err
@@ -594,15 +667,20 @@ let updating: Promise<string | undefined> | null = null
 let refreshing: Promise<boolean> | null = null
 
 /**
- * The self-update keeps the same path and is fast when already current.
+ * Whether the engine is the latest release, going by the signed checksum list.
  *
- * Only the single file can update itself. A onedir copy cannot (`-U` refuses),
- * so it compares its zip's checksum with the latest release's instead: equal
- * is "already current", anything else sends the refresh on to a fresh copy.
- * A single file on a machine with a onedir build answers "not current" too,
- * which is how an install that missed the launch migration moves over.
+ * Equal is "already current"; anything else sends the refresh on to a fresh copy.
+ * A single file on a machine with a onedir build answers "not current" too, which
+ * is how an install that missed the launch migration moves over.
+ *
+ * The single file used to be left to update itself with `-U`, and never is now.
+ * yt-dlp's updater checks the checksum list from the same release and not the
+ * signature (yt_dlp/update.py), so that one route would have put an unchecked file
+ * in place of the engine. All replacing goes through `fetchBinary`. A failure of
+ * any kind here only means "not known to be current": the download that follows
+ * makes the same check, and that is where a refusal is reported from.
  */
-async function selfUpdate(): Promise<number> {
+async function checkCurrent(): Promise<number> {
   const dir = binDir()
   const pointer = onedirExe(dir) ? readPointer(dir) : null
   if (pointer && ASSETS.onedir) {
@@ -615,8 +693,12 @@ async function selfUpdate(): Promise<number> {
     }
   }
   // No onedir copy: move to one, unless that has been failing - then the single file updates itself.
-  if (ASSETS.onedir && !onedirBlocked()) return 1
-  return (await spawnYtdlp(['-U'])).code
+  if ((ASSETS.onedir && !onedirBlocked()) || !ASSETS.onefile || !existsSync(onefilePath())) return 1
+  try {
+    return (await releaseSums()).get(ASSETS.onefile) === (await hashFile(onefilePath())) ? 0 : 1
+  } catch {
+    return 1
+  }
 }
 
 /**
@@ -641,7 +723,7 @@ async function freshCopy(): Promise<void> {
  * Force update the engine to the latest release.
  *
  * `refreshEngineIfDue` refuses to do this while the engine is in use, and
- * documents why: `-U` replaces the very executable a running transfer was
+ * documents why: an update replaces the very executable a running transfer was
  * started from, which on Windows cannot be done at all while it is loaded. The
  * button in Settings ran the same command with none of that care, so clicking
  * it mid-download hit exactly the case the automatic path is written to avoid.
@@ -672,7 +754,7 @@ export async function updateYtdlp(isBusy: () => boolean = () => false): Promise<
         The busy check at the top is stale by now. That wait lasts minutes
         when the refresh fell back to a download, and a transfer started in
         them is often why the refresh gave up: on Windows the rename over a
-        running yt-dlp.exe fails. Running `-U` beside it would replace the
+        running yt-dlp.exe fails. Updating beside it would replace the
         file it runs from. Nothing has been emitted yet, so the engine card
         still shows what the refresh left there.
       */
@@ -680,9 +762,10 @@ export async function updateYtdlp(isBusy: () => boolean = () => false): Promise<
     }
     emit({ state: 'checking', message: 'Updating download engine…' })
     try {
-      const outcome = await runRefresh({ selfUpdate, download: freshCopy, isBusy })
+      const outcome = await runRefresh({ checkCurrent, download: freshCopy, isBusy })
       if (outcome.kind === 'busy') throw new EngineBusyError()
       if (outcome.kind === 'failed') throw new Error(outcome.error)
+      if (outcome.kind === 'refused') throw outcome.error
       markRefreshed()
       const version = await getVersion()
       emit({ state: 'ready', version, message: 'Ready' })
@@ -691,6 +774,12 @@ export async function updateYtdlp(isBusy: () => boolean = () => false): Promise<
     } catch (err) {
       if (err instanceof EngineBusyError) {
         // Nothing was replaced, so the engine the new download runs from is still a working one.
+        emit({ state: 'ready', version: await getVersion(), message: 'Ready' })
+        throw err
+      }
+      if (err instanceof EngineTrustError) {
+        // The same: the engine in use still works, so the card must not read as a failed setup.
+        noteRefusal(err)
         emit({ state: 'ready', version: await getVersion(), message: 'Ready' })
         throw err
       }
@@ -738,7 +827,7 @@ function markRefreshed(): void {
  * This used to key off a module variable initialised to zero, so "at most once
  * every 24h" really meant "on every launch": a network round trip and a binary
  * swap each time the app opened. Worse, with downloads now resuming at startup
- * it raced them — `yt-dlp -U` replaces the very executable those transfers are
+ * it raced them — an update replaces the very executable those transfers are
  * running from, which on Windows cannot even be done while it is loaded, so the
  * update quietly failed and fell back to re-downloading it.
  *
@@ -758,7 +847,7 @@ export async function refreshEngineIfDue(isBusy: () => boolean): Promise<void> {
   if (updating || refreshing) return
   /*
     Nor beside `ensureYtdlp`. When the binary on disk will not start, it is
-    downloading a replacement right now, and a `-U` on the broken file can only
+    downloading a replacement right now, and a refresh on the broken file can only
     fail and fall back to a download of its own. Wait for it, then look again,
     since the button may have been pressed meanwhile. If it failed there is no
     working engine to refresh, and the next detection or download installs one.
@@ -801,7 +890,7 @@ async function refreshNow(state: RefreshState, isBusy: () => boolean): Promise<b
   */
   const before = currentStatus
   try {
-    const outcome = await runRefresh({ selfUpdate, download: freshCopy, isBusy })
+    const outcome = await runRefresh({ checkCurrent, download: freshCopy, isBusy })
     if (outcome.kind === 'done') {
       markRefreshed()
       const version = await getVersion()
@@ -809,6 +898,12 @@ async function refreshNow(state: RefreshState, isBusy: () => boolean): Promise<b
       else if (currentStatus !== before) emit(before)
       log.info('engine', 'Daily refresh done', { version, via: outcome.via })
       return true
+    }
+    if (outcome.kind === 'refused') {
+      noteRefusal(outcome.error)
+      const version = await getVersion()
+      emit(version ? { state: 'ready', version, message: 'Ready' } : before)
+      return false
     }
     if (currentStatus !== before) emit(before)
     if (outcome.kind === 'busy') {

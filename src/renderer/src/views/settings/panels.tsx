@@ -869,7 +869,7 @@ export function UpdatesPage({ settings, set }: PanelProps): JSX.Element {
             // Main's status is in English; while there is no version, only a failure is worth a line.
             <span className="numeric" title={ytdlp.state === 'error' ? ytdlp.message : undefined}>
               {ytdlp.version
-                ? `yt-dlp ${ytdlp.version}`
+                ? `yt-dlp ${ytdlp.version}${ytdlp.refused ? ` · ${t('engine.refusedLabel')}` : ''}`
                 : ytdlp.state === 'error'
                   ? engineFailureText(t, ytdlp.message, 'setup', proxy)
                   : 'yt-dlp'}

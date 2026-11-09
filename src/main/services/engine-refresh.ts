@@ -8,6 +8,8 @@
  * rate-limited or offline attempt counted as a good one for the next 24 hours.
  */
 
+import { EngineTrustError } from './engine-signature'
+
 /** How long a good refresh lasts. Sites change their players often, not hourly. */
 export const REFRESH_INTERVAL = 24 * 60 * 60 * 1000
 
@@ -41,6 +43,12 @@ export interface RefreshState {
   lastFailure: number
   /** Failed attempts in a row since the last good one. */
   failures: number
+  /**
+   * When an update last failed its authenticity check, if none has passed since.
+   * On disk so that the window can still say so after a restart: the next attempt
+   * may be hours away.
+   */
+  refusedAt?: number
 }
 
 function count(value: unknown): number {
@@ -55,10 +63,12 @@ function count(value: unknown): number {
  */
 export function parseRefreshState(raw: unknown): RefreshState {
   const r = raw && typeof raw === 'object' ? (raw as Record<string, unknown>) : {}
+  const refusedAt = count(r.refusedAt)
   return {
     lastRefresh: count(r.lastRefresh),
     lastFailure: count(r.lastFailure),
-    failures: Math.floor(count(r.failures))
+    failures: Math.floor(count(r.failures)),
+    ...(refusedAt ? { refusedAt } : {})
   }
 }
 
@@ -67,7 +77,7 @@ export function parseRefreshState(raw: unknown): RefreshState {
  *
  * The hourly tick would otherwise retry a refresh that cannot succeed - GitHub
  * refusing this address, a proxy that blocks it - twenty-four times a day, and
- * each failed `-U` is followed by a thirty-megabyte download attempt. Two hours
+ * each failed attempt can be a thirty-megabyte download. Two hours
  * after the first failure, then four, keeps a broken network quiet without
  * leaving a fixed one waiting long.
  */
@@ -113,9 +123,14 @@ export function afterFailure(state: RefreshState, now: number, online: boolean):
   return { ...state, lastFailure: now, failures: state.failures + 1 }
 }
 
+/** The record after an update that failed its authenticity check: a failure, and one worth saying. */
+export function afterRefusal(state: RefreshState, now: number): RefreshState {
+  return { ...afterFailure(state, now, true), refusedAt: now }
+}
+
 export interface RefreshSteps {
-  /** `yt-dlp -U`; resolves to its exit code and never rejects. */
-  selfUpdate: () => Promise<number>
+  /** Whether the engine is current: 0 when it is, anything else to fetch a new one. Never rejects. */
+  checkCurrent: () => Promise<number>
   /** A fresh copy of the binary over the old one; rejects when that cannot be done. */
   download: () => Promise<void>
   /** True while a download is running from the binary. */
@@ -123,42 +138,44 @@ export interface RefreshSteps {
 }
 
 export type RefreshOutcome =
-  | { kind: 'done'; via: 'self-update' | 'fresh download' }
+  | { kind: 'done'; via: 'already current' | 'fresh download' }
   /**
    * A download was using the engine, so nothing was replaced. `code` is the
-   * exit code of a `-U` that failed before the download started, and absent
-   * when one was already running and `-U` never ran.
+   * answer of a check made before the download started, and absent when one
+   * was already running and no check was made.
    */
   | { kind: 'busy'; code?: number }
   | { kind: 'failed'; code: number; error: string }
+  /** What the release offered could not be shown to be yt-dlp's. Nothing was replaced. */
+  | { kind: 'refused'; error: EngineTrustError }
 
 /**
- * One refresh: the self-update, and a fresh download only when that fails.
+ * One refresh: the check for being current, and a fresh download only when that fails.
  *
- * Done means done. Exit code 0 from `-U` covers both "updated" and "already
- * current"; anything else - no network, GitHub's rate limit, a build that
- * cannot update itself - is a failure until the fallback has actually put a
+ * Done means done. Anything but 0 from the check - no network, GitHub's rate
+ * limit, a newer release - is a failure until the fallback has actually put a
  * new binary in place.
  *
- * `isBusy` is asked again before the fallback, because `-U` takes a few
+ * `isBusy` is asked again before the fallback, because the check takes a few
  * seconds and a download may have started in them. Replacing the file then is
  * the very thing the busy check exists to prevent: on Windows the rename fails
  * outright while the executable is loaded.
  *
- * It is asked first as well. `-U` replaces the same file, and both callers had
+ * It is asked first as well. An update replaces the same file, and both callers had
  * to remember to ask just before calling this; the button in Settings asked
  * once and then waited minutes for the scheduled refresh, long enough for a
  * download to start. Here no caller can forget.
  */
 export async function runRefresh(steps: RefreshSteps): Promise<RefreshOutcome> {
   if (steps.isBusy()) return { kind: 'busy' }
-  const code = await steps.selfUpdate()
-  if (code === 0) return { kind: 'done', via: 'self-update' }
+  const code = await steps.checkCurrent()
+  if (code === 0) return { kind: 'done', via: 'already current' }
   if (steps.isBusy()) return { kind: 'busy', code }
   try {
     await steps.download()
     return { kind: 'done', via: 'fresh download' }
   } catch (err) {
+    if (err instanceof EngineTrustError) return { kind: 'refused', error: err }
     return { kind: 'failed', code, error: err instanceof Error ? err.message : String(err) }
   }
 }

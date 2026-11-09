@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { engineFailureText, proxyMayBeWhy } from './engineError'
+import { engineFailureText, engineMissingText, proxyMayBeWhy } from './engineError'
 
 const t = ((key: string) => key) as never
 
@@ -21,6 +21,21 @@ describe('a failure with a proxy set', () => {
     expect(proxyMayBeWhy('No download engine is published for this system.', 'http://192.168.1.10:3128')).toBe(false)
     expect(proxyMayBeWhy('Failed to download yt-dlp (HTTP 407)', '  ')).toBe(false)
     expect(engineFailureText(t, 'Failed to download yt-dlp (HTTP 407)', 'setup', '')).toBe('engine.setupFailed')
+  })
+})
+
+describe('a release that failed its authenticity check', () => {
+  const RAW = 'Engine authenticity check failed: the release has no signature.'
+
+  it('says so, and how it differs on a first install and on an update', () => {
+    expect(engineFailureText(t, RAW, 'setup')).toBe('engine.untrusted')
+    expect(engineFailureText(t, RAW, 'update')).toBe('engine.updateRefused')
+    expect(engineMissingText(t, RAW)).toBe('engine.untrusted')
+  })
+
+  it('does not send anyone to their proxy settings over it', () => {
+    expect(proxyMayBeWhy(RAW, 'http://192.168.1.10:3128')).toBe(false)
+    expect(engineFailureText(t, RAW, 'setup', 'http://192.168.1.10:3128')).toBe('engine.untrusted')
   })
 })
 

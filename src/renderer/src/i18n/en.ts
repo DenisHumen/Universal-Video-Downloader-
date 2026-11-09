@@ -301,6 +301,10 @@ export const en = {
   'engine.proxyFailed': 'The app could not be prepared through the proxy in Settings. Check the proxy or turn it off and try again',
   'engine.startFailed': 'The download tool is installed but won’t start; antivirus has probably blocked it. Add the app’s folder to its exclusions and try again',
   'engine.noBuild': 'There is no download tool for this system yet. Update the app and try again',
+  'engine.untrusted': 'The app could not confirm that the download tool on GitHub really comes from its authors, so it did not install or run it. Check your internet and try again. If this keeps happening, update the app',
+  'engine.updateRefused': 'A new version of the download tool could not be confirmed as coming from its authors, so it was not installed. Downloads keep working with the current version. If this keeps happening, update the app',
+  'engine.refusedLabel': 'Update Not Installed',
+  'engine.checkAppUpdate': 'Check for App Updates',
   'engine.updateWaiting': 'The last update attempt failed, so the next one has to wait. Try again later',
   'engine.updateNoConnection': 'The update could not be downloaded. Check your internet and try again',
 

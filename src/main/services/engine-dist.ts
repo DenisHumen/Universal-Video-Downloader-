@@ -11,6 +11,7 @@ import { chmod, mkdir, rename, rm, writeFile } from 'fs/promises'
 import { dirname, isAbsolute, join, normalize, relative } from 'path'
 import { promisify } from 'util'
 import * as zlib from 'zlib'
+import { EngineTrustError } from './engine-signature'
 
 const inflateRaw = promisify(zlib.inflateRaw)
 
@@ -78,9 +79,9 @@ export function sha256(data: Buffer): string {
 /** Refuse an asset whose SHA-256, worked out as it downloaded, is not the one the release lists. */
 export function verifyHash(actual: string, asset: string, sums: Map<string, string>): string {
   const expected = sums.get(asset)
-  if (!expected) throw new Error(`The engine release lists no checksum for ${asset}.`)
+  if (!expected) throw new EngineTrustError('checksum', `the release lists no checksum for ${asset}.`)
   if (actual.toLowerCase() !== expected) {
-    throw new Error(`The downloaded ${asset} does not match its published checksum.`)
+    throw new EngineTrustError('checksum', `the downloaded ${asset} does not match its published checksum.`)
   }
   return expected
 }
