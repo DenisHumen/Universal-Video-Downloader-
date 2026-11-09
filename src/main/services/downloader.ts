@@ -22,7 +22,7 @@ import { log } from './log'
 import { failure, noteRefusedWrite, ReadFailure, readJsonStore, writeJsonAtomic } from './json-store'
 import { clearedBy, finishedBeyond, forHistory, isFinished, isHistoryEntry } from './history'
 import { knownSiteFor } from '@shared/auto-sources'
-import { siteNameOf } from '@shared/library'
+import { siteNameOf } from '@shared/site-name'
 import { downloadFields } from './log-fields'
 import {
   accessArgs,
