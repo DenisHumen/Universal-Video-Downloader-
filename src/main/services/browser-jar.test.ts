@@ -1,6 +1,6 @@
-import { existsSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from 'fs'
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, utimesSync, writeFileSync } from 'fs'
 import { tmpdir } from 'os'
-import { dirname, join } from 'path'
+import { basename, dirname, join } from 'path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 /*
@@ -115,5 +115,54 @@ describe('the terminal reading the app’s jar', () => {
     const { browserCookiesFile, readSavedBrowserJar } = await logins()
     readSavedBrowserJar()
     expect(browserCookiesFile()).toBeUndefined()
+  })
+
+  // Ctrl-C on Windows ends the process with no handler run, so the copy stays behind.
+  describe('copies a run did not live to delete', () => {
+    /** A process id nothing has: past anything Windows or Linux hands out. */
+    const GONE = 0x7ffffff0
+    const copy = (name: string, age = 0): string => {
+      const dir = join(h.dir, name)
+      mkdirSync(dir)
+      writeFileSync(join(dir, 'cookies.txt'), ENTRY)
+      const when = (Date.now() - age) / 1000
+      utimesSync(dir, when, when)
+      return dir
+    }
+    const DAY = 24 * 60 * 60 * 1000
+
+    it('deletes the copy of a process that is gone', async () => {
+      const left = copy(`uvd-cookies-${GONE}-aBc123`)
+      await (await logins()).sweepAbandonedJars(h.dir)
+      expect(existsSync(left)).toBe(false)
+    })
+
+    it('leaves the copy of a run still going', async () => {
+      const running = copy(`uvd-cookies-${process.pid}-aBc123`)
+      await (await logins()).sweepAbandonedJars(h.dir)
+      expect(existsSync(running)).toBe(true)
+    })
+
+    it('gives a copy from before the process id a day', async () => {
+      const recent = copy('uvd-cookies-aBc123')
+      const old = copy('uvd-cookies-dEf456', 2 * DAY)
+      await (await logins()).sweepAbandonedJars(h.dir)
+      expect(existsSync(recent)).toBe(true)
+      expect(existsSync(old)).toBe(false)
+    })
+
+    it('touches nothing else in the folder', async () => {
+      const other = copy('uvd-jar-other', 2 * DAY)
+      await (await logins()).sweepAbandonedJars(h.dir)
+      expect(existsSync(other)).toBe(true)
+    })
+
+    it('puts its own process id on the copy it makes', async () => {
+      jar(`${HEADER}${ENTRY}\n`)
+      const { browserCookiesFile, dropSavedBrowserJar, readSavedBrowserJar } = await logins()
+      readSavedBrowserJar()
+      expect(basename(dirname(browserCookiesFile()!))).toMatch(new RegExp(`^uvd-cookies-${process.pid}-`))
+      dropSavedBrowserJar()
+    })
   })
 })
