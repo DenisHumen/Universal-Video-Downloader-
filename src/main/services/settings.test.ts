@@ -200,6 +200,25 @@ describe('liftProxyPassword', () => {
     return box
   }
 
+  it('forgets the stored password when the address moves to another server', () => {
+    const box = store()
+    liftProxyPassword({ proxy: 'http://user@evil.example:8080' }, box, 'http://user@192.168.1.10:8080')
+    expect(box.forgotten).toBe(1)
+  })
+
+  it('keeps it when only the spelling or the user name changed', () => {
+    const box = store()
+    liftProxyPassword({ proxy: 'http://user2@PROXY.example:8080/' }, box, 'http://user@proxy.example:8080')
+    expect(box.forgotten).toBe(0)
+  })
+
+  it('keeps a new password typed along with a new server', () => {
+    const box = store()
+    liftProxyPassword({ proxy: 'http://user:new@other.example:8080' }, box, 'http://user@192.168.1.10:8080')
+    expect(box.forgotten).toBe(0)
+    expect(box.kept).toEqual(['new'])
+  })
+
   it('moves the password of a stored proxy to the secret store and keeps the user', () => {
     const box = store()
     const next = liftProxyPassword(migrate({ proxy: 'http://user:p%40ss@host:8080' }), box)

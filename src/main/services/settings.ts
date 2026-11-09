@@ -6,7 +6,7 @@ import { isSafeTemplate } from '@shared/filename'
 import { migrateAccent } from '@shared/accent'
 import { normaliseRate } from '@shared/rate'
 import { normaliseSmbTarget } from '@shared/automation'
-import { proxyUser, splitProxyPassword } from '@shared/proxy'
+import { parseProxy, proxyUser, splitProxyPassword } from '@shared/proxy'
 import { log } from './log'
 import { deleteSecret, SECRET, secretsPersist, setSecret } from './secrets'
 import {
@@ -206,13 +206,24 @@ export interface ProxyPasswordStore {
  */
 export function liftProxyPassword<T extends Partial<Pick<AppSettings, 'proxy'>>>(
   settings: T,
-  store: ProxyPasswordStore
+  store: ProxyPasswordStore,
+  /** The address it was saved for, on a save. */
+  before?: string
 ): T {
   if (typeof settings.proxy !== 'string') return settings
   const { proxy, password } = splitProxyPassword(settings.proxy)
   if (!proxyUser(proxy)) store.forget()
-  else if (password && !store.keep(password)) return settings
+  else if (password) {
+    if (!store.keep(password)) return settings
+  } else if (before !== undefined && proxyServer(before) !== proxyServer(proxy)) {
+    // A password belongs to the server it was entered for, and is not sent to the next one named.
+    store.forget()
+  }
   return proxy === settings.proxy ? settings : { ...settings, proxy }
+}
+
+function proxyServer(value: string): string {
+  return parseProxy(value).address.replace(/\/$/, '').toLowerCase()
 }
 
 /** The last proxy-password save or removal asked for; true once it is on disk. */
@@ -378,7 +389,7 @@ export function flushSettings(): void {
 export function setSettings(partial: Partial<AppSettings>): AppSettings {
   const previous = getSettings()
   const patch = migrate(partial as Record<string, unknown>)
-  const next = liftProxyPassword({ ...previous, ...patch }, proxyPasswordStore)
+  const next = liftProxyPassword({ ...previous, ...patch }, proxyPasswordStore, previous.proxy)
   if (next.proxy !== previous.proxy) scrubBackup = true
   if (unread.active) {
     // As saved, not as typed: a proxy password has already been lifted out of `next`.

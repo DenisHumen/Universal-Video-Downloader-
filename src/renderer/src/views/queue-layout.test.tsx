@@ -75,7 +75,23 @@ describe('the keyboard in the queue', () => {
     )
     screen.getByRole('button', { name: en['common.cancel'] }).focus()
     act(() => useStore.setState({ downloads: [row('canceled')] }))
-    await waitFor(() => expect(document.activeElement).toBe(screen.getByRole('button', { name: en['common.retry'] })))
+    // On the row itself: on Retry, the next Enter would restart what was just cancelled.
+    await waitFor(() => expect((document.activeElement as HTMLElement).dataset.row).toBe('k1'))
+  })
+
+  it('ignores the second click of a double click on what appeared under it', () => {
+    const retry = vi.fn()
+    const remove = vi.fn()
+    Object.assign(window.api, { retryDownload: retry, removeDownload: remove })
+    render(<QueueRow item={row('canceled')} index={0} />)
+    fireEvent.click(screen.getByRole('button', { name: en['common.retry'] }), { detail: 2 })
+    fireEvent.click(screen.getByRole('button', { name: en['queue.removeRow'] }), { detail: 2 })
+    expect(retry).not.toHaveBeenCalled()
+    expect(remove).not.toHaveBeenCalled()
+    fireEvent.click(screen.getByRole('button', { name: en['common.retry'] }), { detail: 1 })
+    fireEvent.click(screen.getByRole('button', { name: en['queue.removeRow'] }), { detail: 0 })
+    expect(retry).toHaveBeenCalledTimes(1)
+    expect(remove).toHaveBeenCalledTimes(1)
   })
 })
 

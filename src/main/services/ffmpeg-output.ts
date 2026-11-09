@@ -1,4 +1,22 @@
 /**
+ * What ffmpeg is allowed to take a local file for, in front of each `-i`.
+ *
+ * It decides what a file is by its contents, whatever it is called, and a site
+ * chooses the contents. A "video" that really holds `ffconcat version 1.0` and
+ * `file 'other.mp4'` opens that other file from the same folder, as a conversion's
+ * output: seen on the real thing. So what may be opened is containers, which name
+ * nothing outside themselves, and not the playlists and session descriptions that
+ * do. The engine's own ffmpeg calls are not covered: it needs the concat format for
+ * SponsorBlock cuts, and its switch would apply to those as well.
+ */
+export const LOCAL_INPUT: readonly string[] = [
+  '-protocol_whitelist',
+  'file,crypto,data',
+  '-format_whitelist',
+  'mov,matroska,mpegts,flv,avi,asf,mpeg,mpegvideo,m4v,h264,hevc,vc1,rm,gif,mp3,aac,ac3,eac3,dts,dtshd,truehd,mlp,flac,ogg,wav,w64,aiff,caf,amr,wv,ape,tta,mpc'
+]
+
+/**
  * Reading ffmpeg's console chatter, which the engine passes through verbatim.
  *
  * Some downloads never touch yt-dlp's own downloader at all. A trimmed

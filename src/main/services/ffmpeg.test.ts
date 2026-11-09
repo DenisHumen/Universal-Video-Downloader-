@@ -34,6 +34,26 @@ describe('rangeDuration', () => {
   })
 })
 
+describe('what ffmpeg may take a file for', () => {
+  const beforeInput = (args: string[]): void => {
+    expect(args.indexOf('-format_whitelist')).toBeGreaterThan(-1)
+    expect(args.indexOf('-format_whitelist')).toBeLessThan(args.indexOf('-i'))
+    expect(args[args.indexOf('-format_whitelist') + 1].split(',')).not.toContain('concat')
+    expect(args[args.indexOf('-format_whitelist') + 1].split(',')).not.toContain('hls')
+    expect(args[args.indexOf('-protocol_whitelist') + 1]).toBe('file,crypto,data')
+  }
+
+  it('is held to containers on a trim and on a conversion', () => {
+    beforeInput(buildTrimArgs('in.mp4', 'out.mp4', { start: 1, end: 2 }, true))
+    beforeInput(buildConvertArgs('in.mp4', 'out.mkv', { mode: 'video', container: 'mkv' }))
+    beforeInput(buildConvertArgs('in.mp4', 'out.mp3', { mode: 'audio', container: 'mp3' }))
+  })
+
+  it('calls a file that is not one damaged', () => {
+    expect(humanizeFfmpegError("Format not on whitelist 'mov'!")).toMatch(/damaged/)
+  })
+})
+
 describe('buildTrimArgs', () => {
   it('seeks before the input so the decode starts at the cut', () => {
     const args = buildTrimArgs('in.mp4', 'out.mp4', { start: 12, end: 20 }, true)

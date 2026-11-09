@@ -23,7 +23,7 @@ import { isMediaName, isSidecarName } from '../services/naming'
 import { killTree } from '../services/process'
 import { lineReader } from '../services/engine-output'
 import { ffmpegProgressSeconds, splitOutputLines } from '../services/ffmpeg-output'
-import { browserCookiesFile, dropSavedBrowserJar, readSavedBrowserJar } from '../services/browser-logins'
+import { browserCookiesFile, dropSavedBrowserJar, holdJarCopy, readSavedBrowserJar } from '../services/browser-logins'
 import { flushLog, initLog, log } from '../services/log'
 import {
   describeFailure,
@@ -144,7 +144,7 @@ async function run(options: CliOptions): Promise<number> {
   initLog(settings.logVerbose ? 'debug' : 'info')
   log.info('cli', 'Started', { links: options.links.length })
   await applyProxy(settings)
-  readSavedBrowserJar()
+  await readSavedBrowserJar()
 
   if (!existsSync(ytdlpBinaryPath())) say('Setting up the download engine (first run only)…')
   try {
@@ -186,7 +186,7 @@ async function download(link: string, outputDir: string, choice: CliChoice): Pro
   mkdirSync(dir, { recursive: true })
 
   say(`↓ ${item.url}`)
-  log.info('cli', 'Download started', { url: item.url, dir })
+  log.info('cli', 'Download started', { site: siteOf(item.url) })
 
   let result = await runEngine(item, settings, dir)
   /*
@@ -195,7 +195,7 @@ async function download(link: string, outputDir: string, choice: CliChoice): Pro
   */
   if (result.code !== 0 && !stopping && !item.hlsViaFfmpeg && refusesMidStreamInit(result.stderrTail)) {
     say('  the stream restarts partway through; fetching it with ffmpeg instead')
-    log.info('cli', 'Fetching the HLS stream with ffmpeg', { url: item.url })
+    log.info('cli', 'Fetching the HLS stream with ffmpeg', { site: siteOf(item.url) })
     item.hlsViaFfmpeg = true
     result = await runEngine(item, settings, dir)
   }
@@ -215,13 +215,13 @@ async function download(link: string, outputDir: string, choice: CliChoice): Pro
       return 1
     }
     say(path && existsSync(path) ? `✓ Saved to ${path}` : `✓ Done. Saved in ${dir}`)
-    log.info('cli', 'Download finished', { url: item.url, path })
+    log.info('cli', 'Download finished', { site: siteOf(item.url) })
     return 0
   }
   const classified = classifyYtdlpError(result.stderrTail, hasCookies(settings, browserCookiesFile()))
   const failure = describeFailure(classified.code, classified.message, Boolean(classified.cookieHint))
   for (const line of failure.lines) say(line)
-  log.warn('cli', 'Download failed', { url: item.url, code: classified.code, error: result.stderrTail.slice(-600) })
+  log.warn('cli', 'Download failed', { site: siteOf(item.url), code: classified.code })
   return failure.exitCode
 }
 
@@ -238,7 +238,8 @@ interface EngineRun {
 /** One run of the engine for one item, with its progress drawn as it goes. */
 function runEngine(item: DownloadItem, settings: AppSettings, dir: string): Promise<EngineRun> {
   return new Promise((done) => {
-    const child = spawn(ytdlpBinaryPath(), buildArgs(item, settings, dir, ffmpegLocation()), ytdlpSpawnOptions())
+    const args = buildArgs(item, settings, dir, ffmpegLocation(), undefined, holdJarCopy(settings).file)
+    const child = spawn(ytdlpBinaryPath(), args, ytdlpSpawnOptions())
     live = child
     let finalPath: { path: string; priority: number; alreadyDownloaded: boolean } | undefined
     let announced = false

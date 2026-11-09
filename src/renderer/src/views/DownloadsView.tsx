@@ -167,6 +167,10 @@ export default function DownloadsView(): JSX.Element {
     the focused button goes with it. The keyboard then started again from the top
     of the window, past the sidebar, every time. Only for a button that is really
     gone: a click on empty space must not be taken back by the next progress line.
+
+    The row, and not a button in it. The first button of a cancelled row is Retry,
+    so an Enter held or pressed once too often restarted what had just been
+    cancelled. From the row, Tab goes on to its buttons and Enter does nothing.
   */
   const lastFocused = useRef<HTMLElement | null>(null)
   const lastRow = useRef<string | null>(null)
@@ -175,8 +179,8 @@ export default function DownloadsView(): JSX.Element {
     if (!gone || gone.isConnected || document.activeElement !== document.body) return
     lastFocused.current = null
     const id = lastRow.current
-    const row = id ? scrollRef.current?.querySelector(`[data-row="${id.replace(/["\\]/g, '\\$&')}"]`) : null
-    const target = row?.querySelector('button') ?? scrollRef.current
+    const row = id ? scrollRef.current?.querySelector<HTMLElement>(`[data-row="${id.replace(/["\\]/g, '\\$&')}"]`) : null
+    const target = row ?? scrollRef.current
     target?.focus({ preventScroll: true })
   }, [downloads])
 

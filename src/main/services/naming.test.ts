@@ -1,14 +1,17 @@
 import { describe, expect, it } from 'vitest'
 import type { DownloadItem } from '@shared/types'
 import {
+  finishedBeforeAudioName,
   freeCopySuffix,
   idRepeatsTitle,
   pickOutputStem,
+  restrictedSpaces,
   samePath,
   sectionSuffix,
   sectionTime,
   shouldTakeOwnName,
   templateFor,
+  stemBeforeAudioName,
   waitsForNamesake,
   withNameSuffix,
   withoutEmbedNumber,
@@ -175,6 +178,43 @@ describe('freeCopySuffix', () => {
   it('starts at 2 and skips numbers the folder already has', () => {
     expect(freeCopySuffix('Talk [abc]', ['Talk [abc].mp4'])).toBe(' (2)')
     expect(freeCopySuffix('Talk [abc]', ['Talk [abc].mp4', 'talk [abc] (2).mp4'])).toBe(' (3)')
+  })
+
+  it('looks for the name a copy really gets with restricted names on', () => {
+    const names = ['Talk_[abc].mp4', 'Talk_[abc]_(2).mp4']
+    expect(freeCopySuffix('Talk_[abc]', names, true)).toBe(' (3)')
+    expect(restrictedSpaces('Talk_[abc] (3).%(ext)s')).toBe('Talk_[abc]_(3).%(ext)s')
+    expect(restrictedSpaces('%(title)s [%(id)s] (2).%(ext)s')).toBe('%(title)s_[%(id)s]_(2).%(ext)s')
+  })
+})
+
+describe('the name from before " (audio)"', () => {
+  it('is worked out from the new one', () => {
+    expect(stemBeforeAudioName('Song [abc] (audio)')).toBe('Song [abc]')
+    expect(stemBeforeAudioName('Song_[abc]_(audio)')).toBe('Song_[abc]')
+    expect(stemBeforeAudioName('Song [abc] (audio).f251')).toBe('Song [abc]')
+    expect(stemBeforeAudioName('Song [abc]')).toBeUndefined()
+  })
+
+  const row = (over: Partial<DownloadItem>): DownloadItem =>
+    ({ id: 'a', url: 'https://x.test/v', state: 'queued', mode: 'audio', quality: 'audio', percent: 0, createdAt: 1, ...over }) as DownloadItem
+
+  it('finds the finished file a same request left', () => {
+    const old = row({ id: 'old', state: 'completed', filepath: 'd/Song [abc].mp3' })
+    expect(finishedBeforeAudioName(row({}), [old])).toBe('d/Song [abc].mp3')
+  })
+
+  it('does not take a file under the new name, which the engine finds by itself', () => {
+    expect(finishedBeforeAudioName(row({}), [row({ id: 'n', state: 'completed', filepath: 'd/Song (audio).mp3' })])).toBeUndefined()
+    expect(finishedBeforeAudioName(row({}), [row({ id: 'n', state: 'completed', filepath: 'd/Song (audio) (2).mp3' })])).toBeUndefined()
+  })
+
+  it('does not take something else’s file', () => {
+    const other = row({ id: 'o', state: 'completed', filepath: 'd/Song.mp3', url: 'https://x.test/other' })
+    const video = row({ id: 'v', state: 'completed', filepath: 'd/Song.mp4', mode: 'video', quality: 'best' })
+    const planted = row({ id: 'p', state: 'completed', filepath: 'C:\\Windows\\calc.exe' })
+    expect(finishedBeforeAudioName(row({}), [other, video, planted])).toBeUndefined()
+    expect(finishedBeforeAudioName(row({ mode: 'video' }), [row({ id: 'x', state: 'completed', filepath: 'd/S.mp3', mode: 'video' })])).toBeUndefined()
   })
 })
 

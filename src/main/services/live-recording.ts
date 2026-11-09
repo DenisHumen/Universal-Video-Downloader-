@@ -2,6 +2,7 @@ import { createReadStream, createWriteStream, existsSync, readdirSync, readFileS
 import { basename, dirname, extname, join } from 'path'
 import { pipeline } from 'stream/promises'
 import type { DownloadMode } from '@shared/types'
+import { LOCAL_INPUT } from './ffmpeg-output'
 
 /*
   What a stopped live recording leaves on disk, and how to make a file of it.
@@ -147,7 +148,7 @@ export function savedPath(destinations: readonly string[], mode: DownloadMode): 
 export function remuxArgs(inputs: readonly string[], output: string, mode: DownloadMode): string[] {
   const args: string[] = []
   // `.part` says nothing about what is inside, and the extension is all ffmpeg would have to go on otherwise.
-  for (const input of inputs) args.push('-fflags', '+genpts+discardcorrupt', '-i', input)
+  for (const input of inputs) args.push(...LOCAL_INPUT, '-fflags', '+genpts+discardcorrupt', '-i', input)
   inputs.forEach((_, i) => {
     if (mode !== 'audio') args.push('-map', `${i}:v?`)
     args.push('-map', `${i}:a?`)

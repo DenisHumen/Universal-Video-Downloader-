@@ -20,7 +20,6 @@ import {
   app,
   BrowserWindow,
   dialog,
-  ipcMain,
   Notification,
   shell,
   type IpcMainInvokeEvent
@@ -90,6 +89,7 @@ import {
 import { takePending } from './index'
 import { registerAutomationIpc } from './automation-ipc'
 import { fromRenderer } from './services/navigation'
+import { guardedIpc as ipcMain } from './services/ipc-guard'
 import { log, logFilePath } from './services/log'
 import { mayOpen, mayShow, type KnownPaths } from './services/open-guard'
 import {

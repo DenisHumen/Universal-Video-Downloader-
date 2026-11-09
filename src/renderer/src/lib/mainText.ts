@@ -33,6 +33,8 @@ const EXACT: Record<string, TranslationKey> = {
   'That file is open on the server, so it cannot be replaced right now.': 'main.smb.fileOpen',
   'The server is still deleting an earlier copy of that file.': 'main.smb.deleting',
   'The share could not be reached.': 'main.smb.unreachable',
+  'Enter the password again to use it with another server.': 'main.smb.otherServer',
+  'This download link is corrupted — pick the video again.': 'err.corruptLink',
 
   // Telegram
   'Telegram did not answer in time.': 'main.telegram.noAnswer',

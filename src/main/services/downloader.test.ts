@@ -349,6 +349,12 @@ describe('buildArgs', () => {
   })
 })
 
+describe('siteFolder, for a label that names no site', () => {
+  it('goes by the host for HTML5MediaEmbed, as the Library does', () => {
+    expect(siteFolder({ url: 'https://videos.example.org/a', extractor: 'HTML5MediaEmbed' })).toBe('videos.example.org')
+  })
+})
+
 describe('siteFolder', () => {
   it('files a sniffed page under its site, not "Universal"', () => {
     // Every universally detected site shared one folder named after the fallback.
@@ -438,6 +444,26 @@ describe('titleFromFile', () => {
     expect(titleFromFile(join('d', 'Страница с видео (1) [page-1].mp4'))).toBe('Страница с видео')
     // Only that shape: here the title really does end like that.
     expect(titleFromFile(join('d', 'Часть (1) [abc123].mp4'))).toBe('Часть (1)')
+  })
+
+  it('takes a section and a language off, in the order they went on', () => {
+    expect(
+      titleFromFile(join('d', 'Клип [abc] [0m05s-0m09s] [de] (audio) (2).mp3'), {
+        range: { start: 5, end: 9 },
+        audioLanguage: 'de'
+      })
+    ).toBe('Клип')
+  })
+
+  it('leaves a title ending in brackets when the template does not put an id there', () => {
+    const template = '%(title)s.%(ext)s'
+    expect(titleFromFile(join('d', 'Концерт [Live].mp4'), { template })).toBe('Концерт [Live]')
+    expect(titleFromFile(join('d', 'Концерт [Live] [abc].mp4'))).toBe('Концерт [Live]')
+    expect(titleFromFile(join('d', 'Концерт [de].mp4'), { template })).toBe('Концерт [de]')
+  })
+
+  it('offers nothing for a template with no title in it', () => {
+    expect(titleFromFile(join('d', 'abc123.mp4'), { template: '%(id)s.%(ext)s' })).toBeUndefined()
   })
 
   it('has nothing to offer when the name was only an id', () => {

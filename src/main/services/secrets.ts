@@ -127,6 +127,26 @@ async function seal(value: string): Promise<string> {
   return (await safeStorage.encryptStringAsync(value)).toString('base64')
 }
 
+/**
+ * Seal something too big for the store, for a file of its own. Null when this
+ * machine has no key to seal with, which the caller has to have an answer for.
+ */
+export async function sealText(value: string): Promise<string | null> {
+  await secretsReady
+  return persistent ? seal(value) : null
+}
+
+/** Open what `sealText` made. Null when it was sealed by another user or on another machine. */
+export async function openText(blob: string): Promise<string | null> {
+  await secretsReady
+  if (!persistent) return null
+  try {
+    return (await safeStorage.decryptStringAsync(Buffer.from(blob, 'base64'))).result
+  } catch {
+    return null
+  }
+}
+
 let markReady: () => void = () => undefined
 /**
  * Settles once secrets.dat has been opened (or found unusable). Startup waits

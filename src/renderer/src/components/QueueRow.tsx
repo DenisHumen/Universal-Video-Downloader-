@@ -343,6 +343,8 @@ function QueueRow({ item, index, animateIn = true, heading }: Props): JSX.Elemen
   return (
     <m.li
       data-row={item.id}
+      // Where focus lands when the button it was on goes; see DownloadsView.
+      tabIndex={-1}
       /*
         Measured only when the row moves or changes state. With no dependency,
         framer measured the layout on every render, and a running download
@@ -440,7 +442,14 @@ function QueueRow({ item, index, animateIn = true, heading }: Props): JSX.Elemen
             />
           )}
           {(item.state === 'error' || item.state === 'canceled') && (
-            <IconButton label={t('common.retry')} icon={<RotateCw size={16} />} onClick={() => window.api.retryDownload(item.id)} />
+            <IconButton
+              label={t('common.retry')}
+              icon={<RotateCw size={16} />}
+              // The second click of a double click on Cancel lands here, on what just appeared.
+              onClick={(event) => {
+                if (event.detail <= 1) void window.api.retryDownload(item.id)
+              }}
+            />
           )}
           {/*
             Remove, in the form the state allows. A row still working is
@@ -465,7 +474,9 @@ function QueueRow({ item, index, animateIn = true, heading }: Props): JSX.Elemen
               className="hover:text-bad"
               label={t('queue.removeRow')}
               icon={<Trash2 size={16} />}
-              onClick={() => window.api.removeDownload(item.id)}
+              onClick={(event) => {
+                if (event.detail <= 1) void window.api.removeDownload(item.id)
+              }}
             />
           )}
           {menu.length > 0 && (

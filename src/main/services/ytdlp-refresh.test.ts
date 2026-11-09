@@ -104,7 +104,7 @@ vi.mock('./proxy-auth', () => ({ proxyUrl: () => '', withProxyAuth: <T>(req: T) 
 import { getYtdlpStatus, refreshEngineIfDue, ytdlpBinaryPath } from './ytdlp'
 
 const HOUR = 60 * 60 * 1000
-const realPublic = process.env.PUBLIC
+const realLocal = process.env.LOCALAPPDATA
 
 function engineJson(): { lastRefresh?: number; lastFailure?: number; failures?: number } {
   const file = join(h.dir, 'engine.json')
@@ -117,8 +117,8 @@ function selfUpdates(): number {
 
 beforeEach(() => {
   h.dir = mkdtempSync(join(tmpdir(), 'uvd-engine-'))
-  // On Windows the engine lives under %PUBLIC%, elsewhere under userData.
-  process.env.PUBLIC = h.dir
+  // On Windows the engine lives under %LOCALAPPDATA%, elsewhere under userData.
+  process.env.LOCALAPPDATA = h.dir
   h.online = true
   h.selfUpdate = 0
   h.download = 200
@@ -133,11 +133,16 @@ beforeEach(() => {
 
 afterEach(() => {
   rmSync(h.dir, { recursive: true, force: true })
-  if (realPublic === undefined) delete process.env.PUBLIC
-  else process.env.PUBLIC = realPublic
+  if (realLocal === undefined) delete process.env.LOCALAPPDATA
+  else process.env.LOCALAPPDATA = realLocal
 })
 
 describe('refreshEngineIfDue', () => {
+  it('reads no yt-dlp.conf for the self-update', async () => {
+    await refreshEngineIfDue(() => false)
+    expect(h.spawned.find((args) => args.includes('-U'))).toContain('--ignore-config')
+  })
+
   it('records a refresh when the self-update succeeds', async () => {
     const before = Date.now()
     await refreshEngineIfDue(() => false)

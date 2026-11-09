@@ -39,6 +39,24 @@ vi.mock('../log', () => ({ log: { info: vi.fn(), warn: vi.fn(), error: vi.fn() }
   turn up in series titles and in the text of an exception. The message that
   says checks keep failing is the one that must not itself fail to send.
 */
+describe('a very long reason', () => {
+  it('stays under the limit without cutting through its own escaping or markup', () => {
+    for (const why of ['&'.repeat(20_000), '<'.repeat(20_000), 'x'.repeat(20_000), 'Ошибка & '.repeat(2000)]) {
+      for (const html of [composeFailure('A & B'.repeat(500), 1, 4, why, 3), composeCheckFailure('A & B'.repeat(500), 3, why)]) {
+        expect(html.length).toBeLessThanOrEqual(4096)
+        expect(html).toContain('</b>')
+        // Every & starts a whole entity: nothing was cut through `&amp;`.
+        expect(html.replace(/&(?:amp|lt|gt);/g, '')).not.toMatch(/[&<](?!\/?b>)/)
+      }
+    }
+  })
+
+  it('leaves a short one as it was', () => {
+    expect(composeFailure('Show', 1, 4, 'a & b')).toContain('a &amp; b')
+    expect(composeFailure('Show', 1, 4, 'a & b')).not.toContain('…')
+  })
+})
+
 describe('composeCheckFailure', () => {
   it('escapes the title and the reason', () => {
     const html = composeCheckFailure('Tom & Jerry <remastered>', 3, 'Unexpected token < in JSON')

@@ -1,5 +1,6 @@
 import { knownSiteFor } from './auto-sources'
 import { pageUrlOf } from './page-url'
+import { siteNameOf } from './site-name'
 import type { DownloadItem } from './types'
 import { isWebLink, normalizeUrl } from './urls'
 
@@ -44,15 +45,7 @@ export interface LibraryEntry {
   finishedAt: number
 }
 
-/**
- * The extractor's name when it names a site.
- *
- * The rest are the engine's and this app's words for "no extractor of its own
- * for this one": "Generic" and "HTML5MediaEmbed" on a card told a person nothing.
- */
-export function siteNameOf(extractor: string | undefined): string | undefined {
-  return extractor && !/^(universal|generic|browser|html5mediaembed)$/i.test(extractor) ? extractor : undefined
-}
+export { siteNameOf }
 
 /**
  * The site a Library entry is grouped under, or undefined when nothing says.

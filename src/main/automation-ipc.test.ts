@@ -6,6 +6,7 @@ const h = vi.hoisted(() => ({
   handlers: new Map<string, (event: unknown, ...args: unknown[]) => Promise<unknown>>(),
   fromApp: true,
   send: vi.fn(),
+  test: vi.fn(),
   file: vi.fn()
 }))
 
@@ -26,14 +27,19 @@ vi.mock('./services/share-send', async (importOriginal) => ({
 }))
 vi.mock('./services/downloader', () => ({ getDownload: () => ({ filepath: h.file() }), relocateItem: vi.fn() }))
 vi.mock('./services/library', () => ({ entryFile: vi.fn(), followEntry: vi.fn() }))
-vi.mock('./services/settings', () => ({ getSettings: () => ({ smbTargets: [] }) }))
+vi.mock('./services/settings', () => ({
+  getSettings: () => ({ smbTargets: [{ id: 'nas', name: 'NAS', host: '192.168.1.10', share: 'video', path: '', domain: '', username: 'me' }] })
+}))
 vi.mock('./services/automation/store', () => ({ watchEvents: { on: vi.fn() } }))
 vi.mock('./services/automation/watcher', () => ({}))
 vi.mock('./services/automation/pipeline', () => ({}))
-vi.mock('./services/automation/smb', () => ({}))
+vi.mock('./services/automation/smb', () => ({ testTarget: h.test, listSmbFolders: h.test, createSmbFolder: h.test }))
 vi.mock('./services/automation/telegram', () => ({}))
 vi.mock('./services/automation/detect', () => ({}))
-vi.mock('./services/secrets', () => ({ SECRET: {} }))
+vi.mock('./services/secrets', () => ({
+  SECRET: { smbPassword: (id: string) => `smb.${id}` },
+  getSecretWhenReady: async (key: string) => (key === 'smb.nas' ? 'stored-example' : undefined)
+}))
 vi.mock('./services/log', () => {
   const quiet = vi.fn()
   return { log: { info: quiet, warn: quiet, error: quiet, debug: quiet }, logFilePath: () => '' }
@@ -50,6 +56,43 @@ beforeEach(async () => {
   h.file.mockReset()
   h.file.mockReturnValue(__filename)
   if (!h.handlers.size) (await import('./automation-ipc')).registerAutomationIpc()
+})
+
+describe('the stored password of a share', () => {
+  const nas = { id: 'nas', name: 'NAS', host: '192.168.1.10', share: 'video', path: '', domain: '', username: 'me' }
+  const channels = [IPC.autoTestSmb, IPC.autoListShareFolders, IPC.autoCreateShareFolder]
+  beforeEach(() => h.test.mockReset())
+
+  it.each(channels)('%s does not go to a host the window names', async (channel) => {
+    await expect(h.handlers.get(channel)!(event, { ...nas, host: 'evil.example' }, '', '', 'x')).rejects.toThrow(/another server/)
+    expect(h.test).not.toHaveBeenCalled()
+  })
+
+  it.each(channels)('%s goes to its own server, whatever else the form changed', async (channel) => {
+    await h.handlers.get(channel)!(event, { ...nas, host: '192.168.1.10 ', share: 'other' }, '', '', 'x')
+    expect(h.test.mock.calls[0][0]).toMatchObject({ host: '192.168.1.10', share: 'other' })
+    expect(h.test.mock.calls[0][1]).toBe('stored-example')
+  })
+
+  it('leaves a password being typed to go where the form says', async () => {
+    await h.handlers.get(IPC.autoTestSmb)!(event, { ...nas, host: '192.168.1.20' }, 'typed-example')
+    expect(h.test).toHaveBeenCalledWith(expect.objectContaining({ host: '192.168.1.20' }), 'typed-example')
+  })
+
+  it('gives a target that is not saved no stored password, even with an id that has one', async () => {
+    await h.handlers.get(IPC.autoTestSmb)!(event, { ...nas, id: 'new', host: 'evil.example' }, '')
+    expect(h.test.mock.calls[0][1]).toBe('')
+  })
+})
+
+describe('every channel', () => {
+  it('refuses a page that is not the app, whichever it is', async () => {
+    h.fromApp = false
+    expect(h.handlers.size).toBeGreaterThan(10)
+    for (const [channel, handler] of h.handlers) {
+      await expect(handler(event), channel).rejects.toThrow(/only available to the app/)
+    }
+  })
 })
 
 describe('Send to Share over the bridge', () => {

@@ -186,13 +186,38 @@ function clamp(text: string, limit: number): string {
   return text.length <= limit ? text : `${text.slice(0, limit - 1)}…`
 }
 
+/**
+ * Escaped and no longer than `limit` once it is, without cutting through what the
+ * escaping wrote. A cut through `&amp;` or a closing tag is markup Telegram refuses,
+ * and the message was the alert that a long error message needed to get through.
+ */
+function escFit(value: string, limit: number): string {
+  let out = ''
+  for (const char of String(value)) {
+    const piece = esc(char)
+    if (out.length + piece.length >= limit) return `${out}…`
+    out += piece
+  }
+  return out
+}
+
+/** Room for each part of a message, which together stay under MAX_TEXT. */
+const FIT_NAME = 300
+const FIT_LINE = 500
+const FIT_REASON = 3000
+
 export async function sendMessage(token: string, chatId: string, html: string): Promise<void> {
+  /*
+    The parts are already cut to fit. Should a message still run over, a cut is not
+    safe in HTML, so it goes as plain words rather than not at all.
+  */
+  const fits = html.length <= MAX_TEXT
   await serialise(() =>
     deliver(token, 'sendMessage', {
       chat_id: chatId,
-      parse_mode: 'HTML',
+      ...(fits ? { parse_mode: 'HTML' } : {}),
       disable_web_page_preview: true,
-      text: clamp(html, MAX_TEXT)
+      text: fits ? html : clamp(html.replace(/<[^>]*>/g, ''), MAX_TEXT)
     })
   )
 }
@@ -289,12 +314,12 @@ const took = (language: MainLanguage, seconds?: number): string => {
 /** What a "new episode" notification looks like. */
 export function composeEpisodeNews(news: EpisodeNews, language: MainLanguage = 'en'): string {
   const lines = [
-    `🎬 <b>${esc(news.series)}</b> — S${pad(news.season)}E${pad(news.episode)}`
+    `🎬 <b>${escFit(news.series, FIT_NAME)}</b> — S${pad(news.season)}E${pad(news.episode)}`
   ]
   const sub = [news.translator, news.quality].filter(Boolean).join(' · ')
-  if (sub) lines.push(`<i>${esc(sub)}</i>`)
+  if (sub) lines.push(`<i>${escFit(sub, FIT_LINE)}</i>`)
   if (news.remotePath) {
-    lines.push('', wordsIn(language).t('telegram.uploaded', { path: `<code>${esc(news.remotePath)}</code>` }))
+    lines.push('', wordsIn(language).t('telegram.uploaded', { path: `<code>${escFit(news.remotePath, FIT_REASON)}</code>` }))
   }
   const facts = [size(language, news.bytes), took(language, news.seconds)].filter(Boolean).join(' · ')
   if (facts) lines.push(esc(facts))
@@ -316,11 +341,11 @@ export function composeFailure(
   attempts = 1,
   language: MainLanguage = 'en'
 ): string {
-  const lines = [`⚠️ <b>${esc(series)}</b> — S${pad(season)}E${pad(episode)}`]
+  const lines = [`⚠️ <b>${escFit(series, FIT_NAME)}</b> — S${pad(season)}E${pad(episode)}`]
   if (attempts > 1) {
     lines.push(wordsIn(language).tp('telegram.gaveUp', attempts))
   }
-  lines.push('', esc(why))
+  lines.push('', escFit(why, FIT_REASON))
   return lines.join('\n')
 }
 
@@ -339,9 +364,9 @@ export function composeCheckFailure(
   language: MainLanguage = 'en'
 ): string {
   return [
-    `⚠️ <b>${esc(series)}</b>`,
+    `⚠️ <b>${escFit(series, FIT_NAME)}</b>`,
     wordsIn(language).tp('telegram.checksFailed', failures),
     '',
-    esc(why)
+    escFit(why, FIT_REASON)
   ].join('\n')
 }

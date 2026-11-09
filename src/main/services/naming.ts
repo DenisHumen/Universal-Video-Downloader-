@@ -211,10 +211,49 @@ export function pickOutputStem(choice: StemChoice): string {
  * The ` (n)` that gives a file of this stem a name nothing in the folder has.
  * Starts at 2, the way a file manager numbers a copy.
  */
-export function freeCopySuffix(stem: string, names: readonly string[]): string {
+export function freeCopySuffix(stem: string, names: readonly string[], restricted = false): string {
+  // Look for the name it will really have, or a third copy lands on the second's file.
+  const asWritten = (name: string): string => (restricted ? restrictedSpaces(name) : name)
   let n = 2
-  while (hasFileNamed(names, copyName(stem, n))) n++
+  while (hasFileNamed(names, asWritten(copyName(stem, n)))) n++
   return ` (${n})`
+}
+
+/**
+ * With restricted names on, the engine's switch only reaches the fields; the spaces
+ * in the template itself are ours. Those inside `%(...)s` are left alone.
+ */
+export function restrictedSpaces(name: string): string {
+  return name.replace(/ (?![^(]*\))/g, '_')
+}
+
+/**
+ * The name a download from before ` (audio)` existed had, from one that has it.
+ * Undefined for any other name. A format's number comes off too: `T (audio).f251`.
+ */
+export function stemBeforeAudioName(stem: string): string | undefined {
+  const bare = stem.replace(/\.f[\w-]+$/, '')
+  const before = bare.replace(/[ _]\(audio\)$/, '')
+  return before === bare ? undefined : before
+}
+
+/**
+ * A finished audio file from before ` (audio)` existed, which is what this entry
+ * asks for. The engine now looks for the new name, so it would never find it and
+ * would fetch the same thing again.
+ */
+export function finishedBeforeAudioName(item: DownloadItem, all: readonly DownloadItem[]): string | undefined {
+  if (item.mode !== 'audio' || item.outputStem || item.copySuffix || hasTrim(item.range)) return undefined
+  const found = all.find(
+    (other) =>
+      other.id !== item.id &&
+      other.state === 'completed' &&
+      Boolean(other.filepath) &&
+      isMediaName(other.filepath as string) &&
+      !/[ _]\(audio\)(?: \(\d+\))?\.[^.]+$/.test(other.filepath as string) &&
+      sameRequest(other, item)
+  )
+  return found?.filepath
 }
 
 /**

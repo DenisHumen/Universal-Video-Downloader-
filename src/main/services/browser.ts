@@ -14,6 +14,7 @@ import { directUrlFor } from '../resolvers'
 import { startDownload } from './downloader'
 import { getSettings } from './settings'
 import { mt } from './locale'
+import { guardedIpc } from './ipc-guard'
 import { rendererIndex, wireNavigation } from './navigation'
 import { chromeOptions, forwardMaximized, themeOptions } from './window-chrome'
 import { log } from './log'
@@ -492,37 +493,37 @@ async function queuePageDownload(download: QueuedPageDownload): Promise<void> {
 }
 
 export function registerBrowserIpc(): void {
-  ipcMain.handle(IPC.browserOpen, (_e, url?: string) => openBrowserWindow(url))
-  ipcMain.handle(IPC.browserNavigate, (_e, url: string) => {
+  guardedIpc.handle(IPC.browserOpen, (_e, url?: string) => openBrowserWindow(url))
+  guardedIpc.handle(IPC.browserNavigate, (_e, url: string) => {
     void view?.webContents.loadURL(normalizeInput(url))
   })
-  ipcMain.handle(IPC.browserBack, () => {
+  guardedIpc.handle(IPC.browserBack, () => {
     if (view?.webContents.navigationHistory.canGoBack()) view.webContents.navigationHistory.goBack()
   })
-  ipcMain.handle(IPC.browserForward, () => {
+  guardedIpc.handle(IPC.browserForward, () => {
     if (view?.webContents.navigationHistory.canGoForward()) {
       view.webContents.navigationHistory.goForward()
     }
   })
-  ipcMain.handle(IPC.browserReload, () => view?.webContents.reload())
-  ipcMain.handle(IPC.browserStop, () => view?.webContents.stop())
-  ipcMain.handle(IPC.browserSetBounds, (_e, bounds) => layoutView(bounds))
-  ipcMain.handle(IPC.browserSetPick, (_e, enabled: boolean) => setPicking(Boolean(enabled)))
-  ipcMain.handle(IPC.browserClearMedia, () => {
+  guardedIpc.handle(IPC.browserReload, () => view?.webContents.reload())
+  guardedIpc.handle(IPC.browserStop, () => view?.webContents.stop())
+  guardedIpc.handle(IPC.browserSetBounds, (_e, bounds) => layoutView(bounds))
+  guardedIpc.handle(IPC.browserSetPick, (_e, enabled: boolean) => setPicking(Boolean(enabled)))
+  guardedIpc.handle(IPC.browserClearMedia, () => {
     media.clear()
     candidateHeaders.clear()
     sendMedia()
   })
-  ipcMain.handle(IPC.browserDownload, (_e, target: { mediaId?: string; url?: string }) =>
+  guardedIpc.handle(IPC.browserDownload, (_e, target: { mediaId?: string; url?: string }) =>
     download(target)
   )
-  ipcMain.handle(IPC.browserState, () => {
+  guardedIpc.handle(IPC.browserState, () => {
     sendState()
     sendMedia()
   })
 
   // ---- passwords ----
-  ipcMain.handle(IPC.browserLoginAnswer, async (_e, answer: 'save' | 'never' | 'dismiss') => {
+  guardedIpc.handle(IPC.browserLoginAnswer, async (_e, answer: 'save' | 'never' | 'dismiss') => {
     const pending = offered
     offered = null
     if (!pending) return
@@ -530,12 +531,12 @@ export function registerBrowserIpc(): void {
     else if (answer === 'never') await neverForSite(pending.origin)
   })
 
-  ipcMain.handle(IPC.browserLogins, () => listLogins())
-  ipcMain.handle(IPC.browserForgetLogins, (_e, origin?: string) =>
+  guardedIpc.handle(IPC.browserLogins, () => listLogins())
+  guardedIpc.handle(IPC.browserForgetLogins, (_e, origin?: string) =>
     forgetLogins(typeof origin === 'string' ? origin : undefined)
   )
-  ipcMain.handle(IPC.browserSignOut, () => signOutOfSites())
-  ipcMain.handle(IPC.browserImportSignIns, (_e, browser: unknown) =>
+  guardedIpc.handle(IPC.browserSignOut, () => signOutOfSites())
+  guardedIpc.handle(IPC.browserImportSignIns, (_e, browser: unknown) =>
     typeof browser === 'string' && (SUPPORTED_COOKIE_BROWSERS as readonly string[]).includes(browser)
       ? importSignIns(browser)
       : { ok: false, why: 'failed' }
