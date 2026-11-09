@@ -65,6 +65,9 @@ import { coalesce } from './services/coalesce'
 import { infoCache } from './services/info-store'
 import { flushBrowserCookies, initBrowserLogins } from './services/browser-logins'
 import { closeHidesWindow, trayStatusLine } from './services/tray-menu'
+import { ffmpegPath } from './services/ffmpeg'
+import { reapOrphanedFfmpeg } from './services/process'
+import { shouldResume } from './services/resume'
 
 const isMac = process.platform === 'darwin'
 let mainWindow: BrowserWindow | null = null
@@ -781,9 +784,17 @@ if (cliArgs) {
       queue until somebody noticed and pressed resume. Only items the shutdown
       itself paused come back; a download the user paused on purpose stays that
       way. Waits for the engine, since a resumed item needs it immediately.
+
+      After a crash an ffmpeg may still be writing the partial a resumed item
+      wants, so that goes first. Nothing was cut short, nothing to look for.
     */
+    const cutShort = listDownloads().some(shouldResume)
+    const reaped = (cutShort ? reapOrphanedFfmpeg(ffmpegPath()) : Promise.resolve(0)).then((count) => {
+      if (count > 0) log.warn('app', 'Ended an ffmpeg the last session left running', { count })
+    })
     if (getSettings().resumeOnLaunch) {
-      void ensureYtdlp()
+      void reaped
+        .then(() => ensureYtdlp())
         .then(() => resumeInterrupted())
         .catch(() => undefined)
     }

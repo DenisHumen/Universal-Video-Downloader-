@@ -102,6 +102,10 @@ jobs:
       # (on Windows it rewrites the executable with rcedit after the hook).
       - name: Check Electron's fuses in the packed app
         run: node scripts/check-fuses.mjs
+      # Everything the app opens at run time is in there, nothing of the
+      # repository's is, and main has its Russian without React.
+      - name: Check what is in the packed app
+        run: node scripts/check-package.mjs
 
       # The .deb and .rpm themselves, not only the unpacked app. The AppArmor
       # profile, the hicolor icons and the desktop entry are all written by

@@ -1,6 +1,7 @@
 import { app, type Cookie } from 'electron'
 import { spawn } from 'child_process'
 import { chmodSync, mkdtempSync, readFileSync, renameSync, rmSync, writeFileSync } from 'fs'
+import { readdir, rm, stat } from 'fs/promises'
 import { tmpdir } from 'os'
 import { dirname, join } from 'path'
 import { browsingSession } from '../resolvers/universal/capture'
@@ -80,6 +81,7 @@ function scheduleJar(): void {
 export function initBrowserLogins(): void {
   if (started) return
   started = true
+  void sweepAbandonedJars()
   const ses = browsingSession()
   ses.cookies.on('changed', (_e, cookie, _cause, removed) => {
     scheduleJar()
@@ -112,11 +114,12 @@ export function browserCookiesFile(): string | undefined {
 export function readSavedBrowserJar(): void {
   reading = true
   jarCount = 0
+  void sweepAbandonedJars()
   try {
     const text = readFileSync(JAR(), 'utf8')
     const count = netscapeCount(text)
     if (!count) return
-    const file = join(mkdtempSync(join(tmpdir(), 'uvd-cookies-')), 'cookies.txt')
+    const file = join(mkdtempSync(join(tmpdir(), `${JAR_COPY_PREFIX}${process.pid}-`)), 'cookies.txt')
     writeFileSync(file, text, { mode: 0o600, flag: 'wx' })
     privateJar = file
     jarCount = count
@@ -135,6 +138,46 @@ export function dropSavedBrowserJar(): void {
     rmSync(dirname(file), { recursive: true, force: true, maxRetries: 3, retryDelay: 100 })
   } catch (err) {
     log.warn('browser', 'Could not remove the copy of the cookie jar', { why: String(err) })
+  }
+}
+
+const JAR_COPY_PREFIX = 'uvd-cookies-'
+/** A copy from before they carried a process id: older than this, nothing is still using it. */
+const NAMELESS_COPY_AGE = 24 * 60 * 60 * 1000
+
+function processRuns(pid: number): boolean {
+  try {
+    process.kill(pid, 0)
+    return true
+  } catch (err) {
+    // EPERM is somebody else's process, which is still a process.
+    return (err as NodeJS.ErrnoException).code !== 'ESRCH'
+  }
+}
+
+/**
+ * Delete the copies of the jar that runs of `uvd` did not live to delete.
+ *
+ * `dropSavedBrowserJar` cannot cover every way out. On Windows, Ctrl-C in a
+ * console ends an Electron process there and then: `process.on('SIGINT')` never
+ * runs (measured on Electron 45, exit status 0xC000013A), so what the command
+ * leaves is signed-in cookies in the temp folder. A closed terminal or a killed
+ * process does the same anywhere. The next launch of either kind cleans up, and
+ * the process id in the name leaves a run still going alone.
+ */
+export async function sweepAbandonedJars(dir = tmpdir(), now = Date.now()): Promise<void> {
+  try {
+    for (const name of await readdir(dir)) {
+      if (!name.startsWith(JAR_COPY_PREFIX)) continue
+      const path = join(dir, name)
+      const owner = /^(\d+)-/.exec(name.slice(JAR_COPY_PREFIX.length))
+      const abandoned = owner
+        ? !processRuns(Number(owner[1]))
+        : now - (await stat(path)).mtimeMs > NAMELESS_COPY_AGE
+      if (abandoned) await rm(path, { recursive: true, force: true, maxRetries: 3, retryDelay: 100 })
+    }
+  } catch (err) {
+    log.warn('browser', 'Could not clean up old copies of the cookie jar', { why: String(err) })
   }
 }
 

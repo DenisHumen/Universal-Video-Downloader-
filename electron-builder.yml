@@ -27,6 +27,19 @@ files:
   - '!{.eslintignore,.eslintrc.cjs,.prettierignore,.prettierrc.yaml,dev-app-update.yml,CHANGELOG.md,README.md,THIRD_PARTY_NOTICES.txt}'
   - '!{.env,.env.*,.npmrc,pnpm-lock.yaml,package-lock.json}'
   - '!{tsconfig.json,tsconfig.node.json,tsconfig.web.json,tailwind.config.js,postcss.config.js}'
+  # The visual baselines alone were 7.5 MB of every install's app.asar, a third
+  # of it. scripts/check-package.mjs reads the packed app and fails on these.
+  - '!{test,tests}{,/**/*}'
+  - '!{eslint.config.mjs,.nvmrc}'
+  # What dependencies publish beside the code they run: nothing requires any of it.
+  - '!**/node_modules/**/*.{map,flow,d.ts,d.mts,d.cts}'
+  - '!**/node_modules/js-md4/doc{,/**/*}'
+  # node-smb2 formats a date with moment-timezone. It loads moment.js and
+  # data/packed; moment's other builds and the time-zone data's other forms are
+  # 5 MB nobody opens. moment/locale stays: moment looks in there at run time.
+  - '!**/node_modules/moment/{min,dist,src,ts3.1-typings}{,/**/*}'
+  - '!**/node_modules/moment-timezone/builds{,/**/*}'
+  - '!**/node_modules/moment-timezone/data/meta{,/**/*}'
 
 # ffmpeg-static ships a per-platform binary that must stay executable on disk.
 # Checks the ffmpeg inside each packed target, before its installer is built -
@@ -50,6 +63,15 @@ extraResources:
 win:
   executableName: Universal Video Downloader
   artifactName: ${productName}-${version}-windows-${arch}-setup.${ext}
+  # Chromium's own words, 48 MB of 51 in languages this app has no interface in.
+  # Not English alone: `app.getLocale()` only answers with a language it has a
+  # file for, and that answer is how a Russian or Ukrainian system gets the
+  # Russian interface (locale.ts, i18n/translate.ts). Only these two platforms:
+  # on a Mac the same list names .lproj folders, and the files are elsewhere.
+  electronLanguages:
+    - en-US
+    - ru
+    - uk
   target:
     - target: nsis
       arch:
@@ -139,6 +161,11 @@ linux:
   maintainer: Denis Humen <dberkut18@gmail.com>
   synopsis: Universal video downloader with automatic stream detection
   description: A beautiful cross-platform desktop app that detects and downloads video streams from almost any website.
+  # See win.electronLanguages.
+  electronLanguages:
+    - en-US
+    - ru
+    - uk
   # The sizes hicolor actually looks up, 16 to 512, from scripts/generate-icons.mjs.
   # Without them the packages carried one 1024px icon no launcher ever finds.
   icon: build/icons

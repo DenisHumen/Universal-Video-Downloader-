@@ -1,4 +1,4 @@
-import { session, type Session, type OnBeforeSendHeadersListenerDetails } from 'electron'
+import { app, session, type Session, type OnBeforeSendHeadersListenerDetails } from 'electron'
 import { UA } from '../http'
 import { log } from '../../services/log'
 import { scoreUrl, type MediaCandidate } from './candidates'
@@ -122,6 +122,14 @@ export function browsingSession(): Session {
   const ses = session.fromPartition(BROWSING_PARTITION)
   if (!hardened) {
     hardened = true
+    /*
+      Sites in here pick their language from this. Left alone, Chromium says only
+      the interface language it has a file for, and the package keeps three of
+      those (electron-builder.yml): a German site would have been asked for
+      English on a German system.
+    */
+    const languages = app.getPreferredSystemLanguages()
+    if (languages.length) ses.setUserAgent(BROWSER_UA, languages.join(','))
     ses.setPermissionRequestHandler((_wc, permission, callback) =>
       callback(permission === 'fullscreen')
     )

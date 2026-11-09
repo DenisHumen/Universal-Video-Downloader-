@@ -93,6 +93,46 @@ afterEach(() => {
   Object.defineProperty(process, 'arch', realArch)
 })
 
+describe('the log', () => {
+  /** What electron-updater does with a failure: its logger hears, then the listeners and the caller. */
+  const failingLikeTheRealOne = (au: FakeUpdater & { logger?: { error: (m: string) => void } }): void => {
+    au.checkForUpdates.mockImplementation(async () => {
+      au.logger?.error(`Error: HttpError: 503 Service Unavailable\n"method: GET url: https://example.com/latest.yml"`)
+      const failure = new Error('503 Service Unavailable\nmethod: GET')
+      au.emit('error', failure)
+      throw failure
+    })
+  }
+  const lines = (): number =>
+    h.log.error.mock.calls.length + h.log.warn.mock.calls.length
+
+  it('has one line for a failed check somebody asked for', async () => {
+    const { updater, au } = await load('win32')
+    await updater.initUpdater()
+    failingLikeTheRealOne(au)
+    await updater.checkForUpdates()
+    expect(lines()).toBe(1)
+    expect(h.log.warn).toHaveBeenCalledWith('updater', 'Update failed', { error: '503 Service Unavailable' })
+  })
+
+  it('has one line for a failed check nobody asked for', async () => {
+    const { updater, au } = await load('win32')
+    await updater.initUpdater()
+    failingLikeTheRealOne(au)
+    await updater.backgroundCheck()
+    expect(lines()).toBe(1)
+  })
+
+  it('keeps what the updater says that is not its echo of a failure', async () => {
+    const { updater, au } = await load('win32')
+    await updater.initUpdater()
+    ;(au as FakeUpdater & { logger: { error: (m: string) => void } }).logger.error(
+      'Cannot download differentially, fallback to full download'
+    )
+    expect(h.log.error).toHaveBeenCalledWith('updater', 'Cannot download differentially, fallback to full download')
+  })
+})
+
 describe('backgroundCheck', () => {
   it.each([
     ['downloaded', (au: FakeUpdater) => au.emit('update-downloaded', { version: '3.25.0' })],

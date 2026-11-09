@@ -187,6 +187,9 @@ jobs:
       - name: Check Electron's fuses in the packed app
         run: node scripts/check-fuses.mjs
 
+      - name: Check what is in the packed app
+        run: node scripts/check-package.mjs
+
       - name: Check what the .deb and .rpm install
         if: matrix.platform == 'linux'
         run: node scripts/check-linux-packages.mjs
