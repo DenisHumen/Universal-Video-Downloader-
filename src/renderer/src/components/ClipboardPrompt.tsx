@@ -13,6 +13,7 @@ import { useT } from '../i18n'
 export default function ClipboardPrompt(): JSX.Element {
   const t = useT()
   const link = useStore((s) => s.clipboardLink)
+  const sent = useStore((s) => s.clipboardLinkSent)
   const dismiss = useStore((s) => s.dismissClipboardLink)
   const requestDetect = useStore((s) => s.requestDetect)
   const prefetchDetect = useStore((s) => s.prefetchDetect)
@@ -26,15 +27,19 @@ export default function ClipboardPrompt(): JSX.Element {
     strip goes or shows another link - unless it went because the link was
     accepted: this cleanup runs in the same commit as Home's own effect, before
     Home has had the chance to adopt the run.
+
+    Never for a link sent from outside. Any web page can send one, and detecting
+    is a request to a site the page chose, carrying the cookies set up for it.
+    Copying a link is the person's own act; this has to wait for "use it".
   */
   useEffect(() => {
-    if (!link) return
+    if (!link || sent) return
     prefetchDetect(link)
     return () => {
       if (handedOver.current === link) handedOver.current = null
       else cancelPrefetch(link)
     }
-  }, [link, prefetchDetect, cancelPrefetch])
+  }, [link, sent, prefetchDetect, cancelPrefetch])
 
   const accept = (): void => {
     if (!link) return
@@ -51,9 +56,9 @@ export default function ClipboardPrompt(): JSX.Element {
       {link && (
         <m.div {...collapse} className="shrink-0 overflow-hidden">
           <div className="flex items-center gap-3 border-b border-edge bg-raise px-4 py-2.5">
-            <span className="label shrink-0 text-accent-ink">{t('stamp.clipboard')}</span>
+            <span className="label shrink-0 text-accent-ink">{t(sent ? 'stamp.sentLink' : 'stamp.clipboard')}</span>
             <div className="min-w-0 flex-1">
-              <p className="text-body font-medium text-ink">{t('home.clipboardFound')}</p>
+              <p className="text-body font-medium text-ink">{t(sent ? 'home.sentLinkFound' : 'home.clipboardFound')}</p>
               <p className="mono truncate text-meta text-ink-2" title={link}>
                 {link}
               </p>

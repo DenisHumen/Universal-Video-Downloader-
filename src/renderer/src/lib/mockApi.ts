@@ -267,6 +267,8 @@ function syncMockLibrary(): void {
   }
 }
 
+const sentLinkListeners = new Set<(url: string) => void>()
+
 type YtdlpListener = (status: YtDlpStatus) => void
 type UpdateListener = (status: UpdateStatus) => void
 type BrowserStateListener = (state: BrowserState) => void
@@ -305,6 +307,8 @@ declare global {
       queue: (patch: Partial<DownloadItem>) => DownloadItem
       /** Maximise or restore the window the way Win+Up or Snap would, without the button. */
       maximize: (next: boolean) => void
+      /** A link arriving from outside, as a `uvd://` link would bring it. */
+      sendLink: (url: string) => void
       /** The terminal command's state, read when Settings next opens. */
       cli: (patch: Partial<CliStatus>) => void
       /** Which library files are gone from disk. */
@@ -358,6 +362,7 @@ export function installMockApi(): void {
     },
     browserMedia: (list) => browserMediaListeners.forEach((cb) => cb(list)),
     maximize: setMaximized,
+    sendLink: (url) => sentLinkListeners.forEach((cb) => cb(url)),
     queue: (patch) => {
       const item: DownloadItem = {
         id: `mock-row-${++itemSeq}`,
@@ -661,6 +666,10 @@ export function installMockApi(): void {
     // No network in the preview build; a YouTube link still gets its poster from the id.
     onDetectPreview: () => () => undefined,
     onClipboardLink: () => () => undefined,
+    onSentLink: (cb) => {
+      sentLinkListeners.add(cb)
+      return () => sentLinkListeners.delete(cb)
+    },
     onAutoDownload: () => () => undefined,
     onPasteLink: () => () => undefined,
     takePending: async () => ({}),

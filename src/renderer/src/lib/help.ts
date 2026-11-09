@@ -1,7 +1,7 @@
 import type { AppErrorCode } from '@shared/types'
 import type { TranslateFn, TranslationKey } from '../i18n'
 import type { ViewId } from '../store'
-import { AlertTriangle, ChannelSecure, Download, FolderOpen, Globe, Info, Radar, Send, type IconComponent } from '../ui/icons'
+import { AlertTriangle, ChannelSecure, Download, FolderOpen, Globe, Info, Link2, Radar, Send, type IconComponent } from '../ui/icons'
 import { fixFor } from './fixes'
 
 /*
@@ -15,7 +15,7 @@ import { fixFor } from './fixes'
   sentence telling someone to press something that is gone.
 */
 
-export type HelpTopicId = 'download' | 'whereFile' | 'signIn' | 'newEpisodes' | 'browser' | 'cookies' | 'failed' | 'report'
+export type HelpTopicId = 'download' | 'whereFile' | 'signIn' | 'newEpisodes' | 'browser' | 'cookies' | 'send' | 'failed' | 'report'
 
 export type HelpAction =
   | { kind: 'view'; view: ViewId; name: TranslationKey }
@@ -25,6 +25,8 @@ export type HelpAction =
   | { kind: 'downloadsFolder' }
   | { kind: 'addWatch' }
   | { kind: 'topic'; topic: HelpTopicId }
+  | { kind: 'extensionGuide' }
+  | { kind: 'copyBookmarklet' }
 
 export interface HelpTopic {
   id: HelpTopicId
@@ -94,6 +96,15 @@ export const HELP_TOPICS: HelpTopic[] = [
     summary: 'help.cookies.summary',
     paragraphs: ['help.cookies.what'],
     actions: [{ kind: 'settings', route: 'access#cookies', name: 'prefs.panel.access' }]
+  },
+  {
+    id: 'send',
+    icon: Link2,
+    title: 'help.send.title',
+    summary: 'help.send.summary',
+    steps: ['help.send.step1', 'help.send.step2', 'help.send.step3'],
+    note: 'help.send.note',
+    actions: [{ kind: 'extensionGuide' }, { kind: 'copyBookmarklet' }]
   },
   {
     id: 'failed',

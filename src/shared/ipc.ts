@@ -105,6 +105,7 @@ export const IPC = {
   evtBrowserQueued: 'event:browser-queued',
   evtBrowserLoginOffer: 'event:browser-login-offer',
   evtClipboardLink: 'event:clipboard-link',
+  evtSentLink: 'event:sent-link',
   evtAutoDownload: 'event:auto-download',
   evtPasteLink: 'event:paste-link',
   evtNavigate: 'event:navigate',

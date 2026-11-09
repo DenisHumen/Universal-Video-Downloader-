@@ -70,6 +70,8 @@ interface AppState {
   updateDismissed: boolean
   /** A link the user copied in another app, waiting to be accepted. */
   clipboardLink: string | null
+  /** That link came from outside the app rather than the clipboard: see ClipboardPrompt. */
+  clipboardLinkSent: boolean
   /*
     Work handed from one screen to another.
 
@@ -251,8 +253,10 @@ async function runInit(set: SetState, get: GetState): Promise<void> {
     */
     const link = normalizeUrl(url)
     if (get().downloads.some((d) => normalizeUrl(d.sourceUrl || d.url) === link)) return
-    set({ clipboardLink: url })
+    set({ clipboardLink: url, clipboardLinkSent: false })
   })
+  // Not checked against the queue: somebody just pressed a button in a browser, and it should show.
+  window.api.onSentLink((url) => set({ clipboardLink: url, clipboardLinkSent: true }))
   // The tray's "Paste link": asked for outright, so it goes straight to Home.
   window.api.onPasteLink((url) => get().requestDetect(url))
   /*
@@ -293,9 +297,10 @@ async function runInit(set: SetState, get: GetState): Promise<void> {
   if (missed.link) {
     const link = normalizeUrl(missed.link)
     if (!get().downloads.some((d) => normalizeUrl(d.sourceUrl || d.url) === link)) {
-      set({ clipboardLink: missed.link })
+      set({ clipboardLink: missed.link, clipboardLinkSent: false })
     }
   }
+  if (missed.sentLink) set({ clipboardLink: missed.sentLink, clipboardLinkSent: true })
 
   // Make sure the engine is ready.
   void window.api.ensureYtdlp().then((s) => set({ ytdlp: s }))
@@ -311,6 +316,7 @@ export const useStore = create<AppState>((set, get) => ({
   update: { state: 'idle' },
   updateDismissed: false,
   clipboardLink: null,
+  clipboardLinkSent: false,
   pendingUrl: null,
   pendingQuery: null,
   pendingWatch: null,

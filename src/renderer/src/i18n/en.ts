@@ -275,6 +275,14 @@ export const en = {
   'help.cookies.title': 'What Are Cookies?',
   'help.cookies.summary': 'How a site remembers that you signed in',
   'help.cookies.what': 'Cookies are small notes a site leaves in your browser to remember that you signed in; with them the app can download what you can already watch, and it gives them only to that site.',
+  'help.send.title': 'Send From Your Browser',
+  'help.send.summary': 'One click in the browser brings the link here',
+  'help.send.step1': 'Add the extension to Firefox, Chrome or a browser like it: [[help.send.guide]] shows how.',
+  'help.send.step2': 'On the page with the video, press the extension in the browser toolbar, or right-click a link and send it from the menu. If the browser asks whether to open this app, allow it.',
+  'help.send.step3': 'The link appears at the top of this window. Press [[home.clipboardUse]] to look for the video. Nothing downloads until you choose it.',
+  'help.send.note': 'No extension? Press [[help.send.copyBookmarklet]], make a new bookmark in your browser and paste it as the address: that bookmark then does the same. If the browser shows nothing or an error, open this app once and try again. An AppImage cannot receive links until it is added to the system; a .deb or .rpm package can.',
+  'help.send.guide': 'How to Add the Extension',
+  'help.send.copyBookmarklet': 'Copy Bookmark Address',
   'help.failed.title': 'A Download Failed',
   'help.failed.summary': 'What to try, in order',
   'help.failed.step1': 'Open [[nav.queue]] and read the message under the video: it says what happened.',
@@ -336,6 +344,7 @@ export const en = {
   'home.universalHint':
     'The engine didn’t know this site, so the app opened the page and captured the stream itself.',
   'home.clipboardFound': 'Link on your clipboard',
+  'home.sentLinkFound': 'Link from a browser or another program',
   'home.clipboardUse': 'Use It',
   'home.addedToQueue': 'Added to My Downloads',
   'toast.viewQueue': 'Show My Downloads',
@@ -842,6 +851,7 @@ export const en = {
   */
   'stamp.update': 'Update',
   'stamp.clipboard': 'Clipboard',
+  'stamp.sentLink': 'Link',
   'stamp.error': 'Error',
 
   // ---- screen reader announcements ----

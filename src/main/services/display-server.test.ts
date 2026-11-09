@@ -1,3 +1,4 @@
+import { linkFromArgv } from '@shared/sent-link'
 import { describe, expect, it } from 'vitest'
 import { x11Relaunch, X11_RELAUNCH_GUARD, xDisplayReachable } from './display-server'
 
@@ -26,6 +27,12 @@ describe('x11Relaunch', () => {
     expect(decide({ argv: [EXE, link] })?.args).toEqual(['--ozone-platform=x11', link])
     expect(decide({ argv: [EXE, '--hidden'] })?.args).toEqual(['--ozone-platform=x11', '--hidden'])
     expect(decide({ argv: [EXE, '--', link] })?.args).toEqual(['--ozone-platform=x11', '--', link])
+    // What a browser hands over: the new process reads it as any second launch does.
+    const sent = 'uvd://open?url=https%3A%2F%2Fexample.com%2Fwatch%3Fv%3D1%26t%3D2'
+    const moved = decide({ argv: [EXE, sent] })?.args
+    expect(moved).toEqual(['--ozone-platform=x11', sent])
+    expect(linkFromArgv(moved!).link).toBe(link)
+    expect(linkFromArgv(decide({ argv: [EXE, '--no-sandbox', sent] })!.args).link).toBe(link)
   })
 
   it('starts an AppImage from the file, not from its mount', () => {

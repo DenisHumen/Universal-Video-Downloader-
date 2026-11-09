@@ -21,6 +21,7 @@ files:
   # repository's, not the app's; all three were landing in app.asar.
   - '!README.ru.md'
   - '!packaging{,/**/*}'
+  - '!browser-extension{,/**/*}'
   - '!brag-output*{,/**/*}'
   - '!{vitest.config.ts,vite.preview.config.ts}'
   - '!electron.vite.config.{js,ts,mjs,cjs}'
@@ -40,6 +41,15 @@ files:
   - '!**/node_modules/moment/{min,dist,src,ts3.1-typings}{,/**/*}'
   - '!**/node_modules/moment-timezone/builds{,/**/*}'
   - '!**/node_modules/moment-timezone/data/meta{,/**/*}'
+
+# uvd://open?url=<link>, which the browser extension opens. A Mac reads this into
+# Info.plist, and the Linux packages and the AppImage into their desktop entries
+# as MimeType=x-scheme-handler/uvd beside the %U electron-builder always writes.
+# Windows has no such file: the app registers itself on launch (link-protocol.ts).
+protocols:
+  - name: Universal Video Downloader link
+    schemes:
+      - uvd
 
 # ffmpeg-static ships a per-platform binary that must stay executable on disk.
 # Checks the ffmpeg inside each packed target, before its installer is built -

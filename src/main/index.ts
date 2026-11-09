@@ -67,6 +67,9 @@ import { infoCache } from './services/info-store'
 import { flushBrowserCookies, initBrowserLogins } from './services/browser-logins'
 import { closeHidesWindow, trayStatusLine } from './services/tray-menu'
 import { x11Relaunch, X11_RELAUNCH_GUARD } from './services/display-server'
+import { createLinkInbox } from './services/link-inbox'
+import { claimLinkScheme } from './services/link-protocol'
+import { linkFromArgv, linkFromSentUrl } from '@shared/sent-link'
 import { ffmpegPath } from './services/ffmpeg'
 import { reapOrphanedFfmpeg } from './services/process'
 import { shouldResume } from './services/resume'
@@ -268,7 +271,7 @@ const pending: PendingDelivery = {}
 let rendererReady = false
 
 /** Hand something to the window, or hold it until there is one listening. */
-function deliver(channel: string, slot: 'link' | 'view', value: string): void {
+function deliver(channel: string, slot: 'link' | 'sentLink' | 'view', value: string): void {
   const wc = mainWindow?.webContents
   if (rendererReady && wc && !wc.isDestroyed()) {
     wc.send(channel, value)
@@ -312,6 +315,7 @@ export function takePending(): PendingDelivery {
   rendererReady = true
   const out: PendingDelivery = { ...pending }
   delete pending.link
+  delete pending.sentLink
   delete pending.view
   return out
 }
@@ -676,11 +680,6 @@ function applySettings(settings: AppSettings): void {
   }
 }
 
-/** A link handed to the app on the command line (e.g. "open with"). */
-function linkFromArgv(argv: string[]): string | undefined {
-  return argv.find((arg) => /^https?:\/\//i.test(arg))
-}
-
 /** Start again on X11 if this session calls for it (display-server.ts); true if that is under way. */
 function startOnX11Instead(): boolean {
   const next = x11Relaunch({
@@ -726,11 +725,26 @@ if (movedToX11) {
   app.quit()
 } else {
   const gate = createStartupGate()
+  const inbox = createLinkInbox({
+    hand: (link) => deliver(IPC.evtSentLink, 'sentLink', link),
+    raise: () => gate.requestShow(showMainWindow)
+  })
+  // Whatever a refused link said stays out of the log: it is somebody else's text, in any amount.
+  const noteRefusedLink = coalesce(() => log.warn('app', 'Refused a link sent from outside'), 2000)
+
   app.on('second-instance', (_event, argv) => {
+    const { link, refused } = linkFromArgv(argv)
+    if (link) inbox.take(link)
+    else if (refused) noteRefusedLink()
     // Before the first window exists this only records the request (startup-gate.ts).
-    gate.requestShow(showMainWindow)
-    const link = linkFromArgv(argv)
-    if (link) deliver(IPC.evtClipboardLink, 'link', link)
+    else gate.requestShow(showMainWindow)
+  })
+  // How a Mac hands over a link, whether or not the app was running; Windows and Linux use the command line.
+  app.on('open-url', (event, url) => {
+    event.preventDefault()
+    const link = linkFromSentUrl(url)
+    if (link) inbox.take(link)
+    else noteRefusedLink()
   })
 
   app.whenReady().then(async () => {
@@ -794,7 +808,9 @@ if (movedToX11) {
     for (const item of listDownloads()) if (item.remotePath && !item.filepath) recordFinished(item)
     // electron-updater loads with the first check (see updater.ts), not here.
     buildMenu()
-    const startHidden = shouldStartHidden(process.argv, getSettings(), openedAtLogin())
+    const initialLink = linkFromArgv(process.argv).link
+    // A link is somebody waiting for the window, whatever else the command line says.
+    const startHidden = !initialLink && shouldStartHidden(process.argv, getSettings(), openedAtLogin())
     createWindow(startHidden)
     gate.started()
     applySettings(getSettings())
@@ -864,8 +880,14 @@ if (movedToX11) {
     watchingSinceLogin = watchesFromHiddenStart(startHidden, listWatches().length)
     if (!startHidden || watchingSinceLogin) startWatcher()
 
-    const initialLink = linkFromArgv(process.argv)
-    if (initialLink) pending.link = initialLink
+    if (initialLink) pending.sentLink ??= initialLink
+
+    // Only ever an installed app, and never on Linux (link-protocol.ts).
+    try {
+      claimLinkScheme(app, { packaged: app.isPackaged, platform: process.platform, env: process.env })
+    } catch (err) {
+      log.warn('app', 'Could not claim uvd: links', { error: String(err) })
+    }
 
     app.on('activate', () => {
       if (BrowserWindow.getAllWindows().length === 0) createWindow()

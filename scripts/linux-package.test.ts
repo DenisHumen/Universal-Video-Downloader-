@@ -1,4 +1,5 @@
 import { readdirSync, readFileSync } from 'fs'
+import { createRequire } from 'module'
 import { join } from 'path'
 import { describe, expect, it } from 'vitest'
 import {
@@ -9,6 +10,7 @@ import {
   iconProblems,
   layoutProblems,
   packageLayout,
+  parseDesktopEntry,
   pngSize,
   profileProblem,
   rpmScriptlets,
@@ -209,6 +211,7 @@ describe('the desktop entry', () => {
     'GenericName=Video Downloader',
     'Keywords=video;download;downloader;youtube;yt-dlp;stream;',
     'Name[ru]=Universal Video Downloader',
+    'MimeType=x-scheme-handler/uvd;',
     'Categories=AudioVideo;Video;'
   ].join('\n')
 
@@ -216,8 +219,44 @@ describe('the desktop entry', () => {
     expect(desktopEntryProblems(shipped, executable)).toEqual([
       '"entry" is not a desktop entry key',
       '"entry" holds a printed JavaScript object',
-      'StartupWMClass is "Universal Video Downloader", not "universal-video-downloader"'
+      'StartupWMClass is "Universal Video Downloader", not "universal-video-downloader"',
+      'MimeType leaves out x-scheme-handler/uvd, so uvd: links do not reach the app'
     ])
+  })
+
+  it('catches an entry a link would not reach', () => {
+    expect(desktopEntryProblems(fixed.replace(' %U', ''), executable)).toEqual(['Exec does not end in %U, so a link never arrives'])
+    expect(desktopEntryProblems(fixed.replace('MimeType=x-scheme-handler/uvd;\n', ''), executable)).toEqual([
+      'MimeType leaves out x-scheme-handler/uvd, so uvd: links do not reach the app'
+    ])
+  })
+
+  /*
+    Out of electron-builder's own writer, with this repository's config: the
+    deb and the rpm take the first form, the AppImage the second. An AppImage
+    nobody integrated has nowhere to put its entry, so nothing changes for it
+    (link-protocol.ts); one that AppImageLauncher integrates gets a working one.
+  */
+  it.each([
+    ['the deb and the rpm', undefined, '"/opt/Universal Video Downloader/universal-video-downloader" %U'],
+    ['the AppImage', 'AppRun --no-sandbox %U', 'AppRun --no-sandbox %U']
+  ])('is what electron-builder writes for %s', async (_name, exec, wanted) => {
+    expect(builderYml).toMatch(/^protocols:\r?\n\s+- name: .+\r?\n\s+schemes:\r?\n\s+- uvd\s*$/m)
+    const { LinuxTargetHelper } = createRequire(import.meta.url)('app-builder-lib/out/targets/LinuxTargetHelper')
+    const helper = new LinuxTargetHelper({
+      appInfo: { productName: 'Universal Video Downloader', sanitizedProductName: 'Universal Video Downloader' },
+      executableName: executable,
+      fileAssociations: [],
+      config: { protocols: [{ name: 'x', schemes: ['uvd'] }] },
+      platformSpecificBuildOptions: {},
+      info: { metadata: {} }
+    })
+    const linux = { category: 'AudioVideo;Video;', description: 'x', desktop: { StartupWMClass: executable } }
+    const entry: string = await helper.computeDesktopEntry(linux, exec)
+    const fields = parseDesktopEntry(entry)
+    expect(fields.get('Exec')).toBe(wanted)
+    expect(fields.get('MimeType')).toBe('x-scheme-handler/uvd;')
+    expect(desktopEntryProblems(entry, executable)).toEqual([])
   })
 
   it('passes the one written from the current config', () => {

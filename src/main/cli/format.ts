@@ -1,3 +1,4 @@
+import { isSentLink } from '@shared/sent-link'
 import type { AppErrorCode, AppSettings, DownloadMode, QualityPreset } from '@shared/types'
 
 /**
@@ -17,8 +18,13 @@ export const CLI_FLAG = '--cli'
  * Everything after `--cli`: the wrapper puts it first, but Electron in
  * development puts its own entry script ahead of it, so it is looked for
  * rather than assumed at a position.
+ *
+ * Never with a `uvd:` link beside it. A terminal run downloads without asking,
+ * and a link is what a web page can fire: one that got `--cli` onto the command
+ * line would have downloaded by itself, which is the one thing it must not do.
  */
 export function cliArgvFrom(argv: string[]): string[] | null {
+  if (argv.some(isSentLink)) return null
   const at = argv.indexOf(CLI_FLAG)
   return at === -1 ? null : argv.slice(at + 1)
 }
