@@ -180,7 +180,7 @@ async function download(link: string, outputDir: string, choice: CliChoice): Pro
   mkdirSync(dir, { recursive: true })
 
   say(`↓ ${item.url}`)
-  log.info('cli', 'Download started', { url: item.url, dir })
+  log.info('cli', 'Download started', { site: siteOf(item.url) })
 
   let result = await runEngine(item, settings, dir)
   /*
@@ -189,7 +189,7 @@ async function download(link: string, outputDir: string, choice: CliChoice): Pro
   */
   if (result.code !== 0 && !stopping && !item.hlsViaFfmpeg && refusesMidStreamInit(result.stderrTail)) {
     say('  the stream restarts partway through; fetching it with ffmpeg instead')
-    log.info('cli', 'Fetching the HLS stream with ffmpeg', { url: item.url })
+    log.info('cli', 'Fetching the HLS stream with ffmpeg', { site: siteOf(item.url) })
     item.hlsViaFfmpeg = true
     result = await runEngine(item, settings, dir)
   }
@@ -209,13 +209,13 @@ async function download(link: string, outputDir: string, choice: CliChoice): Pro
       return 1
     }
     say(path && existsSync(path) ? `✓ Saved to ${path}` : `✓ Done. Saved in ${dir}`)
-    log.info('cli', 'Download finished', { url: item.url, path })
+    log.info('cli', 'Download finished', { site: siteOf(item.url) })
     return 0
   }
   const classified = classifyYtdlpError(result.stderrTail, hasCookies(settings, browserCookiesFile()))
   const failure = describeFailure(classified.code, classified.message, Boolean(classified.cookieHint))
   for (const line of failure.lines) say(line)
-  log.warn('cli', 'Download failed', { url: item.url, code: classified.code, error: result.stderrTail.slice(-600) })
+  log.warn('cli', 'Download failed', { site: siteOf(item.url), code: classified.code })
   return failure.exitCode
 }
 
