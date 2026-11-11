@@ -251,6 +251,23 @@ const aksorOnly = (videos: YaniVideo[]): YaniVideo[] => videos.filter((v) => v.d
 */
 const aksorLists = shortLivedCache<YaniVideo[]>(5 * 60_000, 8)
 
+/**
+ * A series, not a film: by what is out, or by what the site says is coming.
+ *
+ * Counting only the episodes out called every series a single video in its
+ * premiere week, and following it was refused with "there is nothing to wait
+ * for" - in the one week when following it is the whole point. The site states
+ * how many episodes a title will have, and whether it is still coming out.
+ */
+export function isSeriesTitle(
+  out: number,
+  meta: { anime_status?: { alias?: string }; type?: { alias?: string }; episodes?: { count?: number } }
+): boolean {
+  if (out > 1 || (meta.episodes?.count ?? 0) > 1) return true
+  // Still airing with its length not announced; a film is a film however it is listed.
+  return meta.anime_status?.alias === 'ongoing' && !/movie/.test(meta.type?.alias ?? '')
+}
+
 function episodeCount(seasons: StreamSeason[] | undefined): number {
   return (seasons ?? []).reduce((n, s) => n + s.episodes.length, 0)
 }
@@ -291,7 +308,8 @@ export async function streamingFromId(animeId: string, webUrl: string): Promise<
         title?: string
         poster?: YaniPoster
         anime_status?: { alias?: string }
-        episodes?: { aired?: number; next_date?: number }
+        type?: { alias?: string }
+        episodes?: { count?: number; aired?: number; next_date?: number }
       }
     }
   ).response
@@ -341,7 +359,7 @@ export async function streamingFromId(animeId: string, webUrl: string): Promise<
     id: animeId,
     title: meta.title || 'Anime',
     thumbnail,
-    isSeries: episodeCount(episodesByTranslator[defaultTranslator]) > 1,
+    isSeries: isSeriesTitle(episodeCount(episodesByTranslator[defaultTranslator]), meta),
     translators,
     defaultTranslator,
     seasons: episodesByTranslator[defaultTranslator],

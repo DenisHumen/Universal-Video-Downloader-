@@ -11,7 +11,8 @@ import {
   parseAksorTranslator,
   shortLivedCache,
   YUMMY_DOMAIN,
-  yummyQualities
+  yummyQualities,
+  isSeriesTitle
 } from './yummyani'
 
 /*
@@ -351,5 +352,26 @@ describe("YummyAnime's old addresses", () => {
     expect(YUMMY_DOMAIN.test('https://old.yummy-anime.ru/catalog/item/sousou-no-frieren')).toBe(true)
     expect(YUMMY_DOMAIN.test('https://yani.tv/catalog/item/sousou-no-frieren')).toBe(true)
     expect(YUMMY_DOMAIN.test('https://api.yani.tv/anime/10661')).toBe(false)
+  })
+})
+
+/*
+  A series with one episode out is still a series. Counted by what was out, it
+  was "a single video" in its premiere week, and could not be followed.
+*/
+describe('isSeriesTitle', () => {
+  it('goes by the episodes the site says the title will have', () => {
+    expect(isSeriesTitle(1, { episodes: { count: 12 } })).toBe(true)
+    expect(isSeriesTitle(1, { episodes: { count: 1 }, type: { alias: 'short-movie' } })).toBe(false)
+  })
+
+  it('takes a title still airing for a series, and a film for a film', () => {
+    expect(isSeriesTitle(1, { anime_status: { alias: 'ongoing' }, type: { alias: 'tv' } })).toBe(true)
+    expect(isSeriesTitle(1, { anime_status: { alias: 'ongoing' }, type: { alias: 'movie' } })).toBe(false)
+    expect(isSeriesTitle(1, {})).toBe(false)
+  })
+
+  it('still knows a series by what is out', () => {
+    expect(isSeriesTitle(15, {})).toBe(true)
   })
 })

@@ -95,6 +95,10 @@ export function toSmbError(err: unknown, host: string): SmbError {
     return new SmbError(`The server refused the request (0x${n.toString(16)}).`, 'unknown')
   }
   const message = String(raw?.message ?? raw ?? '')
+  // The library reads a status off a timeout that has none, and throws that instead of the timeout.
+  if (err instanceof TypeError && /reading 'status'|reading 'header'/.test(message)) {
+    return new SmbError(`Could not reach ${host}. Is it on, and on this network?`, 'network')
+  }
   if (/timeout|ETIMEDOUT|ENOTFOUND|EHOSTUNREACH|ECONNREFUSED|connect_timeout/i.test(message)) {
     return new SmbError(`Could not reach ${host}. Is it on, and on this network?`, 'network')
   }

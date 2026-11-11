@@ -92,9 +92,19 @@ export async function resolveUrl(
     } catch (err) {
       // A cancel is the caller's answer, not a reason to hand the engine the page.
       if (options.signal?.aborted) throw err
+      /*
+        The site answered, in a shape the resolver was not written for: a field
+        gone, a page of HTML where JSON was. What reached the row, and a watch's
+        Telegram alert, was the interpreter's own "Cannot read properties of
+        undefined (reading 'response')".
+      */
+      if (err instanceof TypeError || err instanceof SyntaxError) {
+        throw new Error('The site answered in a way this app could not read. It may have changed.')
+      }
       // A resolver that throws for a real reason (premium content, removed
       // video) should surface that reason rather than silently degrading.
       if (err instanceof Error && !/HTTP \d{3}|timed out/i.test(err.message)) throw err
+      if (options.strict) throw err
       return { url: trimmed }
     }
   }

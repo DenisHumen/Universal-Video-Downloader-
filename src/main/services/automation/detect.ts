@@ -217,7 +217,7 @@ export async function checkWatch(watch: Watch): Promise<CheckResult> {
   }
   let resolved
   try {
-    resolved = await resolveUrl(watch.url)
+    resolved = await resolveUrl(watch.url, { strict: true })
   } catch (err) {
     // "Not yet" is an answer, not a failure: nothing to back off from.
     if (err instanceof NotReleasedError) {

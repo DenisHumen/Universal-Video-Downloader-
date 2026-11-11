@@ -255,6 +255,13 @@ async function drain(watchId: string, todo: EpisodeRef[], title: string): Promis
     const live = getWatch(watchId)
     if (!live || !live.enabled) break
     /*
+      The schedules were stopped - the window was closed with background
+      watching off. The episode in hand finishes; the rest of a backlog, up to
+      two dozen downloads and their uploads, is not started behind a closed
+      window. They stay unhandled, and the next check finds them.
+    */
+    if (halted) break
+    /*
       Asked now and not when the list was read: the backlog may have taken hours.
       It stays owed, so the next check that finds it over fetches it.
     */
@@ -444,7 +451,11 @@ function onResume(): void {
   setTimeout(tickIfRunning, RESUME_DELAY_MS)
 }
 
+/** The schedules were stopped by hand of the app (the window closed, no background watching), not merely never started. */
+let halted = false
+
 export function startWatcher(): void {
+  halted = false
   if (timer) return
   timer = setInterval(tick, TICK_MS)
   powerMonitor.on('resume', onResume)
@@ -455,6 +466,7 @@ export function startWatcher(): void {
 }
 
 export function stopWatcher(): void {
+  halted = true
   if (timer) clearInterval(timer)
   timer = null
   powerMonitor.off('resume', onResume)

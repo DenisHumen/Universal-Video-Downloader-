@@ -45,6 +45,13 @@ export interface ResolveOptions {
   allowBrowser?: boolean
   /** Cancels the browser pass; the hidden window is torn down at once. */
   signal?: AbortSignal
+  /**
+   * Let a site's own failure through instead of handing the link on as a plain
+   * page. For a watch, which knows the link is a series on that site: "HTTP
+   * 503" is why the check failed, and "the page no longer looks like a series"
+   * is what it used to be told instead.
+   */
+  strict?: boolean
 }
 
 /** A hand-written resolver for one site (or family of mirror domains). */
