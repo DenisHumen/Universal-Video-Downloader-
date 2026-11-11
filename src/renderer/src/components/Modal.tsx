@@ -4,6 +4,7 @@ import { dialog, overlay } from '../lib/motion'
 import {
   claimsEscape,
   openModals,
+  popoverHasKeys,
   pushModal,
   removeModal,
   topModal,
@@ -59,6 +60,8 @@ const panels = new Map<ModalEntry, () => HTMLElement | null>()
 function onKey(e: KeyboardEvent): void {
   const top = topModal()
   if (!top) return
+  // An open list or menu answers first; see modalStack.
+  if (popoverHasKeys()) return
 
   if (claimsEscape(e)) {
     e.preventDefault()

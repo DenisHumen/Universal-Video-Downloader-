@@ -1,6 +1,7 @@
 import { useEffect } from 'react'
 import { useStore } from '../store'
 import { chordAction } from '../lib/shortcuts'
+import { openModals } from '../lib/modalStack'
 
 /**
  * Global keyboard shortcuts. ⌘/Ctrl+1…5 switch views (N, F and comma are
@@ -22,9 +23,19 @@ export function useShortcuts(): void {
       const action = chordAction(e.key, e.code)
       if (!action) return
       e.preventDefault()
-      if (action === 'help') setShortcutsOpen(!useStore.getState().shortcutsOpen)
-      else if (action === 'palette') useStore.getState().setPaletteOpen(!useStore.getState().paletteOpen)
-      else setView(action)
+      /*
+        Under an open dialog nothing switches. The dialogs belong to the screen
+        they were opened on, so Ctrl+1 while typing in Add Series changed the
+        screen and took the dialog, and what was in it, without a word. The two
+        that are dialogs themselves can still be closed by their own chord.
+      */
+      const state = useStore.getState()
+      const underDialog = openModals() > 0
+      if (action === 'help') {
+        if (!underDialog || state.shortcutsOpen) setShortcutsOpen(!state.shortcutsOpen)
+      } else if (action === 'palette') {
+        if (!underDialog || state.paletteOpen) state.setPaletteOpen(!state.paletteOpen)
+      } else if (!underDialog) setView(action)
     }
     window.addEventListener('keydown', onKey, { capture: true })
     return () => window.removeEventListener('keydown', onKey, { capture: true })

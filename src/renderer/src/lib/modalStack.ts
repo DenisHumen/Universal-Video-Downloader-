@@ -42,6 +42,32 @@ export function topModal(): ModalEntry | undefined {
   return stack[stack.length - 1]
 }
 
+/*
+  A list or a menu open over a dialog: a drop-down in the step editor, the dub
+  picker in Add Series. It is drawn outside the dialog and it is what the keys
+  belong to while it is open. The dialogs' listener runs first, in the capture
+  phase, so without this an Esc meant for the list closed the whole dialog -
+  and the form typed into it - and a Tab was sent back to the dialog's first
+  control.
+*/
+let floating = 0
+
+/** A popover opened; call the returned function when it closes. */
+export function holdKeysForPopover(): () => void {
+  floating++
+  let released = false
+  return () => {
+    if (released) return
+    released = true
+    floating--
+  }
+}
+
+/** Whether a popover is open, and so has the keyboard ahead of any dialog. */
+export function popoverHasKeys(): boolean {
+  return floating > 0
+}
+
 /** How many dialogs are open. */
 export function openModals(): number {
   return stack.length

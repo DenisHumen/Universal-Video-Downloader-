@@ -11,6 +11,7 @@ import {
   type RefObject
 } from 'react'
 import { createPortal } from 'react-dom'
+import { holdKeysForPopover } from '../lib/modalStack'
 import { cx } from './cx'
 
 /**
@@ -54,6 +55,8 @@ export function usePopover(): UsePopover {
     setOpen(false)
     if (refocus) triggerRef.current?.focus()
   }, [])
+
+  useEffect(() => (open ? holdKeysForPopover() : undefined), [open])
 
   useEffect(() => {
     if (!open) return

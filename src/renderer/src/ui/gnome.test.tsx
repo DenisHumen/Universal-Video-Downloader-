@@ -199,3 +199,38 @@ describe('Badge, Banner, Spinner', () => {
     expect(await axeViolations(document.body)).toEqual([])
   })
 })
+
+/*
+  A list open over a dialog owns the keyboard. The dialogs' listener runs first,
+  so an Esc meant for the list used to close the dialog under it - and the form
+  typed into it.
+*/
+describe('a drop-down inside a dialog', () => {
+  it('takes Esc for itself, and the dialog takes the next one', async () => {
+    const { default: Modal } = await import('../components/Modal')
+    const onClose = vi.fn()
+    render(
+      <Modal onClose={onClose} label="Step">
+        <PreferencesGroup>
+          <ComboRow
+            title="Share"
+            value="a"
+            onChange={() => undefined}
+            options={[
+              { value: 'a', label: 'NAS' },
+              { value: 'b', label: 'Backup' }
+            ]}
+          />
+        </PreferencesGroup>
+      </Modal>
+    )
+    fireEvent.click(screen.getByRole('combobox', { name: 'Share' }))
+    const option = screen.getByRole('option', { name: 'Backup' })
+    fireEvent.keyDown(option, { key: 'Escape' })
+    expect(screen.queryByRole('option', { name: 'Backup' })).toBeNull()
+    expect(onClose).not.toHaveBeenCalled()
+
+    fireEvent.keyDown(screen.getByRole('combobox', { name: 'Share' }), { key: 'Escape' })
+    expect(onClose).toHaveBeenCalledTimes(1)
+  })
+})
