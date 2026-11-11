@@ -5,6 +5,7 @@ import { Download, Globe, Layers } from '../ui/icons'
 import type { DetectStage, MediaInfo, SearchResult } from '@shared/types'
 import { engineKnowsHost, looksLikeCollection, youtubeIdOf } from '@shared/urls'
 import { useStore } from '../store'
+import { useKept } from '../hooks/useKept'
 import { isProbablyUrl } from '../lib/format'
 import { availableHeights, estimateSize, initialMode, initialQuality, resolveSelection, selectionForLanguage } from '../lib/quality'
 import { detectIsDone } from '../lib/emphasis'
@@ -57,18 +58,19 @@ export default function HomeView(): JSX.Element {
   const detectPreview = useStore((s) => s.detectPreview)
   const hasHistory = useStore((s) => s.downloads.length > 0)
 
-  const [url, setUrl] = useState('')
-  const [choice, setChoice] = useState<ResultChoice>(FRESH_CHOICE)
+  // Kept while another tab is up: a look at Settings is not a reason to lose thirty pasted links.
+  const [url, setUrl] = useKept('kept:home.url', '')
+  const [choice, setChoice] = useKept<ResultChoice>('kept:home.choice', FRESH_CHOICE)
   const [starting, setStarting] = useState(false)
-  const [batchOpen, setBatchOpen] = useState(false)
-  const [batchText, setBatchText] = useState('')
+  const [batchOpen, setBatchOpen] = useKept('kept:home.batchOpen', false)
+  const [batchText, setBatchText] = useKept('kept:home.batchText', '')
   /*
     Where the job on screen lands: one value for every card here - a video,
     a playlist, a series, a batch - shown above each button. It lives as long
     as this screen does, so a folder picked for one job is never applied to
     another without being on screen.
   */
-  const [saveDir, setSaveDir] = useState('')
+  const [saveDir, setSaveDir] = useKept('kept:home.saveDir', '')
   const batchPanelId = useId()
   const inputRef = useRef<HTMLInputElement>(null)
   const resultRef = useRef<HTMLDivElement>(null)
@@ -167,6 +169,11 @@ export default function HomeView(): JSX.Element {
   useEffect(() => {
     if (!pendingUrl) return
     const link = takePendingUrl() ?? pendingUrl
+    // Several links pasted on another screen are a batch here too, not one address made of all of them.
+    if (isMultiLink(link)) {
+      openBatch(link)
+      return
+    }
     setUrl(link)
     void det.detect(link, preselect)
     // eslint-disable-next-line react-hooks/exhaustive-deps

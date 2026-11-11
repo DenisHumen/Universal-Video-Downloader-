@@ -13,6 +13,7 @@ import {
 } from '../ui/icons'
 import type { DownloadItem } from '@shared/types'
 import { useStore } from '../store'
+import { useKept } from '../hooks/useKept'
 import { formatBytes, formatEta, formatSpeed } from '../lib/format'
 import { useT, useTp, type TranslationKey } from '../i18n'
 import QueueRow from '../components/QueueRow'
@@ -96,8 +97,8 @@ export default function DownloadsView(): JSX.Element {
   const setView = useStore((s) => s.setView)
   const headerHasRoom = useMediaQuery(LABELS_FROM)
 
-  const [filter, setFilter] = useState<Filter>('all')
-  const [query, setQuery] = useState('')
+  const [filter, setFilter] = useKept<Filter>('kept:downloads.filter', 'all')
+  const [query, setQuery] = useKept('kept:downloads.query', '')
   const [confirmClearFailed, setConfirmClearFailed] = useState(false)
   const [limit, setLimit] = useState(PAGE)
   const scrollRef = useRef<HTMLDivElement>(null)

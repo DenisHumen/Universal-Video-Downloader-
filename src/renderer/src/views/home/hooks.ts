@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { useKept } from '../../hooks/useKept'
 import type { AppErrorCode, DetectResult, MediaInfo, SearchResult } from '@shared/types'
 import { allowedSearchServices, SEARCH_ALL_SERVICES } from '@shared/types'
 import { needsCookiesOften } from '@shared/urls'
@@ -42,10 +43,13 @@ export interface UseDetect {
 export function useDetect(fallbackError: string): UseDetect {
   const beginDetect = useStore((s) => s.beginDetect)
   const endDetect = useStore((s) => s.endDetect)
-  const [status, setStatus] = useState<DetectStatus>('idle')
-  const [info, setInfo] = useState<MediaInfo | null>(null)
-  const [detectedUrl, setDetectedUrl] = useState('')
-  const [failure, setFailure] = useState<DetectFailure>(NO_FAILURE)
+  // Kept with the rest of the Download screen. A detect that was under way ended with it.
+  const [status, setStatus] = useKept<DetectStatus>('kept:home.detect.status', 'idle', (was) =>
+    was === 'detecting' ? 'idle' : was
+  )
+  const [info, setInfo] = useKept<MediaInfo | null>('kept:home.detect.info', null)
+  const [detectedUrl, setDetectedUrl] = useKept('kept:home.detect.url', '')
+  const [failure, setFailure] = useKept<DetectFailure>('kept:home.detect.failure', NO_FAILURE)
   const requestRef = useRef<string | null>(null)
 
   /** Stop listening for the detect in flight, and stop the engine working on it. */

@@ -3,6 +3,7 @@ import { showFile } from '../lib/showFile'
 import { librarySite, pageLinkOf, siteNameOf, type LibraryEntry, type LibraryGroup } from '@shared/library'
 import type { DownloadItem } from '@shared/types'
 import { useStore } from '../store'
+import { useKept } from '../hooks/useKept'
 import { useI18n, useT } from '../i18n'
 import { formatBytes, formatDuration } from '../lib/format'
 import { toast } from '../lib/toast'
@@ -73,8 +74,8 @@ export default function LibraryView(): JSX.Element {
   const [entries, setEntries] = useState<LibraryEntry[]>([])
   const [total, setTotal] = useState(0)
   const [loaded, setLoaded] = useState(false)
-  const [query, setQuery] = useState('')
-  const [group, setGroup] = useState<LibraryGroup>('date')
+  const [query, setQuery] = useKept('kept:library.query', '')
+  const [group, setGroup] = useKept<LibraryGroup>('kept:library.group', 'date')
   const [missing, setMissing] = useState<Set<string>>(new Set())
   const [confirm, setConfirm] = useState<LibraryEntry | null>(null)
   const [job, setJob] = useState<{ entry: LibraryEntry; mode: JobMode } | null>(null)

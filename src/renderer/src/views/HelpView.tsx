@@ -1,10 +1,11 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo } from 'react'
 import HelpText from '../components/HelpText'
 import { useT } from '../i18n'
 import { HELP_TOPICS, helpPlain, helpSearchText, type HelpAction, type HelpTopic } from '../lib/help'
 import { matchesQuery } from '../lib/settingsSearch'
 import { toast } from '../lib/toast'
 import { useStore } from '../store'
+import { useKept } from '../hooks/useKept'
 import { BOOKMARKLET } from '@shared/sent-link'
 import { ExpanderRow, PreferencesGroup, PreferencesPage } from '../ui'
 import { Search } from '../ui/icons'
@@ -19,7 +20,7 @@ export default function HelpView(): JSX.Element {
   const t = useT()
   const topic = useStore((s) => s.helpTopic)
   const request = useStore((s) => s.helpRequest)
-  const [query, setQuery] = useState('')
+  const [query, setQuery] = useKept('kept:help.query', '')
 
   const shown = useMemo(
     () => HELP_TOPICS.filter((h) => matchesQuery(query, helpSearchText(h, t))),

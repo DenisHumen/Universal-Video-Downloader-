@@ -7,7 +7,12 @@ import { afterEach } from 'vitest'
 
 if (typeof window !== 'undefined') {
   const { cleanup } = await import('@testing-library/react')
-  afterEach(() => cleanup())
+  const { forgetKept } = await import('../src/renderer/src/hooks/useKept')
+  afterEach(() => {
+    cleanup()
+    // Tests share one window; a screen remembered from the last one is not this one's.
+    forgetKept()
+  })
 
   const w = window as unknown as Record<string, unknown>
   w.matchMedia ??= (query: string) => ({

@@ -23,9 +23,10 @@ import { toast } from '../lib/toast'
 import { queueDownload } from '../lib/queue'
 import { describeError, errorText } from '../lib/errors'
 import { capLimit, firstLimit, mergeByUrl, mightHaveMore } from '../lib/search'
-import { useT, type TranslateFn } from '../i18n'
+import { useT, useTp, type TranslateFn } from '../i18n'
 import { serviceLabel } from '../lib/services'
 import { useStore } from '../store'
+import { useKept } from '../hooks/useKept'
 
 type Status = 'idle' | 'searching' | 'error'
 
@@ -70,16 +71,22 @@ function queryFromHash(): string {
 
 export default function SearchView({ settings, embedded = false }: Props): JSX.Element {
   const t = useT()
+  const tp = useTp()
   const pendingQuery = useStore((s) => s.pendingQuery)
   const takePendingQuery = useStore((s) => s.takePendingQuery)
-  const [query, setQuery] = useState(embedded ? '' : queryFromHash)
-  const [service, setService] = useState<SearchScope>('all')
-  const [status, setStatus] = useState<Status>('idle')
-  const [error, setError] = useState('')
-  const [errorCode, setErrorCode] = useState<AppErrorCode | undefined>()
-  const [results, setResults] = useState<SearchResult[] | null>(null)
-  const [probes, setProbes] = useState<Record<string, QualityProbe>>({})
-  const [added, setAdded] = useState<Set<string>>(new Set())
+  // Kept while another tab is up: opening a result goes to Download, and coming back found nothing.
+  const [query, setQuery] = useKept('kept:search.query', embedded ? '' : queryFromHash)
+  const [service, setService] = useKept<SearchScope>('kept:search.service', 'all')
+  // A search nobody is waiting on any more is not still searching.
+  const [status, setStatus] = useKept<Status>('kept:search.status', 'idle', (was) => (was === 'searching' ? 'idle' : was))
+  const [error, setError] = useKept('kept:search.error', '')
+  const [errorCode, setErrorCode] = useKept<AppErrorCode | undefined>('kept:search.errorCode', undefined)
+  const [results, setResults] = useKept<SearchResult[] | null>('kept:search.results', null)
+  // Probes that were under way ended with the screen; those rows are asked about again.
+  const [probes, setProbes] = useKept<Record<string, QualityProbe>>('kept:search.probes', {}, (was) =>
+    Object.fromEntries(Object.entries(was).filter(([, probe]) => probe.status !== 'loading'))
+  )
+  const [added, setAdded] = useKept<Set<string>>('kept:search.added', () => new Set())
   const [picker, setPicker] = useState<MediaInfo | null>(null)
   const pickerTitleId = useId()
   const [pickerBusy, setPickerBusy] = useState<string | null>(null)
@@ -110,8 +117,9 @@ export default function SearchView({ settings, embedded = false }: Props): JSX.E
   const probeQueue = useRef<{ item: SearchResult; gen: number }[]>([])
   const probeWorkers = useRef(0)
   /** What the results on screen answer: "Show More" repeats this, whatever the field says by now. */
-  const shown = useRef<{ q: string; s: SearchScope } | null>(null)
-  const [canShowMore, setCanShowMore] = useState(false)
+  const [answered, setAnswered] = useKept<{ q: string; s: SearchScope } | null>('kept:search.answered', null)
+  const shown = useRef(answered)
+  const [canShowMore, setCanShowMore] = useKept('kept:search.canShowMore', false)
   const [showingMore, setShowingMore] = useState(false)
 
   const cancelProbes = (): void => {
@@ -124,7 +132,7 @@ export default function SearchView({ settings, embedded = false }: Props): JSX.E
     const q = (value ?? query).trim()
     const s = svc ?? service
     if (!q) return
-    generation.current++
+    const gen = ++generation.current
     cancelProbes()
     setStatus('searching')
     setError('')
@@ -147,8 +155,11 @@ export default function SearchView({ settings, embedded = false }: Props): JSX.E
     const res: SearchResponse = await window.api
       .searchVideos(q, s, limit)
       .catch((err: unknown) => ({ ok: false, error: describeError(err) }))
+    // An answer to the search before this one: its rows under the newer query, and probes for them.
+    if (gen !== generation.current) return
     if (res.ok && res.results) {
       shown.current = { q, s }
+      setAnswered(shown.current)
       setResults(res.results)
       setCanShowMore(mightHaveMore(res.results, limit))
       setStatus('idle')
@@ -234,7 +245,9 @@ export default function SearchView({ settings, embedded = false }: Props): JSX.E
   // Auto-run the query this view was opened with, plus follow-up queries sent
   // from the main window (standalone) or the home view (embedded).
   useEffect(() => {
-    if (query) void search(query)
+    // Back on a search already answered: its rows are here, and only the unprobed ones need asking about.
+    if (results) probeQualities(results.filter((row) => !probes[row.url]), generation.current)
+    else if (query && status !== 'error') void search(query)
     else inputRef.current?.focus({ preventScroll: true })
 
     // The standalone search window is handed its query over IPC.
@@ -269,7 +282,8 @@ export default function SearchView({ settings, embedded = false }: Props): JSX.E
 
   const changeService = (s: SearchScope): void => {
     setService(s)
-    if (results || status === 'error') void search(undefined, s)
+    // While searching too: the pill moved and the search under way was still for the old one.
+    if (results || status === 'error' || status === 'searching') void search(undefined, s)
   }
 
   const showAdult = settings?.showAdultServices ?? false
@@ -381,7 +395,7 @@ export default function SearchView({ settings, embedded = false }: Props): JSX.E
             options={services.map((s) => ({ value: s, label: serviceLabel(s, t) }))}
           />
           {results && (
-            <span className="numeric ml-auto shrink-0 text-meta text-ink-2">{t('search.results', { count: results.length })}</span>
+            <span className="numeric ml-auto shrink-0 text-meta text-ink-2">{tp('search.results', results.length)}</span>
           )}
         </div>
         {/*
