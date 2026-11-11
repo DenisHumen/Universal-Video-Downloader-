@@ -508,6 +508,13 @@ export interface DownloadItem {
    * they are how Stop and Save finds what an interrupted run left behind.
    */
   partialPaths?: string[]
+  /**
+   * The files the engine announced for an ordinary download that has not
+   * finished: `Title.f137.mp4`, `Title.f140.m4a`, the merged name. Kept across a
+   * restart, and how Cancel and Remove find everything the row wrote, not only
+   * what still ends in `.part`. Gone once the download completes.
+   */
+  streamPaths?: string[]
   /** Stop and Save is under way: the engine is finishing, or the pieces are being joined. */
   savingLive?: boolean
   /** A recording that could not be made playable: the file it is still in. */

@@ -1,11 +1,11 @@
 import { EventEmitter } from 'events'
-import { mkdtempSync } from 'fs'
+import { existsSync, mkdtempSync, writeFileSync } from 'fs'
 import { tmpdir } from 'os'
 import { join } from 'path'
 import { PassThrough } from 'stream'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { DownloadItem, DownloadRequest } from '@shared/types'
-import { listDownloads, pauseDownload, resumeDownload, startDownload } from './downloader'
+import { cancelDownload, listDownloads, pauseDownload, resumeDownload, startDownload } from './downloader'
 
 /*
   The queue end to end, with the engine played back.
@@ -143,6 +143,66 @@ describe('a name another download already has', () => {
     await vi.waitFor(() => expect(find(again.id)?.state).toBe('completed'))
     expect(runs).toHaveLength(2)
     expect(find(again.id)?.filepath).toBe(find(first.id)?.filepath)
+  })
+})
+
+/*
+  A resume once the picture is down. The engine keeps a finished stream and
+  says so in the same words it uses for a finished video, then fetches the
+  sound and merges. That line is about a part, not about somebody else's file.
+*/
+describe('a stream kept from before a pause', () => {
+  it('finishes on the merged file, in one run', async () => {
+    const req = request('v9')
+    script = (args) => {
+      const final = fileOf(args, 'Talk', 'v9')
+      return {
+        stdout: [
+          `[download] ${final.replace(/\.mp4$/, '.f137.mp4')} has already been downloaded`,
+          `[download] Destination: ${final.replace(/\.mp4$/, '.f140.m4a')}`,
+          `[Merger] Merging formats into "${final}"`
+        ]
+      }
+    }
+    const item = await startDownload(req)
+
+    await vi.waitFor(() => expect(find(item.id)?.state).toBe('completed'))
+    expect(runs).toHaveLength(1)
+    expect(find(item.id)?.filepath).toBe(join(req.outputDir!, 'Talk [v9].mp4'))
+  })
+})
+
+/*
+  Cancel used to know one path and remove only what ended in `.part`: stopped
+  while the sound was coming down, the finished picture stayed behind for good.
+*/
+describe('a download cancelled between its streams', () => {
+  it('takes the finished stream and the partial with it, and nothing else', async () => {
+    const req = request('v10')
+    const dir = req.outputDir!
+    const video = join(dir, 'Talk [v10].f137.mp4')
+    const audio = join(dir, 'Talk [v10].f140.m4a')
+    const neighbour = join(dir, 'Talk [v100].f137.mp4')
+    script = () => ({ stdout: [`[download] Destination: ${video}`, `[download] Destination: ${audio}`], hang: true })
+    const item = await startDownload(req)
+    await vi.waitFor(() => expect(find(item.id)?.streamPaths).toHaveLength(2))
+    for (const file of [video, `${audio}.part`, neighbour]) writeFileSync(file, 'x')
+
+    cancelDownload(item.id)
+    runs[0].close(1)
+
+    expect(existsSync(video)).toBe(false)
+    expect(existsSync(`${audio}.part`)).toBe(false)
+    expect(existsSync(neighbour)).toBe(true)
+    expect(find(item.id)?.state).toBe('canceled')
+  })
+
+  it('leaves a finished download alone when the click comes too late', async () => {
+    script = (args) => ({ stdout: [wrote(args, 'v11')] })
+    const item = await startDownload(request('v11'))
+    await vi.waitFor(() => expect(find(item.id)?.state).toBe('completed'))
+    cancelDownload(item.id)
+    expect(find(item.id)?.state).toBe('completed')
   })
 })
 

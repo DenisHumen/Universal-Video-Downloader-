@@ -4,7 +4,7 @@ import { app } from 'electron'
 import { EventEmitter } from 'events'
 import { spawn, ChildProcess, type ChildProcessWithoutNullStreams } from 'child_process'
 import { existsSync, mkdirSync, readdirSync, renameSync, rmSync, statSync } from 'fs'
-import { basename, dirname, join } from 'path'
+import { basename, dirname, extname, join } from 'path'
 import { randomUUID } from 'crypto'
 import { withJsRuntime } from './js-runtime'
 import { ytdlpBinaryPath, ensureYtdlp, ytdlpSpawnOptions } from './ytdlp'
@@ -107,6 +107,8 @@ const DEFAULT_TEMPLATE = '%(title)s [%(id)s].%(ext)s'
 const items = new Map<string, DownloadItem>()
 const procs = new Map<string, ChildProcess>()
 const finalPaths = new Map<string, { path: string; priority: number }>()
+/** Rows whose engine has named a file this session: part of them is on the disk, whatever the bar says. */
+const begunOnDisk = new Set<string>()
 const retryTimers = new Map<string, NodeJS.Timeout>()
 /*
   Resolving is the one phase of a download with no process behind it, so
@@ -944,8 +946,13 @@ function parseFinalPath(line: string, item: DownloadItem, runDir: string): void 
   if (!current || (found.priority >= current.priority && !outranked)) {
     finalPaths.set(item.id, { path: found.path, priority: found.priority })
   }
+  begunOnDisk.add(item.id)
   if (found.alreadyDownloaded) alreadyOnDisk.set(item.id, found.path)
   if (item.mode === 'audio' && found.priority === DESTINATION_PRIORITY) clearPartialFromBeforeAudioName(item, found.path)
+  if (!item.live && isMediaName(found.path) && !item.streamPaths?.includes(found.path)) {
+    item.streamPaths = [...(item.streamPaths ?? []), found.path]
+    scheduleSave()
+  }
   if (item.live && found.priority === DESTINATION_PRIORITY && isMediaName(found.path)) {
     // Subtitles announce a destination too, and are nothing to save a recording from.
     const known = item.partialPaths ?? []
@@ -966,8 +973,12 @@ function clearPartialFromBeforeAudioName(item: DownloadItem, destination: string
   const stem = stemBeforeAudioName(partialStem(destination))
   if (!stem) return
   const link = item.sourceUrl || item.url
+  // A failed row counts: its partial is what Retry continues from, and 80% of a film is worth keeping.
   const shared = [...items.values()].some(
-    (other) => other.id !== item.id && IN_FLIGHT_STATES.includes(other.state) && (other.sourceUrl || other.url) === link
+    (other) =>
+      other.id !== item.id &&
+      (IN_FLIGHT_STATES.includes(other.state) || other.state === 'error') &&
+      (other.sourceUrl || other.url) === link
   )
   if (!shared) cleanupPartialsAt(join(dirname(destination), `${stem}.x`))
 }
@@ -1329,7 +1340,12 @@ function processQueue(): void {
  * queue as downloads so pause/cancel/remove, progress and history all behave
  * identically — from the user's side it's one list of things in flight.
  */
+/** The latest run of each trim or convert: an earlier one still in its probe is no longer the row's. */
+const mediaRuns = new Map<string, symbol>()
+
 async function runMediaJob(item: DownloadItem): Promise<void> {
+  const mine = Symbol(item.id)
+  mediaRuns.set(item.id, mine)
   const source = item.sourcePath
   if (!source || !existsSync(source)) {
     failWith(item, 'sourceMissing', 'The source file is gone — it may have been moved or deleted.')
@@ -1363,7 +1379,12 @@ async function runMediaJob(item: DownloadItem): Promise<void> {
     `procs`, so one of them is left running untracked and unkillable.
   */
   const stateAfterProbe = items.get(item.id)?.state
-  if (stateAfterProbe !== 'processing') {
+  /*
+    The state alone does not tell the two calls apart: the second has set
+    `processing` again by the time the first comes out of its probe, so both
+    passed. Each run now knows whether it is still the row's own.
+  */
+  if (stateAfterProbe !== 'processing' || mediaRuns.get(item.id) !== mine) {
     processQueue()
     return
   }
@@ -1595,12 +1616,21 @@ async function runDownload(item: DownloadItem): Promise<void> {
       processQueue()
       return
     }
-    const verdict = diskVerdict(item.sizeEstimate, free, item.downloadedBytes)
-    if (verdict === 'wontFit') {
+    /*
+      A refusal is for a download that has not started. One that has - paused,
+      retried, picked up after a restart - already holds part of itself on this
+      disk, and `downloadedBytes` is the count for the stream in hand, not for
+      the row: with the picture down and the sound half-way it said "nothing
+      yet", the sum asked for the whole size twice over, and a resume that
+      needed a few megabytes was turned away with "disk is full", every time.
+    */
+    const begun = Boolean(item.downloadedBytes || item.percent || begunOnDisk.has(item.id))
+    const verdict = diskVerdict(item.sizeEstimate, free, 0)
+    if (verdict === 'wontFit' && !begun) {
       failWith(item, 'diskFull', 'Your disk is full — free some space and try again.')
       return
     }
-    if (verdict === 'mayNotFit') {
+    if (verdict !== 'fits') {
       log.warn('download', 'This may not fit on the disk', { ...downloadFields(item), free: free?.bytes })
     }
   }
@@ -1758,7 +1788,16 @@ async function runDownload(item: DownloadItem): Promise<void> {
     stderr.flush()
     // Read or not, the file has had its one use.
     if (infoFile) infoCache.release(infoFile)
-    const existing = alreadyOnDisk.get(item.id)
+    /*
+      Only when that file is where the run ended. The engine says "already
+      downloaded" for a finished stream too - `Title.f137.mp4`, kept from before
+      a pause or a restart - and then goes on to the sound and the merge. Taken
+      for the finished file, that line had the whole video fetched a second time
+      as "Title (2)" after every resume that came once the picture was down.
+    */
+    const heard = alreadyOnDisk.get(item.id)
+    const ended = finalPaths.get(item.id)?.path
+    const existing = heard && ended && samePath(heard, ended) ? heard : undefined
     alreadyOnDisk.delete(item.id)
     // If we deliberately stopped it, the state was already set — or has since
     // been changed again by a resume, which is equally not a failure.
@@ -1787,6 +1826,7 @@ async function runDownload(item: DownloadItem): Promise<void> {
     if (code === 0 && refuseFinalFile(item, existing)) return
     if (code === 0) {
       item.state = 'completed'
+      item.streamPaths = undefined
       finishProgress(item)
       item.speed = undefined
       item.eta = undefined
@@ -2475,6 +2515,37 @@ function cleanupPartials(item: DownloadItem): void {
   for (const path of item.partialPaths ?? []) if (path !== known) cleanupPartialsAt(path)
 }
 
+/** A stream the engine fetches on its way to a merge: `Title.f137.mp4`, `Title.fhls-1080.mp4`. */
+const PER_FORMAT_FILE = /\.f[\w-]+\.\w+$/
+
+/**
+ * Everything an abandoned download wrote, for Cancel and Remove.
+ *
+ * `cleanupPartials` knows one path, and only what still ends in `.part`. A
+ * video cancelled while its sound was coming down left the whole picture
+ * behind as `Title.f137.mp4`, nine tenths of the bytes, for good; cancelled in
+ * the merge, `Title.temp.mp4` as well; and a row from before a restart had no
+ * path in memory at all, so nothing of it was removed. These are the names the
+ * engine itself announced for this row, so nothing here is guessed from a title.
+ * Worked out now and run later: the row may be gone by the time its process is.
+ */
+function discardWritten(item: DownloadItem): () => void {
+  const known = item.filepath || finalPaths.get(item.id)?.path
+  const partials = [...new Set([...(known ? [known] : []), ...(item.partialPaths ?? []), ...(item.streamPaths ?? [])])]
+  const streams = (item.streamPaths ?? []).filter((path) => PER_FORMAT_FILE.test(basename(path)))
+  const merging = (item.streamPaths ?? []).filter((path) => !PER_FORMAT_FILE.test(basename(path)))
+  item.streamPaths = undefined
+  return () => {
+    for (const path of partials) cleanupPartialsAt(path)
+    for (const path of streams) rmSync(path, { force: true })
+    // What ffmpeg writes while merging into `Title.mp4`, which itself is left alone.
+    for (const path of merging) {
+      const ext = extname(path)
+      rmSync(`${path.slice(0, path.length - ext.length)}.temp${ext}`, { force: true })
+    }
+  }
+}
+
 function cleanupPartialsAt(known: string): void {
   const stem = partialStem(known)
   const dir = dirname(known)
@@ -2490,6 +2561,8 @@ function cleanupPartialsAt(known: string): void {
 export function cancelDownload(id: string): void {
   const item = items.get(id)
   if (!item) return
+  // A click that lands as the download finishes: the file is there, and "cancelled, 0%" was not true of it.
+  if (item.state === 'completed') return
   clearRetry(id)
   abortResolve(id)
   abandonLiveStop(item)
@@ -2511,12 +2584,13 @@ export function cancelDownload(id: string): void {
       ffmpeg child still holds them open either fails outright or races them
       into recreating the files we just removed.
     */
-    proc.once('close', () => cleanupPartials(item))
+    proc.once('close', discardWritten(item))
     deliberateStops.add(id)
     killTree(proc)
   } else {
-    cleanupPartials(item)
+    discardWritten(item)()
   }
+  begunOnDisk.delete(id)
   emitUpdated(item)
   processQueue()
 }
@@ -2560,21 +2634,24 @@ export function removeDownload(id: string): void {
   if (item) abandonLiveStop(item)
   const unfinished =
     item !== undefined &&
-    IN_FLIGHT_STATES.includes(item.state) &&
+    // A failed row too: once it is gone nothing will ever continue from its partials.
+    // (Not a failed recording: what it kept is named on the row as still there.)
+    (IN_FLIGHT_STATES.includes(item.state) || (item.state === 'error' && !item.live)) &&
     item.kind !== 'trim' &&
     item.kind !== 'convert'
-  const known = unfinished ? item.filepath || finalPaths.get(id)?.path : undefined
+  const discard = unfinished ? discardWritten(item) : undefined
   const proc = procs.get(id)
   if (proc) {
     deliberateStops.add(id)
-    if (known) proc.once('close', () => cleanupPartialsAt(known))
+    if (discard) proc.once('close', discard)
     killTree(proc)
-  } else if (known) {
-    cleanupPartialsAt(known)
+  } else {
+    discard?.()
   }
   procs.delete(id)
   items.delete(id)
   finalPaths.delete(id)
+  begunOnDisk.delete(id)
   alreadyOnDisk.delete(id)
   skipInfo.delete(id)
   scheduleSave()
@@ -2607,6 +2684,7 @@ function forgetItem(id: string): void {
   forgetProgress(id)
   items.delete(id)
   finalPaths.delete(id)
+  begunOnDisk.delete(id)
   skipInfo.delete(id)
   // Per-item 'removed' events. The automation pipeline needs each one;
   // ipc.ts folds them into a single message for the window.

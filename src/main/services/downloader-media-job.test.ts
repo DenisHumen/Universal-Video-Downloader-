@@ -9,21 +9,28 @@ import type { DownloadItem } from '@shared/types'
   and so in the Library. ffmpeg itself is pretended; the output file is real.
 */
 
-const h = vi.hoisted(() => ({ dir: '' }))
+const h = vi.hoisted(() => ({ dir: '', probes: [] as (() => void)[], held: false, encodes: 0 }))
 vi.mock('electron', () => ({ app: { getPath: () => h.dir }, shell: {} }))
 vi.mock('./log', () => ({ log: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() } }))
 vi.mock('./settings', () => ({ getSettings: () => ({ concurrentDownloads: 1, downloadDir: h.dir }) }))
 vi.mock('./ytdlp', () => ({ ytdlpBinaryPath: () => '', ensureYtdlp: async () => undefined, ytdlpSpawnOptions: () => ({}) }))
 vi.mock('./ffmpeg', async (real) => ({
   ...(await real<typeof import('./ffmpeg')>()),
-  probeMedia: async () => ({ duration: 600, hasVideo: true, hasAudio: true }),
+  probeMedia: async () => {
+    if (h.held) await new Promise<void>((release) => h.probes.push(release))
+    return { duration: 600, hasVideo: true, hasAudio: true }
+  },
   runFfmpeg: (args: string[]) => {
+    h.encodes++
     writeFileSync(args[args.length - 1], 'twelve bytes')
     return { child: { kill: () => undefined }, done: Promise.resolve({ code: 0, stderr: '' }) }
   }
 }))
 
 beforeEach(() => {
+  h.probes = []
+  h.held = false
+  h.encodes = 0
   h.dir = mkdtempSync(join(tmpdir(), 'uvd-job-'))
   vi.resetModules()
 })
@@ -60,5 +67,27 @@ describe('a finished media job', () => {
   it('takes only a real web address as that page', async () => {
     const item = await runJob({ originUrl: 'file:///etc/passwd' })
     expect(item.originUrl).toBeUndefined()
+  })
+})
+
+/*
+  The probe takes a moment, and the row can be paused and resumed inside it.
+  The second run sets the same state the first one checks for on its way out,
+  so both went on to encode into one file.
+*/
+describe('a media job restarted while it is still looking at its file', () => {
+  it('encodes once', async () => {
+    h.held = true
+    const source = join(h.dir, 'film.mp4')
+    writeFileSync(source, 'the whole film')
+    const { startMediaJob, pauseDownload, resumeDownload, listDownloads } = await import('./downloader')
+    const item = startMediaJob({ kind: 'trim', sourcePath: source, title: 'Film', range: { start: 10, end: 70 } })
+    await vi.waitFor(() => expect(h.probes).toHaveLength(1))
+    pauseDownload(item.id)
+    resumeDownload(item.id)
+    await vi.waitFor(() => expect(h.probes).toHaveLength(2))
+    for (const release of h.probes) release()
+    await vi.waitFor(() => expect(listDownloads().find((d) => d.id === item.id)?.state).toBe('completed'))
+    expect(h.encodes).toBe(1)
   })
 })

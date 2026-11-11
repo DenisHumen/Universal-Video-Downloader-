@@ -5,7 +5,7 @@ import { join } from 'path'
 import { PassThrough } from 'stream'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { DownloadItem } from '@shared/types'
-import { listDownloads, pauseDownload, retryDownload, startDownload } from './downloader'
+import { listDownloads, pauseDownload, resumeDownload, retryDownload, startDownload } from './downloader'
 
 /*
   Whether a download that cannot fit gets as far as the engine. The same stand-ins
@@ -91,6 +91,30 @@ describe('a download that will not fit', () => {
     free.mockResolvedValue({ bytes: 5_000, reliable: true })
     retryDownload(item.id)
     await vi.waitFor(() => expect(spawn).toHaveBeenCalledTimes(1))
+    pauseDownload(item.id)
+  })
+})
+
+/*
+  The check is for a download that has not started. One picked up again holds
+  part of itself on this disk already, and was turned away for the room it had
+  itself taken: "disk is full", on every resume once the picture was down.
+*/
+describe('a download picked up again', () => {
+  it('is not refused for the room it has already used', async () => {
+    free.mockResolvedValue({ bytes: 5_000, reliable: true })
+    const dir = outputDir()
+    const item = await startDownload({ url: link(), mode: 'video', outputDir: dir, sizeEstimate: { ...exact, merging: true } })
+    await vi.waitFor(() => expect(spawn).toHaveBeenCalledTimes(1))
+    spawn.mock.results[0].value.stdout.write(`[download] Destination: ${join(dir, 'Talk.f137.mp4')}\n`)
+    await new Promise((r) => setImmediate(r))
+    pauseDownload(item.id)
+    spawn.mock.results[0].value.emit('close', null)
+
+    free.mockResolvedValue({ bytes: 100, reliable: true })
+    resumeDownload(item.id)
+    await vi.waitFor(() => expect(spawn).toHaveBeenCalledTimes(2))
+    expect(find(item.id)?.errorCode).toBeUndefined()
     pauseDownload(item.id)
   })
 })
