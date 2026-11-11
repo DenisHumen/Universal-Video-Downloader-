@@ -254,6 +254,8 @@ describe('replacing the engine from more than one place', () => {
     // The file on disk is too small to be an engine, so ensureYtdlp downloads a new one.
     const ensured = m.ensureYtdlp()
     const refreshed = m.refreshEngineIfDue(() => false)
+    // Waited for, not slept through: twenty milliseconds is not always enough on the slowest build machine.
+    await vi.waitFor(() => expect(h.requests).toBe(1), { timeout: 8000 })
     await settle()
     // Only ensureYtdlp's own look at the list: the refresh has not started.
     expect(h.lists).toBe(1)
@@ -274,6 +276,7 @@ describe('replacing the engine from more than one place', () => {
     const ensured = m.ensureYtdlp()
     // The button does not wait for ensureYtdlp; its fallback must not start a download of its own.
     const updated = m.updateYtdlp(() => false)
+    await vi.waitFor(() => expect(h.requests).toBe(1), { timeout: 8000 })
     await settle()
     expect(h.requests).toBe(1)
 
@@ -292,9 +295,8 @@ describe('replacing the engine from more than one place', () => {
     h.download = 403
 
     const refreshed = m.refreshEngineIfDue(() => busy)
-    await settle()
     // The check found a newer release and the fallback download is waiting on GitHub.
-    expect(h.requests).toBe(1)
+    await vi.waitFor(() => expect(h.requests).toBe(1), { timeout: 8000 })
 
     // Nothing is running when the button is pressed; a download starts while it waits.
     const refused = expect(m.updateYtdlp(() => busy)).rejects.toMatchObject({ code: 'engineBusy' })

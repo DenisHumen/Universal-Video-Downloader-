@@ -565,8 +565,16 @@ export async function getVersion(): Promise<string | undefined> {
  * running from it now is never pulled out from under. A failure is logged and
  * tried again in a day; nothing is shown, since the engine in use still works.
  */
+/** The migration under way, or the last one. Nothing in the app waits on it; tests do, instead of sleeping. */
+let migration: Promise<void> = Promise.resolve()
+
+/** Resolves once no background migration is running. For tests. */
+export function __migrationSettled(): Promise<void> {
+  return migration
+}
+
 function migrateInBackground(): void {
-  void downloadBinary()
+  migration = downloadBinary()
     .then(async () => {
       const version = await getVersion()
       if (version && onedirExe(binDir())) emit({ state: 'ready', version, message: 'Ready' })

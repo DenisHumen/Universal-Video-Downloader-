@@ -250,8 +250,9 @@ describe('the onedir engine', () => {
     expect(m.ytdlpBinaryPath()).toBe(onefile())
 
     h.requested = []
-    await (await fresh()).ensureYtdlp()
-    await settle()
+    const again = await fresh()
+    await again.ensureYtdlp()
+    await again.__migrationSettled()
     expect(h.requested).toEqual([])
   })
 
@@ -265,7 +266,7 @@ describe('the onedir engine', () => {
 
     const n = await fresh()
     await expect(n.ensureYtdlp()).resolves.toBe(onefile())
-    await settle()
+    await n.__migrationSettled()
     expect(existsSync(onefile())).toBe(true)
     expect(n.ytdlpBinaryPath()).toBe(onefile())
   })
@@ -276,7 +277,7 @@ describe('the onedir engine', () => {
     publish({ 'yt-dlp_linux.zip': 403, 'yt-dlp_linux': Buffer.from('a different single file') })
     const m = await fresh()
     await m.ensureYtdlp()
-    await settle()
+    await m.__migrationSettled()
     expect(h.requested).not.toContain('yt-dlp_linux')
     expect(readFileSync(onefile()).equals(ONEFILE)).toBe(true)
   })
@@ -332,7 +333,7 @@ describe('the onedir engine', () => {
     publish({ 'yt-dlp_linux.zip': zipOf({ 'yt-dlp_linux': 'tampered' }) })
     const m = await fresh()
     await m.ensureYtdlp()
-    await settle()
+    await m.__migrationSettled()
     expect(m.ytdlpBinaryPath()).toBe(onefile())
   })
 
