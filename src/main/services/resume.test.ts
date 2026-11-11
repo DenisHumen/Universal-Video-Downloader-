@@ -79,6 +79,17 @@ describe('the shutdown-then-launch round trip', () => {
     expect(shouldResume(persisted)).toBe(true)
   })
 
+  // Stop was pressed, and the app quit before the file was written: resuming would record again.
+  it('does not start a recording again that was being saved', () => {
+    const saving = item('processing', { live: true, savingLive: true })
+    markInterrupted(saving)
+    const persisted = JSON.parse(JSON.stringify(saving)) as DownloadItem
+    markInterrupted(persisted)
+    expect(persisted).toMatchObject({ state: 'paused', interrupted: false })
+    expect(persisted.savingLive).toBeUndefined()
+    expect(shouldResume(persisted)).toBe(false)
+  })
+
   it('does not resume something paused before quitting', () => {
     const held = item('paused')
     markInterrupted(held)

@@ -30,8 +30,16 @@ export const WAS_RUNNING: DownloadItem['state'][] = [
  */
 export function markInterrupted(item: DownloadItem): boolean {
   if (!WAS_RUNNING.includes(item.state)) return false
+  /*
+    A recording being saved was stopped by the person, not by the app. Flagged
+    as interrupted it was picked up on the next launch like any download, which
+    for a recording means starting the broadcast again: they pressed Stop, quit
+    before the file was written, and came back to it recording. It stays
+    paused, with everything recorded still there to be saved.
+  */
+  const stoppedByHand = item.savingLive === true
   item.state = 'paused'
-  item.interrupted = true
+  item.interrupted = !stoppedByHand
   // Whatever was saving a recording died with the app; what it was saving is still there.
   item.savingLive = undefined
   return true
