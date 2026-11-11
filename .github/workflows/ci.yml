@@ -3,9 +3,18 @@ name: CI
 on:
   push:
     branches: [main]
+    # Words alone build nothing: a README commit used to start four packagers, two of them on Macs.
+    paths-ignore: ['**.md', 'docs/**']
   pull_request:
     branches: [main]
   workflow_dispatch:
+
+# One run per branch. Three pushes in three minutes asked for six Mac runners at
+# once (v4.0.4): GitHub handed out none, and every Mac job was cancelled after a
+# quarter of an hour without running a step. A newer push makes the older run moot.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   # The cheap gate: everything that is platform-independent, once.

@@ -175,7 +175,8 @@ jobs:
         run: node scripts/check-ffmpeg-arch.mjs --arch=${{ matrix.arch }}
 
       - name: Typecheck & test
-        run: npm run typecheck && npm test
+        # Lint too: 4.6.0 was tagged with a lint failure that only CI, running beside this, would have caught.
+        run: npm run lint && npm run typecheck && npm test
 
       # CI gates the palette on every push; a release must clear the same bar.
       - name: Contrast gate
@@ -370,8 +371,21 @@ jobs:
 
       # Every file appears at once, and /releases/latest — where installed
       # copies look for an update — moves to this release only now.
+      # "Latest" only when it is: re-running the jobs of an old tag - there have
+      # been drafts left behind by failed builds - used to publish that old
+      # version as the latest, which is what apt, the badges and every installed
+      # copy read.
       - name: Publish
-        run: gh release edit "$TAG" --draft=false --latest
+        run: |
+          set -eu
+          newest=$(gh release list --exclude-drafts --exclude-pre-releases --limit 100 --json tagName -q '.[].tagName' \
+            | { cat; echo "$TAG"; } | sort -V | tail -n 1)
+          if [ "$newest" = "$TAG" ]; then
+            gh release edit "$TAG" --draft=false --latest
+          else
+            echo "::notice::$TAG is older than $newest, so it is published without becoming the latest release."
+            gh release edit "$TAG" --draft=false --latest=false
+          fi
 
   # apt and dnf, once the release is public. The .deb and .rpm stay on the
   # release; only signed index files are added (see scripts/linux-repo.sh).
@@ -448,6 +462,9 @@ jobs:
     needs: finalize
     if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
+    # Somebody else's action runs here with a key of ours: it gets to read the repository and nothing more.
+    permissions:
+      contents: read
     env:
       TAG: ${{ github.ref_name }}
       HAS_KEY: ${{ secrets.AUR_KEY != '' }}
@@ -460,8 +477,11 @@ jobs:
 
       - name: Fill in the version and checksum
         if: env.HAS_KEY == 'true'
+        # bash with pipefail: under the default shell a failed download still piped into
+        # sha256sum, and the checksum of nothing would have gone into the PKGBUILD.
+        shell: bash
         run: |
-          set -eu
+          set -euo pipefail
           V="${TAG#v}"
           URL="https://github.com/${{ github.repository }}/releases/download/$TAG/Universal-Video-Downloader-$V-linux-amd64.deb"
           SUM=$(curl -fsSL "$URL" | sha256sum | cut -d' ' -f1)
@@ -471,7 +491,7 @@ jobs:
 
       - name: Push to the AUR
         if: env.HAS_KEY == 'true'
-        uses: KSXGitHub/github-actions-deploy-aur@v3.0.1
+        uses: KSXGitHub/github-actions-deploy-aur@a97f56a8425a7a7f3b8c58607f769c69b089cadb # v3.0.1
         with:
           pkgname: universal-video-downloader-bin
           pkgbuild: ./aur/PKGBUILD
@@ -488,6 +508,7 @@ jobs:
     needs: finalize
     if: startsWith(github.ref, 'refs/tags/v')
     runs-on: windows-latest
+    permissions: {}
     env:
       HAS_TOKEN: ${{ secrets.WINGET_TOKEN != '' }}
     steps:
@@ -496,7 +517,7 @@ jobs:
         run: echo "::notice::WINGET_TOKEN is not set, so no winget update was submitted."
 
       - if: env.HAS_TOKEN == 'true'
-        uses: vedantmgoyal9/winget-releaser@v2
+        uses: vedantmgoyal9/winget-releaser@b7370d4d152efdce803a26cc6ca9eee58cb2ad54 # v2
         with:
           identifier: DenisHumen.UniversalVideoDownloader
           installers-regex: 'windows-x64-setup\.exe$'
