@@ -16,7 +16,8 @@ import {
   Scissors,
   Trash2,
   Upload,
-  X
+  X,
+  Film
 } from '../ui/icons'
 import type { DownloadItem, DownloadRequest } from '@shared/types'
 import { pageLinkOf } from '@shared/library'
@@ -381,7 +382,12 @@ function QueueRow({ item, index, animateIn = true, heading }: Props): JSX.Elemen
             src={item.thumbnail}
             pageUrl={item.sourceUrl ?? item.originUrl}
             className="h-full w-full object-cover"
-            fallback={<div className="h-full w-full bg-sink" />}
+            // A row with no picture (a failed one never got that far) says so, instead of showing an empty grey box.
+            fallback={
+              <div className="flex h-full w-full items-center justify-center bg-sink text-ink-3">
+                <Film size={16} />
+              </div>
+            }
           />
         </div>
 

@@ -9,6 +9,7 @@ import { emptyTarget, pathOf, ShareForm, TelegramForm, useSecretState } from './
 import Dialog from '../ui/Dialog'
 import Dropdown from '../ui/Dropdown'
 import IconButton from '../ui/IconButton'
+import { PreferencesGroup, SwitchRow } from '../ui'
 import {
   DEFAULT_REMOTE_PATH,
   DEFAULT_RENAME_TEMPLATE,
@@ -62,8 +63,8 @@ const blank = (kind: StepKind, video: boolean): PipelineStep => {
   return { id, kind: kind as 'notify' | 'download', enabled: true }
 }
 
-const SAMPLE = { title: 'Табакошка', season: 1, episode: 9, quality: '720p', ext: 'mkv' }
-const SAMPLE_VIDEO = { title: 'Как устроен звук', channel: 'Табакошка', videoId: 'dQw4w9WgXcQ', season: 0, episode: 0, quality: '720p', ext: 'mp4' }
+const SAMPLE = { season: 1, episode: 9, quality: '720p', ext: 'mkv' }
+const SAMPLE_VIDEO = { videoId: 'dQw4w9WgXcQ', season: 0, episode: 0, quality: '720p', ext: 'mp4' }
 
 export default function StepEditor({
   step: initial,
@@ -118,14 +119,17 @@ export default function StepEditor({
 
   const preview = useMemo(() => {
     try {
-      const sample = video ? SAMPLE_VIDEO : SAMPLE
+      // The names in the example are in the reader's language: it was a Russian title in the English interface.
+      const sample = video
+        ? { ...SAMPLE_VIDEO, title: t('auto.sampleVideo'), channel: t('auto.sampleChannel') }
+        : { ...SAMPLE, title: t('auto.sampleSeries') }
       if (step.kind === 'rename') return renameFor(step, sample)
       if (step.kind === 'upload') return remoteDirFor(step.remotePath, sample) || '/'
     } catch {
       return ''
     }
     return ''
-  }, [step, video])
+  }, [step, video, t])
 
   const set = (patch: Partial<PipelineStep>): void =>
     setStep((s) => ({ ...s, ...patch }) as PipelineStep)
@@ -306,7 +310,7 @@ export default function StepEditor({
               </div>
             )}
 
-            <div className="rounded border border-edge p-3">
+            <div>
               <ShareForm
                 target={draft}
                 onTarget={setDraft}
@@ -328,21 +332,21 @@ export default function StepEditor({
               <p className="hint mt-1">{t('auto.remotePathHint')}</p>
             </div>
 
-            <label className="flex items-center gap-2.5 text-control text-ink">
-              <input
-                type="checkbox"
+            <PreferencesGroup>
+              <SwitchRow
+                id="deleteLocal"
+                title={t('auto.deleteLocal')}
                 checked={step.deleteLocalAfter}
-                onChange={(e) => set({ deleteLocalAfter: e.target.checked })}
+                onChange={(on) => set({ deleteLocalAfter: on })}
               />
-              {t('auto.deleteLocal')}
-            </label>
+            </PreferencesGroup>
           </>
         )}
 
         {step.kind === 'notify' && (
           <>
             <p className="hint">{t('auto.notifyHint')}</p>
-            <div className="rounded border border-edge p-3">
+            <div>
               <TelegramForm
                 token={token}
                 onToken={setToken}
@@ -361,14 +365,14 @@ export default function StepEditor({
           </div>
         )}
 
-        <label className="flex items-center gap-2.5 border-t border-edge pt-3 text-control text-ink">
-          <input
-            type="checkbox"
+        <PreferencesGroup>
+          <SwitchRow
+            id="stepEnabled"
+            title={t('auto.stepEnabled')}
             checked={step.enabled}
-            onChange={(e) => set({ enabled: e.target.checked })}
+            onChange={(on) => set({ enabled: on })}
           />
-          {t('auto.stepEnabled')}
-        </label>
+        </PreferencesGroup>
       </div>
 
     </Dialog>
