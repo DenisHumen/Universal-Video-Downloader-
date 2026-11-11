@@ -151,7 +151,6 @@ async function fresh(): Promise<typeof import('./ytdlp')> {
   return import('./ytdlp')
 }
 
-const settle = (): Promise<void> => new Promise((resolve) => setTimeout(resolve, 300))
 const realPublic = process.env.PUBLIC
 const realLocal = process.env.LOCALAPPDATA
 const bin = (): string => join(h.dir, 'UniversalVideoDownloader', 'bin')
