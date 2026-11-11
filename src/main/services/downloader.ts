@@ -776,7 +776,9 @@ export function buildArgs(
     Settings asks for files beside the video.
   */
   const picked = item.mode === 'video' && item.subtitles?.length ? item.subtitles : undefined
-  const subLangs = picked?.join(',') ?? (settings.subtitleLanguages.trim() || 'all')
+  const asked = picked?.join(',') ?? (settings.subtitleLanguages.trim() || 'all')
+  // "All" is every language, not the live chat: on YouTube that is a transcript of the whole chat, and slow to fetch.
+  const subLangs = /(^|,)\s*all\s*(,|$)/i.test(asked) && !/live_chat/.test(asked) ? `${asked},-live_chat` : asked
   /*
     Machine-made captions count as subtitles to a person: a video with nothing
     else came down with none, embedded, while the Settings row promised them.
@@ -1494,6 +1496,12 @@ async function runMediaJob(item: DownloadItem): Promise<void> {
     emitUpdated(item)
     processQueue()
     return
+  }
+  // What a failed encode wrote is a file that starts and then stops, under the name of a finished one.
+  try {
+    if (item.filepath) rmSync(item.filepath, { force: true })
+  } catch {
+    /* best effort */
   }
   appendLog(item, stderr)
   log.debug('engine', stderr, { id: item.id.slice(0, 8) })

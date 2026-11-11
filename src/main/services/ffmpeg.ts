@@ -1,5 +1,5 @@
 import { spawn, type ChildProcess } from 'child_process'
-import { dirname, extname, join } from 'path'
+import { basename, dirname, extname, join } from 'path'
 import { existsSync } from 'fs'
 import type { AppErrorCode, ConvertTarget, TrimRange } from '@shared/types'
 import { LOCAL_INPUT } from './ffmpeg-output'
@@ -453,7 +453,8 @@ export function uniqueOutputPath(
 ): string {
   const dir = dirname(sourcePath)
   const ext = extname(sourcePath)
-  const base = sourcePath.slice(dir.length + 1, sourcePath.length - ext.length)
+  // `basename`, not a slice past the folder: a drive's root already ends in its slash, and `D:\video.mp4` lost its first letter.
+  const base = basename(sourcePath, ext)
   /*
     `taken` is what the queue has already promised to other jobs. On disk a name
     is free until something writes it, and nothing writes until the job runs —

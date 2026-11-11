@@ -208,15 +208,24 @@ export async function searchVideos(
       errorCode: 'adultHidden'
     }
   }
-  const engineFailure = await engineUnavailable()
-  if (engineFailure) return engineFailure
+  /*
+    Only the services the engine searches wait on it. The others ask the site's
+    own API, and were turned away with "the engine is not installed" all the
+    same: an offline first launch could not search the one catalogue that needs
+    nothing downloaded.
+  */
+  const needsEngine = (service: SearchService): boolean => !API_SEARCH[service]
+  const engineFailure =
+    scope === 'all' || needsEngine(scope) ? ((await engineUnavailable()) as SearchResponse | undefined) : undefined
 
-  if (scope !== 'all') return searchOne(q, scope, limit)
+  if (scope !== 'all') return engineFailure ?? searchOne(q, scope, limit)
 
   // In 'all' mode the limit applies per service, so the grid stays balanced.
   const perService = Math.max(3, Math.min(SEARCH_CAP_PER_SERVICE, limit))
   const services = allowedSearchServices(SEARCH_ALL_SERVICES, showAdult)
-  const settled = await Promise.all(services.map((s) => searchOne(q, s, perService)))
+  const settled = await Promise.all(
+    services.map((s) => (engineFailure && needsEngine(s) ? engineFailure : searchOne(q, s, perService)))
+  )
   const successes = settled.filter((r) => r.ok && r.results?.length).map((r) => r.results!)
   if (!successes.length) {
     const firstFailure = settled.find((r) => !r.ok)

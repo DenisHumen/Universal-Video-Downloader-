@@ -74,6 +74,8 @@ export const ytdlpEvents = new EventEmitter()
 
 let currentStatus: YtDlpStatus = { state: 'idle' }
 let ensurePromise: Promise<string> | null = null
+/** Where the engine was when `ensurePromise` last answered, to notice it gone. */
+let ensuredAt: string | null = null
 /** This install is the move out of the shared folder, which the window says in its own words. */
 let movingFromShared = false
 
@@ -581,7 +583,20 @@ function migrateInBackground(): void {
  * launch. Safe to call multiple times — concurrent calls share one promise.
  */
 export function ensureYtdlp(): Promise<string> {
+  /*
+    Checked once is not checked for good. An antivirus that takes the engine an
+    hour into the session left this answering "ready" with a path to nothing:
+    every download then failed to start, and Retry asked here and was told
+    "ready" again, until the app was restarted. A file that has gone is looked
+    for, and fetched, like on a first launch.
+  */
+  if (ensurePromise && ensuredAt && !existsSync(ensuredAt)) {
+    log.warn('engine', 'The engine is no longer where it was; setting it up again')
+    ensurePromise = null
+    ensuredAt = null
+  }
   if (ensurePromise) return ensurePromise
+  ensuredAt = null
   ensurePromise = (async () => {
     try {
       selectJsRuntime()
@@ -650,6 +665,12 @@ export function ensureYtdlp(): Promise<string> {
       throw err
     }
   })()
+  void ensurePromise.then(
+    (path) => {
+      ensuredAt = path
+    },
+    () => undefined
+  )
   return ensurePromise
 }
 
