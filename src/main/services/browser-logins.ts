@@ -3,6 +3,7 @@ import { spawn } from 'child_process'
 import { randomBytes } from 'crypto'
 import {
   chmodSync,
+  existsSync,
   mkdirSync,
   mkdtempSync,
   readdirSync,
@@ -84,9 +85,8 @@ function writeOwnerOnly(file: string, text: string): void {
 
 /**
  * A cookies.txt is readable by anything able to read the profile, in a format
- * every tool understands. (Chromium's own store beside it is not encrypted
- * either while the EnableCookieEncryption fuse is off; see electron-fuses.mjs.
- * Turning that on is a one-way change, still to be decided.) Sealed with the same key as the
+ * every tool understands, beside a cookie store Chromium itself encrypts
+ * (the EnableCookieEncryption fuse; see electron-fuses.mjs). Sealed with the same key as the
  * saved passwords, the clear copy goes as soon as a sealed one is down. A machine
  * with no key (a Linux desktop with no keyring) keeps the clear file, because the
  * terminal has no other way to the sign-ins.
@@ -148,9 +148,54 @@ function removeQuietly(path: string): void {
 }
 
 /** Called once the app is ready. */
+const SEALED_MARK = (): string => join(app.getPath('userData'), 'cookies-sealed')
+
+/**
+ * Encrypt the cookies that were stored before the store was encrypted.
+ *
+ * With the EnableCookieEncryption fuse on, Chromium encrypts a cookie when it
+ * writes it and still reads the plain ones it finds, so an update signs nobody
+ * out - and leaves every sign-in made before it in the clear until the site
+ * happens to set it again. Each is written once more here, as itself, which
+ * stores it encrypted. Once per profile, and only in the installed app: a
+ * development build has the fuse off, and would mark the job done without doing it.
+ */
+async function sealStoredCookies(): Promise<void> {
+  if (!app.isPackaged || existsSync(SEALED_MARK())) return
+  const ses = browsingSession()
+  let moved = 0
+  for (const c of await ses.cookies.get({})) {
+    // A session cookie is not on disk.
+    if (c.session || !c.domain) continue
+    const url = `${c.secure ? 'https' : 'http'}://${c.domain.replace(/^\./, '')}${c.path || '/'}`
+    const same = {
+      url,
+      name: c.name,
+      value: c.value,
+      ...(c.hostOnly ? {} : { domain: c.domain }),
+      path: c.path,
+      secure: c.secure,
+      httpOnly: c.httpOnly,
+      expirationDate: c.expirationDate
+    }
+    try {
+      await ses.cookies.remove(url, c.name)
+      // A same-site value Chromium will not take back must not cost the sign-in.
+      await ses.cookies.set({ ...same, sameSite: c.sameSite }).catch(() => ses.cookies.set(same))
+      moved++
+    } catch (err) {
+      log.warn('browser', 'Could not re-save a cookie encrypted', { why: String(err) })
+    }
+  }
+  await ses.cookies.flushStore()
+  writeFileSync(SEALED_MARK(), '')
+  log.info('browser', 'The stored cookies are encrypted now', { cookies: moved })
+}
+
 export function initBrowserLogins(): void {
   if (started) return
   started = true
+  void sealStoredCookies().catch((err) => log.warn('browser', 'Could not encrypt the stored cookies', { why: String(err) }))
   void sweepAbandonedJars()
   // A crash leaves the copies its runs were using, and a sign-in import's file.
   removeQuietly(COPIES())

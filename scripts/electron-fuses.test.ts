@@ -68,6 +68,7 @@ describe('reading the fuse wire', () => {
   it('names what is wrong with Electron as it comes', () => {
     expect(fuseProblems(binary())).toEqual([
       'RunAsNode is on, should be off',
+      'EnableCookieEncryption is off, should be on',
       'EnableNodeOptionsEnvironmentVariable is on, should be off',
       'EnableNodeCliInspectArguments is on, should be off',
       'OnlyLoadAppFromAsar is off, should be on'
@@ -84,29 +85,29 @@ describe('reading the fuse wire', () => {
 })
 
 describe('flipping the fuses', () => {
-  it('turns off RunAsNode, NODE_OPTIONS and --inspect, and loads only app.asar', () => {
+  it('turns off RunAsNode, NODE_OPTIONS and --inspect, encrypts cookies, and loads only app.asar', () => {
     const buf = binary()
     expect(flipFuses(buf)).toBe(1)
-    expect(wireOf(buf)).toEqual(['00000101'])
+    expect(wireOf(buf)).toEqual(['01000101'])
     expect(fuseProblems(buf)).toEqual([])
   })
 
   // It rewrites a 180 MB executable in place: anything beyond those four bytes
   // would be a corrupt app.
-  it('changes those four bytes and nothing else', () => {
+  it('changes those five bytes and nothing else', () => {
     const before = binary()
     const after = Buffer.from(before)
     flipFuses(after)
     const changed = [...before.keys()].filter((i) => before[i] !== after[i])
     const start = fuseWires(before)[0].start
-    expect(changed).toEqual([0, 2, 3, 5].map((i) => start + i))
+    expect(changed).toEqual([0, 1, 2, 3, 5].map((i) => start + i))
   })
 
   // The ninth fuse is not one this app sets; it stays as Electron ships it.
   it('leaves the fuses after the first eight alone in Electron 45', () => {
     const buf = binary(ELECTRON_45)
     expect(flipFuses(buf)).toBe(1)
-    expect(wireOf(buf)).toEqual(['000001011'])
+    expect(wireOf(buf)).toEqual(['010001011'])
     expect(fuseProblems(buf)).toEqual([])
   })
 
@@ -123,7 +124,7 @@ describe('flipping the fuses', () => {
   it('flips every wire in the file', () => {
     const buf = binary(ELECTRON_33, { copies: 2 })
     expect(flipFuses(buf)).toBe(2)
-    expect(wireOf(buf)).toEqual(['00000101', '00000101'])
+    expect(wireOf(buf)).toEqual(['01000101', '01000101'])
   })
 
   // The order of the fuses belongs to the wire version; under another version
@@ -157,13 +158,16 @@ describe('flipping the fuses', () => {
 
 describe('what ships', () => {
   // Asar integrity would stop the app at startup on Windows, where
-  // electron-builder 25 embeds nothing to check; cookie encryption converts
-  // the store one way and brings up keyring prompts on Linux.
-  it('leaves asar integrity and cookie encryption as Electron sets them', () => {
+  // electron-builder 25 embeds nothing to check.
+  it('leaves asar integrity as Electron sets it', () => {
     expect(Object.keys(SHIPPED_FUSES)).not.toContain('EnableEmbeddedAsarIntegrityValidation')
-    expect(Object.keys(SHIPPED_FUSES)).not.toContain('EnableCookieEncryption')
     expect(Object.keys(SHIPPED_FUSES)).not.toContain('WasmTrapHandlers')
     for (const name of Object.keys(SHIPPED_FUSES)) expect(FUSES).toContain(name)
+  })
+
+  // The browser's sign-ins, and those imported from the person's main browser, are not kept as plain SQLite.
+  it('encrypts the cookie store', () => {
+    expect(SHIPPED_FUSES.EnableCookieEncryption).toBe(true)
   })
 })
 

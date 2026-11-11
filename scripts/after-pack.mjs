@@ -164,7 +164,7 @@ function checkFuses(file) {
         problems.map((p) => `    ${p}`).join('\n')
     )
   }
-  console.log(`  • Electron fuses: RunAsNode, NODE_OPTIONS and --inspect off, app.asar only`)
+  console.log(`  • Electron fuses: RunAsNode, NODE_OPTIONS and --inspect off, app.asar only, cookies encrypted`)
 }
 
 /**

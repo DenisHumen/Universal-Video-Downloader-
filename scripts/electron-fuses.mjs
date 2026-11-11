@@ -54,12 +54,21 @@ export const FUSES = [
  *  - EnableEmbeddedAsarIntegrityValidation would stop the app at startup on
  *    Windows, where electron-builder 25 embeds no integrity resource to check,
  *    and Linux does not support it at all;
- *  - EnableCookieEncryption converts the cookie store one way only, and can
- *    bring up keyring prompts on Linux. A decision of its own, not this one;
  *  - WasmTrapHandlers is on by default and only makes WebAssembly faster.
  */
+/*
+  EnableCookieEncryption, on since 4.7.4. The built-in browser keeps people
+  signed in, and can take every sign-in of their main browser; with the fuse off
+  all of that sat on disk as plain SQLite, readable by anything that can read
+  the profile. On, Chromium encrypts cookie values with the system's key store,
+  the one the saved passwords already use. It is one-way: a store written
+  encrypted cannot be read by an older copy of the app, so going back to 4.7.3
+  or earlier signs every site out. On Linux without a keyring Chromium falls
+  back to its built-in key, which is no worse than the plain store it replaces.
+*/
 export const SHIPPED_FUSES = {
   RunAsNode: false,
+  EnableCookieEncryption: true,
   EnableNodeOptionsEnvironmentVariable: false,
   EnableNodeCliInspectArguments: false,
   OnlyLoadAppFromAsar: true
