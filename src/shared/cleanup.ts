@@ -15,9 +15,17 @@ const SIDECAR = [
   /^(?:jpe?g|png|webp)$/i,
   /^(?:[a-z]{2,3}(?:-[a-z0-9]{2,8})?\.)?(?:srt|vtt|ass|ssa|lrc)$/i,
   /^(?:info\.json|description|annotations\.xml)$/i,
-  // Leftovers of an interrupted or retried attempt, whatever the format.
-  /\.(?:part|ytdl|temp)$/i,
-  /^part(?:-frag\d+)?$/i,
+  /*
+    Leftovers of an interrupted or retried attempt: `mp4.part`, `f137.mp4.part`,
+    `mp4.ytdl`, `mp4.part-Frag12`, `temp.mp4`. Each spelled out from its start.
+    "Ends in .part" also took `Lecture 3.5 [id].mp4.part` for a leftover of
+    `Lecture 3.mp4`: another download's file, and one still being written.
+  */
+  /^(?:f[\w-]+\.)?[a-z0-9]{2,5}\.(?:part|ytdl)$/i,
+  /^(?:f[\w-]+\.)?[a-z0-9]{2,5}\.part-frag\d+(?:\.part)?$/i,
+  /^temp\.[a-z0-9]{2,5}$/i,
+  /^(?:part|ytdl)$/i,
+  /^part-frag\d+$/i,
 ]
 
 /** Split "C:\a\b\Show s1e2.mp4" into its folder and file name, either slash. */

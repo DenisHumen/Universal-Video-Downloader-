@@ -45,6 +45,12 @@ describe('leftoversOf', () => {
     }
   })
 
+  // "Lecture 3." starts both names; only one of them is Lecture 3's.
+  it('never takes the partial of a download whose name merely starts the same', () => {
+    const names = ['Lecture 3.5 [abc].mp4.part', 'Lecture 3.5 [abc].f137.mp4.part', 'Lecture 3.mp4.part', 'Lecture 3.temp.mp4']
+    expect(leftoversOf('Lecture 3.mp4', names).sort()).toEqual(['Lecture 3.mp4.part', 'Lecture 3.temp.mp4'])
+  })
+
   it('leaves the episode itself to the caller', () => {
     expect(leftoversOf('Show s1e2.mp4', folder)).not.toContain('Show s1e2.mp4')
   })
