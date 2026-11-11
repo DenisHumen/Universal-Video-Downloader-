@@ -108,6 +108,13 @@ describe('which uploads of a listing are new', () => {
     expect(ids(out.old)).toEqual(['stale'])
   })
 
+  // The site was down for three days: each failed check moved "last checked", and what came out meanwhile was old.
+  it('counts from the last look that saw the list, not the last that failed', () => {
+    const down = watch({ lastListedAt: NOW - 4 * DAY, lastCheckedAt: NOW - 60_000 })
+    const out = siftUploads(down, [[up('during', { at: NOW - 2 * DAY }), up('c'), up('d')]])
+    expect(ids(out.fresh)).toEqual(['during'])
+  })
+
   it('a dated list with nothing known keeps what is new and is not called changed', () => {
     const out = siftUploads(watch(), [[up('x', { at: NOW - 60_000 }), up('y', { at: NOW - 90 * DAY })]])
     expect(ids(out.fresh)).toEqual(['x'])

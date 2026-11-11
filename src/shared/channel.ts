@@ -101,7 +101,7 @@ export interface Sifted {
 export function siftUploads(watch: Watch, lists: ListedUpload[][]): Sifted {
   const known = new Set(watch.seen.map(episodeKey))
   const owed = new Map((watch.owed ?? []).filter((r) => !known.has(episodeKey(r))).map((r) => [episodeKey(r), r]))
-  const since = (watch.lastCheckedAt ?? watch.createdAt) - DATE_MARGIN_MS
+  const since = (watch.lastListedAt ?? watch.lastCheckedAt ?? watch.createdAt) - DATE_MARGIN_MS
 
   const fresh = new Map<string, EpisodeRef>()
   const old = new Map<string, EpisodeRef>()

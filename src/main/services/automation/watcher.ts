@@ -159,6 +159,7 @@ async function look(watch: Watch, manual: boolean, read: () => void): Promise<Fo
       thumbnail: result.thumbnail ?? watch.thumbnail,
       translatorName: result.translatorName ?? watch.translatorName,
       lastCheckedAt: Date.now(),
+      lastListedAt: Date.now(),
       lastError: undefined,
       failures: 0,
       nextCheckAt: nextDue({ ...watch, failures: 0 }),
