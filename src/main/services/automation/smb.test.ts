@@ -22,8 +22,13 @@ const h = vi.hoisted(() => ({
   read: [] as string[],
   dirs: [] as string[],
   /** A status the next readDirectory is refused with. */
-  readRefuse: undefined as number | undefined
+  readRefuse: undefined as number | undefined,
+  /** How many bytes of the next upload the share quietly keeps. */
+  keep: undefined as number | undefined
 }))
+
+/** The library's own rule for a name in a listing: `./name`, unless it starts with a dot. */
+const asListed = (name: string): string => (name[0] === '.' || name[0] === '/' ? name : `./${name}`)
 
 vi.mock('node-smb2', async () => {
   const { Writable } = await import('stream')
@@ -36,8 +41,9 @@ vi.mock('node-smb2', async () => {
     readDirectory: async (path = '') => {
       h.read.push(path)
       if (h.readRefuse !== undefined) throw refusal(h.readRefuse)
-      return h.listing.get(path) ?? []
+      return (h.listing.get(path) ?? []).map((e) => ({ ...e, filename: asListed(e.filename) }))
     },
+    registerFile: () => undefined,
     removeFile: async (path: string) => {
       h.files.delete(path)
     },
@@ -57,7 +63,8 @@ vi.mock('node-smb2', async () => {
           done()
         },
         final(done) {
-          h.files.set(path, body)
+          h.files.set(path, h.keep === undefined ? body : body.slice(0, h.keep))
+          h.keep = undefined
           done()
         }
       })
@@ -71,9 +78,20 @@ vi.mock('node-smb2', async () => {
   }
   return { default: { Client } }
 })
+vi.mock('node-smb2/dist/client/File', () => ({
+  default: class {
+    fileSize: bigint | undefined
+    async open(path: string): Promise<void> {
+      const body = h.files.get(path)
+      if (body === undefined) throw { header: { status: 0xc0000034 } }
+      this.fileSize = BigInt(Buffer.byteLength(body))
+    }
+    async close(): Promise<void> {}
+  }
+}))
 vi.mock('../log', () => ({ log: { info: vi.fn(), warn: vi.fn(), error: vi.fn() } }))
 
-const { createSmbFolder, listSmbFolders, toSmbError, uploadFile } = await import('./smb')
+const { createSmbFolder, listSmbFolders, smbTiming, toSmbError, uploadFile } = await import('./smb')
 
 const target: SmbTarget = {
   id: 'nas',
@@ -180,6 +198,21 @@ describe('uploadFile', () => {
     expect(h.created).toHaveLength(1)
   })
 
+  /*
+    The library takes a write's interim answer for its final one, so a share
+    that fills up half-way ends the stream without an error. The caller deletes
+    the local file on success: the size on the share is the only witness.
+  */
+  it('refuses an upload the share kept only part of, and leaves nothing under either name', async () => {
+    smbTiming.sizeSettleMs = 0
+    h.keep = 2
+    await expect(uploadFile(target, 'example', local, 'Series', 'ep.mkv')).rejects.toMatchObject({
+      message: 'The share did not keep the whole file.',
+      kind: 'full'
+    })
+    expect([...h.files.keys()]).toEqual([])
+  })
+
   it('replaces an episode already on the share, as a re-run should', async () => {
     h.files.set(final, 'the old copy')
     await uploadFile(target, 'example', local, 'Series', 'ep.mkv')
@@ -241,6 +274,12 @@ describe('listSmbFolders', () => {
       file('Zed.mkv')
     ])
     expect(await listSmbFolders(target, 'pw', '')).toEqual(['archive', 'Backups', 'video'])
+  })
+
+  // Every name arrives as `./name`: taking that for a hidden folder emptied the whole list.
+  it('lists folders whose names the library prefixed', async () => {
+    h.listing.set('', [dir('Movies'), dir('.cache')])
+    expect(await listSmbFolders(target, 'pw', '')).toEqual(['Movies'])
   })
 
   it('leaves out what a file manager hides', async () => {

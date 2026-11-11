@@ -48,6 +48,15 @@ vi.mock('node-smb2', async () => {
   }
   return { default: { Client } }
 })
+vi.mock('node-smb2/dist/client/File', () => ({
+  default: class {
+    fileSize: bigint | undefined
+    async open(path: string): Promise<void> {
+      this.fileSize = BigInt(Buffer.byteLength(h.files.get(path) ?? ''))
+    }
+    async close(): Promise<void> {}
+  }
+}))
 vi.mock('./log', () => ({ log: { info: vi.fn(), warn: vi.fn(), error: vi.fn() } }))
 vi.mock('./secrets', () => ({
   SECRET: { smbPassword: (id: string) => `smb.${id}.password` },

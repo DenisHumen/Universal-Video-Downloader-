@@ -30,6 +30,7 @@ const EXACT: Record<string, TranslationKey> = {
   'The share does not accept that file name.': 'main.smb.badName',
   'A file with that name already exists on the share.': 'main.smb.nameTaken',
   'The share is full.': 'main.smb.full',
+  'The share did not keep the whole file.': 'main.smb.short',
   'The account has used up its space on the share.': 'main.smb.quota',
   'That file is open on the server, so it cannot be replaced right now.': 'main.smb.fileOpen',
   'The server is still deleting an earlier copy of that file.': 'main.smb.deleting',

@@ -2,7 +2,7 @@ import { randomUUID } from 'crypto'
 import { createReadStream, statSync } from 'fs'
 import { pipeline } from 'stream/promises'
 import { log } from '../log'
-import { normaliseSmbTarget, type SmbTarget } from '@shared/automation'
+import { normaliseSmbTarget, safeFileName, type SmbTarget } from '@shared/automation'
 
 /**
  * Putting a finished episode on a share.
@@ -142,6 +142,61 @@ async function ensureDirs(tree: Client, dir: string): Promise<void> {
   }
 }
 
+/**
+ * A name as the server has it. The library hands every entry of a listing back
+ * as `./name`; only a name that itself starts with a dot comes through bare.
+ */
+function entryName(filename: string): string {
+  return filename.startsWith('./') ? filename.slice(2) : filename
+}
+
+/** How long the server is given to show the whole file before the upload is called short. Tests shorten it. */
+export const smbTiming = { sizeSettleMs: 10_000 }
+
+/**
+ * How many bytes of `path` the share holds, by opening it and reading what the
+ * server says. Not from a listing: the library reads one page of a folder, and
+ * in a full one the file would simply not be on it.
+ */
+async function sizeOnShare(tree: Client, path: string): Promise<bigint> {
+  const File = ((await import('node-smb2/dist/client/File')) as any).default
+  const file = new File(tree)
+  tree.registerFile?.(file)
+  try {
+    await file.open(path)
+    return BigInt(file.fileSize ?? -1)
+  } finally {
+    try {
+      await file.close()
+    } catch {
+      /* never opened */
+    }
+  }
+}
+
+/**
+ * Refuse an upload the share did not keep all of.
+ *
+ * The stream finishing is not the server agreeing: the library takes an
+ * interim "pending" answer to a write for the final one, and never reads the
+ * answer that follows, so a share that filled up half-way looked like success.
+ * The caller deletes the local file on that success. The size is given a few
+ * seconds to arrive, since the last writes may still be landing.
+ */
+async function assertWholeFile(tree: Client, path: string, total: number): Promise<void> {
+  const want = BigInt(total)
+  const deadline = Date.now() + smbTiming.sizeSettleMs
+  let have = -1n
+  for (;;) {
+    have = await sizeOnShare(tree, path)
+    if (have === want) return
+    if (Date.now() >= deadline) break
+    await new Promise((r) => setTimeout(r, 250))
+  }
+  log.warn('upload', 'The share did not keep the whole file', { path, have: String(have), want: String(want) })
+  throw new SmbError('The share did not keep the whole file.', 'full')
+}
+
 export interface UploadResult {
   remotePath: string
   bytes: number
@@ -182,7 +237,9 @@ export async function uploadFile(
     .split(/[\\/]+/)
     .filter(Boolean)
     .join(SEP)
-  const finalPath = dir ? dir + SEP + remoteName : remoteName
+  // Nothing may have renamed this file: the name is then the site's, and a share is stricter than a disk.
+  const name = safeFileName(remoteName)
+  const finalPath = dir ? dir + SEP + name : name
   let tempPath = `${finalPath}.uvd-part`
   const refuseIfTaken = async (): Promise<void> => {
     if (!replace && (await tree.exists(finalPath))) {
@@ -237,6 +294,7 @@ export async function uploadFile(
       await pipeline(createReadStream(localPath), stream)
     }
 
+    await assertWholeFile(tree, tempPath, total)
     await refuseIfTaken()
     // Replace anything already there, rather than failing on a re-run.
     try {
@@ -337,9 +395,9 @@ export async function listSmbFolders(input: SmbTarget, password: string, folder:
     )
     return entries
       .filter((e) => e.type === 'Directory' || Boolean(e.fileAttributes?.includes('Directory')))
-      .filter((e) => e.filename !== '.' && e.filename !== '..' && !e.filename.startsWith('.'))
       .filter((e) => !e.fileAttributes?.includes('Hidden'))
-      .map((e) => e.filename)
+      .map((e) => entryName(e.filename))
+      .filter((name) => name && !name.startsWith('.'))
       .sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base', numeric: true }))
   })
 }

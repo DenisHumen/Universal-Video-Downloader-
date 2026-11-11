@@ -965,6 +965,7 @@ export const en = {
   'main.smb.badName': 'The share does not accept that file name.',
   'main.smb.nameTaken': 'A file with that name already exists on the share.',
   'main.smb.full': 'The share is full.',
+  'main.smb.short': 'The share did not keep the whole file.',
   'main.smb.quota': 'The account has used up its space on the share.',
   'main.smb.fileOpen': 'That file is open on the server, so it cannot be replaced right now.',
   'main.smb.deleting': 'The server is still deleting an earlier copy of that file.',
