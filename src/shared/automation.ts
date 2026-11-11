@@ -158,6 +158,13 @@ export interface Watch {
   /** Absolute wall-clock time, so a sleeping machine does not lose its place. */
   nextCheckAt: number
   lastCheckedAt?: number
+  /**
+   * When the site last answered a check. Not `lastCheckedAt`, which a failed
+   * check moves too: a channel's dated uploads are new if they came after the
+   * last look that saw the list, and three days of a site being down must not
+   * make everything published in them old.
+   */
+  lastListedAt?: number
   lastError?: string
   /** Consecutive failures, for backoff. Reset on success. */
   failures: number
@@ -325,7 +332,33 @@ export function applyReplacements(title: string, replacements: Replacement[]): s
   return out
 }
 
-const pad2 = (n: number): string => String(Math.trunc(Math.abs(n))).padStart(2, '0')
+/**
+ * Two digits, and whatever follows the point kept: 5 is `05`, 12.5 is `12.5`.
+ * Dropping the fraction named a recap episode 12.5 as episode 12, and the
+ * rename and the upload both replace a file of the same name.
+ */
+const pad2 = (n: number): string => {
+  const [whole, fraction] = String(Math.abs(n)).split('.')
+  return whole.padStart(2, '0') + (fraction ? `.${fraction}` : '')
+}
+
+const encoder = new TextEncoder()
+
+/** How many bytes a name takes on disk: what ext4 and most NAS filesystems count, 255 to a name. */
+const bytes = (text: string): number => encoder.encode(text).length
+
+/** As much of the start of `text` as fits in `limit` bytes, never half a character. */
+export function fitBytes(text: string, limit: number): string {
+  if (bytes(text) <= limit) return text
+  let out = ''
+  let used = 0
+  for (const char of text) {
+    used += bytes(char)
+    if (used > limit) break
+    out += char
+  }
+  return out
+}
 
 /**
  * Fill a template in.
@@ -362,7 +395,11 @@ export function fillTemplate(
   )
 }
 
-/** The longest a name `safeSegment` lets through, extension aside. */
+/**
+ * The longest a name `safeSegment` lets through, extension aside. In bytes:
+ * 180 Cyrillic letters are 360 of them, past the 255 a Linux disk or a NAS
+ * allows a name, and the rename failed on every attempt.
+ */
 const NAME_LIMIT = 180
 
 /**
@@ -371,11 +408,23 @@ const NAME_LIMIT = 180
  * that can contain anything.
  */
 export function safeSegment(name: string): string {
-  return name
+  const cleaned = name
     .replace(/[<>:"/\\|?*]+/g, ' ')
     .replace(/\s+/g, ' ')
     .replace(/^[. ]+|[. ]+$/g, '')
-    .slice(0, NAME_LIMIT)
+  return fitBytes(cleaned, NAME_LIMIT).replace(/[. ]+$/, '')
+}
+
+/**
+ * A file's name made fit for a share: the same cleaning, the extension kept.
+ * For a name nothing has renamed, which is whatever the site and the engine
+ * made of the title; a Windows server refuses `Re:Zero?.mp4` outright.
+ */
+export function safeFileName(name: string): string {
+  const dot = name.lastIndexOf('.')
+  const ext = dot > 0 && /^\.[A-Za-z0-9]{1,8}$/.test(name.slice(dot)) ? name.slice(dot) : ''
+  const stem = safeSegment(ext ? name.slice(0, dot) : name)
+  return `${stem || 'file'}${ext}`
 }
 
 /** What a new rename step starts with, and what one that fills to nothing falls back to. */
@@ -440,20 +489,22 @@ export function renameFor(
       name that fits before it fits after.
     */
     const uses = template.split('{title}').length - 1
-    const rest = fillTemplate(template, { ...shared, title: '' }, now).length
-    const room = uses ? Math.max(0, Math.floor((NAME_LIMIT - rest) / uses)) : title.length
-    return safeSegment(fillTemplate(template, { ...shared, title: title.slice(0, room) }, now))
+    const rest = bytes(fillTemplate(template, { ...shared, title: '' }, now))
+    const room = uses ? Math.max(0, Math.floor((NAME_LIMIT - rest) / uses)) : bytes(title)
+    return safeSegment(fillTemplate(template, { ...shared, title: fitBytes(title, room) }, now))
   }
   let stem = fill(video ? videoTemplate(step.template) : step.template)
   if (!video && !EPISODE_TOKEN.test(step.template)) {
     // Cut the stem, not the number, when the whole name would be too long.
     const suffix = fillTemplate(EPISODE_SUFFIX, values, now)
     stem = stem
-      ? safeSegment(stem.slice(0, NAME_LIMIT - suffix.length) + suffix)
+      ? safeSegment(fitBytes(stem, NAME_LIMIT - bytes(suffix)) + suffix)
       : fill(DEFAULT_RENAME_TEMPLATE)
   }
   const ext = values.ext ? `.${values.ext.replace(/^\./, '')}` : ''
-  return `${stem || (video ? values.videoId : 'episode')}${ext}`
+  // A template may spell the extension out itself: `{title}.{ext}` is offered, and is not `.mkv.mkv`.
+  const named = stem || (video ? values.videoId : 'episode')
+  return ext && named?.toLowerCase().endsWith(ext.toLowerCase()) ? named : `${named}${ext}`
 }
 
 /**

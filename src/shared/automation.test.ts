@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
+  fitBytes,
+  safeFileName,
   applyReplacements,
   byStepOrder,
   formatSmbPath,
@@ -182,6 +184,46 @@ describe('renameFor', () => {
       expect(names('{title} E{episode2}')[1]).toBe('Табакошка E02.mkv')
       expect(names('{episode}. {title}')[1]).toBe('2. Табакошка.mkv')
     })
+  })
+})
+
+/*
+  Names that replaced each other, or could not be written at all. The rename
+  and the upload both replace a file of the same name, so every one of these
+  cost somebody an episode.
+*/
+describe('names that stay apart and fit', () => {
+  const values = { title: 'Show', season: 1, episode: 12, ext: 'mkv' }
+
+  it('keeps a recap episode apart from the one before it', () => {
+    const whole = renameFor(step(), values, AT)
+    const recap = renameFor(step(), { ...values, episode: 12.5 }, AT)
+    expect(whole).toBe('Show - S01E12.mkv')
+    expect(recap).toBe('Show - S01E12.5.mkv')
+  })
+
+  it('does not double an extension the template already spells out', () => {
+    expect(renameFor(step({ template: '{title} E{episode2}.{ext}' }), values, AT)).toBe('Show E12.mkv')
+  })
+
+  // 180 Cyrillic letters are 360 bytes, and a Linux disk allows a name 255.
+  it('counts a long name in bytes, and still ends it with the episode', () => {
+    const name = renameFor(step(), { ...values, title: 'Ж'.repeat(300) }, AT)
+    expect(new TextEncoder().encode(name).length).toBeLessThanOrEqual(190)
+    expect(name.endsWith(' - S01E12.mkv')).toBe(true)
+  })
+
+  it('never cuts a character in half', () => {
+    expect(fitBytes('aЖЖ', 2)).toBe('a')
+    expect(fitBytes('😀😀', 5)).toBe('😀')
+    expect(fitBytes('short', 99)).toBe('short')
+  })
+
+  it('makes a name nothing renamed fit for a share, extension kept', () => {
+    expect(safeFileName('Re:Zero? s1e5 [abc].mp4')).toBe('Re Zero s1e5 [abc].mp4')
+    expect(safeFileName('plain.mkv')).toBe('plain.mkv')
+    expect(safeFileName('???.mp4')).toBe('file.mp4')
+    expect(safeFileName('no extension')).toBe('no extension')
   })
 })
 

@@ -19,7 +19,7 @@ import { awaitDownload, DownloadFailed, DownloadStopped, type QueueView } from '
 import { carryOver } from './carry-over'
 import { downloadUrlFor } from './detect'
 import { addRun, getWatch, lastRunFor, updateRun, updateWatch } from './store'
-import { uploadFile } from './smb'
+import { SmbError, uploadFile } from './smb'
 import { currentLanguage } from '../locale'
 import { reasonIn } from '../words'
 import { composeEpisodeNews, composeFailure, composeVideoFailure, sendNotification, TelegramError } from './telegram'
@@ -376,13 +376,28 @@ export async function runEpisode(
         values(),
         renameStep && renameStep.kind === 'rename' ? renameStep.replacements : []
       )
-      const result = await uploadFile(
-        target,
-        password,
-        source,
-        dir,
-        source.split(/[\\/]/).pop() as string
-      )
+      const name = basename(source)
+      /*
+        An episode's name is its number, so a file already under it is this
+        episode from an earlier run, and is replaced. An upload's name is its
+        title, and a channel repeats those - "Morning stream", daily - so the
+        one already there is a different video: this one goes beside it, told
+        apart by its id.
+      */
+      const send = (as: string, replace: boolean): ReturnType<typeof uploadFile> =>
+        uploadFile(target, password, source, dir, as, undefined, replace)
+      let result: Awaited<ReturnType<typeof uploadFile>>
+      if (ref.videoId && !name.includes(ref.videoId)) {
+        try {
+          result = await send(name, false)
+        } catch (err) {
+          if (!(err instanceof SmbError) || err.kind !== 'exists') throw err
+          const ext = extname(name)
+          result = await send(`${name.slice(0, name.length - ext.length)} [${ref.videoId}]${ext}`, true)
+        }
+      } else {
+        result = await send(name, true)
+      }
       remotePath = result.remotePath
       seconds = result.seconds
       // Written straight away: a later step that fails must not cost this upload on the retry.

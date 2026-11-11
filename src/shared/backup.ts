@@ -274,7 +274,8 @@ function isEpisodeRef(v: unknown): v is EpisodeRef {
   const { season, episode } = v
   return (
     Number.isInteger(season) &&
-    Number.isInteger(episode) &&
+    // Not an integer: a recap is episode 12.5, and dropping it here fetched it again after a restore.
+    Number.isFinite(episode) &&
     (season as number) >= 0 &&
     (episode as number) >= 0
   )
