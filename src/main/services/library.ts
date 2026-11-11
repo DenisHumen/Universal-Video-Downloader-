@@ -91,6 +91,41 @@ export function readHistoryReadOnly(file: string): HistoryRead {
 */
 let seedPending = false
 
+/*
+  library.json was there at launch and could not be opened - an antivirus scan,
+  a sync client, a backup holding it. That lasts seconds, but nothing looked
+  again: the session ran on an empty library and every finished download was
+  dropped at the next save, for good. What the session records is kept in `lib`
+  as before; once the file opens, it is merged on top of what the file holds.
+*/
+let lockedOut = false
+
+/** The file opens now: take what it holds, with this session's entries on top. Still shut: false. */
+function readAfterLockout(): boolean {
+  const read = readJsonStore(FILE(), 'library', isLibraryFile)
+  if (read.status === 'unreadable') {
+    unread.set()
+    return false
+  }
+  const session = lib.entries
+  lockedOut = false
+  unread.clear()
+  if (read.status === 'ok') {
+    if (isNewerLibrary(read.data)) {
+      // A newer version's file is never written over; see loadLibrary.
+      unread.set()
+      return false
+    }
+    lib = normaliseLibrary(read.data as LibraryFile)
+    // Oldest first, so the newest of the session ends up where a fresh entry goes.
+    for (const entry of [...session].reverse()) lib = upsertEntry(lib, entry)
+    log.info('library', 'library.json could be read again; this session’s entries are merged in', {
+      entries: session.length
+    })
+  }
+  return true
+}
+
 /** Read library.json, or seed it from history.json when there is none. */
 export function loadLibrary(): void {
   try {
@@ -98,8 +133,10 @@ export function loadLibrary(): void {
     const read = readJsonStore(FILE(), 'library', isLibraryFile)
     if (read.status === 'unreadable') {
       unread.set()
+      lockedOut = true
       return
     }
+    lockedOut = false
     unread.clear()
     if (read.status === 'ok') {
       lib = normaliseLibrary(read.data as LibraryFile)
@@ -142,6 +179,13 @@ export function flushLibrary(): void {
   if (timer) {
     clearTimeout(timer)
     timer = null
+  }
+  if (lockedOut) {
+    try {
+      if (readAfterLockout()) for (const cb of listeners) cb()
+    } catch (err) {
+      log.error('library', 'Load failed', failure(err))
+    }
   }
   if (unread.active) {
     noteRefusedWrite(FILE(), 'library')
@@ -429,4 +473,5 @@ export function __resetLibrary(): void {
   lib = EMPTY_LIBRARY
   unread.clear()
   seedPending = false
+  lockedOut = false
 }

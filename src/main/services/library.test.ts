@@ -398,3 +398,29 @@ describe('an entry sent to a share', () => {
     expect(entry).toMatchObject({ id: 'b', filepath: '/d/ep6.mp4', remotePath: 'anime/Show/S01E06.mp4' })
   })
 })
+
+/*
+  A file that is there but will not open at launch - a scanner or a sync client
+  holding it - opens again seconds later. Nothing used to look a second time,
+  so the session's downloads were dropped at the next save.
+*/
+describe('a library file that could not be opened at launch', () => {
+  it('is read once it opens, and keeps both what it held and what the session added', async () => {
+    const file = join(h.dir, 'library.json')
+    const before = upsertEntry(EMPTY_LIBRARY, entryFromItem(done('old', '/d/old.mp4', 1))!)
+    // A folder under the file's name: there, and not readable as a file.
+    mkdirSync(file)
+    const { loadLibrary, recordFinished, flushLibrary } = await import('./library')
+    loadLibrary()
+    recordFinished(done('new', '/d/new.mp4', 2))
+    flushLibrary()
+    expect(existsSync(join(file, 'x'))).toBe(false)
+
+    rmSync(file, { recursive: true })
+    writeFileSync(file, JSON.stringify(before))
+    flushLibrary()
+
+    const saved = JSON.parse(readFileSync(file, 'utf-8')) as typeof before
+    expect(saved.entries.map((e) => e.id)).toEqual(['new', 'old'])
+  })
+})
