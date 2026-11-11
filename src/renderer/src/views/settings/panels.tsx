@@ -11,6 +11,7 @@ import {
   type LanguageId,
   type QualityPreset,
   type SavedSiteLogins,
+  type SignInImport,
   type ThemeId
 } from '@shared/types'
 import type { BackupError, ImportCounts } from '@shared/backup'
@@ -18,6 +19,7 @@ import { useStore } from '../../store'
 import { audioFormatLabel } from '../../lib/format'
 import { useT, useTp, type TranslationKey } from '../../i18n'
 import { toast } from '../../lib/toast'
+import { describeError } from '../../lib/errors'
 import { describeCliCommand } from '../../lib/cliCommand'
 import { updateErrorDetail, updateErrorText } from '../../lib/updateError'
 import { engineFailureText } from '../../lib/engineError'
@@ -29,7 +31,6 @@ import {
   AccentSwatches,
   ActionRow,
   ComboRow,
-  EntryRow,
   PreferencesGroup,
   PreferencesPage,
   SegmentedControl,
@@ -40,7 +41,7 @@ import {
   type TileStyle
 } from '../../ui'
 import { formatRoute, type Route } from './router'
-import { ProxyRows, SpeedLimitField, TemplateRow } from './fields'
+import { DraftEntryRow, ProxyRows, SpeedLimitField, TemplateRow } from './fields'
 
 /*
   The panels and subpages of Settings, as GNOME Settings lays them out
@@ -272,14 +273,14 @@ export function ProcessingPanel({ settings, set }: PanelProps): JSX.Element {
       </PreferencesGroup>
       <PreferencesGroup title={t('prefs.group.subtitles')} footer={t('settings.subtitleLanguagesHint')}>
         {sw('writeSubtitles', 'writeSubtitles', 'settings.writeSubtitles', 'settings.writeSubtitlesHint')}
-        <EntryRow
+        <DraftEntryRow
           id="subtitleLanguages"
           title={t('settings.subtitleLanguages')}
           mono
           value={settings.subtitleLanguages}
           placeholder="en,ru"
           spellCheck={false}
-          onChange={(e) => set('subtitleLanguages', e.target.value)}
+          onCommit={(v) => set('subtitleLanguages', v)}
         />
       </PreferencesGroup>
       <PreferencesGroup title={t('prefs.group.formats')}>
@@ -536,8 +537,11 @@ export function ImportSignInsPage(): JSX.Element {
   const browsers = SUPPORTED_COOKIE_BROWSERS.filter((b) => b !== 'safari' || platform === 'darwin')
   const run = async (browser: string): Promise<void> => {
     setBusy(browser)
-    const result = await window.api.browserImportSignIns(browser)
-    setBusy(null)
+    // A rejected call must not leave every Import button disabled and spinning.
+    const result = await window.api
+      .browserImportSignIns(browser)
+      .catch((): SignInImport => ({ ok: false, why: 'failed' }))
+      .finally(() => setBusy(null))
     const name = browserName(browser)
     if (result.ok) {
       toast(tp('prefs.toast.imported', result.sites, { browser: name }), 'success')
@@ -577,7 +581,8 @@ export function PasswordsPage(): JSX.Element {
   const t = useT()
   const [sites, setSites] = useState<SavedSiteLogins[] | null>(null)
   const [confirmAll, setConfirmAll] = useState(false)
-  const load = (): void => void window.api.browserLogins().then(setSites)
+  // An empty list rather than a spinner for good, if the list cannot be read.
+  const load = (): void => void window.api.browserLogins().then(setSites, () => setSites([]))
   useEffect(load, [])
   const forget = async (origin?: string): Promise<void> => {
     await window.api.browserForgetLogins(origin)
@@ -841,8 +846,13 @@ export function UpdatesPage({ settings, set }: PanelProps): JSX.Element {
               disabled={checking}
               onClick={async () => {
                 setChecking(true)
-                await window.api.checkForUpdates()
-                setTimeout(() => setChecking(false), 1500)
+                try {
+                  await window.api.checkForUpdates()
+                } catch (err) {
+                  toast(describeError(err), 'error')
+                } finally {
+                  setTimeout(() => setChecking(false), 1500)
+                }
               }}
             >
               {checking && <Spinner />}

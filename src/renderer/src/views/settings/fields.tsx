@@ -13,6 +13,72 @@ import { useSecretState } from '../../components/AutomationForms'
   libadwaita rows.
 */
 
+/** How long after the last key a typed setting is saved. A blur saves at once. */
+const SAVE_AFTER_MS = 400
+
+/**
+ * A text setting as it is being typed.
+ *
+ * The field used to be bound straight to the saved value, and every key was a
+ * save: over IPC and onto the disk, with the reply landing a moment later. Until
+ * it did the field showed the old value, so the caret jumped to the end and a
+ * quick typist lost letters; and a reply to an earlier key arrived over a later
+ * one and put the text back. Now what is typed stays in the field, is saved
+ * once the typing stops (or the field is left), and the saved value is only
+ * followed while nobody is typing.
+ */
+export function useDraft(
+  value: string,
+  commit: (v: string) => void,
+  accepts: (v: string) => boolean = () => true
+): { draft: string; change: (v: string) => void; settle: () => void } {
+  const [draft, setDraft] = useState(value)
+  const typed = useRef<string | null>(null)
+  const timer = useRef<ReturnType<typeof setTimeout>>()
+  const live = useRef({ commit, accepts, value })
+  live.current = { commit, accepts, value }
+
+  const save = (): void => {
+    clearTimeout(timer.current)
+    const text = typed.current
+    typed.current = null
+    if (text === null) return
+    if (live.current.accepts(text)) {
+      if (text !== live.current.value) live.current.commit(text)
+    } else setDraft(live.current.value)
+  }
+  useEffect(() => {
+    if (typed.current === null) setDraft(value)
+  }, [value])
+  // Leaving the page with something typed still saves it.
+  useEffect(() => () => save(), [])
+
+  return {
+    draft,
+    change: (v) => {
+      typed.current = v
+      setDraft(v)
+      clearTimeout(timer.current)
+      // Not while it would be refused: half a path or half a number is not a value yet.
+      if (live.current.accepts(v)) timer.current = setTimeout(save, SAVE_AFTER_MS)
+    },
+    settle: save
+  }
+}
+
+/** An entry row for a plain text setting, saved as `useDraft` describes. */
+export function DraftEntryRow({
+  value,
+  onCommit,
+  ...row
+}: Omit<Parameters<typeof EntryRow>[0], 'value' | 'onChange' | 'onBlur'> & {
+  value: string
+  onCommit: (v: string) => void
+}): JSX.Element {
+  const { draft, change, settle } = useDraft(value, onCommit)
+  return <EntryRow {...row} value={draft} onChange={(e) => change(e.target.value)} onBlur={settle} />
+}
+
 /**
  * The speed limit, which the engine reads far more strictly than people
  * write ("2MB", "1,5M", "2 Мб" all fail it). The draft is read into the
@@ -23,20 +89,19 @@ export function SpeedLimitField({ value, onCommit }: { value: string; onCommit: 
   const t = useT()
   const labelledBy = useRowTitleId()
   const hintId = useId()
-  const [draft, setDraft] = useState(value)
-  // Follow a reset, but not our own commit coming back normalised (a Cyrillic "2М" would turn Latin mid-word).
-  useEffect(() => setDraft((d) => (normaliseRate(d) === value ? d : value)), [value])
+  // Saved in the engine's form; the field keeps what was typed until it is left (a Cyrillic "2М" would turn Latin mid-word).
+  const { draft, change, settle } = useDraft(
+    value,
+    (text) => onCommit(normaliseRate(text) ?? value),
+    (text) => normaliseRate(text) !== null
+  )
   const valid = normaliseRate(draft) !== null
   return (
     <span className="flex flex-col items-end gap-1">
       <input
         value={draft}
-        onChange={(e) => {
-          setDraft(e.target.value)
-          const rate = normaliseRate(e.target.value)
-          if (rate !== null) onCommit(rate)
-        }}
-        onBlur={() => setDraft(normaliseRate(draft) ?? value)}
+        onChange={(e) => change(e.target.value)}
+        onBlur={settle}
         placeholder="2M"
         aria-labelledby={labelledBy}
         aria-invalid={!valid}
@@ -69,8 +134,7 @@ export function TemplateRow({
   example: TemplateExampleOptions
 }): JSX.Element {
   const t = useT()
-  const [draft, setDraft] = useState(value)
-  useEffect(() => setDraft(value), [value])
+  const { draft, change, settle } = useDraft(value, onCommit, isSafeTemplate)
   const safe = isSafeTemplate(draft)
   const example = safe ? templateExample(draft, options) : null
   return (
@@ -82,11 +146,8 @@ export function TemplateRow({
         value={draft}
         invalid={!safe}
         spellCheck={false}
-        onChange={(e) => {
-          setDraft(e.target.value)
-          if (isSafeTemplate(e.target.value)) onCommit(e.target.value)
-        }}
-        onBlur={() => (isSafeTemplate(draft) ? onCommit(draft) : setDraft(value))}
+        onChange={(e) => change(e.target.value)}
+        onBlur={settle}
       />
       <div className="ui-row flex-col items-stretch gap-1.5" role="status">
         {!safe && <p className="text-meta text-bad">{t('settings.filenameTemplateUnsafe')}</p>}
