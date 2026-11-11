@@ -75,8 +75,9 @@ export default function StepEditor({
   step: PipelineStep | StepKind
   /** For a channel or playlist, whose uploads have titles and no numbers. */
   video?: boolean
-  onSave: (step: PipelineStep) => void
-  onRemove: (id: string) => void
+  /** May be a save in progress: the dialog waits for it, and stays open with the reason if it fails. */
+  onSave: (step: PipelineStep) => void | Promise<void>
+  onRemove: (id: string) => void | Promise<void>
   onClose: () => void
 }): JSX.Element {
   const t = useT()
@@ -103,6 +104,8 @@ export default function StepEditor({
   const [saving, setSaving] = useState(false)
 
   useEffect(() => {
+    // A password typed for one share is not the next one's: it was written to whichever was chosen at Save.
+    setPassword('')
     if (targetId === NEW_SHARE) {
       setDraft(emptyTarget())
       return
@@ -144,16 +147,16 @@ export default function StepEditor({
         }
         await saveSettings({ smbTargets: [...targets.filter((x) => x.id !== target.id), target] })
         if (password) await window.api.autoSetSecret('smb', target.id, password)
-        onSave({ ...step, targetId: target.id })
+        await onSave({ ...step, targetId: target.id })
         return
       }
       if (step.kind === 'notify') {
         await saveSettings({ telegramChatId: chatId.trim() })
         if (token.trim()) await window.api.autoSetSecret('telegram', '', token.trim())
-        onSave(step)
+        await onSave(step)
         return
       }
-      onSave(step)
+      await onSave(step)
     } catch (err) {
       toast(describeError(err), 'error')
       setSaving(false)
@@ -178,7 +181,18 @@ export default function StepEditor({
       actions={
         <>
           {!isNew && (
-            <button className="btn-danger mr-auto" onClick={() => onRemove(step.id)}>
+            <button
+              className="btn-danger mr-auto"
+              disabled={saving}
+              onClick={() => {
+                setSaving(true)
+                // The dialog closes when the step is gone; if it could not go, it says why and lets go.
+                void Promise.resolve(onRemove(step.id)).catch((err: unknown) => {
+                  toast(describeError(err), 'error')
+                  setSaving(false)
+                })
+              }}
+            >
               <Trash2 size={14} /> {t('common.remove')}
             </button>
           )}

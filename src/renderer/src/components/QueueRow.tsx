@@ -18,7 +18,7 @@ import {
   Upload,
   X
 } from '../ui/icons'
-import type { DownloadItem } from '@shared/types'
+import type { DownloadItem, DownloadRequest } from '@shared/types'
 import { pageLinkOf } from '@shared/library'
 import { useStore } from '../store'
 import { formatBytes, formatEta, formatSpeed, splitPath } from '../lib/format'
@@ -212,7 +212,13 @@ function QueueRow({ item, index, animateIn = true, heading }: Props): JSX.Elemen
   */
   const requeue = async (change: { mode?: 'audio'; outputDir?: string; waitForVideo?: boolean }): Promise<void> => {
     await window.api.removeDownload(item.id)
-    await queueDownload({
+    const queued = await queueDownload(requestFor(change)).catch(() => false)
+    // The row is gone by now. If its replacement could not be queued, it comes back as it was, not nothing.
+    if (!queued) await queueDownload(requestFor({})).catch(() => false)
+  }
+
+  const requestFor = (change: { mode?: 'audio'; outputDir?: string; waitForVideo?: boolean }): DownloadRequest => {
+    return {
       // The page, not the stream a resolver found on it: that address expires and carries no referer.
       url: item.sourceUrl || item.url,
       title: item.title,
@@ -236,7 +242,7 @@ function QueueRow({ item, index, animateIn = true, heading }: Props): JSX.Elemen
       audioLanguage: item.audioLanguage,
       waitForVideo: change.waitForVideo ?? item.waitForVideo,
       outputDir: change.outputDir ?? item.outputDir
-    })
+    }
   }
 
   const running =

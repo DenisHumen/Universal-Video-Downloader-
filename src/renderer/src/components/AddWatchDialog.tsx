@@ -59,8 +59,11 @@ export default function AddWatchDialog({
 
   const look = async (keep?: WatchIntent): Promise<void> => {
     const target = (keep?.url ?? url).trim()
-    if (!target) return
+    // Enter while a lookup is under way started a second one, and whichever answered last won.
+    if (!target || looking) return
     setLooking(true)
+    // A choice made for the last listing means nothing for this one.
+    setLatest(0)
     try {
       const [found, list] = await Promise.all([
         window.api.autoDescribe(target),
@@ -200,7 +203,11 @@ export default function AddWatchDialog({
             title={t('auto.seriesUrl')}
             mono
             value={url}
-            onChange={(e) => setUrl(e.target.value)}
+            onChange={(e) => {
+              setUrl(e.target.value)
+              // The series on offer was found at the address that was here; a different one has not been looked up.
+              setOffer(null)
+            }}
             onKeyDown={(e) => e.key === 'Enter' && void look()}
             placeholder="https://…"
             spellCheck={false}

@@ -32,7 +32,23 @@ export default function App(): JSX.Element {
   const platform = useStore((s) => s.appInfo?.platform)
 
   useEffect(() => {
-    void init()
+    /*
+      One failed call at launch - the main process still starting, a store it
+      could not read yet - used to leave "Starting…" on screen for good, with
+      nothing to press. It is tried again until it answers.
+    */
+    let timer: ReturnType<typeof setTimeout> | undefined
+    let gone = false
+    const start = (): void => {
+      init().catch(() => {
+        if (!gone) timer = setTimeout(start, 2000)
+      })
+    }
+    start()
+    return () => {
+      gone = true
+      clearTimeout(timer)
+    }
   }, [init])
 
   useShortcuts()

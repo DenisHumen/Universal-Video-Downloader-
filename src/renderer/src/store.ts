@@ -337,7 +337,13 @@ export const useStore = create<AppState>((set, get) => ({
   settingsDeepLinked: false,
 
   init: () => {
-    if (!initPromise) initPromise = runInit(set, get)
+    if (!initPromise) {
+      // A start that failed is not kept: the next call tries again instead of handing back the failure.
+      initPromise = runInit(set, get).catch((err: unknown) => {
+        initPromise = null
+        throw err
+      })
+    }
     return initPromise
   },
 

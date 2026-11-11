@@ -147,7 +147,8 @@ function LiveRow({ item }: { item: DownloadItem }): JSX.Element {
     item.speed ? formatSpeed(item.speed) : null
   ].filter(Boolean)
   return (
-    <li className="ui-row min-h-[50px] flex-wrap">
+    // `relative`: the progress line below is placed against this row, not against the window.
+    <li className="ui-row relative min-h-[50px] flex-wrap">
       <div className="flex items-center gap-2">
         <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${meta.dot}`} aria-hidden="true" />
         <span className="min-w-0 flex-1 truncate text-control text-ink" title={item.title}>

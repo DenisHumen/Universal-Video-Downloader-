@@ -1,5 +1,5 @@
 import { showFile } from '../lib/showFile'
-import { useId, useMemo, useRef, useState, type KeyboardEvent } from 'react'
+import { useEffect, useId, useMemo, useRef, useState, type KeyboardEvent } from 'react'
 import { useStore } from '../store'
 import { useT, type TranslationKey } from '../i18n'
 import { matchesQuery } from '../lib/settingsSearch'
@@ -133,6 +133,11 @@ function Palette(): JSX.Element {
   }, [query, commands, t])
 
   const at = Math.min(active, Math.max(0, shown.length - 1))
+  const activeId = shown[at] ? `${listId}-${shown[at].id}` : undefined
+  // The arrows move the highlight past the edge of a short window; the list follows it.
+  useEffect(() => {
+    if (activeId) document.getElementById(activeId)?.scrollIntoView({ block: 'nearest' })
+  }, [activeId])
   const run = async (c: Command | undefined): Promise<void> => {
     if (!c) return
     close()
