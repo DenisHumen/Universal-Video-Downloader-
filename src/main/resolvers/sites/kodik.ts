@@ -144,16 +144,24 @@ export function kodikTarget(
   const single = playerUrl.match(/\/(seria|video)\/(\d+)\/([a-f0-9]+)/)
   if (single) return { id: single[2], hash: single[3], type: single[1] as KodikTarget['type'] }
 
+  let numbered = false
   for (const opt of html.match(/<option[^>]*>/g) || []) {
     const id = pick(/data-id="(\d+)"/, opt)
     const hash = pick(/data-hash="([a-f0-9]+)"/, opt)
-    if (id && hash && Number(pick(/value="(\d+)"/, opt)) === episode) {
+    const value = pick(/value="(\d+)"/, opt)
+    if (id && hash && value) numbered = true
+    if (id && hash && Number(value) === episode) {
       return { id, hash, type: 'seria' }
     }
   }
 
-  // Some players number their options from something other than one.
-  const seq = [...html.matchAll(/data-id="(\d+)"\s+data-hash="([a-f0-9]+)"/g)]
+  /*
+    By position, but only in a list that carries no numbers of its own. In a
+    numbered one the episode is simply not there - a season listing 1-4, 6, 7
+    handed back episode 6 for the fifth place, and it was saved, sent and
+    announced as episode 5.
+  */
+  const seq = numbered ? [] : [...html.matchAll(/data-id="(\d+)"\s+data-hash="([a-f0-9]+)"/g)]
   const fallback = seq[episode - 1]
   if (fallback) return { id: fallback[1], hash: fallback[2], type: 'seria' }
 

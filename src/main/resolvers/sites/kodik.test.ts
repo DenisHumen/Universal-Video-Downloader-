@@ -173,10 +173,18 @@ describe('kodikTarget', () => {
     })
   })
 
-  it('falls back to position when no option carries that value', () => {
-    expect(kodikTarget('https://kodikplayer.com/season/120921/7abe07/720p', options, 3)?.id).toBe(
-      '903'
-    )
+  it('falls back to position in a list that carries no numbers', () => {
+    const bare = [1, 2, 3].map((n) => `<option data-id="90${n}" data-hash="aaa${n}">ep</option>`).join('')
+    expect(kodikTarget('https://kodikplayer.com/season/120921/7abe07/720p', bare, 3)?.id).toBe('903')
+  })
+
+  // 1-4, 6, 7: the fifth in line is episode 6, and was saved and announced as episode 5.
+  it('does not hand over the next episode for one a numbered list lacks', () => {
+    const gap = [1, 2, 3, 4, 6, 7]
+      .map((n) => `<option value="${n}" data-id="90${n}" data-hash="aaa${n}">ep ${n}</option>`)
+      .join('')
+    expect(kodikTarget('https://kodikplayer.com/season/120921/7abe07/720p', gap, 5)).toBeUndefined()
+    expect(kodikTarget('https://kodikplayer.com/season/120921/7abe07/720p', gap, 6)?.id).toBe('906')
   })
 
   it('gives nothing when the player holds neither, so the caller can say so', () => {
