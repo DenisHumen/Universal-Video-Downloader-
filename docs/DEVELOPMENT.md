@@ -25,6 +25,7 @@ The `allowScripts` field in package.json names the four packages whose install s
 ```bash
 npm install              # install dependencies
 npm run dev              # launch the app with hot reload
+npm run lint             # ESLint
 npm run typecheck        # type-check main + renderer
 npm test                 # unit tests
 npm run check:contrast   # WCAG AA gate over every theme
@@ -37,6 +38,9 @@ Extras worth knowing about:
 npm run preview          # the renderer alone, in a browser, against a mock IPC bridge
 npm run shots            # regenerate docs/screenshots (--lang=ru, --theme=day|both, --scale=2, --out=<dir>, --offscreen with the display locked)
 npm run tour             # re-record docs/assets/tour.webp + tour.mp4 (needs ffmpeg)
+npm run visual           # compare every screen with tests/visual/baseline
+npm run visual:update    # accept the screens as they are now, after a change that was meant (--only=<scene>)
+npm run check:scroll     # every pane that overflows scrolls with the wheel
 npm run make:icons       # rasterise the logo into app, tray and DMG artwork
 npm run fetch:ffmpeg     # replace ffmpeg-static's binary with the pinned ffmpeg 9.0.2 (as CI does)
 npm run check:ffmpeg     # verify the bundled ffmpeg matches the target architecture
@@ -119,4 +123,4 @@ A resolver returns the real stream URL plus any headers it needs, or a list of e
 
 ## Contributing
 
-Bug reports, site requests and pull requests are welcome. Before a PR, run `npm run typecheck`, `npm test` and `npm run check:contrast`; CI runs the same checks.
+Bug reports, site requests and pull requests are welcome. Before a PR, run `npm run lint`, `npm run typecheck`, `npm test` and `npm run check:contrast`; CI runs the same checks. After a change to anything on screen, run `npm run visual` as well: no workflow does, so the baselines only stay true if whoever changes the interface updates them in the same commit.

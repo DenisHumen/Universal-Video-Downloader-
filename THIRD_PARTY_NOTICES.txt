@@ -71,7 +71,7 @@ the LICENSE file in the same folder as ffmpeg.
 https://github.com/eugeneware/ffmpeg-static
 
 
-Electron 33 - MIT
+Electron 45 - MIT
 -----------------
 
 The runtime the app is built on. https://github.com/electron/electron
