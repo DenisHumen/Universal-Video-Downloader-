@@ -124,9 +124,10 @@ const SCENES = [
     name: 'dialog',
     setup: `
       __uvdShot.seedQueue(); await __uvdShot.view('downloads');
-      const go = document.querySelector('[data-uvd="cancel-download"]');
-      if (!go) throw new Error('no cancel control on screen');
-      go.click();
+      // Cancel asks only where it would lose work, so the row part-way through is the one that opens it.
+      const controls = [...document.querySelectorAll('[data-uvd="cancel-download"]')];
+      if (!controls.length) throw new Error('no cancel control on screen');
+      controls[controls.length - 1].click();
       await new Promise((r) => setTimeout(r, 200));
       if (!document.querySelector('[role="dialog"],[role="alertdialog"]')) throw new Error('dialog did not open');
     `
