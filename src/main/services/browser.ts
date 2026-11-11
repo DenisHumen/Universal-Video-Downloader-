@@ -15,7 +15,7 @@ import { startDownload } from './downloader'
 import { getSettings } from './settings'
 import { mt } from './locale'
 import { guardedIpc } from './ipc-guard'
-import { rendererIndex, wireNavigation } from './navigation'
+import { devRendererUrl, rendererIndex, wireNavigation } from './navigation'
 import { chromeOptions, forwardMaximized, themeOptions } from './window-chrome'
 import { log } from './log'
 import {
@@ -126,6 +126,35 @@ function popupOptions(): Electron.BrowserWindowConstructorOptions {
       sandbox: true
     }
   }
+}
+
+/** Sign-in popups open at once, at most. */
+const MAX_POPUPS = 3
+
+/**
+ * A popup has no address bar, and its title was the page's to choose: a page
+ * could open "Sign in - Google Accounts" on its own address, and there was
+ * nowhere to see that it was not Google. The window's title now starts with
+ * the host it is really on, whatever the page calls itself.
+ */
+function showHostInTitle(popup: BrowserWindow): void {
+  const retitle = (pageTitle?: string): void => {
+    if (popup.isDestroyed()) return
+    let host = ''
+    try {
+      host = new URL(popup.webContents.getURL()).host
+    } catch {
+      /* about:blank, before the first page */
+    }
+    const title = pageTitle ?? popup.webContents.getTitle()
+    popup.setTitle(host ? `${host} — ${title}` : title)
+  }
+  popup.webContents.on('page-title-updated', (event, title) => {
+    event.preventDefault()
+    retitle(title)
+  })
+  popup.webContents.on('did-navigate', () => retitle())
+  popup.webContents.on('did-navigate-in-page', () => retitle())
 }
 
 function shellPreload(): string {
@@ -330,7 +359,11 @@ export function openBrowserWindow(initialUrl?: string): void {
   followIdentity(wc)
   wc.setWindowOpenHandler(({ url, disposition }) => {
     if (!/^https?:\/\//i.test(url)) return { action: 'deny' }
-    if (disposition === 'new-window') return { action: 'allow', overrideBrowserWindowOptions: popupOptions() }
+    if (disposition === 'new-window') {
+      // A sign-in opens one window. A page that opens them without end gets no more.
+      if (popups.size >= MAX_POPUPS) return { action: 'deny' }
+      return { action: 'allow', overrideBrowserWindowOptions: popupOptions() }
+    }
     // A link meant for a new tab: this browser has one page, so it opens here.
     void wc.loadURL(url)
     return { action: 'deny' }
@@ -339,6 +372,7 @@ export function openBrowserWindow(initialUrl?: string): void {
     const id = child.webContents.id
     popups.add(id)
     followIdentity(child.webContents)
+    showHostInTitle(child)
     child.webContents.on('dom-ready', () => fillLogin(child.webContents))
     child.webContents.setWindowOpenHandler(({ url }) => {
       if (/^https?:\/\//i.test(url)) void child.webContents.loadURL(url)
@@ -386,7 +420,7 @@ export function openBrowserWindow(initialUrl?: string): void {
     candidateHeaders.clear()
   })
 
-  const devUrl = process.env['ELECTRON_RENDERER_URL']
+  const devUrl = devRendererUrl()
   if (devUrl) {
     void win.loadURL(`${devUrl}#/browser`)
   } else {

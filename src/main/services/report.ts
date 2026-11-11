@@ -230,6 +230,8 @@ async function environment(): Promise<ReportEnv> {
   const secrets = (
     await Promise.all([
       getSecretWhenReady(SECRET.telegramToken()),
+      // Only caught before as part of `scheme://user:password@`; an engine or proxy error can quote it bare.
+      getSecretWhenReady(SECRET.proxyPassword()),
       ...settings.smbTargets.map((target) => getSecretWhenReady(SECRET.smbPassword(target.id)))
     ])
   ).filter((value): value is string => Boolean(value))

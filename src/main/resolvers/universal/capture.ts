@@ -64,6 +64,12 @@ export function registerBrowserPage(page: BrowserPage): () => void {
 
 /** Five in fifteen seconds is more than a person clicks; a page in a loop is not. */
 const tooManyDownloads = floodGuard(5, 15_000)
+/**
+ * And one a minute for those nobody clicked for. A countdown page that starts
+ * its file by itself still works; a page that starts one every three seconds,
+ * staying just under the limit above, no longer fills the disk at its leisure.
+ */
+const tooManyUnasked = floodGuard(1, 60_000)
 
 function onWillDownload(
   ses: Session,
@@ -77,7 +83,8 @@ function onWillDownload(
   const onScreen = Boolean(page?.onScreen())
   const url = item.getURL()
   const mimeType = item.getMimeType()
-  const flooding = onScreen && tooManyDownloads(String(id))
+  const flooding =
+    onScreen && (tooManyDownloads(String(id)) || (!item.hasUserGesture() && tooManyUnasked(String(id))))
   const verdict = downloadVerdict({ url, mimeType, onScreen, flooding })
   if (verdict === 'ask') return
 
@@ -184,6 +191,30 @@ function passThrough(
 const BLOCKED =
   /(doubleclick|googlesyndication|google-analytics|googletagmanager|analytics\.|adservice|adsystem|scorecardresearch|popads|propellerads|exoclick|juicyads|trafficjunky|hotjar|mc\.yandex|facebook\.net|connect\.facebook)/i
 
+/** What "Sign in with Facebook" loads. Noise to a detection window, the sign-in itself to a person. */
+const SIGN_IN_SDK = /(^|\.)facebook\.(net|com)$/i
+
+/**
+ * Whether a request is one of those, and may be dropped.
+ *
+ * By the host it goes to, never the whole address: `analytics.` anywhere in a
+ * link - a query string, a path - used to cancel the request, and a page the
+ * person navigated to is never cancelled at all. And not the Facebook SDK in
+ * the browser someone is looking at: blocked there, "Sign in with Facebook" did
+ * nothing, in the browser whose sign-ins are the point.
+ */
+export function blocksRequest(url: string, resourceType: string, detectionWindow: boolean): boolean {
+  if (resourceType === 'mainFrame') return false
+  let host: string
+  try {
+    host = new URL(url).hostname
+  } catch {
+    return false
+  }
+  if (!BLOCKED.test(host)) return false
+  return detectionWindow || !SIGN_IN_SDK.test(host)
+}
+
 const MEDIA_EXT = /\.(m3u8|mpd|mp4|m4v|webm|mov|flv|mp3|m4a|flac|aac|ogg|oga|opus|wav)(\?|#|$)/i
 const MEDIA_TYPE =
   /(application\/(x-mpegurl|vnd\.apple\.mpegurl|dash\+xml)|video\/(mp4|webm|x-flv|quicktime|mp2t)|audio\/(mpeg|mp4|aac|ogg|opus|flac|wav|x-m4a))/i
@@ -259,7 +290,7 @@ function install(ses: Session): Installation {
   }
 
   ses.webRequest.onBeforeRequest({ urls: ['<all_urls>'] }, (details, callback) => {
-    callback({ cancel: BLOCKED.test(details.url) })
+    callback({ cancel: blocksRequest(details.url, details.resourceType, sniffers.has(details.webContentsId ?? -1)) })
   })
 
   ses.webRequest.onBeforeSendHeaders({ urls: ['<all_urls>'] }, (details, callback) => {

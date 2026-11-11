@@ -83,8 +83,10 @@ function writeOwnerOnly(file: string, text: string): void {
 }
 
 /**
- * Chromium keeps these cookies encrypted, and a cookies.txt beside them undid
- * that for anything able to read the profile. Sealed with the same key as the
+ * A cookies.txt is readable by anything able to read the profile, in a format
+ * every tool understands. (Chromium's own store beside it is not encrypted
+ * either while the EnableCookieEncryption fuse is off; see electron-fuses.mjs.
+ * Turning that on is a one-way change, still to be decided.) Sealed with the same key as the
  * saved passwords, the clear copy goes as soon as a sealed one is down. A machine
  * with no key (a Linux desktop with no keyring) keeps the clear file, because the
  * terminal has no other way to the sign-ins.
@@ -101,6 +103,21 @@ async function saveJar(text: string): Promise<void> {
 }
 
 function writeJar(cookies: Cookie[]): void {
+  /*
+    With "stay signed in" off the engine is not given the jar, so there is no
+    reason for one to exist. It was written all the same: the session cookies
+    Chromium drops at exit sat in a file until the next launch, under a setting
+    that says they do not outlive the session.
+  */
+  if (!getSettings().browserStaySignedIn) {
+    jarText = toNetscape([])
+    jarCount = 0
+    saving = saving.then(() => {
+      rmSync(JAR(), { force: true })
+      rmSync(SEALED_JAR(), { force: true })
+    })
+    return
+  }
   const text = toNetscape(cookies)
   jarText = text
   jarCount = netscapeCount(text)
@@ -322,6 +339,12 @@ export async function signOutOfSites(): Promise<void> {
 export async function importSignIns(browser: string): Promise<SignInImport> {
   const file = join(app.getPath('userData'), `import-${process.pid}-${Date.now()}.txt`)
   try {
+    /*
+      Made here first, readable by this account only. Left to the engine the
+      file came out with the default permissions, and for as long as the import
+      ran it held every cookie of the person's main browser, decrypted.
+    */
+    writeOwnerOnly(file, '# Netscape HTTP Cookie File\n')
     const stderr = await new Promise<string>((resolve) => {
       const child = spawn(
         ytdlpBinaryPath(),

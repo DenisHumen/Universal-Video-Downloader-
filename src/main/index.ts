@@ -48,7 +48,7 @@ import {
   startClipboardWatch,
   stopClipboardWatch
 } from './services/clipboard'
-import { rendererIndex, wireNavigation } from './services/navigation'
+import { devRendererUrl, rendererIndex, wireNavigation } from './services/navigation'
 import {
   chromeOptions,
   followNativeTheme,
@@ -169,7 +169,7 @@ function windowOptions(width: number, height: number): Electron.BrowserWindowCon
 }
 
 function loadRenderer(win: BrowserWindow, hash?: string): void {
-  const devUrl = process.env['ELECTRON_RENDERER_URL']
+  const devUrl = devRendererUrl()
   if (devUrl) {
     win.loadURL(hash ? `${devUrl}#${hash}` : devUrl)
   } else {

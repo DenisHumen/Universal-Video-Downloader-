@@ -1,4 +1,4 @@
-import { shell, type BrowserWindow } from 'electron'
+import { app, shell, type BrowserWindow } from 'electron'
 import { join } from 'path'
 import { log } from './log'
 import { isRendererDocument, navigationVerdict, type RendererLocation } from './navigation-rules'
@@ -14,9 +14,21 @@ export function rendererIndex(): string {
   return join(__dirname, '../renderer/index.html')
 }
 
+/**
+ * The dev server's address, in development only.
+ *
+ * The variable used to be read in the installed app too. Whoever could set it -
+ * a changed launcher, a `.desktop` file - had every window load their page
+ * with the full bridge, and every caller check accept that page as the app:
+ * exactly what the fuses for RunAsNode and NODE_OPTIONS are there to prevent.
+ */
+export function devRendererUrl(): string | undefined {
+  return app.isPackaged ? undefined : process.env['ELECTRON_RENDERER_URL'] || undefined
+}
+
 function rendererLocation(): RendererLocation {
   return {
-    devUrl: process.env['ELECTRON_RENDERER_URL'] || undefined,
+    devUrl: devRendererUrl(),
     indexPath: rendererIndex(),
     platform: process.platform
   }
