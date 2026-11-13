@@ -395,6 +395,10 @@ jobs:
     needs: finalize
     if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
+    # One Pages deploy at a time, this one or website.yml's.
+    concurrency:
+      group: pages
+      cancel-in-progress: false
     permissions:
       contents: write
       pages: write
@@ -438,6 +442,16 @@ jobs:
         env:
           FPR: ${{ steps.gpg.outputs.fpr }}
         run: PASSFILE="$RUNNER_TEMP/pass" bash scripts/linux-repo.sh
+
+      # The website shares Pages with the dnf repository, so it goes out with it,
+      # its list of versions now including this one.
+      - uses: actions/setup-node@v4
+        if: env.HAS_KEY == 'true'
+        with:
+          node-version: 24
+      - name: Add the website
+        if: env.HAS_KEY == 'true'
+        run: node scripts/build-website.mjs --out=site
 
       - name: Attach the apt index to the release
         if: env.HAS_KEY == 'true'

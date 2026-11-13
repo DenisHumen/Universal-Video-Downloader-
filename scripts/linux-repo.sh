@@ -70,7 +70,8 @@ repo_gpgcheck=1
 gpgkey=$PAGES/uvd.asc
 EOF
 
-cat > site/index.html <<EOF
+# repo.html, not index.html: the website (scripts/build-website.mjs) is the index.
+cat > site/repo.html <<EOF
 <!doctype html><meta charset="utf-8"><title>Universal Video Downloader repositories</title>
 <h1>Universal Video Downloader — apt and dnf</h1>
 <p>Ubuntu, Debian, Mint:</p>

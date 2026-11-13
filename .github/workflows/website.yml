@@ -1,0 +1,52 @@
+name: Website
+
+# The site at https://denishumen.github.io/Universal-Video-Downloader/, published
+# when the site itself changes. A release publishes it too (release.yml), with
+# the dnf repository it shares Pages with; this keeps that repository as it is.
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'website/**'
+      - 'docs/screenshots/**'
+      - 'docs/assets/**'
+      - 'scripts/build-website.mjs'
+      - 'scripts/fetch-pages-repo.sh'
+      - '.github/workflows/website.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Publish the website
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      GH_REPO: ${{ github.repository }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Keep the dnf repository that is already published
+        run: bash scripts/fetch-pages-repo.sh
+      - name: Build the website
+        run: node scripts/build-website.mjs --out=site
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+      - id: deploy
+        uses: actions/deploy-pages@v4

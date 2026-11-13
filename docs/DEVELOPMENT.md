@@ -37,7 +37,8 @@ Extras worth knowing about:
 ```bash
 npm run preview          # the renderer alone, in a browser, against a mock IPC bridge
 npm run shots            # regenerate docs/screenshots (--lang=ru, --theme=day|both, --scale=2, --out=<dir>, --offscreen with the display locked)
-npm run tour             # re-record docs/assets/tour.webp + tour.mp4 (needs ffmpeg)
+npm run website          # assemble the website (website/) into site/; release.yml and website.yml publish it to Pages
+npm run tour             # re-record docs/assets/tour.webp + tour.mp4 (needs ffmpeg); --theme=day records tour-day.mp4 for the website
 npm run visual           # compare every screen with tests/visual/baseline
 npm run visual:update    # accept the screens as they are now, after a change that was meant (--only=<scene>)
 npm run check:scroll     # every pane that overflows scrolls with the wheel
@@ -78,7 +79,7 @@ A release that needs a newer macOS than the one before it says so in its notes, 
 
 **UVD · Adwaita (Yaru)**, since 4.0: the app follows GNOME's HIG as it looks on Ubuntu 26.04 (GNOME 50, libadwaita 1.9) with Yaru: 9 px controls, 12 px cards, 15 px popovers and dialogs, 36 px sidebar rows, destructive buttons as a red label on a tint, and GNOME 50's ten accents in Ubuntu's palette. The measurements are in `docs/design/calibration.md`. That means a sidebar with a header bar per pane, boxed lists of rows (action, switch, combo, expander and entry rows), Settings laid out as GNOME Settings (eight panels, subpages that slide in, deep links like `network/proxy#address`), popovers, toasts and status pages. Type is Ubuntu Sans with tabular figures for numbers, and Ubuntu Sans Mono for paths, URLs and IDs. Icons are Yaru symbolics behind one `<Icon>` entry point. Fonts and icons ship with the app, so it looks the same offline and on every OS. Window controls are drawn as GNOME's on Linux (honouring `button-layout`), use `titleBarOverlay` on Windows, and are the native traffic lights on macOS. Motion is CSS only, critically damped, and nothing animates while idle.
 
-There are three styles (day, night, follow the system) and nine GNOME accents (Yaru orange by default, or the system's). Each accent is darkened in OKLab only as far as white text on it needs. The day theme is designed on its own, not inverted from the night one. Text colours are named tokens, and `npm run check:contrast` checks every text, plane, fill and accent pairing across both themes, failing CI below WCAG AA (4.5:1). `npm run visual` diffs every view at 720, 1000 and 1220 px in English and Russian against `tests/visual/baseline`, and `npm run check:scroll` checks that the wheel scrolls every pane that overflows. README screenshots come from `npm run shots` and the tour video from `npm run tour` (both with `npx vite --config vite.preview.config.ts` serving).
+There are three styles (day, night, follow the system) and the ten GNOME 50 accents (Yaru orange by default, or the system's). Each accent is darkened in OKLab only as far as white text on it needs. The day theme is designed on its own, not inverted from the night one. Text colours are named tokens, and `npm run check:contrast` checks every text, plane, fill and accent pairing across both themes, failing CI below WCAG AA (4.5:1). `npm run visual` diffs every view at 720, 1000 and 1220 px in English and Russian against `tests/visual/baseline`, and `npm run check:scroll` checks that the wheel scrolls every pane that overflows. README screenshots come from `npm run shots` and the tour video from `npm run tour` (both with `npx vite --config vite.preview.config.ts` serving).
 
 The full specification lives in [`design-system/universal-video-downloader/MASTER.md`](../design-system/universal-video-downloader/MASTER.md).
 

@@ -25,6 +25,9 @@ import { DRIVER } from './shot-driver.mjs'
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const BASE = process.argv.find((a) => a.startsWith('--url='))?.slice(6) ?? 'http://localhost:5174'
 const OUT = join(root, 'docs', 'assets')
+/** `--theme=day` records the day theme, into tour-day.mp4 and tour-day.webp (the website crossfades the two). */
+const THEME = process.argv.find((a) => a.startsWith('--theme='))?.slice(8) ?? 'night'
+const SUFFIX = THEME === 'night' ? '' : `-${THEME}`
 const FPS = 15
 const WIDTH = 1280
 const HEIGHT = 800
@@ -34,7 +37,10 @@ const wait = (ms) => new Promise((r) => setTimeout(r, ms))
 
 /** Each beat: what to do, then how long to hold on it. */
 const BEATS = [
-  { hold: 900, run: `await window.__uvdShot.view('home')` },
+  {
+    hold: 900,
+    run: `await window.__uvdStore.getState().saveSettings({ theme: '${THEME}' }); await window.__uvdShot.view('home')`
+  },
   {
     hold: 2600,
     run: `
@@ -128,10 +134,11 @@ app.whenReady().then(async () => {
 
   mkdirSync(OUT, { recursive: true })
   const input = ['-y', '-framerate', String(FPS), '-i', join(frames, '%05d.png')]
-  execFileSync('ffmpeg', [...input, '-vf', 'scale=1280:-2', '-c:v', 'libx264', '-pix_fmt', 'yuv420p', '-crf', '26', '-movflags', '+faststart', join(OUT, 'tour.mp4')], { stdio: 'ignore' })
-  execFileSync('ffmpeg', [...input, '-vf', 'fps=12,scale=960:-1:flags=lanczos', '-c:v', 'libwebp', '-loop', '0', '-quality', '62', '-compression_level', '6', join(OUT, 'tour.webp')], { stdio: 'ignore' })
+  execFileSync('ffmpeg', [...input, '-vf', 'scale=1280:-2', '-c:v', 'libx264', '-pix_fmt', 'yuv420p', '-crf', '26', '-movflags', '+faststart', join(OUT, `tour${SUFFIX}.mp4`)], { stdio: 'ignore' })
+  // The README's animated image is the night one; the day tour is only the website's video.
+  if (!SUFFIX) execFileSync('ffmpeg', [...input, '-vf', 'fps=12,scale=960:-1:flags=lanczos', '-c:v', 'libwebp', '-loop', '0', '-quality', '62', '-compression_level', '6', join(OUT, `tour${SUFFIX}.webp`)], { stdio: 'ignore' })
   rmSync(frames, { recursive: true, force: true })
-  for (const f of ['tour.mp4', 'tour.webp']) {
+  for (const f of SUFFIX ? [`tour${SUFFIX}.mp4`] : ['tour.mp4', 'tour.webp']) {
     console.log(`  • docs/assets/${f} (${(statSync(join(OUT, f)).size / 1e6).toFixed(1)} MB, ${n} frames)`)
   }
   app.exit(0)

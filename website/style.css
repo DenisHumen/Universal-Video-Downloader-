@@ -1,0 +1,819 @@
+/*
+  The app's own look, on a web page: GNOME 50 as Ubuntu 26.04 draws it. The
+  tokens are the app's (src/renderer/src/index.css), so the page and the
+  screenshots on it are one design: Yaru orange, 9 / 12 / 15 px corners,
+  boxed lists, Ubuntu Sans. Light and dark follow the reader's system.
+*/
+
+@font-face {
+  font-family: 'Ubuntu Sans';
+  src: url('fonts/UbuntuSans-wdth-wght.ttf') format('truetype');
+  font-weight: 100 800;
+  font-stretch: 75% 100%;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Ubuntu Sans Mono';
+  src: url('fonts/UbuntuSansMono-wght.ttf') format('truetype');
+  font-weight: 400 700;
+  font-display: swap;
+}
+
+:root {
+  color-scheme: light dark;
+  --r-1: 9px;
+  --r-3: 12px;
+  --r-float: 15px;
+  --ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+
+  /* Day: Yaru light */
+  --bg: 250 250 250;
+  --header: 250 250 250;
+  --card: 255 255 255;
+  --fill: 61 61 61;
+  --text: 61 61 61;
+  --text-2: 92 92 92;
+  --line: 219 219 219;
+  --line-soft: 237 237 237;
+  --accent: 213 65 0;
+  --accent-bright: 233 84 32;
+  --accent-ink: 183 31 0;
+  --accent-fg: 255 255 255;
+  --code: 243 243 243;
+  --shadow-card: 0 0 0 1px rgb(0 0 6 / 0.03), 0 1px 3px 1px rgb(0 0 6 / 0.07), 0 2px 6px 2px rgb(0 0 6 / 0.03);
+  --shadow-window: 0 0 0 1px rgb(0 0 6 / 0.06), 0 24px 64px -12px rgb(0 0 0 / 0.28), 0 8px 16px -8px rgb(0 0 0 / 0.12);
+}
+
+/* Night: Yaru dark. The page's own choice wins; without script, the system's. */
+[data-theme='dark'] {
+  color-scheme: dark;
+  --bg: 44 44 44;
+  --header: 44 44 44;
+  --card: 61 61 61;
+  --fill: 247 247 247;
+  --text: 247 247 247;
+  --text-2: 178 178 178;
+  --line: 31 31 31;
+  --line-soft: 39 39 39;
+  --accent-ink: 255 154 106;
+  --code: 36 36 36;
+  --shadow-card: inset 0 1px 0 rgb(255 255 255 / 0.04), 0 1px 2px rgb(0 0 0 / 0.4);
+  --shadow-window: 0 0 0 1px rgb(0 0 0 / 0.5), 0 24px 64px -12px rgb(0 0 0 / 0.7), 0 8px 16px -8px rgb(0 0 0 / 0.5);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme]) {
+    --bg: 44 44 44;
+    --header: 44 44 44;
+    --card: 61 61 61;
+    --fill: 247 247 247;
+    --text: 247 247 247;
+    --text-2: 178 178 178;
+    --line: 31 31 31;
+    --line-soft: 39 39 39;
+    --accent-ink: 255 154 106;
+    --code: 36 36 36;
+    --shadow-card: inset 0 1px 0 rgb(255 255 255 / 0.04), 0 1px 2px rgb(0 0 0 / 0.4);
+    --shadow-window: 0 0 0 1px rgb(0 0 0 / 0.5), 0 24px 64px -12px rgb(0 0 0 / 0.7), 0 8px 16px -8px rgb(0 0 0 / 0.5);
+  }
+}
+[data-theme='light'] {
+  color-scheme: light;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+  scroll-padding-top: 64px;
+}
+
+body {
+  margin: 0;
+  background: rgb(var(--bg));
+  color: rgb(var(--text));
+  font-family: 'Ubuntu Sans', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  font-size: 16px;
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+img,
+video {
+  display: block;
+  max-width: 100%;
+  height: auto;
+}
+
+a {
+  color: rgb(var(--accent-ink));
+  text-underline-offset: 3px;
+}
+a:hover {
+  text-decoration-thickness: 2px;
+}
+
+code,
+pre {
+  font-family: 'Ubuntu Sans Mono', ui-monospace, monospace;
+  font-size: 0.875rem;
+}
+
+:focus-visible {
+  outline: 2px solid rgb(var(--accent-ink));
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+.skip {
+  position: absolute;
+  left: 12px;
+  top: -48px;
+  z-index: 100;
+  padding: 8px 14px;
+  border-radius: var(--r-1);
+  background: rgb(var(--card));
+  box-shadow: var(--shadow-card);
+}
+.skip:focus {
+  top: 8px;
+}
+
+.dim {
+  color: rgb(var(--text-2));
+}
+
+/* ---- Header bar: flat, 47 px, the page's colour, a hairline under it ---- */
+.headerbar {
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  background: rgb(var(--header) / 0.86);
+  backdrop-filter: saturate(1.4) blur(12px);
+  -webkit-backdrop-filter: saturate(1.4) blur(12px);
+  box-shadow: inset 0 -1px rgb(var(--line));
+}
+.headerbar-inner {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  max-width: 1120px;
+  min-height: 52px;
+  margin: 0 auto;
+  padding: 0 16px;
+}
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: inherit;
+  font-weight: 700;
+  text-decoration: none;
+  white-space: nowrap;
+}
+.nav {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  margin-left: auto;
+}
+.nav a {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 34px;
+  padding: 0 12px;
+  border-radius: var(--r-1);
+  color: inherit;
+  font-weight: 700;
+  font-size: 0.9375rem;
+  text-decoration: none;
+  transition: background-color 150ms var(--ease);
+}
+.nav a:hover {
+  background: rgb(var(--fill) / 0.08);
+}
+
+/* A flat round image button, as in a GNOME header bar */
+.icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  transition: background-color 150ms var(--ease);
+}
+.icon-btn:hover {
+  background: rgb(var(--fill) / 0.1);
+}
+[data-theme='dark'] .icon-btn .moon,
+[data-theme='light'] .icon-btn .sun,
+:root:not([data-theme]) .icon-btn .sun {
+  display: none;
+}
+
+/* A GNOME toggle group */
+.segmented {
+  display: inline-flex;
+  padding: 3px;
+  border-radius: calc(var(--r-1) + 3px);
+  background: rgb(var(--fill) / 0.1);
+}
+.segmented button {
+  min-width: 40px;
+  min-height: 28px;
+  border: 0;
+  border-radius: var(--r-1);
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-size: 0.875rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+.segmented button[aria-checked='true'] {
+  background: rgb(var(--card));
+  box-shadow: var(--shadow-card);
+}
+
+/* ---- Buttons: 34 px, 9 px corners, bold labels ---- */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 34px;
+  padding: 6px 16px;
+  border: 0;
+  border-radius: var(--r-1);
+  background: rgb(var(--fill) / 0.1);
+  color: inherit;
+  font: inherit;
+  font-weight: 700;
+  font-size: 0.9375rem;
+  text-decoration: none;
+  cursor: pointer;
+  transition:
+    background-color 150ms var(--ease),
+    filter 150ms var(--ease),
+    transform 100ms var(--ease);
+}
+.btn:hover {
+  background: rgb(var(--fill) / 0.15);
+}
+.btn:active {
+  transform: scale(0.97);
+}
+.btn-flat {
+  background: transparent;
+}
+.btn-suggested {
+  background: rgb(var(--accent));
+  color: rgb(var(--accent-fg));
+}
+.btn-suggested:hover {
+  background: rgb(var(--accent));
+  filter: brightness(0.94);
+}
+.btn-pill {
+  min-height: 48px;
+  padding: 10px 32px;
+  border-radius: 999px;
+  font-size: 1.0625rem;
+}
+
+/* ---- Hero ---- */
+main {
+  overflow-x: clip;
+}
+.hero {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  max-width: 1120px;
+  margin: 0 auto;
+  padding: 56px 16px 32px;
+  text-align: center;
+}
+.hero-icon {
+  width: 112px;
+  height: 112px;
+  margin-bottom: 20px;
+  filter: drop-shadow(0 10px 18px rgb(0 0 0 / 0.22));
+  animation: rise 700ms var(--ease) both;
+}
+h1 {
+  max-width: 18ch;
+  margin: 0;
+  font-size: clamp(2rem, 5.2vw, 3.4rem);
+  line-height: 1.08;
+  letter-spacing: -0.02em;
+  font-weight: 800;
+  text-wrap: balance;
+  animation: rise 700ms 60ms var(--ease) both;
+}
+.lead {
+  max-width: 62ch;
+  margin: 18px 0 0;
+  color: rgb(var(--text-2));
+  font-size: 1.125rem;
+  text-wrap: pretty;
+  animation: rise 700ms 120ms var(--ease) both;
+}
+.hero-download {
+  margin: 30px 0 44px;
+  animation: rise 700ms 180ms var(--ease) both;
+}
+.hero-meta {
+  margin: 12px 0 0;
+  color: rgb(var(--text-2));
+  font-size: 0.9375rem;
+  font-variant-numeric: tabular-nums;
+}
+.hero-alt {
+  margin: 6px 0 0;
+  font-size: 0.9375rem;
+}
+
+/* The app, in a window as GNOME draws it */
+.window {
+  position: relative;
+  width: 100%;
+  max-width: 1040px;
+  margin: 0;
+  overflow: hidden;
+  border-radius: var(--r-float);
+  background: rgb(var(--header));
+  box-shadow: var(--shadow-window);
+}
+/*
+  Each picture of the app comes in both themes, stacked: the page's theme says
+  which one shows, and a switch fades one into the other, so the window on the
+  page turns day or night with the page around it.
+*/
+.screens,
+.shot {
+  display: grid;
+}
+.screens > *,
+.shot > img {
+  grid-area: 1 / 1;
+  transition: opacity 700ms var(--ease);
+}
+.window video {
+  width: 100%;
+  aspect-ratio: 1280 / 734;
+  object-fit: cover;
+  background: rgb(var(--bg));
+}
+[data-theme='light'] .night,
+[data-theme='dark'] .day,
+:root:not([data-theme]) .day {
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* The colours follow during a switch, and only then: nothing animates on load. */
+.theme-switching,
+.theme-switching * {
+  transition:
+    background-color 600ms var(--ease),
+    color 600ms var(--ease),
+    border-color 600ms var(--ease),
+    box-shadow 600ms var(--ease),
+    opacity 700ms var(--ease) !important;
+}
+
+/* The day spreads from the button that asked for it (View Transitions, where there are). */
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation: none;
+  mix-blend-mode: normal;
+}
+::view-transition-new(root) {
+  animation: reveal 650ms var(--ease) both;
+}
+@keyframes reveal {
+  from {
+    clip-path: circle(0 at var(--from-x, 100%) var(--from-y, 0));
+  }
+  to {
+    clip-path: circle(var(--reach, 150vmax) at var(--from-x, 100%) var(--from-y, 0));
+  }
+}
+.play[hidden] {
+  display: none;
+}
+.play {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 22px;
+  border: 0;
+  border-radius: 999px;
+  background: rgb(30 30 30 / 0.82);
+  color: #fff;
+  font: inherit;
+  font-weight: 700;
+  transform: translate(-50%, -50%);
+  cursor: pointer;
+}
+
+/* ---- Sections ---- */
+section {
+  scroll-margin-top: 64px;
+}
+.section-title {
+  margin: 0 0 8px;
+  font-size: clamp(1.6rem, 3.4vw, 2.2rem);
+  line-height: 1.15;
+  font-weight: 800;
+  letter-spacing: -0.015em;
+  text-align: center;
+}
+.section-lead {
+  margin: 0 auto 28px;
+  max-width: 60ch;
+  text-align: center;
+}
+.features,
+.more,
+.download,
+.releases {
+  max-width: 1120px;
+  margin: 0 auto;
+  padding: 72px 16px 8px;
+}
+
+.feature {
+  display: grid;
+  grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
+  align-items: center;
+  gap: 48px;
+  margin-top: 56px;
+}
+.feature:nth-of-type(even) {
+  grid-template-columns: minmax(0, 7fr) minmax(0, 5fr);
+}
+.feature:nth-of-type(even) .feature-text {
+  order: 2;
+}
+.feature h3 {
+  margin: 0 0 10px;
+  font-size: 1.5rem;
+  line-height: 1.2;
+  font-weight: 800;
+}
+.feature p {
+  margin: 0;
+  color: rgb(var(--text-2));
+  font-size: 1.0625rem;
+}
+.shot {
+  width: 100%;
+  overflow: hidden;
+  border-radius: var(--r-3);
+  box-shadow: var(--shadow-window);
+}
+.shot > img {
+  width: 100%;
+}
+
+/* A boxed list, as AdwPreferencesGroup draws it */
+.boxed-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  overflow: hidden;
+  border-radius: var(--r-3);
+  background: rgb(var(--card));
+  box-shadow: var(--shadow-card);
+}
+.boxed-list > li {
+  padding: 14px 16px;
+  border-bottom: 1px solid rgb(var(--line-soft));
+}
+.boxed-list > li:last-child {
+  border-bottom: 0;
+}
+.boxed-list.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  margin-top: 28px;
+}
+.boxed-list.grid > li {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 18px 20px;
+  border-right: 1px solid rgb(var(--line-soft));
+}
+.boxed-list.grid span {
+  color: rgb(var(--text-2));
+  font-size: 0.9375rem;
+}
+
+/* ---- Download ---- */
+.platforms {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 18px;
+}
+.card {
+  padding: 22px;
+  border-radius: var(--r-3);
+  background: rgb(var(--card));
+  box-shadow: var(--shadow-card);
+}
+.platform {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  transition: box-shadow 200ms var(--ease);
+}
+.platform.is-yours {
+  box-shadow:
+    0 0 0 2px rgb(var(--accent-bright)),
+    var(--shadow-card);
+}
+.platform h3 {
+  margin: 6px 0 0;
+  font-size: 1.25rem;
+}
+.platform p {
+  margin: 0;
+  font-size: 0.9375rem;
+}
+.platform-icon {
+  width: 32px;
+  height: 32px;
+  color: rgb(var(--text-2));
+}
+.links {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 14px 0 4px;
+}
+.links .btn {
+  justify-content: space-between;
+}
+.links .size {
+  color: rgb(var(--text-2));
+  font-weight: 400;
+  font-variant-numeric: tabular-nums;
+}
+.note {
+  margin-top: 8px !important;
+  color: rgb(var(--text-2));
+  font-size: 0.875rem !important;
+}
+.yours-badge {
+  align-self: flex-start;
+  padding: 2px 10px;
+  border-radius: 999px;
+  background: rgb(var(--accent));
+  color: rgb(var(--accent-fg));
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.repos {
+  margin-top: 40px;
+}
+.repos h3 {
+  margin: 0;
+  font-size: 1.25rem;
+}
+.repos > p {
+  margin: 4px 0 14px;
+  font-size: 0.9375rem;
+}
+.tabs {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-bottom: 10px;
+  padding: 3px;
+  border-radius: calc(var(--r-1) + 3px);
+  background: rgb(var(--fill) / 0.1);
+}
+.tabs button {
+  min-height: 30px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: var(--r-1);
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-size: 0.875rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+.tabs button[aria-selected='true'] {
+  background: rgb(var(--card));
+  box-shadow: var(--shadow-card);
+}
+.code {
+  position: relative;
+  border-radius: var(--r-3);
+  background: rgb(var(--code));
+  box-shadow: inset 0 0 0 1px rgb(var(--line-soft));
+}
+.code pre {
+  margin: 0;
+  padding: 16px 92px 16px 16px;
+  overflow-x: auto;
+  line-height: 1.7;
+}
+.copy {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+}
+
+/* ---- All versions ---- */
+.release > summary {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 34px;
+  list-style: none;
+  cursor: pointer;
+}
+.release > summary::-webkit-details-marker {
+  display: none;
+}
+.release > summary::after {
+  content: '';
+  width: 8px;
+  height: 8px;
+  margin-left: auto;
+  border-right: 2px solid currentColor;
+  border-bottom: 2px solid currentColor;
+  opacity: 0.6;
+  transform: rotate(45deg);
+  transition: transform 200ms var(--ease);
+}
+.release[open] > summary::after {
+  transform: rotate(-135deg);
+}
+.release .ver {
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.release .date {
+  color: rgb(var(--text-2));
+  font-size: 0.9375rem;
+  font-variant-numeric: tabular-nums;
+}
+.tag {
+  padding: 1px 9px;
+  border-radius: 999px;
+  background: rgb(var(--accent) / 0.14);
+  color: rgb(var(--accent-ink));
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+.files {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(210px, 250px));
+  gap: 6px 18px;
+  margin: 12px 0 4px;
+  padding: 0;
+  list-style: none;
+  font-size: 0.9375rem;
+}
+.files a {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+.files .size {
+  color: rgb(var(--text-2));
+  font-variant-numeric: tabular-nums;
+}
+.placeholder {
+  color: rgb(var(--text-2));
+  text-align: center;
+}
+.center {
+  margin-top: 18px;
+  text-align: center;
+}
+
+/* ---- Footer ---- */
+.footer {
+  max-width: 1120px;
+  margin: 72px auto 0;
+  padding: 28px 16px 48px;
+  border-top: 1px solid rgb(var(--line));
+  text-align: center;
+  font-size: 0.9375rem;
+}
+.footer p {
+  margin: 4px 0;
+}
+
+/* ---- Motion: arrivals only, and none at all for those who ask for less ---- */
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.js .reveal {
+  opacity: 0;
+  transform: translateY(24px);
+  transition:
+    opacity 600ms var(--ease),
+    transform 600ms var(--ease);
+}
+.js .reveal.is-in {
+  opacity: 1;
+  transform: none;
+}
+.feature .shot {
+  transition: transform 600ms var(--ease);
+}
+.feature.is-in .shot {
+  transform: none;
+}
+.js .feature:not(.is-in) .shot {
+  transform: scale(0.97);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+  *,
+  *::before,
+  *::after {
+    animation: none !important;
+    transition: none !important;
+  }
+  .js .reveal,
+  .js .feature:not(.is-in) .shot {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* ---- Narrow windows ---- */
+@media (max-width: 860px) {
+  .feature,
+  .feature:nth-of-type(even) {
+    grid-template-columns: 1fr;
+    gap: 20px;
+    margin-top: 44px;
+  }
+  .feature:nth-of-type(even) .feature-text {
+    order: 0;
+  }
+  .nav a:not(.nav-github) {
+    display: none;
+  }
+}
+@media (max-width: 520px) {
+  .brand span,
+  .nav-github span {
+    display: none;
+  }
+  .hero {
+    padding-top: 36px;
+  }
+  .code pre {
+    padding-right: 16px;
+    padding-bottom: 52px;
+  }
+  .copy {
+    top: auto;
+    bottom: 8px;
+  }
+}

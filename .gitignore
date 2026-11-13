@@ -43,3 +43,6 @@ brag-output*/
 
 # Visual-diff harness output (baselines in tests/visual/baseline are committed)
 tests/visual/.out/
+
+# The assembled website (npm run website)
+/site/

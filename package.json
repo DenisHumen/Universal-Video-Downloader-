@@ -9,10 +9,10 @@
   "license": "MIT",
   "main": "./out/main/index.js",
   "desktopName": "universal-video-downloader.desktop",
-  "homepage": "https://github.com/DenisHumen/Universal-Video-Downloader-",
+  "homepage": "https://github.com/DenisHumen/Universal-Video-Downloader",
   "repository": {
     "type": "git",
-    "url": "https://github.com/DenisHumen/Universal-Video-Downloader-.git"
+    "url": "https://github.com/DenisHumen/Universal-Video-Downloader.git"
   },
   "engines": {
     "node": ">=22.12"
@@ -51,7 +51,8 @@
     "visual:update": "node scripts/visual.mjs --update",
     "check:scroll": "node scripts/scroll-check.mjs",
     "make:mac-guide": "electron scripts/generate-mac-guide.mjs",
-    "tour": "electron scripts/record-tour.mjs"
+    "tour": "electron scripts/record-tour.mjs",
+    "website": "node scripts/build-website.mjs --out=site"
   },
   "dependencies": {
     "electron-updater": "^6.3.9",
