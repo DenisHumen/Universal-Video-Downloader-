@@ -129,13 +129,21 @@ export default function TrimEditor({ duration, value, onChange, hint }: Props): 
             }
           }}
         >
-          <div
-            className="absolute inset-y-0 bg-accent/20"
-            style={{
-              left: `${percentOf(start)}%`,
-              width: `${Math.max(0, percentOf(end ?? total) - percentOf(start))}%`
-            }}
-          />
+          {/*
+            The selection is clipped to the track's own rounded shape. Unclipped,
+            its square corners stood out past the track's at either end, over its
+            border, which the rounder 4.8 corners made plain. The handles stay
+            outside the clip: they may hang over the end of the track.
+          */}
+          <div className="pointer-events-none absolute inset-0 overflow-hidden rounded-[inherit]">
+            <div
+              className="absolute inset-y-0 bg-accent/20"
+              style={{
+                left: `${percentOf(start)}%`,
+                width: `${Math.max(0, percentOf(end ?? total) - percentOf(start))}%`
+              }}
+            />
+          </div>
           {(['start', 'end'] as const).map((handle) => {
             const seconds = handle === 'start' ? start : (end ?? total)
             return (
