@@ -14,8 +14,8 @@
  * and falls back to Blue when it cannot.
  */
 
-/** GNOME's nine accents (A1), with Ubuntu's Yaru orange in the orange slot and as the default (Y1). */
-export const ACCENTS = ['orange', 'blue', 'teal', 'green', 'yellow', 'red', 'pink', 'purple', 'slate'] as const
+/** GNOME's accents (A1), with Ubuntu's Yaru orange in the orange slot and as the default (Y1). Brown is GNOME 50's tenth. */
+export const ACCENTS = ['orange', 'blue', 'teal', 'green', 'yellow', 'red', 'pink', 'purple', 'slate', 'brown'] as const
 export const DEFAULT_ACCENT = 'orange' as const
 
 /** 4.0-alpha accents that GNOME's set renamed. */

@@ -92,7 +92,7 @@ function fail(message) {
  * accent tints the UI paints selected states with.
  */
 // Orange (Yaru) is the default and lives in the theme blocks; the rest are [data-accent] blocks.
-const ACCENTS = ['orange', 'blue', 'teal', 'green', 'yellow', 'red', 'pink', 'purple', 'slate']
+const ACCENTS = ['orange', 'blue', 'teal', 'green', 'yellow', 'red', 'pink', 'purple', 'slate', 'brown']
 const DEFAULT_ACCENT = 'orange'
 const ACCENT_VARS = ['--accent', '--accent-ink', '--accent-fg']
 // Selected and hover states are accent/12 only; a stronger tint is never under text.
@@ -390,8 +390,32 @@ for (const m of css.matchAll(/([^{}]*:focus(?:-visible|-within)?[^{}]*)\{([^}]*)
   }
 }
 // A translucent fill under a label is lighter on a light plane: that is what took the white to 4.03:1.
-for (const m of css.matchAll(/(?:hover|active):bg-(accent|destructive)\/\d+/g)) {
+for (const m of css.matchAll(/(?:hover|active):bg-accent\/\d+/g)) {
   fail(`${m[0]} in index.css: a solid button darkens (hover:brightness-95), it does not go see-through`)
+}
+
+/*
+  The destructive button, as GNOME 50 draws it: --destructive-ink on a --destructive
+  tint, which gets stronger under the pointer and when pressed. Its label is
+  read on the tint over every plane it can sit on, at the strongest alpha.
+*/
+let destructiveChecks = 0
+const tints = [...css.matchAll(/\.btn-danger\s*\{[^}]*bg-destructive\/(\d+)[^}]*\}/g)].flatMap((m) =>
+  [...m[0].matchAll(/bg-destructive\/(\d+)/g)].map((t) => Number(t[1]) / 100)
+)
+if (!tints.length) fail('.btn-danger: no destructive tint found to check')
+for (const { name, selector } of THEMES) {
+  const vars = readTheme(selector)
+  if (!vars) continue
+  for (const planeVar of PLANE_VARS) {
+    const plane = vars[planeVar]
+    if (!plane || !vars['--destructive'] || !vars['--destructive-ink']) continue
+    for (const alpha of tints) {
+      const ratio = contrast(vars['--destructive-ink'], composite(vars['--destructive'], plane, alpha))
+      destructiveChecks++
+      if (ratio < AA_NORMAL) fail(`${name} · --destructive-ink on --destructive/${alpha} over ${planeVar} → ${ratio.toFixed(2)}:1`)
+    }
+  }
 }
 
 for (const { name, selector } of THEMES) {
@@ -466,6 +490,7 @@ if (process.exitCode) {
     `✓ ${stacked} stacked pairings clear their floor ` +
       `(tightest text: ${thinnestStack.what} at ${thinnestStack.ratio.toFixed(2)}:1)`
   )
+  console.log(`✓ ${destructiveChecks} destructive-button label pairings clear ${AA_NORMAL}:1`)
   console.log(
     `✓ ${ringChecks} focus ring pairings clear ${NON_TEXT_MIN}:1 ` +
       `(faintest: ${faintestRing.what} at ${faintestRing.ratio.toFixed(2)}:1)`

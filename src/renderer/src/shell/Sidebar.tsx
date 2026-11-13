@@ -74,11 +74,11 @@ export default function Sidebar({ platform, overlay }: Props): JSX.Element {
         }
       />
 
-      <nav ref={navRef} aria-label={t('nav.label')} className="flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto px-2 pb-2">
+      <nav ref={navRef} aria-label={t('nav.label')} className="flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto px-1.5 pb-1.5">
         {NAV_MAIN.map((s) => (
           <NavItem key={s.id} section={s} />
         ))}
-        <div className="mx-2 my-1.5 h-px shrink-0 bg-fill/15" role="separator" />
+        <div className="mx-1.5 my-1.5 h-px shrink-0 bg-fill/15" role="separator" />
         {/* In plain sight: someone who is lost will not think to look behind the menu button. */}
         <NavItem section={{ id: 'guide', label: 'help.title', icon: Help, key: '' }} />
         {NAV_BOTTOM.map((s) => (
@@ -111,7 +111,7 @@ function NavItem({ section }: { section: NavSection }): JSX.Element {
       type="button"
       onClick={() => setView(section.id)}
       aria-current={on ? 'page' : undefined}
-      className={cx('ui-nav-item no-drag relative flex h-11 w-full shrink-0 items-center gap-3 rounded-1 px-3 text-body', on && 'ui-nav-item-on')}
+      className={cx('ui-nav-item no-drag relative flex h-9 w-full shrink-0 items-center gap-3 rounded-1 px-2 text-body', on && 'ui-nav-item-on')}
     >
       <section.icon size={16} />
       <span className="min-w-0 flex-1 truncate text-left">{label}</span>

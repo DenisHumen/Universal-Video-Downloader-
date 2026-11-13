@@ -166,7 +166,7 @@ function PanelList({ route, query, onQuery, onOpen, wide, showToggle }: ListProp
       type="button"
       onClick={() => onOpen(r)}
       aria-current={on ? 'page' : undefined}
-      className={cx('ui-nav-item no-drag flex min-h-[44px] w-full items-center gap-3 rounded-1 px-3 py-1.5 text-left text-body', on && 'ui-nav-item-on')}
+      className={cx('ui-nav-item no-drag flex min-h-9 w-full items-center gap-3 rounded-1 px-2 py-1 text-left text-body', on && 'ui-nav-item-on')}
     >
       {icon}
       <span className="min-w-0 flex-1">
@@ -191,7 +191,7 @@ function PanelList({ route, query, onQuery, onOpen, wide, showToggle }: ListProp
         }
         end={!wide ? <WindowControls side="end" where="content" /> : undefined}
       />
-      <div className={cx('min-h-0 flex-1 overflow-y-auto px-2 pb-3', !wide && 'mx-auto w-full max-w-[600px]')}>
+      <div className={cx('min-h-0 flex-1 overflow-y-auto px-1.5 pb-3', !wide && 'mx-auto w-full max-w-[600px]')}>
         <label className="field mb-2 flex cursor-text items-center gap-2">
           <Search size={16} className="shrink-0 text-ink-2" />
           <input

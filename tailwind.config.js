@@ -25,6 +25,7 @@ module.exports = {
         fill: 'rgb(var(--fill) / <alpha-value>)',
         destructive: 'rgb(var(--destructive) / <alpha-value>)',
         'destructive-fg': 'rgb(var(--destructive-fg) / <alpha-value>)',
+        'destructive-ink': 'rgb(var(--destructive-ink) / <alpha-value>)',
         osd: {
           DEFAULT: 'rgb(var(--osd) / <alpha-value>)',
           fg: 'rgb(var(--osd-fg) / <alpha-value>)'

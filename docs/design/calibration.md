@@ -154,3 +154,39 @@ button at the end; groups split by thin separators; a centred panel title in
 the content header with round caption buttons; bold group titles with an
 optional flat "+" on the title line; rows of an optional leading icon, the
 label, then a switch, a flat icon button, or a dim value and a chevron.
+
+## 2026-11-13: Ubuntu 26.04 (GNOME 50, libadwaita 1.9)
+
+The same `render.js`, run again on the user's machine after the upgrade:
+Ubuntu 26.04.1, GNOME Shell 50.1, `libadwaita-1-0` 1.9.1-0ubuntu0.2,
+`yaru-theme-gtk` 26.04.5. Renders: `calibration/yaru-26.04-{light,dark}.png`,
+measurements beside them. Ubuntu's libadwaita still carries Yaru inside it
+(`/org/gnome/Adwaita/styles/default-*-yaru-*.css`, read for values only).
+
+| | 24.04 | 26.04 |
+|---|---|---|
+| Heights: header bar / sidebar row / boxed row / button and entry | 46 / 36 / 50 / 34 | unchanged |
+| Radius: button, entry, toggle, sidebar row, menu item, tooltip | 6 | **9** |
+| Radius: card, boxed list | 12 | 12 |
+| Radius: popover, menu | 12 | **15** |
+| Radius: dialog sheet / alert | 12 | **15 / 18** |
+| Dark sidebar pane | 48 | **57** |
+| Dark pane divider | 31 | **43** (the sidebar's tone separates) |
+| Accent fill (orange, white label) | 233 84 32 | **203 67 20** dark, **211 70 21** light |
+| Destructive button | solid red, white label | **red label on a red tint** |
+| Accents | GNOME's nine | **ten: GNOME 50 adds brown** (`#B39169`); Ubuntu draws all ten in Yaru's palette |
+
+Yaru's palette as libadwaita 1.9 on 26.04 defines it (`--accent-*`):
+blue `#0073E5`, teal `#308280`, green `#4B8501`, yellow `#C88800`, orange
+`#E95420`, red `#DA3450`, pink `#B34CB3`, purple `#7764D8`, slate `#657B69`,
+brown `#B39169`. `scripts/accents.mjs` derives the fills and inks from these.
+
+What changed in the app to follow:
+- `--r-1`/`--r-2` 9 px, `--r-float` 15 px for popovers and menus, `--r-4` 15 px for dialogs.
+- Sidebar rows 36 px, 2 px apart, 6 px from the pane's edge; Settings' panel list the same.
+- Night `--sidebar` 57, `--sidebar-2` 50, `--sheet-edge` 43.
+- `.btn-danger`: `--destructive-ink` on `--destructive` at .10 / .15 / .20; the contrast gate checks the label on every plane.
+- The tenth accent, brown; the other nine moved to Yaru's 26.04 values.
+
+The portal now reports an accent (`org.freedesktop.appearance accent-color`
+answered `#ED5B00` for orange), so "System" is offered on this machine.

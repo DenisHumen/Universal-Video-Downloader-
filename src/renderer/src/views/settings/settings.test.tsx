@@ -139,13 +139,14 @@ describe('search', () => {
 })
 
 describe('Appearance', () => {
-  it('offers the nine accents, and System only when the desktop reports one', async () => {
+  it('offers the ten accents, brown included, and System only when the desktop reports one', async () => {
     await app(1220)
     act(() => useStore.getState().openSettings('appearance'))
     const group = screen.getByRole('radiogroup', { name: 'Accent Color' })
-    expect(within(group).getAllByRole('radio')).toHaveLength(10)
+    expect(within(group).getAllByRole('radio')).toHaveLength(11)
+    expect(within(group).getByRole('radio', { name: 'Brown' })).toBeTruthy()
     act(() => useStore.setState({ appInfo: { ...useStore.getState().appInfo!, systemAccent: undefined } }))
-    expect(within(screen.getByRole('radiogroup', { name: 'Accent Color' })).getAllByRole('radio')).toHaveLength(9)
+    expect(within(screen.getByRole('radiogroup', { name: 'Accent Color' })).getAllByRole('radio')).toHaveLength(10)
     fireEvent.click(screen.getByRole('radio', { name: 'Blue' }))
     await waitFor(() => expect(useStore.getState().settings?.accent).toBe('blue'))
     expect(screen.getAllByRole('radio', { name: /Day|Night|System/ }).length).toBeGreaterThanOrEqual(3)

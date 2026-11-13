@@ -167,10 +167,19 @@ describe('the built stylesheet', () => {
 
   // bg-accent/90 let the page through, and the white label fell to 4.03:1 on a light one.
   it('darkens solid buttons under the pointer instead of thinning them', async () => {
-    for (const variant of ['btn-solid', 'ui-btn-primary', 'btn-danger', 'ui-btn-danger']) {
+    for (const variant of ['btn-solid', 'ui-btn-primary']) {
       const props = (await declsFor(`.${variant}:hover`)).flatMap(Object.keys)
       expect(props, variant).toContain('filter')
       expect(props, variant).not.toContain('background-color')
+    }
+  })
+
+  // GNOME 50's destructive button is a tint with the red as its label; the pointer deepens the tint.
+  it('draws destructive buttons as a red label on a tint that deepens under the pointer', async () => {
+    for (const variant of ['btn-danger', 'ui-btn-danger']) {
+      expect((await declsFor(`.${variant}:hover`)).flatMap(Object.keys), variant).toContain('background-color')
+      const base = (await declsFor(`.${variant}`)).reduce((all, d) => ({ ...all, ...d }), {} as Record<string, string>)
+      expect(base.color, variant).toContain('--destructive-ink')
     }
   })
 

@@ -53,7 +53,7 @@ export function parsePortalAccent(raw: string | undefined | null): string | null
 }
 
 /**
- * Ubuntu's Yaru accents, read from each variant's gtk-4.0 theme on 24.04
+ * Ubuntu's Yaru accents, read from each variant's gtk-4.0 theme on 24.04 and 26.04
  * (theme_selected_bg_color; values only, the GPL CSS is not copied: L3).
  * GNOME 46 has no accent key in the portal, so on Ubuntu the theme name is
  * how the desktop's accent is known (E2's optional nicety).
@@ -68,7 +68,10 @@ export const YARU_ACCENTS: Record<string, string> = {
   purple: '7764d8',
   red: 'da3450',
   sage: '657b69',
-  viridian: '03875b'
+  viridian: '03875b',
+  // Ubuntu 26.04's variants.
+  wartybrown: '927050',
+  yellow: 'a86800'
 }
 
 /** `'Yaru-blue-dark'` → `0073e5`; anything that is not Yaru → null. */

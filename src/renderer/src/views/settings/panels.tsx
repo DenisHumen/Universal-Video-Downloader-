@@ -76,6 +76,7 @@ export const ACCENT_LABEL: Record<AccentChoice, TranslationKey> = {
   pink: 'prefs.accent.pink',
   purple: 'prefs.accent.purple',
   slate: 'prefs.accent.slate',
+  brown: 'prefs.accent.brown',
   system: 'prefs.accent.system'
 }
 
@@ -99,6 +100,7 @@ export function AppearancePanel({ settings, set }: PanelProps): JSX.Element {
           <StyleTiles
             label={t('prefs.group.style')}
             value={settings.theme as TileStyle}
+            accent={settings.accent === 'system' ? undefined : settings.accent}
             onChange={(v) => set('theme', v as ThemeId)}
             options={[
               { value: 'day', label: t('prefs.style.day') },

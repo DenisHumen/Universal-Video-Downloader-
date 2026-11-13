@@ -1,6 +1,6 @@
 /**
  * Derive the accent tokens (A1 §1, A1.2 Y1): fill, ink and label for each of
- * GNOME's nine accents, with Ubuntu's Yaru orange as "orange".
+ * GNOME's ten accents as Ubuntu 26.04 draws them, Yaru orange as "orange".
  *
  *   node scripts/accents.mjs          # print the table
  *   node scripts/accents.mjs --css    # print the index.css blocks
@@ -15,17 +15,25 @@
  */
 import { pathToFileURL } from 'url'
 
+/*
+  The accents as Ubuntu 26.04 draws them (GNOME 50, libadwaita 1.9 with Yaru):
+  Ubuntu's libadwaita overrides GNOME's palette with Yaru's own colours, and
+  GNOME 50 adds a tenth, brown. Read from the installed libadwaita stylesheet
+  (`--accent-*` in default-light-yaru-default.css), values only.
+*/
 export const GNOME_ACCENTS = {
-  blue: [53, 132, 228],
-  teal: [33, 144, 164],
-  green: [58, 148, 74],
+  blue: [0, 115, 229],
+  teal: [48, 130, 128],
+  green: [75, 133, 1],
   yellow: [200, 136, 0],
-  // Ubuntu's orange (#E95420), the Yaru accent the user's desktop runs, in GNOME's orange slot.
+  // Ubuntu's orange (#E95420), the Yaru accent and the default.
   orange: [233, 84, 32],
-  red: [230, 45, 66],
-  pink: [213, 97, 153],
-  purple: [145, 65, 172],
-  slate: [111, 131, 150]
+  red: [218, 52, 80],
+  pink: [179, 76, 179],
+  purple: [119, 100, 216],
+  slate: [101, 123, 105],
+  // New in GNOME 50; Ubuntu's Yaru "warty brown".
+  brown: [179, 145, 105]
 }
 
 const toLin = (c) => {
@@ -89,8 +97,8 @@ export const PLANES = {
   night: [
     [44, 44, 44],
     [61, 61, 61],
-    [48, 48, 48],
-    [46, 46, 46],
+    [57, 57, 57],
+    [50, 50, 50],
     [56, 56, 56]
   ]
 }

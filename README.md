@@ -32,7 +32,7 @@ and finds the stream itself on pages nobody wrote an extractor for.
 - **It works on pages other downloaders give up on.** The yt-dlp engine handles 1800+ sites. When it doesn't know a site, the app reads the page, then plays it in a hidden browser and catches the stream as it loads, with the headers the server asks for.
 - **It tells you what you'll get before you click.** The quality buttons come from what the video really has, and "best" says what it means: `2160p60 · HDR · MP4 · ≈ 1.2 GB`.
 - **It can do the whole job for a series.** Add a series to *New Episodes* and every new episode is downloaded, renamed, copied to a network share and announced in Telegram, without you opening the app.
-- **It looks like it belongs on your desktop.** Version 4 is designed after GNOME: a sidebar and header bar, boxed lists, Settings laid out like GNOME Settings, Ubuntu Sans and the Yaru orange accent, in a day and a night theme. It looks the same on Windows and macOS.
+- **It looks like it belongs on your desktop.** Version 4 is designed after GNOME 50 on Ubuntu 26.04: a compact sidebar and header bar, boxed lists, Settings laid out like GNOME Settings, Ubuntu Sans and the Yaru orange accent, in a day and a night theme. It looks the same on Windows and macOS.
 - **No account, no ads, no telemetry.** Everything runs on your computer. English and Russian interface.
 
 ## Install
@@ -114,7 +114,7 @@ uvd https://www.youtube.com/watch?v=jNQXAC9IVRw
 | **Sign-in videos** | Age-gated and members-only videos: sign in once in the built-in browser (Google included), bring the sign-ins over from Firefox, Chrome or another browser in one click, or use cookies from your browser or a `cookies.txt`. |
 | **Help** | Plain answers and a button that goes there: how to download, where the file went, signing in, what to do when something fails. In the main menu and <kbd>Ctrl</kbd>+<kbd>K</kbd>; a failed row links to the right answer. |
 | **Keyboard first** | <kbd>Ctrl</kbd>+<kbd>K</kbd> opens a command palette for any section, action, setting or recent download; <kbd>Ctrl</kbd>+<kbd>1</kbd>…<kbd>5</kbd> switch sections, <kbd>Ctrl</kbd>+<kbd>,</kbd> opens Settings. |
-| **Extras** | Subtitles, thumbnails and chapters embedded, SponsorBlock, per-site folders, filename template, speed limit, proxy, *Send to Share…* for any finished file, day and night themes with nine accent colours, notifications that open the right row, and a backup file that carries settings and watched series to a new computer. |
+| **Extras** | Subtitles, thumbnails and chapters embedded, SponsorBlock, per-site folders, filename template, speed limit, proxy, *Send to Share…* for any finished file, day and night themes with ten accent colours, notifications that open the right row, and a backup file that carries settings and watched series to a new computer. |
 
 ## Screenshots
 
@@ -188,7 +188,7 @@ Settings follow GNOME Settings: eight panels in a list on the left, subpages tha
 
 | Panel | What's there |
 | --- | --- |
-| **Appearance** | Style (day, night, or follow the system), accent colour (nine GNOME colours, or the system's), language |
+| **Appearance** | Style (day, night, or follow the system), accent colour (GNOME 50's ten colours as Ubuntu 26.04 draws them, brown included, or the system's), language |
 | **Downloading** | Folder, per-site subfolders, default mode and quality, audio format, parallel downloads, resume on launch, finished rows to keep, speed limit, playlist depth |
 | **Post-processing** | Embed thumbnail / metadata / chapters / subtitles, `.srt` files, subtitle languages, SponsorBlock, prefer H.264 + AAC, filename template |
 | **New Episodes** | Checking in the background; *Network Shares* (SMB) and *Telegram* as their own pages |

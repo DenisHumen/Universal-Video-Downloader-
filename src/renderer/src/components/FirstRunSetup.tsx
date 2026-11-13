@@ -122,6 +122,7 @@ function Steps({ settings, onClose }: { settings: AppSettings; onClose: () => vo
               <StyleTiles
                 label={t('prefs.group.style')}
                 value={settings.theme as TileStyle}
+                accent={settings.accent === 'system' ? undefined : settings.accent}
                 onChange={(v) => void save({ theme: v as ThemeId })}
                 options={[
                   { value: 'day', label: t('prefs.style.day') },

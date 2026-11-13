@@ -126,6 +126,7 @@ export const en = {
   'prefs.accent.pink': 'Pink',
   'prefs.accent.purple': 'Purple',
   'prefs.accent.slate': 'Slate',
+  'prefs.accent.brown': 'Brown',
   'prefs.accent.system': 'System Accent',
   'prefs.row.language': 'Language',
   'prefs.language.auto': 'Match the System',

@@ -119,6 +119,7 @@ export const ru: Dictionary = {
   'prefs.accent.pink': 'Розовый',
   'prefs.accent.purple': 'Фиолетовый',
   'prefs.accent.slate': 'Сланцевый',
+  'prefs.accent.brown': 'Коричневый',
   'prefs.accent.system': 'Цвет системы',
   'prefs.row.language': 'Язык',
   'prefs.language.auto': 'Как в системе',

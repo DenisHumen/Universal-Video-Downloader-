@@ -33,13 +33,17 @@ interface StyleTilesProps {
   value: TileStyle
   options: { value: TileStyle; label: string }[]
   onChange: (v: TileStyle) => void
+  /** The accent the miniatures are drawn in; not 'system', whose colour is only on the window. */
+  accent?: string
 }
 
 /** A thumbnail window in one theme (or split, for System), painted from that theme's tokens. */
-function Thumbnail({ theme }: { theme: TileStyle }): JSX.Element {
+function Thumbnail({ theme, accent }: { theme: TileStyle; accent?: string }): JSX.Element {
   const half = (t: 'day' | 'night', side?: 'left' | 'right'): ReactNode => (
     <span
       data-theme={t}
+      /* The theme attribute restarts the accent at orange; the miniature shows the one chosen. */
+      data-accent={accent}
       className={cx('ui-tile-window', side === 'left' && 'ui-tile-left', side === 'right' && 'ui-tile-right')}
       aria-hidden="true"
     >
@@ -62,7 +66,7 @@ function Thumbnail({ theme }: { theme: TileStyle }): JSX.Element {
   return <span className="ui-tile-frame">{half(theme)}</span>
 }
 
-export function StyleTiles({ label, value, options, onChange }: StyleTilesProps): JSX.Element {
+export function StyleTiles({ label, value, options, onChange, accent }: StyleTilesProps): JSX.Element {
   const values = options.map((o) => o.value)
   const { refs, onKeyDown } = useRadioKeys(values, value, onChange)
   return (
@@ -81,7 +85,7 @@ export function StyleTiles({ label, value, options, onChange }: StyleTilesProps)
             onClick={() => onChange(o.value)}
           >
             <span className="relative">
-              <Thumbnail theme={o.value} />
+              <Thumbnail theme={o.value} accent={accent} />
               {on && (
                 <span className="ui-tile-check" aria-hidden="true">
                   <Check size={12} />
