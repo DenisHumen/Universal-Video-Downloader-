@@ -46,3 +46,5 @@ tests/visual/.out/
 
 # The assembled website (npm run website)
 /site/
+# Private audit notes: they list weaknesses not yet fixed
+/docs/audit-*.md
