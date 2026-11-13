@@ -3,7 +3,7 @@ Universal Video Downloader - third-party notices
 
 Universal Video Downloader is free software under the MIT licence,
 Copyright (c) 2026 Denis Humen. Its source code is at
-https://github.com/DenisHumen/Universal-Video-Downloader-
+https://github.com/DenisHumen/Universal-Video-Downloader
 
 It ships, or fetches when it first runs, the software below. Each part keeps
 its own licence.
@@ -60,7 +60,7 @@ as long after that as a release containing it is offered for download, anyone
 who has it may ask for the complete corresponding source code of the FFmpeg
 build inside it - FFmpeg itself, the libraries compiled into it and the scripts
 that built it - and will be given access to download it at no charge. Ask by
-opening an issue at https://github.com/DenisHumen/Universal-Video-Downloader-/issues
+opening an issue at https://github.com/DenisHumen/Universal-Video-Downloader/issues
 
 
 ffmpeg-static 5.3.0 - GNU General Public License, version 3 or later

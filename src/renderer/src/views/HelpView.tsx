@@ -114,7 +114,7 @@ function Answer({ topic }: { topic: HelpTopic }): JSX.Element {
 }
 
 /** The steps for the extension, in the repository: it is not on any store, and that page can say so when it is. */
-const EXTENSION_GUIDE = 'https://github.com/DenisHumen/Universal-Video-Downloader-/tree/main/browser-extension#readme'
+const EXTENSION_GUIDE = 'https://github.com/DenisHumen/Universal-Video-Downloader/tree/main/browser-extension#readme'
 
 function ActionButton({ action }: { action: HelpAction }): JSX.Element {
   const t = useT()

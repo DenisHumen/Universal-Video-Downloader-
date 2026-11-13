@@ -1082,7 +1082,7 @@ export function LogsPage({ settings, set }: PanelProps): JSX.Element {
 
 /* ---------------------------------------------------------------- About (AdwAboutDialog layout) */
 
-const REPO = 'https://github.com/DenisHumen/Universal-Video-Downloader-'
+const REPO = 'https://github.com/DenisHumen/Universal-Video-Downloader'
 
 function debugInfo(info: ReturnType<typeof useStore.getState>['appInfo'], engine: string | undefined): string {
   return [

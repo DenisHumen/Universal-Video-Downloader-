@@ -232,5 +232,5 @@ rpm:
 publish:
   provider: github
   owner: DenisHumen
-  repo: Universal-Video-Downloader-
+  repo: Universal-Video-Downloader
   releaseType: draft

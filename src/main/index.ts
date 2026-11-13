@@ -508,12 +508,12 @@ function buildMenu(): void {
       submenu: [
         {
           label: mt('menu.github'),
-          click: () => shell.openExternal('https://github.com/DenisHumen/Universal-Video-Downloader-')
+          click: () => shell.openExternal('https://github.com/DenisHumen/Universal-Video-Downloader')
         },
         {
           label: mt('menu.issue'),
           click: () =>
-            shell.openExternal('https://github.com/DenisHumen/Universal-Video-Downloader-/issues/new')
+            shell.openExternal('https://github.com/DenisHumen/Universal-Video-Downloader/issues/new')
         }
       ]
     }

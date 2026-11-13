@@ -41,7 +41,7 @@ import { normalizeUrl } from './urls'
 export const REPORT_TARGET = {
   address: 'denis@krokosha.com',
   endpoint: 'https://formsubmit.co/ajax/denis@krokosha.com',
-  formUrl: 'https://github.com/DenisHumen/Universal-Video-Downloader-'
+  formUrl: 'https://github.com/DenisHumen/Universal-Video-Downloader'
 } as const
 
 // ---------------------------------------------------------------------------

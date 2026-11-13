@@ -1,7 +1,7 @@
 # Send to Universal Video Downloader
 
 A browser extension with one job: send the current page, or a link you right-click, to the
-[Universal Video Downloader](https://github.com/DenisHumen/Universal-Video-Downloader-) app by opening
+[Universal Video Downloader](https://github.com/DenisHumen/Universal-Video-Downloader) app by opening
 `uvd://open?url=<link>`. The app then shows the link in a strip at the top of its window, and nothing happens
 until you press **Use It** there. Nothing downloads by itself, whatever the app's settings say.
 

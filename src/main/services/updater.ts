@@ -31,9 +31,9 @@ let loading: Promise<AppUpdater> | null = null
 
 export const updateEvents = new EventEmitter()
 
-export const RELEASES_PAGE = 'https://github.com/DenisHumen/Universal-Video-Downloader-/releases/latest'
+export const RELEASES_PAGE = 'https://github.com/DenisHumen/Universal-Video-Downloader/releases/latest'
 const RELEASES_API =
-  'https://api.github.com/repos/DenisHumen/Universal-Video-Downloader-/releases/latest'
+  'https://api.github.com/repos/DenisHumen/Universal-Video-Downloader/releases/latest'
 
 let currentStatus: UpdateStatus = { state: 'idle' }
 

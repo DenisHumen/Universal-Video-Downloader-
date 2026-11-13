@@ -79,6 +79,18 @@ else
     chmod 0755 '/opt/${sanitizedProductName}/chrome-sandbox' || true
 fi
 
+# The repository was renamed: Universal-Video-Downloader- (with a dash at the
+# end) became Universal-Video-Downloader. GitHub sends the old release address
+# on to the new one, but not the old Pages address the dnf repository lives on,
+# so a system set up from the old README is moved to the new address here, once,
+# by the package itself. Only the files the README told people to create, and
+# only the old name in them.
+for list in /etc/yum.repos.d/universal-video-downloader.repo /etc/zypp/repos.d/universal-video-downloader.repo /etc/apt/sources.list.d/universal-video-downloader.list; do
+    if [ -f "$list" ] && grep -q 'Universal-Video-Downloader-/' "$list"; then
+        sed -i 's|Universal-Video-Downloader-/|Universal-Video-Downloader/|g' "$list" || true
+    fi
+done
+
 # A profile that would not load must not leave the package half-configured: the
 # fallback above already keeps the app able to start.
 exit 0

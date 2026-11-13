@@ -13,7 +13,7 @@ import {
 } from './updater-rules'
 
 const NOW = Date.UTC(2026, 9, 6, 12, 0, 0)
-const BASE = 'https://github.com/DenisHumen/Universal-Video-Downloader-/releases/download/v3.25.0'
+const BASE = 'https://github.com/DenisHumen/Universal-Video-Downloader/releases/download/v3.25.0'
 
 /** The files a release carries, as release.yml uploads them. */
 const ASSETS: ReleaseAsset[] = [

@@ -8,12 +8,12 @@ pkgver=@VERSION@
 pkgrel=1
 pkgdesc="Detect and download video from almost any website - a desktop app around yt-dlp and ffmpeg"
 arch=('x86_64')
-url="https://github.com/DenisHumen/Universal-Video-Downloader-"
+url="https://github.com/DenisHumen/Universal-Video-Downloader"
 license=('MIT')
 depends=('gtk3' 'nss' 'alsa-lib' 'libxss' 'libxtst' 'xdg-utils' 'libnotify' 'libsecret')
 provides=('universal-video-downloader')
 conflicts=('universal-video-downloader')
-source=("https://github.com/DenisHumen/Universal-Video-Downloader-/releases/download/v${pkgver}/Universal-Video-Downloader-${pkgver}-linux-amd64.deb")
+source=("https://github.com/DenisHumen/Universal-Video-Downloader/releases/download/v${pkgver}/Universal-Video-Downloader-${pkgver}-linux-amd64.deb")
 sha256sums=('@SHA256@')
 
 package() {

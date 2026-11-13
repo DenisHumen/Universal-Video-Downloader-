@@ -8,12 +8,12 @@
 Бесплатное приложение для Windows, macOS и Linux: скачивает видео с YouTube и ещё 1800+ сайтов,<br />
 а на страницах, для которых никто не написал поддержку, находит видео само.
 
-[![Скачать для Windows](https://img.shields.io/badge/скачать-Windows-e95420?style=for-the-badge)](https://github.com/DenisHumen/Universal-Video-Downloader-/releases/latest)
-[![Скачать для macOS](https://img.shields.io/badge/скачать-macOS-e95420?style=for-the-badge)](https://github.com/DenisHumen/Universal-Video-Downloader-/releases/latest)
+[![Скачать для Windows](https://img.shields.io/badge/скачать-Windows-e95420?style=for-the-badge)](https://github.com/DenisHumen/Universal-Video-Downloader/releases/latest)
+[![Скачать для macOS](https://img.shields.io/badge/скачать-macOS-e95420?style=for-the-badge)](https://github.com/DenisHumen/Universal-Video-Downloader/releases/latest)
 [![Скачать для Linux](https://img.shields.io/badge/скачать-Linux-e95420?style=for-the-badge)](#linux)
 
-[![Последняя версия](https://img.shields.io/github/v/release/DenisHumen/Universal-Video-Downloader-?label=версия&color=27272c)](https://github.com/DenisHumen/Universal-Video-Downloader-/releases/latest)
-[![Загрузки](https://img.shields.io/github/downloads/DenisHumen/Universal-Video-Downloader-/total?label=загрузки&color=27272c)](https://github.com/DenisHumen/Universal-Video-Downloader-/releases)
+[![Последняя версия](https://img.shields.io/github/v/release/DenisHumen/Universal-Video-Downloader?label=версия&color=27272c)](https://github.com/DenisHumen/Universal-Video-Downloader/releases/latest)
+[![Загрузки](https://img.shields.io/github/downloads/DenisHumen/Universal-Video-Downloader/total?label=загрузки&color=27272c)](https://github.com/DenisHumen/Universal-Video-Downloader/releases)
 [![Лицензия MIT](https://img.shields.io/badge/лицензия-MIT-27272c)](LICENSE)
 
 [English](README.md) · **Русский**
@@ -32,6 +32,7 @@
 - **Работает там, где другие сдаются.** Программа yt-dlp знает 1800+ сайтов. Если сайт ей незнаком, приложение читает страницу, а потом открывает её в скрытом браузере и ловит видео в момент загрузки.
 - **Говорит, что вы получите, ещё до нажатия.** Кнопки качества берутся из того, что у видео есть на самом деле, а «лучшее» объясняет, что это значит: `2160p60 · HDR · MP4 · ≈ 1.2 GB`.
 - **Может вести сериал целиком.** Добавьте сериал в «Новые серии», и каждая новая серия скачается, переименуется, уедет в сетевую папку и придёт уведомлением в Telegram, даже если приложение не открыто.
+- **Сайт:** [denishumen.github.io/Universal-Video-Downloader](https://denishumen.github.io/Universal-Video-Downloader/) сам подбирает загрузку для вашего компьютера и показывает все версии.
 - **Выглядит как родное приложение.** Версия 4 сделана по образцу GNOME 50 в Ubuntu 26.04: компактная боковая панель и заголовок, списки-карточки, настройки устроены как «Параметры» GNOME, шрифт Ubuntu Sans и оранжевый акцент Yaru, дневная и ночная темы. На Windows и macOS выглядит так же.
 - **Без аккаунта, рекламы и телеметрии.** Всё работает на вашем компьютере. Интерфейс на русском и английском.
 
@@ -39,10 +40,10 @@
 
 | Платформа | Скачать | |
 | --- | --- | --- |
-| **Windows 10 / 11** | [`…-windows-x64-setup.exe`](https://github.com/DenisHumen/Universal-Video-Downloader-/releases/latest) | обновляется само |
-| **macOS 13+**, Apple silicon | [`…-mac-arm64.dmg`](https://github.com/DenisHumen/Universal-Video-Downloader-/releases/latest) | см. [первый запуск](#macos-приложение-повреждено-и-не-может-быть-открыто) |
-| **macOS 13+**, Intel | [`…-mac-x64.dmg`](https://github.com/DenisHumen/Universal-Video-Downloader-/releases/latest) | |
-| **Linux** | [apt или dnf](#linux) (лучше всего), либо [`.deb` / `.rpm` / `.AppImage`](https://github.com/DenisHumen/Universal-Video-Downloader-/releases/latest) | обновляется вместе с системой |
+| **Windows 10 / 11** | [`…-windows-x64-setup.exe`](https://github.com/DenisHumen/Universal-Video-Downloader/releases/latest) | обновляется само |
+| **macOS 13+**, Apple silicon | [`…-mac-arm64.dmg`](https://github.com/DenisHumen/Universal-Video-Downloader/releases/latest) | см. [первый запуск](#macos-приложение-повреждено-и-не-может-быть-открыто) |
+| **macOS 13+**, Intel | [`…-mac-x64.dmg`](https://github.com/DenisHumen/Universal-Video-Downloader/releases/latest) | |
+| **Linux** | [apt или dnf](#linux) (лучше всего), либо [`.deb` / `.rpm` / `.AppImage`](https://github.com/DenisHumen/Universal-Video-Downloader/releases/latest) | обновляется вместе с системой |
 
 При первом запуске приложение скачает программу yt-dlp (около 30 МБ) и дальше само будет его обновлять, а затем в фоне — Deno (около 40 МБ, 100 МБ на диске), изолированную программу, которая нужна yt-dlp, чтобы YouTube показывал все качества; ffmpeg уже встроен. Короткая первая настройка спросит, куда сохранять и какие тему и акцент вы хотите; любой шаг можно пропустить. Потом вставьте ссылку, выберите качество и нажмите **Скачать**. Файлы попадают в папку *Загрузки*. Заблудились? *Справка* в главном меню простыми словами отвечает на первые вопросы, и интернет ей не нужен.
 
@@ -51,15 +52,15 @@
 Ubuntu, Debian, Mint:
 
 ```bash
-curl -fsSL https://denishumen.github.io/Universal-Video-Downloader-/uvd.gpg | sudo tee /usr/share/keyrings/uvd.gpg > /dev/null
-echo "deb [arch=amd64 signed-by=/usr/share/keyrings/uvd.gpg] https://github.com/DenisHumen/Universal-Video-Downloader-/releases/latest/download/ ./" | sudo tee /etc/apt/sources.list.d/universal-video-downloader.list
+curl -fsSL https://denishumen.github.io/Universal-Video-Downloader/uvd.gpg | sudo tee /usr/share/keyrings/uvd.gpg > /dev/null
+echo "deb [arch=amd64 signed-by=/usr/share/keyrings/uvd.gpg] https://github.com/DenisHumen/Universal-Video-Downloader/releases/latest/download/ ./" | sudo tee /etc/apt/sources.list.d/universal-video-downloader.list
 sudo apt update && sudo apt install universal-video-downloader
 ```
 
 Fedora, RHEL, openSUSE (в openSUSE файл кладётся в `/etc/zypp/repos.d/`):
 
 ```bash
-sudo curl -fsSL -o /etc/yum.repos.d/universal-video-downloader.repo https://denishumen.github.io/Universal-Video-Downloader-/universal-video-downloader.repo
+sudo curl -fsSL -o /etc/yum.repos.d/universal-video-downloader.repo https://denishumen.github.io/Universal-Video-Downloader/universal-video-downloader.repo
 sudo dnf install universal-video-downloader
 ```
 
@@ -142,7 +143,7 @@ uvd https://www.youtube.com/watch?v=jNQXAC9IVRw
 1. **Откройте встроенный браузер.** Откройте страницу в нём и нажмите play; всё, что она воспроизводит, появится в боковой панели. Закрытый баннер согласия или выполненный вход запоминаются, и загрузки идут с этим входом, если другие cookies не выбраны.
 2. **Включите cookies.** *Настройки → Доступ и cookies*, выберите браузер, в котором вы вошли в аккаунт. Проверка возраста, вход и «только для подписчиков» перестанут мешать. Закройте этот браузер на время скачивания: он блокирует свою базу cookies.
 3. **Отправьте отчёт.** Когда ссылка не сработала, приложение предложит отправить разработчику ссылку, ошибку и технические подробности. Без вашего клика ничего не уходит, а пути, пароли и токены вырезаются заранее.
-4. **Или [заведите issue](https://github.com/DenisHumen/Universal-Video-Downloader-/issues/new)** со ссылкой и *техническими подробностями* из её строки в разделе *Загрузки*.
+4. **Или [заведите issue](https://github.com/DenisHumen/Universal-Video-Downloader/issues/new)** со ссылкой и *техническими подробностями* из её строки в разделе *Загрузки*.
 
 ## Подробнее
 

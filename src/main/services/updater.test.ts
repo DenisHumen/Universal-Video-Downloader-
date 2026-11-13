@@ -222,8 +222,8 @@ describe('checkForUpdates', () => {
 
   it('points a Mac at its own disk image, and keeps the page for "open the downloads page"', async () => {
     const { updater } = await load('darwin')
-    const base = 'https://github.com/DenisHumen/Universal-Video-Downloader-/releases/download/v3.25.0'
-    const page = 'https://github.com/DenisHumen/Universal-Video-Downloader-/releases/tag/v3.25.0'
+    const base = 'https://github.com/DenisHumen/Universal-Video-Downloader/releases/download/v3.25.0'
+    const page = 'https://github.com/DenisHumen/Universal-Video-Downloader/releases/tag/v3.25.0'
     github(200, {
       tag_name: 'v3.25.0',
       html_url: page,
@@ -245,7 +245,7 @@ describe('checkForUpdates', () => {
 
   it('falls back to the release page when no file matches', async () => {
     const { updater } = await load('darwin')
-    const page = 'https://github.com/DenisHumen/Universal-Video-Downloader-/releases/tag/v3.25.0'
+    const page = 'https://github.com/DenisHumen/Universal-Video-Downloader/releases/tag/v3.25.0'
     github(200, { tag_name: 'v3.25.0', html_url: page, assets: [] })
 
     await updater.checkForUpdates()

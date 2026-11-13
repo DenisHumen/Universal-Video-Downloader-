@@ -8,12 +8,12 @@
 A free desktop app for Windows, macOS and Linux that downloads video from YouTube and 1800+ other sites,<br />
 and finds the stream itself on pages nobody wrote an extractor for.
 
-[![Download for Windows](https://img.shields.io/badge/download-Windows-e95420?style=for-the-badge)](https://github.com/DenisHumen/Universal-Video-Downloader-/releases/latest)
-[![Download for macOS](https://img.shields.io/badge/download-macOS-e95420?style=for-the-badge)](https://github.com/DenisHumen/Universal-Video-Downloader-/releases/latest)
+[![Download for Windows](https://img.shields.io/badge/download-Windows-e95420?style=for-the-badge)](https://github.com/DenisHumen/Universal-Video-Downloader/releases/latest)
+[![Download for macOS](https://img.shields.io/badge/download-macOS-e95420?style=for-the-badge)](https://github.com/DenisHumen/Universal-Video-Downloader/releases/latest)
 [![Download for Linux](https://img.shields.io/badge/download-Linux-e95420?style=for-the-badge)](#linux)
 
-[![Latest release](https://img.shields.io/github/v/release/DenisHumen/Universal-Video-Downloader-?label=latest&color=27272c)](https://github.com/DenisHumen/Universal-Video-Downloader-/releases/latest)
-[![Downloads](https://img.shields.io/github/downloads/DenisHumen/Universal-Video-Downloader-/total?color=27272c)](https://github.com/DenisHumen/Universal-Video-Downloader-/releases)
+[![Latest release](https://img.shields.io/github/v/release/DenisHumen/Universal-Video-Downloader?label=latest&color=27272c)](https://github.com/DenisHumen/Universal-Video-Downloader/releases/latest)
+[![Downloads](https://img.shields.io/github/downloads/DenisHumen/Universal-Video-Downloader/total?color=27272c)](https://github.com/DenisHumen/Universal-Video-Downloader/releases)
 [![License: MIT](https://img.shields.io/badge/license-MIT-27272c)](LICENSE)
 
 **English** · [Русский](README.ru.md)
@@ -32,6 +32,7 @@ and finds the stream itself on pages nobody wrote an extractor for.
 - **It works on pages other downloaders give up on.** The yt-dlp engine handles 1800+ sites. When it doesn't know a site, the app reads the page, then plays it in a hidden browser and catches the stream as it loads, with the headers the server asks for.
 - **It tells you what you'll get before you click.** The quality buttons come from what the video really has, and "best" says what it means: `2160p60 · HDR · MP4 · ≈ 1.2 GB`.
 - **It can do the whole job for a series.** Add a series to *New Episodes* and every new episode is downloaded, renamed, copied to a network share and announced in Telegram, without you opening the app.
+- **Website:** [denishumen.github.io/Universal-Video-Downloader](https://denishumen.github.io/Universal-Video-Downloader/) picks the right download for your computer and lists every version.
 - **It looks like it belongs on your desktop.** Version 4 is designed after GNOME 50 on Ubuntu 26.04: a compact sidebar and header bar, boxed lists, Settings laid out like GNOME Settings, Ubuntu Sans and the Yaru orange accent, in a day and a night theme. It looks the same on Windows and macOS.
 - **No account, no ads, no telemetry.** Everything runs on your computer. English and Russian interface.
 
@@ -39,10 +40,10 @@ and finds the stream itself on pages nobody wrote an extractor for.
 
 | Platform | Download | |
 | --- | --- | --- |
-| **Windows 10 / 11** | [`…-windows-x64-setup.exe`](https://github.com/DenisHumen/Universal-Video-Downloader-/releases/latest) | updates itself |
-| **macOS 13+**, Apple silicon | [`…-mac-arm64.dmg`](https://github.com/DenisHumen/Universal-Video-Downloader-/releases/latest) | see [the first-launch note](#macos-the-app-is-damaged-and-cant-be-opened) |
-| **macOS 13+**, Intel | [`…-mac-x64.dmg`](https://github.com/DenisHumen/Universal-Video-Downloader-/releases/latest) | |
-| **Linux** | [apt or dnf](#linux) (recommended), or the [`.deb` / `.rpm` / `.AppImage`](https://github.com/DenisHumen/Universal-Video-Downloader-/releases/latest) | updates with the system |
+| **Windows 10 / 11** | [`…-windows-x64-setup.exe`](https://github.com/DenisHumen/Universal-Video-Downloader/releases/latest) | updates itself |
+| **macOS 13+**, Apple silicon | [`…-mac-arm64.dmg`](https://github.com/DenisHumen/Universal-Video-Downloader/releases/latest) | see [the first-launch note](#macos-the-app-is-damaged-and-cant-be-opened) |
+| **macOS 13+**, Intel | [`…-mac-x64.dmg`](https://github.com/DenisHumen/Universal-Video-Downloader/releases/latest) | |
+| **Linux** | [apt or dnf](#linux) (recommended), or the [`.deb` / `.rpm` / `.AppImage`](https://github.com/DenisHumen/Universal-Video-Downloader/releases/latest) | updates with the system |
 
 On first launch the app downloads the yt-dlp engine (about 30 MB) and keeps it up to date, then in the background the sandboxed Deno runtime (about 40 MB, 100 MB unpacked) that yt-dlp needs for YouTube's full choice of qualities; ffmpeg is built in. A short first-run setup asks where to save and which theme and accent you like; every step can be skipped. Then paste a link, pick the quality and press **Download**. Files go to your *Downloads* folder. Lost? *Help* in the main menu answers the first questions in plain words, without the internet.
 
@@ -51,15 +52,15 @@ On first launch the app downloads the yt-dlp engine (about 30 MB) and keeps it u
 Ubuntu, Debian, Mint:
 
 ```bash
-curl -fsSL https://denishumen.github.io/Universal-Video-Downloader-/uvd.gpg | sudo tee /usr/share/keyrings/uvd.gpg > /dev/null
-echo "deb [arch=amd64 signed-by=/usr/share/keyrings/uvd.gpg] https://github.com/DenisHumen/Universal-Video-Downloader-/releases/latest/download/ ./" | sudo tee /etc/apt/sources.list.d/universal-video-downloader.list
+curl -fsSL https://denishumen.github.io/Universal-Video-Downloader/uvd.gpg | sudo tee /usr/share/keyrings/uvd.gpg > /dev/null
+echo "deb [arch=amd64 signed-by=/usr/share/keyrings/uvd.gpg] https://github.com/DenisHumen/Universal-Video-Downloader/releases/latest/download/ ./" | sudo tee /etc/apt/sources.list.d/universal-video-downloader.list
 sudo apt update && sudo apt install universal-video-downloader
 ```
 
 Fedora, RHEL, openSUSE (on openSUSE the file goes to `/etc/zypp/repos.d/`):
 
 ```bash
-sudo curl -fsSL -o /etc/yum.repos.d/universal-video-downloader.repo https://denishumen.github.io/Universal-Video-Downloader-/universal-video-downloader.repo
+sudo curl -fsSL -o /etc/yum.repos.d/universal-video-downloader.repo https://denishumen.github.io/Universal-Video-Downloader/universal-video-downloader.repo
 sudo dnf install universal-video-downloader
 ```
 
@@ -142,7 +143,7 @@ uvd https://www.youtube.com/watch?v=jNQXAC9IVRw
 1. **Use the built-in browser.** Open the page there and press play; every stream it requests appears in the side panel. A consent banner you dismiss or a login you complete is remembered, and downloads use that login whenever no other cookies are set.
 2. **Switch on cookies.** *Settings → Access & Cookies*, then pick the browser you're signed in with. Age gates, login walls and "members only" go away. Close that browser while downloading; it locks its cookie database.
 3. **Send a report.** When a link fails, the app offers to send the developer the link, the error and the engine's output. Nothing is sent unless you click, and paths, passwords and tokens are removed first.
-4. **Or [open an issue](https://github.com/DenisHumen/Universal-Video-Downloader-/issues/new)** with the link and the *Technical Details* from its row in *My Downloads*.
+4. **Or [open an issue](https://github.com/DenisHumen/Universal-Video-Downloader/issues/new)** with the link and the *Technical Details* from its row in *My Downloads*.
 
 ## More detail
 
